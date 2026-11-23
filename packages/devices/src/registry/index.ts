@@ -1,20 +1,7 @@
 /** The Devices: this computer's own Device row, and on a Host the Devices that paired with it, their presence and its audit. */
 
-export { machineFingerprint } from "./machine";
+export type { DevicePresence, PairedDevice } from "./domain/paired-device";
 export {
-	createDeviceRegistry,
-	type DevicePresence,
 	type DeviceRegistry,
-	deviceNamesOf,
-	homePersonsOf,
-	knownDevices,
-	type PairedDevice,
-} from "./registry";
-export {
-	adoptSelfDevice,
-	defaultSelfDeviceHost,
-	inContainer,
-	selfDevice,
-	selfOwnerId,
-	setSelfOwner,
-} from "./self-device";
+	wireRegistry,
+} from "./wire";

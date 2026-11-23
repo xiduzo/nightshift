@@ -13,7 +13,7 @@ import {
 	deviceRowsOn,
 } from "@nightshift/engine/testing";
 import { eq } from "drizzle-orm";
-import { createDeviceRegistry, setSelfOwner } from "../registry";
+import { createDeviceRegistry, setSelfOwner } from "../registry/test-support";
 import { createHost, type Host } from "./host";
 
 /**

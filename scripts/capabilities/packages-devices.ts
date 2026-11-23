@@ -12,6 +12,9 @@ export const PACKAGE_DEVICES: Record<string, Place> = {
 	host: "devices",
 	// The outbound connection to a Host. A port with its adapter.
 	links: M,
+	// This computer as its operating system shows it: the fingerprint of
+	// its hardware, its host name, whether it is a container.
+	machine: M,
 	// This computer's membership of its home Host.
 	membership: "devices",
 	offers: "devices",

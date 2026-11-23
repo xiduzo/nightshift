@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { machineFingerprint, parseIoreg, parseMachineGuid } from "./machine";
+import {
+	machineFingerprint,
+	parseIoreg,
+	parseMachineGuid,
+} from "./fingerprint";
 
 const reads = (id: string | null) => ({
 	container: false,

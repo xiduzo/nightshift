@@ -27,10 +27,9 @@ import {
 import { createPrivatePaths, createWalkers } from "./peers";
 import { createPlacement } from "./placement";
 import {
-	createDeviceRegistry,
 	type DevicePresence,
 	type DeviceRegistry,
-	deviceNamesOf,
+	wireRegistry,
 } from "./registry";
 
 /** What the peers take beside the engine's own parts. */
@@ -138,8 +137,8 @@ export function createPeers(
 	const { device, history, documents, now } = context;
 	const { db, dataDir } = own;
 	const { relay } = options;
-	const registry = createDeviceRegistry({
-		db,
+	const rows = wireRegistry({ db });
+	const registry = rows.paired({
 		logFact: context.logFact,
 		history,
 		deviceRows: context.deviceRows,
@@ -157,6 +156,7 @@ export function createPeers(
 	 */
 	const admission = createOfferAdmission({
 		db,
+		selfOwnerId: registry.selfOwnerId,
 		device,
 		documents,
 		projects: context.projects,
@@ -240,7 +240,7 @@ export function createPeers(
 		},
 		runs: {
 			walkers: createWalkers({
-				names: (ids) => deviceNamesOf(db, ids),
+				names: (ids) => rows.listDeviceNames({ ids }),
 				walkerId: context.walkerId,
 				device,
 				documents,

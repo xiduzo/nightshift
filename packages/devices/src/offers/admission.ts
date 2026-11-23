@@ -17,7 +17,6 @@ import { isAgentProfile, type ProfileSettings } from "@nightshift/flows";
 import { Refusal, wordsFor } from "@nightshift/refusal";
 import type { WorkRelay, WorkReply, WorkRequest } from "../contract";
 import { createHostSpaces, personInSpace, personOnHost } from "../links";
-import { selfOwnerId } from "../registry";
 import { remoteDevice, serveWork } from "../work";
 import type { OfferedSessions } from "./engine-offers";
 import { createOfferUse, type OfferUse, offerKey } from "./offer-use";
@@ -114,6 +113,8 @@ export type OfferAdmission = {
 
 export function createOfferAdmission(deps: {
 	db: Database;
+	/** The Person who owns this computer, or null (`DeviceRegistry.selfOwnerId` of `registry`). */
+	selfOwnerId: () => Promise<string | null>;
 	/** This computer as a Device: it serves every admitted call. */
 	device: Device;
 	documents: SpaceDocuments;
@@ -150,7 +151,7 @@ export function createOfferAdmission(deps: {
 
 	/** This computer's owner, as the Space's Host knows them. */
 	async function ownerHere(spaceId: string): Promise<string | null> {
-		return personInSpace(db, spaceId, await selfOwnerId(db));
+		return personInSpace(db, spaceId, await deps.selfOwnerId());
 	}
 
 	/**
@@ -166,7 +167,7 @@ export function createOfferAdmission(deps: {
 		if ("hostId" in via) {
 			return hostOf === via.hostId ? personOnHost(db, spaceId) : undefined;
 		}
-		return hostOf === null ? selfOwnerId(db) : undefined;
+		return hostOf === null ? deps.selfOwnerId() : undefined;
 	}
 
 	/** Why a call is refused, or what it runs under: null for its owner's run, else the Offers in force. */

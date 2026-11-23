@@ -12,7 +12,8 @@ import {
 import { asc, eq } from "drizzle-orm";
 import { createHostLinks, deviceKeyStore } from "../links";
 import { SECOND_HOME } from "../links/host-links";
-import { createDeviceRegistry, type DeviceRegistry } from "./registry";
+import type { DeviceRegistry } from ".";
+import { createDeviceRegistry } from "./test-support";
 
 let sandbox: Sandbox;
 let ownerId: string;

@@ -23,7 +23,7 @@ import {
 	type PairingRedeemed,
 	type PairingStart,
 } from "../contract";
-import { type DeviceRegistry, selfOwnerId } from "../registry";
+import type { DeviceRegistry } from "../registry";
 import { admission } from "./keyed-call";
 import type { PairingReviewView } from "./types";
 
@@ -110,7 +110,7 @@ export function createHost(deps: {
 				d.id !== key.deviceId && d.revokedAt === null && d.homeHost !== null,
 		);
 		const host =
-			(await selfOwnerId(deps.db)) === key.personId
+			(await registry.selfOwnerId()) === key.personId
 				? [{ id: deps.self.id, name: deps.self.name }]
 				: [];
 		return [...host, ...others.map((d) => ({ id: d.id, name: d.name }))];

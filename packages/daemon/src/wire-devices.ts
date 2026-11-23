@@ -1,13 +1,10 @@
 import type { Database } from "@nightshift/db";
 import {
-	defaultSelfDeviceHost,
 	deviceDirectory,
 	machineFingerprint,
-	selfDevice,
-	selfOwnerId,
 	servedDocuments,
-	setSelfOwner,
 	startDevices,
+	wireRegistry,
 } from "@nightshift/devices";
 import { documentRows } from "@nightshift/engine";
 import { isThisComputer } from "./http";
@@ -29,15 +26,16 @@ type Sessions = Parameters<typeof servedDocuments>[0]["sessions"];
  * devices start. Nothing is read until a call asks.
  */
 export function openRegistry(db: Database, options: { dev: boolean }) {
+	const registry = wireRegistry({ db });
 	return {
 		/** Every Device this Replica knows, by id. */
 		directory: deviceDirectory(db),
 		/** This computer's Device: the Walker of its runs, the owner of its Clones. */
-		self: () => selfDevice(db, defaultSelfDeviceHost({ dev: options.dev })),
+		self: () => registry.ensureSelfDevice({ dev: options.dev }),
 		/** The Person this computer's Device names, and how to name another. */
 		owner: {
-			ownerId: () => selfOwnerId(db),
-			setOwner: (personId: string) => setSelfOwner(db, personId),
+			ownerId: () => registry.readSelfOwner(),
+			setOwner: (personId: string) => registry.setSelfOwner({ personId }),
 		},
 	};
 }

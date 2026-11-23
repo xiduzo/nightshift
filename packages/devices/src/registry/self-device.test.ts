@@ -13,7 +13,7 @@ import {
 	hostDeviceName,
 	isContainerId,
 	selfDevice,
-} from "./self-device";
+} from "./test-support";
 
 let sandbox: Sandbox;
 beforeEach(async () => {

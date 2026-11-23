@@ -53,16 +53,9 @@ export {
 	servedDocuments,
 } from "./host";
 export type { HostRole, JoinProgress, OpenDocumentChannel } from "./links";
+export { inContainer, machineFingerprint } from "./machine";
 export type { Offers, OfferView, SpaceDeviceView } from "./offers";
-export {
-	defaultSelfDeviceHost,
-	inContainer,
-	machineFingerprint,
-	type PairedDevice,
-	selfDevice,
-	selfOwnerId,
-	setSelfOwner,
-} from "./registry";
+export { type PairedDevice, wireRegistry } from "./registry";
 export { startDevices } from "./wire";
 export { deviceDirectory } from "./wire-peers-directory";
 export type { PeerEngine } from "./wire-peers-engine";

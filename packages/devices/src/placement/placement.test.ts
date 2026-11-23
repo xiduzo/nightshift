@@ -55,6 +55,7 @@ import {
 } from "../contract";
 import { createHostSpaces } from "../links";
 import { type DeviceOffer, NO_STARTER } from "../offers";
+import { selfOwnerId } from "../registry/test-support";
 import { withPeers } from "../testing";
 import { deviceDirectory } from "../wire-peers-directory";
 import { createPeerEngine, type PeerEngine } from "../wire-peers-engine";
@@ -1392,7 +1393,7 @@ describe("the owner's other Devices in a Space of the home Host", () => {
 			walkerId: async () => b.deviceId,
 			profiles: NO_PROFILES,
 			keptDevice: async () => null,
-			registry: {} as never,
+			registry: { selfOwnerId: () => selfOwnerId(b.db) } as never,
 			documents: spaceDocuments,
 			hostSpaces: createHostSpaces(b.db),
 			// The laptop has a Clone, as the Space document B keeps says.
@@ -1520,7 +1521,7 @@ describe("a Device of the plan, by id", () => {
 			walkerId: async () => a.deviceId,
 			profiles: NO_PROFILES,
 			keptDevice: async () => null,
-			registry: {} as never,
+			registry: { selfOwnerId: () => selfOwnerId(a.db) } as never,
 			documents,
 			hostSpaces: createHostSpaces(a.db),
 			projects: NO_PROJECTS,
@@ -1562,7 +1563,7 @@ describe("a run with no starter", () => {
 			walkerId: async () => a.deviceId,
 			profiles: NO_PROFILES,
 			keptDevice: async () => null,
-			registry: {} as never,
+			registry: { selfOwnerId: () => selfOwnerId(a.db) } as never,
 			documents,
 			hostSpaces: createHostSpaces(a.db),
 			projects: NO_PROJECTS,

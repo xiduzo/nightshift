@@ -15,7 +15,7 @@ import { isAgentProfile } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { now } from "@nightshift/time";
 import { createHostSpaces, personInSpace } from "../links";
-import { type DeviceRegistry, homePersonsOf } from "../registry";
+import type { DeviceRegistry } from "../registry";
 import type { EngineOffers } from "./engine-offers";
 import {
 	deviceOffers,
@@ -52,7 +52,7 @@ export function createOffers(deps: {
 	 */
 	engine: Engine & {
 		offers: EngineOffers;
-		devices: Pick<DeviceRegistry, "get">;
+		devices: Pick<DeviceRegistry, "get" | "homePersons">;
 		members: {
 			name(spaceId: string, personId: string): Promise<string | null>;
 		};
@@ -73,7 +73,7 @@ export function createOffers(deps: {
 	 * it is, as "Personal of <name>", by name.
 	 */
 	async function theirPersonals(): Promise<OfferSpace[]> {
-		const persons = (await homePersonsOf(db)).filter(
+		const persons = (await engine.devices.homePersons()).filter(
 			(person) => person !== deps.ownerId,
 		);
 		const names = await personNames(db, persons);

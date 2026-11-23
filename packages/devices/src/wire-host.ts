@@ -6,7 +6,6 @@ import { createDevices, createHost, type Host } from "./host";
 import type { DeviceKeyStore, DeviceLinks, HostLinks } from "./links";
 import type { HomeMembership } from "./membership";
 import type { Reach } from "./reach";
-import { adoptSelfDevice } from "./registry";
 import type { PeerEngine } from "./wire-peers-engine";
 import type { SecretsOfDevices } from "./wire-secrets";
 
@@ -74,7 +73,7 @@ export function wireDevices(
 		membership: HomeMembership;
 	},
 ) {
-	const { db, self } = deps;
+	const { self } = deps;
 	return createDevices({
 		host: at.host,
 		links: at.links,
@@ -85,8 +84,7 @@ export function wireDevices(
 		identity: {
 			machine: at.machine,
 			keysOf: at.keysOf,
-			adopt: (deviceId, walkerSeq) =>
-				adoptSelfDevice(db, engine.deviceRows, deviceId, walkerSeq),
+			adopt: (deviceId, walkerSeq) => engine.devices.adopt(deviceId, walkerSeq),
 		},
 		localOnly: at.localOnly,
 		settings: deps.settings,

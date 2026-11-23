@@ -15,6 +15,7 @@ import { createSandbox, type Sandbox } from "@nightshift/engine/testing";
 import { now } from "@nightshift/time";
 import type { WorkReply, WorkRequest } from "../contract";
 import { createHostSpaces } from "../links";
+import { selfOwnerId } from "../registry/test-support";
 import { deviceDirectory } from "../wire-peers-directory";
 import { serveWork } from "../work";
 import {
@@ -177,6 +178,7 @@ beforeEach(async () => {
 	runFolder = runFolders.path(RUN);
 	admission = createOfferAdmission({
 		db: sandbox.db,
+		selfOwnerId: () => selfOwnerId(sandbox.db),
 		device,
 		documents,
 		// Its Clone of the Space's project, and a project without a folder.

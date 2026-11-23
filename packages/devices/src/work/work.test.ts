@@ -13,6 +13,7 @@ import { now } from "@nightshift/time";
 import type { WorkReply, WorkRequest } from "../contract";
 import { httpsLink } from "../links/link";
 import { createOfferAdmission, type DeviceOffer } from "../offers";
+import { selfOwnerId } from "../registry/test-support";
 import { partialHostClient, withPeers } from "../testing";
 import { deviceDirectory } from "../wire-peers-directory";
 import { createPeerEngine, type PeerEngine } from "../wire-peers-engine";
@@ -244,6 +245,7 @@ describe("the work server", () => {
 		} as unknown as Device;
 		const admission = createOfferAdmission({
 			db: sandbox.db,
+			selfOwnerId: () => selfOwnerId(sandbox.db),
 			device,
 			documents,
 			projects: engine.projects,

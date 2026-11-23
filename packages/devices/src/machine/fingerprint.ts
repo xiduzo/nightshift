@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { userInfo } from "node:os";
-import { inContainer } from "./self-device";
+import { inContainer } from "./this-computer";
 
 /**
  * The fingerprint of this computer (ADR 20): a hash of its hardware id and

@@ -15,7 +15,7 @@ import {
 } from "@nightshift/engine/testing";
 import type { AgentProfile } from "@nightshift/flows";
 import { asDate } from "@nightshift/time";
-import { selfOwnerId } from "../registry";
+import { homePersonsOf, selfOwnerId } from "../registry/test-support";
 import { createEngineOffers } from "./engine-offers";
 import {
 	deviceOffers,
@@ -69,7 +69,10 @@ function offersWith(paired: Record<string, object>) {
 				},
 			],
 		},
-		devices: { get: async (id: string) => paired[id] ?? null },
+		devices: {
+			get: async (id: string) => paired[id] ?? null,
+			homePersons: () => homePersonsOf(sandbox.db),
+		},
 		members: {
 			name: async (_space: string, person: string) =>
 				({ me: "Sander", marieke: "Marieke" })[person] ?? null,
@@ -120,7 +123,10 @@ describe("withdraw", () => {
 		});
 		const offers = createOffers({
 			db: sandbox.db,
-			engine: { offers: engineOffers } as never,
+			engine: {
+				offers: engineOffers,
+				devices: { homePersons: () => homePersonsOf(sandbox.db) },
+			} as never,
 			document,
 			profiles: {} as never,
 			self: { id: "self", name: "LE2316" },
@@ -251,6 +257,7 @@ describe("Offers by profile id", () => {
 		const offers = createOffers({
 			db: sandbox.db,
 			engine: {
+				devices: { homePersons: () => homePersonsOf(sandbox.db) },
 				offers: {
 					list: async (spaceId: string) =>
 						spaceId === "space-team" ? [listed] : [],
@@ -386,6 +393,7 @@ describe("the Host admin offers to a person's Personal", () => {
 		const offers = createOffers({
 			db: sandbox.db,
 			engine: {
+				devices: { homePersons: () => homePersonsOf(sandbox.db) },
 				space: () => ({ listRuns: async () => [] }),
 				offers: {
 					list: async () => [],

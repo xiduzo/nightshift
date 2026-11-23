@@ -11,7 +11,6 @@ devices/host
 devices/membership
 devices/offers
 devices/placement
-devices/registry
 devices/secrets
 engine/agent-setup
 engine/device-config

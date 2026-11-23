@@ -27,7 +27,6 @@ import {
 	offerTakes,
 	spaceOffers,
 } from "../offers";
-import { selfOwnerId } from "../registry";
 import { remoteDevice } from "../work";
 import { hasProject, offeredChoice } from "./listed-device";
 import { NO_STARTER_RELAY, UNREACHABLE } from "./no-relay";
@@ -107,7 +106,7 @@ export function createPlacement(deps: PlacementDeps) {
 
 	/** The Person who owns this computer, as the Space's Host knows them. */
 	async function ownerHere(spaceId: string): Promise<string | null> {
-		return personInSpace(db, spaceId, await selfOwnerId(db));
+		return personInSpace(db, spaceId, await registry.selfOwnerId());
 	}
 
 	/**
@@ -479,7 +478,7 @@ export function createPlacement(deps: PlacementDeps) {
 				: await personInSpace(
 						db,
 						project.spaceId,
-						start.startedBy ?? (await selfOwnerId(db)),
+						start.startedBy ?? (await registry.selfOwnerId()),
 					);
 		let known: Promise<OwnDevice[]> | null = null;
 		const listed = () => {
@@ -547,7 +546,7 @@ export function createPlacement(deps: PlacementDeps) {
 		if (personId === null || !at.offered.mayUse) return null;
 		if ((await hostSpaces.hostOf(spaceId)) !== null) return null;
 		if ((await personalSpaceIdBySlug(db, personId)) !== spaceId) return null;
-		const name = await nameOfOwner(await selfOwnerId(db));
+		const name = await nameOfOwner(await registry.selfOwnerId());
 		return hostOffersNothing(device.name, name ?? "another person");
 	}
 
