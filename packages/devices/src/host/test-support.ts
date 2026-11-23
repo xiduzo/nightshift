@@ -7,14 +7,14 @@ import { admitKeyedCall } from "./application/admit-keyed-call";
 import type { KeyedCallCodes } from "./application/ports";
 import { type Host, type HostDeps, wireHost } from "./wire";
 
-export type { Host };
+export type { Host } from "./wire";
 
 /**
  * The old factories, over `wireHost`, for the database tests and the
  * callers that still name `createHost`.
  */
 
-export function createHost(deps: HostDeps) {
+export function createHost(deps: HostDeps): Host {
 	return wireHost(deps);
 }
 
@@ -41,10 +41,11 @@ export function admission(deps: {
 			registry: deps.registry,
 			settings: { isHost: deps.isHost },
 			spaces: {
-				of: (personId) => spacesOf(deps.db, personId),
+				of: (personId: string) => spacesOf(deps.db, personId),
 			},
 			roles: {
-				roleIn: (personId, spaceId) => roleIn(deps.db, personId, spaceId),
+				roleIn: (personId: string, spaceId: string) =>
+					roleIn(deps.db, personId, spaceId),
 				roleAllows,
 			},
 			codes,

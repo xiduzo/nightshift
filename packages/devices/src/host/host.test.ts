@@ -14,7 +14,8 @@ import {
 } from "@nightshift/engine/testing";
 import { eq } from "drizzle-orm";
 import { createDeviceRegistry, setSelfOwner } from "../registry/test-support";
-import { createHost, type Host } from "./test-support";
+import { createHost } from "./test-support";
+import type { Host } from "./wire";
 
 /**
  * This computer as a Host, with Better Auth on its own database: what it

@@ -14,6 +14,8 @@ import type {
 /**
  * The driven ports of host. Another slice or package fills each one
  * (`@filledBy`). Twins live in `adapters/out/in-memory-neighbours.ts`.
+ * `Registry` is a `Pick` of `DeviceRegistry` (DR), including
+ * `lastWalkerSeq` (the plan's WalkerCounts, now on the registry).
  */
 
 /**
