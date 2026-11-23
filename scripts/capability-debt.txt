@@ -20,8 +20,7 @@ rename packages/insights queries
 # widgets: the home screen widget and the followed run on the lock screen.
 rename packages/client glance
 
-# agents: harnesses, deciders and profiles.
-rename packages/agents decider
+# agents: harnesses and profiles.
 rename packages/agents harnesses
 rename packages/daemon harnesses
 rename packages/engine agent-setup

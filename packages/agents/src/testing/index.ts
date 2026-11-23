@@ -6,7 +6,7 @@
  */
 import { join } from "node:path";
 
-export { defaultDeciderModel } from "../decider/registry";
+export { defaultDeciderModel } from "../decider/domain/catalogue";
 
 export {
 	type FakeHarness,

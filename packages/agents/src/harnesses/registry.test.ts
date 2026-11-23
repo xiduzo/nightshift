@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { tanstackDecider } from "../decider/decider";
-import { DECIDER_ADAPTERS } from "../decider/registry";
+import { tanstackDecider } from "../decider-providers/decider";
+import { DECIDER_ADAPTERS } from "../decider-providers/registry";
 import type {
 	AgentHarness,
 	Decider,

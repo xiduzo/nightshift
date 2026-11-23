@@ -26,15 +26,15 @@ export {
 	terminalResources,
 	terminalTools,
 } from "./assistant";
+export { DECIDER_SETUP } from "./decider";
 export {
-	DECIDER_SETUP,
 	type DeciderModels,
 	type DeciderView,
 	deciderModelsAt,
 	deciderViews,
 	type TanstackDeciderOptions,
 	tanstackDecider,
-} from "./decider";
+} from "./decider-providers";
 export { type CliCheck, checkCustomAgent } from "./doctor";
 export {
 	ACP_DEFAULT_MODEL,

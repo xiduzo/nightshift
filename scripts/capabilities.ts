@@ -99,6 +99,11 @@ export const CAPABILITIES = {
 		meaning:
 			"The agents of a computer: harnesses, deciders, profiles and their setup.",
 	},
+	decider: {
+		word: "Decider",
+		meaning:
+			"The models that decide for a Decision or a Value node: which one, its default model and setup.",
+	},
 	assistant: {
 		word: "Built-in agent",
 		meaning:

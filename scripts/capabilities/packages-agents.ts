@@ -4,8 +4,10 @@ import { MECHANISM as M } from "./kinds";
 /** The verticals of `packages/agents` (`scripts/capabilities.ts` says how to place one). */
 export const PACKAGE_AGENTS: Record<string, Place> = {
 	assistant: "assistant",
-	// The decider providers and their list: the models of a Model Profile.
-	decider: "agents",
+	// Setup constants, default models and the words of a Value refusal.
+	decider: "decider",
+	// Model-API adapters for Decision and Value nodes (O1, decision 98).
+	"decider-providers": M,
 	// Is a program on this computer, which version, whose login.
 	doctor: M,
 	// One adapter and one record of facts per harness, and the skills
