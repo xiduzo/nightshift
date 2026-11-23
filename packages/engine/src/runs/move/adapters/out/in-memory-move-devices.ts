@@ -1,6 +1,6 @@
 import { Refusal } from "@nightshift/refusal";
 import type { OwnDevice } from "../../../../contract";
-import { UNADVERTISED_FLOW_VERSION } from "../../../../placement";
+import { UNADVERTISED_FLOW_VERSION } from "../../../../graph";
 import type { MoveDevices } from "../../application/ports";
 
 /** A Device as the twin keeps it: whose it is, and what it says it walks. */

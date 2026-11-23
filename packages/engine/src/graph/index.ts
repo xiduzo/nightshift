@@ -1,4 +1,4 @@
-/** A flow compiled to a graph and walked: the nodes, the step runner, sleeps, the checkpointer, the stand-ins of a test run, and the input, output and policy rules a step follows. */
+/** A flow compiled to a graph and walked: the nodes, the step runner, sleeps, the checkpointer, the stand-ins of a test run, the input, output and policy rules a step follows, the fit check of a Device, and the walk's reader of a run's plan. */
 
 export {
 	createRunWalks,
@@ -6,20 +6,22 @@ export {
 	type RunWalks,
 	type WalkFiles,
 } from "./checkpoints";
-export {
-	type NodeKind,
-	onDevice,
-	type Requirement,
-	type ServiceBringUp,
-	type ServiceBroughtUp,
-	type ServiceRunner,
-	type StepMove,
-	type StepPlacement,
-	type StepShared,
-	type StopService,
+export type {
+	ServiceBringUp,
+	ServiceBroughtUp,
+	ServiceRunner,
+	StepShared,
+	StopService,
 } from "./context";
 export { askAnswerProblem, resolveInputs } from "./data";
-export { kindOf, kindOfType, missingNames, NODE_KINDS } from "./nodes";
+export {
+	capabilitiesFor,
+	olderNightShift,
+	refusalOf,
+	UNADVERTISED_FLOW_VERSION,
+	unfit,
+} from "./fit";
+export { kindOf } from "./nodes";
 export { createRecorders } from "./recorders";
 export {
 	closeOpenWork,
@@ -35,3 +37,4 @@ export {
 	type TakeOptions,
 } from "./runner";
 export { runFolderOn } from "./step";
+export { createPlacement } from "./step-placement";

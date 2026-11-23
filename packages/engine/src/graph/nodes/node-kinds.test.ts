@@ -29,7 +29,7 @@ import { kindOf, kindOfType, NODE_KINDS } from "./node-kinds";
  * The node-kind descriptors as a table: one fact, every kind. Each table
  * pins what the switches said before the descriptor took them over
  * (`compile.ts`, `route.ts`, the step runner, `closeOpenWork`,
- * `placement/fit.ts` `REQUIREMENTS`), so a new kind shows up here first and
+ * `graph/fit/fit.ts` `REQUIREMENTS`), so a new kind shows up here first and
  * an old one cannot drift. Whether an end is a chosen end (`endsFlow`) and
  * a Call's `ended` label (`endedLabel`) are facts of the node type in
  * `@nightshift/flows`, pinned in its table test.

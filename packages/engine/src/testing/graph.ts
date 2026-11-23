@@ -46,6 +46,7 @@ import {
 	type RunEvent,
 	type RunStateValues,
 } from "../graph/state/state";
+import { createPlacement } from "../graph/step-placement/step-placement";
 import type {
 	EngineEventType,
 	EnginePayloads,
@@ -57,10 +58,10 @@ import { createRunLog, type RunLog } from "../log/run-log/run-log";
 import type { PlacedRun } from "../log/run-row/run-row";
 import { createRunBus } from "../log/transcript/bus";
 import { readMemory } from "../memory";
-import { createPlacement } from "../placement/placement";
 import { gitAuthorOf } from "../read/people";
 import { parseCalledFlows, parseRunFlow } from "../read/run-summary";
 import { createRunFolders } from "../run-folders/run-folders";
+import { takenOverSecrets } from "../secrets";
 import { keptValues } from "../variables/kept";
 import {
 	connectionsOf,
@@ -241,6 +242,7 @@ export function placementOn(
 	return createPlacement({
 		device: { id: TEST_DEVICE_ID },
 		devices: { deviceById },
+		takenOverSecrets,
 	});
 }
 

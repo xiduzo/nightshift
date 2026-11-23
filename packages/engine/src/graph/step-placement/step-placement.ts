@@ -5,9 +5,8 @@ import {
 	legacyDeviceName,
 	profileOf,
 } from "@nightshift/flows";
-import type { StepRun } from "../contract";
-import type { Device } from "../device";
-import type { StepMove, StepPlacement } from "../graph";
+import type { StepRun } from "../../contract";
+import type { Device } from "../../device";
 import {
 	type FallbackDevice,
 	fallbackKey,
@@ -16,16 +15,15 @@ import {
 	planOf,
 	type RunPlan,
 	type RunRow,
-} from "../log";
-import { deriveWorktrees } from "../read";
-import { takenOverSecrets } from "../secrets";
-import { capabilitiesFor, unfit } from "./fit";
-import type { PlacementPort } from "./port";
+} from "../../log";
+import { deriveWorktrees } from "../../read";
+import type { StepMove, StepPlacement } from "../context";
+import { capabilitiesFor, unfit } from "../fit";
 
 /**
  * Placement, while a run walks: where each step runs, as the run's plan
  * says, and nothing decided again. The plan was made once at the start
- * (`run-plan.ts` over `PlacementPort.plan`) and kept on the run's row;
+ * (`planNodes` over `PlacementPort.plan`) and kept on the run's row;
  * this module is the one reader of it. The step runner asks it one
  * question per step (`deviceFor`), the Hand-off and the services ask for
  * a Device by id (`deviceById`), and a step whose Device went offline asks
@@ -41,7 +39,7 @@ import type { PlacementPort } from "./port";
  * - A step that moved goes on where it moved to, with the values of the
  *   fallback's profile, whether or not its first Device is back.
  * - A fallback takes a step when it is online and has what the step needs
- *   (`fit.ts`: the same check as at the start). The plan lists only
+ *   (`fit/`: the same check as at the start). The plan lists only
  *   fallbacks with a Clone where the node needs one.
  *
  * Who the Devices are is the port's: this computer, or another Device
@@ -53,7 +51,11 @@ export type PlacementDeps = {
 	/** This computer: a run names it by this id, or by its Walker's. */
 	device: Pick<Device, "id">;
 	/** The Devices of a run, by id (`PlacementPort.deviceById`). */
-	devices: Pick<PlacementPort, "deviceById">;
+	devices: {
+		deviceById(id: string, run: PlacedRun, name?: string): Device;
+	};
+	/** What the warning of a move says about the secrets where the step goes (`takenOverSecrets`). */
+	takenOverSecrets(at: { host: boolean }): string;
 };
 
 /** What a node writes as its Device, as the plan keys it: the Device's id, or, for a run planned before ids, the name that plan kept (`named`). */
@@ -206,7 +208,7 @@ export function createPlacement(deps: PlacementDeps) {
 				stepId,
 				payload: {
 					kind: "device-fallback",
-					message: `${from.name} is offline. ${to.name} takes over this step. ${takenOverSecrets({ host: to.id === run.plan.fallbacks?.hostId })}`,
+					message: `${from.name} is offline. ${to.name} takes over this step. ${deps.takenOverSecrets({ host: to.id === run.plan.fallbacks?.hostId })}`,
 				},
 			});
 			return to;

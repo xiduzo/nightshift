@@ -19,7 +19,6 @@ import type { Capabilities, Device } from "../../../device";
 import { foldRun } from "../../../log";
 
 import { readTranscriptFile } from "../../../log/transcript/transcripts";
-import { refusalOf } from "../../../placement";
 import { deriveSteps } from "../../../read/run-views";
 import { createRunFolders } from "../../../run-folders";
 import {
@@ -41,6 +40,7 @@ import {
 	TEST_DEVICE_ID,
 	testDevice,
 } from "../../../testing/test-support";
+import { refusalOf } from "../../fit";
 import { endingOf } from "../../runner/thread";
 
 /**

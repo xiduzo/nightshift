@@ -1,4 +1,4 @@
-import { olderNightShift } from "../../placement";
+import { olderNightShift } from "../../graph";
 import type { Access } from "../access";
 import type { Walk } from "../walk";
 import {

@@ -311,7 +311,7 @@ packages/engine/src/
   runs/start/              Run start. The plan loads and validates the
                            flow and its called flows and resolves profiles.
                            The start asks every requirement in REQUIREMENTS
-                           (placement/fit.ts: the shared connections check,
+                           (graph/fit/fit.ts: the shared connections check,
                            then each kind's own from its descriptor: CLI
                            tools defined and installed, harnesses, the
                            decider) whether each Device has what its nodes
@@ -319,12 +319,13 @@ packages/engine/src/
                            slot held, it creates the worktree, writes the
                            run row and RunStarted in one batch, appends
                            WorktreeCreated, and the runner drives.
-  placement/               Placement: the run plan (run-plan.ts,
-                           device-order.ts, over PlacementPort), the one fit
-                           check (fit.ts), and the walk's reader of the plan
-                           (placement.ts, createPlacement): the Device of a
-                           step now, a Device by id, and the move of a step
-                           whose Device is offline to a backup (ADR 17), with
+  placement/               Placement: the run plan (planNodes, over
+                           PlacementPort). The one fit check (graph/fit/)
+                           and the walk's reader of the plan
+                           (graph/step-placement/, createPlacement) are
+                           machinery of the walk: the Device of a step now,
+                           a Device by id, and the move of a step whose
+                           Device is offline to a backup (ADR 17), with
                            StepMoved and the run's warning.
   runs/recovery/            Startup recovery and what Night Shift does to a
                            run on its own. recoverRuns (a dead daemon's open
@@ -1113,8 +1114,8 @@ module. Now the engine asks the descriptor:
 | `logsCommandOutput(node)` | `beginStep` | the three-kind `logPath` rule |
 | `timeBudget(node)` | `beginStep`, `abortEnd` | the Gate and Wait timeout rule, the Agent idle rule |
 | `cutShortOutputs(open, node, outcome)` | `closingEvents` (`graph/runner/open-work.ts`) | the `nodeType` ternary of the stop, and recovery's raw outputs |
-| `connections(node)` | `placement/fit.ts` `connectionsExist` | the Agent-or-Tool branch |
-| `requirements` | `placement/fit.ts` `REQUIREMENTS` | the per-kind requirement functions |
+| `connections(node)` | `graph/fit/fit.ts` `connectionsExist` | the Agent-or-Tool branch |
+| `requirements` | `graph/fit/fit.ts` `REQUIREMENTS` | the per-kind requirement functions |
 
 The deletion test picked the members. A fact is on the descriptor only
 when it would come back in a caller if you deleted the switch there.
@@ -1203,7 +1204,7 @@ type StepShared = {
   log: RunLog;                       // append writes a fact with the rows it implies; events(runId) for lookups
   bus: RunBus;
   recorders: Recorders;              // open(runId, stepId): the step's transcript writer
-  placement: StepPlacement;          // where the run's steps run (placement/): the Device of a step now, a Device by id, a move
+  placement: StepPlacement;          // where the run's steps run (graph/step-placement/): the Device of a step now, a Device by id, a move
   now(): number; minuteMs: number;
   settings(): RunSettings;
   kindOf(node): NodeKind;            // the registry, given by the engine

@@ -16,7 +16,7 @@ import {
 import { Refusal } from "@nightshift/refusal";
 import type { DeviceProfile, StartRunInput } from "../contract";
 import type { Capabilities } from "../device";
-import { kindOf } from "../graph";
+import { capabilitiesFor, kindOf, unfit } from "../graph";
 import {
 	type FallbackDevice,
 	fallbackKey,
@@ -24,7 +24,6 @@ import {
 	type RunFallbacks,
 } from "../log";
 import { takenOverSecrets } from "../secrets";
-import { capabilitiesFor, unfit } from "./fit";
 import type { PlacedDevice } from "./port";
 
 /**

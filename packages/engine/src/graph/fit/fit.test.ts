@@ -9,23 +9,17 @@ import {
 	type FlowNode,
 	type ValueNode,
 } from "@nightshift/flows";
-import type { Capabilities } from "../device/types";
-import { AGENT } from "../graph/nodes/agent/agent";
-import {
-	cliToolsInstalled,
-	harnessesAdded,
-} from "../graph/nodes/agent/requirements";
-import {
-	DECISION,
-	modelDecisionsHaveDecider,
-} from "../graph/nodes/decide/decision";
-import { modelValuesHaveDecider, VALUE } from "../graph/nodes/shape/value";
+import type { Capabilities } from "../../device/types";
 import {
 	cliToolsOf,
 	connectionsOf,
 	type TestDeviceDeps,
 	testDevice,
-} from "../testing/test-support";
+} from "../../testing/test-support";
+import { AGENT } from "../nodes/agent/agent";
+import { cliToolsInstalled, harnessesAdded } from "../nodes/agent/requirements";
+import { DECISION, modelDecisionsHaveDecider } from "../nodes/decide/decision";
+import { modelValuesHaveDecider, VALUE } from "../nodes/shape/value";
 import {
 	connectionsExist,
 	REQUIREMENTS,

@@ -7,7 +7,7 @@ import {
 } from "./documents";
 import { type Engine, type EngineInternals, engineOf } from "./engine";
 import type { EngineOptions } from "./engine-options";
-import { createRunWalks } from "./graph";
+import { createPlacement, createRunWalks } from "./graph";
 import { trackHeldLeases } from "./leases";
 import {
 	createLandedFeed,
@@ -15,8 +15,8 @@ import {
 	createRunHistory,
 	createRunLog,
 } from "./log";
-import { createPlacement } from "./placement";
 import { createRunFolders } from "./run-folders";
+import { takenOverSecrets } from "./secrets";
 import { createSpaces } from "./space";
 import { wireEngineAccess } from "./wire-access";
 import { wireEngineActions } from "./wire-actions";
@@ -80,10 +80,10 @@ import { wireEngineWalk } from "./wire-walk";
  *
  * What the blocks stand on:
  *
- * - `placement/`: where each step runs. The plan a run starts with
- *   (`planNodes`), the one fit check, and the walk's reader of the plan
- *   (`createPlacement`): the Device of a step now, and its move when that
- *   Device is offline (ADR 17).
+ * - `placement/`: where each step runs, the plan a run starts with
+ *   (`planNodes`). `graph/` holds the one fit check and the walk's reader
+ *   of the plan (`createPlacement`): the Device of a step now, and its
+ *   move when that Device is offline (ADR 17).
  * - `flows/`: the flows and schedules of the projects in their flow
  *   documents (`ProjectFlows`), what a person does with them in a Space
  *   (`SpaceFlows`, `SpaceEngine.flows`), and the import of a Clone's
@@ -191,7 +191,7 @@ export function createEngine(
 	});
 	const { placement: devices, relay: hosts } = peers;
 	/** Where each run's steps run, as its plan says (`placement/`). */
-	const placement = createPlacement({ device, devices });
+	const placement = createPlacement({ device, devices, takenOverSecrets });
 
 	// --- projects (phase 3): `wire-projects.ts` ---
 	const { git, projects, catalog, cloneRows, spaces } = wireEngineProjects({

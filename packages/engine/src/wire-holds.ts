@@ -1,6 +1,6 @@
 import type { Database } from "@nightshift/db";
 import type { DeviceDirectory, LeaseHost } from "./contract";
-import { combineHolds } from "./graph";
+import { combineHolds, type createPlacement } from "./graph";
 import {
 	createLeaseKeeper,
 	createLeaseStore,
@@ -8,7 +8,6 @@ import {
 	leasesLost,
 } from "./leases";
 import { getRunRow, type RunLog } from "./log";
-import type { createPlacement } from "./placement";
 import { createServiceKeeper, serviceHolds } from "./services";
 
 /**

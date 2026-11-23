@@ -1,10 +1,7 @@
 import type { Database } from "@nightshift/db";
+import { capabilitiesFor, refusalOf } from "../../../../graph";
 import { lastRunDevice } from "../../../../log";
-import {
-	capabilitiesFor,
-	type PlacementPort,
-	refusalOf,
-} from "../../../../placement";
+import type { PlacementPort } from "../../../../placement";
 import type { RunPlanner } from "../../application/ports";
 
 /** What the planner of the start stands on: the Devices a run may use (`Peers.placement`), and the runs of each project. */
@@ -16,7 +13,7 @@ export type PlacementRunPlannerDeps = {
 /**
  * Where a run's steps run, over Placement (`PlacementPort` of the peers):
  * its plan with the project's latest run's Device as the first last
- * resort, and the one fit check of Placement (`placement/fit.ts`).
+ * resort, and the one fit check of Placement (`graph/fit/`).
  */
 export function placementRunPlanner(deps: PlacementRunPlannerDeps): RunPlanner {
 	const { db, devices } = deps;

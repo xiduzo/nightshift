@@ -3,24 +3,17 @@ import {
 	type FlowNode,
 	type FlowNodeType,
 } from "@nightshift/flows";
-import type { Capabilities, Device } from "../device";
-import {
-	kindOf,
-	kindOfType,
-	missingNames,
-	NODE_KINDS,
-	type NodeKind,
-	onDevice,
-	type Requirement,
-} from "../graph";
+import type { Capabilities, Device } from "../../device";
+import { type NodeKind, onDevice, type Requirement } from "../context";
+import { kindOf, kindOfType, missingNames, NODE_KINDS } from "../nodes";
 
 /**
  * The fit check: whether a Device can take these nodes, written once for
  * every time Placement asks it (ADR 17, decision 3; ADR 19, decision 4).
  * The plan asks it at run start for each Device of its order
- * (`device-order.ts`), run start asks it of each Device for the nodes
+ * (`placement/domain/device-order.ts`), run start asks it of each Device for the nodes
  * placed there before the run is written (`prepareRun`), and a step asks
- * it of each fallback when its Device goes offline (`placement.ts`).
+ * it of each fallback when its Device goes offline (`step-placement/`).
  *
  * The requirements are one function each (`Requirement`) and listed once,
  * in `REQUIREMENTS`, in the order the person sees them. The ones about one

@@ -1,8 +1,6 @@
+import { UNADVERTISED_FLOW_VERSION } from "../../../../graph";
 import { placedRun } from "../../../../log";
-import {
-	type PlacementPort,
-	UNADVERTISED_FLOW_VERSION,
-} from "../../../../placement";
+import type { PlacementPort } from "../../../../placement";
 import type { MoveDevices } from "../../application/ports";
 
 /** The planner of the run's Space (`PlacementPort` of the peers), as much of it as a move asks. */

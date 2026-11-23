@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { FlowNode } from "@nightshift/flows";
-import type { Device } from "../device";
+import type { Device } from "../../device";
 import {
 	fallbackKey,
 	foldRun,
@@ -9,13 +9,14 @@ import {
 	type RunLog,
 	type RunRow,
 	type RunState,
-} from "../log";
-import type { EngineEventType, EventInput } from "../log/events/events";
-import { testDevice } from "../testing/test-support";
+} from "../../log";
+import type { EngineEventType, EventInput } from "../../log/events/events";
+import { takenOverSecrets } from "../../secrets";
+import { testDevice } from "../../testing/test-support";
 
 type Appended = EventInput<EngineEventType>;
 
-import { createPlacement } from "./placement";
+import { createPlacement } from "./step-placement";
 
 /**
  * Placement while a run walks, over a fake port: the plan read from the
@@ -127,6 +128,7 @@ function placementOver(
 			[B]: at(B, "B as the port names it"),
 			[H]: at(H, "H as the port names it"),
 		}),
+		takenOverSecrets,
 	});
 }
 
@@ -181,6 +183,7 @@ describe("the Device of a step, from the plan alone", () => {
 				"twin-a": twin("twin-a"),
 				"twin-b": twin("twin-b"),
 			}),
+			takenOverSecrets,
 		});
 		const twins = row({
 			placements: null,
