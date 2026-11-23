@@ -3,9 +3,6 @@
 export {
 	type FallbackDevice,
 	fallbackKey,
-	type NodeFields,
-	type PlannedDevice,
-	type RunFallbacks,
 	type RunPlan,
 } from "../../contract";
 export {

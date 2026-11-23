@@ -427,7 +427,7 @@ reach.
 A kit cannot name a profile of anyone's computer, so the kit's Agent node names
 no agent. The run's plan gives such a node the first Agent Profile of the
 Device that runs it (`withComputerAgents` in
-`packages/engine/src/placement/run-plan.ts`): the Device the node names, else
+`packages/engine/src/placement/domain/run-plan.ts`): the Device the node names, else
 the Device of the nearest Subflow around it, else the run's Device. A schedule
 runs on the Host, so the Host's agent fetches. **Sync now** runs on the
 computer that starts it. A Device with no Agent Profile refuses the start, and

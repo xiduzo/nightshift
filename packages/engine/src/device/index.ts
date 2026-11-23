@@ -9,7 +9,6 @@ export {
 	type ToolLaunchers,
 } from "./tool-launchers";
 export type {
-	AddressCheck,
 	Capabilities,
 	CapabilityQuery,
 	Device,

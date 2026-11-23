@@ -6,8 +6,9 @@ import {
 	type ProfileRef,
 } from "@nightshift/flows";
 import { addressKey, type Device } from "../device";
-import type { PlacedDevice } from "./port";
-import { type PlanDevices, planNodes, UNREACHABLE_DEVICE } from "./run-plan";
+import { planNodes } from "../wire-start";
+import type { PlacedDevice, PlanDevices } from "./application/plan-nodes";
+import { UNREACHABLE_DEVICE } from "./domain/device-order";
 
 /**
  * The node walk of a run's plan, over Devices a test gives it: the

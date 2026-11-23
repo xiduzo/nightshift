@@ -7,8 +7,7 @@ import {
 	runsAs,
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
-import { type AddressCheck, addressKey } from "../device";
-import type { PlacedDevice } from "./port";
+import type { AddressCheck, PlacedOn, PlanRules } from "./plan-shapes";
 
 /**
  * A run asks each address its nodes name when it starts (ADR 5, decision
@@ -31,15 +30,17 @@ function addressOf(
 	return { check: { decider: node.decider, address: node.address }, ref };
 }
 
-export async function checkAddresses(
+export async function checkAddresses<D>(
 	flows: readonly Flow[],
 	/** The Device of each profile, by its id. */
-	owners: ReadonlyMap<string, PlacedDevice | null>,
+	owners: ReadonlyMap<string, PlacedOn<D> | null>,
 	/** What a refusal calls a profile: its name, or null when unknown. */
 	labelOf: (ref: ProfileRef) => string | null,
+	rules: Pick<PlanRules<D, unknown>, "addressesOn" | "addressKey">,
 ): Promise<void> {
+	const { addressKey } = rules;
 	type Use = { check: AddressCheck; label: string | null; nodeIds: string[] };
-	const asked = new Map<PlacedDevice, Map<string, Use>>();
+	const asked = new Map<PlacedOn<D>, Map<string, Use>>();
 	// A cascade's tiers each ask their own profile's address.
 	for (const node of flows.flatMap((flow) => flow.nodes.flatMap(runsAs))) {
 		const found = addressOf(node);
@@ -58,9 +59,9 @@ export async function checkAddresses(
 	for (const [at, uses] of asked) {
 		const checks = [...uses.values()].map((use) => use.check);
 		// A Device that cannot answer now fails the step itself, later.
-		const answers = await at.device
-			.capabilities({ addresses: checks })
-			.then((has) => has.addresses ?? {})
+		const answers = await rules
+			.addressesOn(at.device, checks)
+			.then((has) => has ?? {})
 			.catch(() => ({}) as Record<string, string | null>);
 		for (const use of uses.values()) {
 			const why = answers[addressKey(use.check)];

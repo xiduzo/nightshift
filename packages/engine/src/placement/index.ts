@@ -1,10 +1,12 @@
-/** Placement: where a run's steps run. The plan made once at the start (`planNodes` over the port's Devices), the one fit check (`REQUIREMENTS`, `unfit`), and the walk's reader of the plan (`createPlacement`): the Device of a step now, and its move when that Device is offline. */
+/** Placement: where a run's steps run. The plan made once at the start (`planNodes` over the port's Devices), as rules in `domain/` that ask the fit check and the Devices through functions. The walk's reader of the plan and the fit check are in `graph`. */
 
 export type {
-	OfferedPlacement,
 	PlacedDevice,
-	PlacementPort,
+	PlanDevices,
 	PlanInput,
 	PlannedRun,
-} from "./port";
-export { type PlanDevices, planNodes, UNREACHABLE_DEVICE } from "./run-plan";
+} from "./application/plan-nodes";
+export type { PlacementPort } from "./application/ports";
+export { UNREACHABLE_DEVICE } from "./domain/device-order";
+export type { OfferedPlacement } from "./domain/plan-shapes";
+export { wirePlacement } from "./wire";

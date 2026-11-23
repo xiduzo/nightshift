@@ -14,17 +14,15 @@ import {
 	withTierNode,
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
-import type { DeviceProfile, StartRunInput } from "../contract";
-import type { Capabilities } from "../device";
-import { capabilitiesFor, kindOf, unfit } from "../graph";
 import {
+	type DeviceProfile,
 	type FallbackDevice,
 	fallbackKey,
 	type NodeFields,
 	type RunFallbacks,
-} from "../log";
-import { takenOverSecrets } from "../secrets";
-import type { PlacedDevice } from "./port";
+	type StartRunInput,
+} from "../../contract";
+import type { PlacedOn, PlanRules } from "./plan-shapes";
 
 /**
  * Which Device takes a run's steps, in one order for every start (ADR 17):
@@ -40,7 +38,7 @@ import type { PlacedDevice } from "./port";
  *   that names a Device or a profile has fallbacks.
  *
  * A Device takes a step when it is online, has the project, and has what the
- * node needs (`fit.ts`: the one check, which a step's move asks again).
+ * node needs (`unfit`: the one check, which a step's move asks again).
  * This module rewrites the nodes it moves: `placeNodes` then places the
  * flow as if the flow had named those Devices itself. The Devices it passes
  * over stay in the plan, so a step can move when its Device goes offline.
@@ -50,11 +48,11 @@ import type { PlacedDevice } from "./port";
  */
 
 /** What the order asks of the Devices a run may use (`PlanDevices`). */
-export type OrderDevices = {
-	walker: PlacedDevice;
-	byId(id: string): Promise<PlacedDevice | null>;
+export type OrderDevices<D> = {
+	walker: PlacedOn<D>;
+	byId(id: string): Promise<PlacedOn<D> | null>;
 	/** A Device a node may name, by id (`PlanDevices.nodeDevice`). */
-	nodeDevice(id: string): Promise<PlacedDevice | null>;
+	nodeDevice(id: string): Promise<PlacedOn<D> | null>;
 	/**
 	 * The Person's other Devices that could take the run, for when no Device
 	 * of the order can. Never a development install. Default: none.
@@ -78,11 +76,17 @@ export type OrderDevices = {
 /** A place a node may run: a Device, and for a node with a profile the pair. */
 type Candidate = { id: string; pair: ProfileRef | null; node: FlowNode };
 
-export type ChosenDevices = {
+/** What the order asks of the other rules: the fit check, what a Device has, the words of a move. */
+export type OrderRules<D, C> = Pick<
+	PlanRules<D, C>,
+	"capabilitiesFor" | "unfit" | "works" | "profilesOn" | "takenOverSecrets"
+>;
+
+export type ChosenDevices<D> = {
 	/** The flows, with the nodes that moved naming their new Device. */
 	flows: Flow[];
 	/** The Device of every node that does not place itself. */
-	run: PlacedDevice;
+	run: PlacedOn<D>;
 	fallbacks: RunFallbacks | null;
 	/** What the person reads: each Device passed over, and why. */
 	notes: string[];
@@ -139,13 +143,14 @@ function unplacedOf(flows: readonly Flow[]): FlowNode[] {
  * flow and the flows it calls, without a test run's stand-ins (ADR 27):
  * those run on no Device, so they never pass a Device over.
  */
-export async function chooseDevices(
+export async function chooseDevices<D, C>(
 	flows: readonly Flow[],
 	start: Pick<StartRunInput, "deviceId" | "startedFrom">,
 	/** A person chose: `start.deviceId` is their pick, not a schedule's Host. */
 	byPerson: boolean,
-	devices: OrderDevices,
-): Promise<ChosenDevices> {
+	devices: OrderDevices<D>,
+	rules: OrderRules<D, C>,
+): Promise<ChosenDevices<D>> {
 	const { walker } = devices;
 	const [flow] = flows as [Flow, ...Flow[]];
 	const pick = byPerson ? start.deviceId : undefined;
@@ -155,7 +160,7 @@ export async function chooseDevices(
 	const starter = byPerson ? (start.startedFrom ?? walker.id) : undefined;
 
 	const notes: string[] = [];
-	const known = new Map<string, Promise<PlacedDevice | null>>();
+	const known = new Map<string, Promise<PlacedOn<D> | null>>();
 	const refusals = new Map<string, Refusal>();
 	/** A Device by id, once per run. A Device this Person cannot use is null. */
 	const placed = (id: string, ask: "run" | "node" = "run") => {
@@ -176,25 +181,27 @@ export async function chooseDevices(
 		}
 		return at;
 	};
-	const capabilities = new Map<string, Promise<Capabilities | null>>();
+	const capabilities = new Map<string, Promise<C | null>>();
 	/** What a Device has for the flows' nodes, asked once per run. Null when this computer cannot reach it: it cannot take the step either. */
-	function capabilitiesOf(at: PlacedDevice): Promise<Capabilities | null> {
+	function capabilitiesOf(at: PlacedOn<D>): Promise<C | null> {
 		let has = capabilities.get(at.id);
 		if (!has) {
-			has = capabilitiesFor(
-				flows.flatMap((f) => f.nodes),
-				at.device,
-			).catch((error: unknown) => {
-				if (error instanceof Refusal) return null;
-				throw error;
-			});
+			has = rules
+				.capabilitiesFor(
+					flows.flatMap((f) => f.nodes),
+					at.device,
+				)
+				.catch((error: unknown) => {
+					if (error instanceof Refusal) return null;
+					throw error;
+				});
 			capabilities.set(at.id, has);
 		}
 		return has;
 	}
-	/** Why a Device cannot take these nodes now, or null when it can (`fit.ts`). */
-	const whyUnfit = (at: PlacedDevice, nodes: readonly FlowNode[]) =>
-		unfit(at, nodes, () => capabilitiesOf(at));
+	/** Why a Device cannot take these nodes now, or null when it can (`unfit`). */
+	const whyUnfit = (at: PlacedOn<D>, nodes: readonly FlowNode[]) =>
+		rules.unfit(at, nodes, () => capabilitiesOf(at));
 
 	// The run's Device: the first in the order that can take all its nodes.
 	const runOrder = unique(
@@ -208,8 +215,8 @@ export async function chooseDevices(
 				],
 	);
 	const unplaced = unplacedOf(flows);
-	let run: PlacedDevice | null = null;
-	let firstPlaced: PlacedDevice | null = null;
+	let run: PlacedOn<D> | null = null;
+	let firstPlaced: PlacedOn<D> | null = null;
 	let firstPlacedId: string | null = null;
 	let runId: string | null = null;
 	const passedOver: string[] = [];
@@ -248,7 +255,7 @@ export async function chooseDevices(
 	if (runTakenOver) {
 		const why = passedOver.map((reason) => `${reason}. `).join("");
 		notes.push(
-			`${why}${run.name} takes over the run. ${takenOverSecrets({ host: runId === devices.hostId })}`,
+			`${why}${run.name} takes over the run. ${rules.takenOverSecrets({ host: runId === devices.hostId })}`,
 		);
 	}
 
@@ -257,16 +264,14 @@ export async function chooseDevices(
 
 	/** A profile of a Device, by its id, as far as this computer can tell. */
 	async function settingsOf(
-		at: PlacedDevice,
+		at: PlacedOn<D>,
 		id: string,
 	): Promise<ProfileSettings | null> {
 		if (at.thisDevice) return devices.profileFor(id);
 		if (at.offline) {
 			return (await devices.lastKnown?.(at.id))?.get(id)?.settings ?? null;
 		}
-		return (
-			(await at.device.capabilities({ profiles: [id] })).profiles[id] ?? null
-		);
+		return (await rules.profilesOn(at.device, [id]))[id] ?? null;
 	}
 
 	/** The name of the profile a node names, on the Device it names. */
@@ -310,7 +315,7 @@ export async function chooseDevices(
 	/** Why a backup cannot be used at all, or null. A node's own profile is not asked. */
 	async function unusableBackup(
 		node: FlowNode,
-		at: PlacedDevice,
+		at: PlacedOn<D>,
 		pair: ProfileRef,
 	): Promise<string | null> {
 		const own = profileOf(node);
@@ -333,7 +338,7 @@ export async function chooseDevices(
 		if (pin === undefined) return node;
 		const candidates = candidatesOf(node, pin);
 		const unknownPin = !(await placed(pin, "node"));
-		const options: { candidate: Candidate; at: PlacedDevice }[] = [];
+		const options: { candidate: Candidate; at: PlacedOn<D> }[] = [];
 		const reasons = new Map<Candidate, string>();
 		for (const candidate of candidates) {
 			const { id, pair } = candidate;
@@ -377,10 +382,10 @@ export async function chooseDevices(
 				? `${await profileName(chosen.candidate.pair)} on ${chosen.at.name}`
 				: chosen.at.name;
 			notes.push(
-				`${why}${taker} takes over node "${node.id}". ${takenOverSecrets({ host: chosen.at.id === devices.hostId })}`,
+				`${why}${taker} takes over node "${node.id}". ${rules.takenOverSecrets({ host: chosen.at.id === devices.hostId })}`,
 			);
 		}
-		const needsClone = kindOf(node).works(node) === "worktree";
+		const needsClone = rules.works(node) === "worktree";
 		const rest: FallbackDevice[] = [];
 		for (const { at, candidate } of options) {
 			const { pair } = candidate;

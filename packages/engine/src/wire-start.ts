@@ -1,12 +1,34 @@
 import type { Database } from "@nightshift/db";
 import type { DeviceDirectory, Relay, StartRunInput } from "./contract";
+import { addressKey } from "./device";
+import { capabilitiesFor, kindOf, unfit } from "./graph";
 import type { RunLog, RunTrigger } from "./log";
-import type { PlacementPort } from "./placement";
+import { type PlacementPort, wirePlacement } from "./placement";
 import type { Projects } from "./projects";
 import type { RunSummary } from "./read";
 import { type Access, wireStart, type wireWalk } from "./runs";
 
 type StartDeps = Parameters<typeof wireStart>[0];
+
+/**
+ * The plan a run starts with (`placement/`), bound to the fit check of the
+ * walk (`graph/fit/`) and to what a Device has (`device/`). The devices'
+ * planner calls it from the engine root (`PlacementPort.plan`), and so
+ * does the engine's own fake of a computer alone. Lane PL of the hexagon
+ * series owns this block.
+ */
+export const { planNodes } = wirePlacement({
+	fit: {
+		capabilitiesFor,
+		unfit,
+		works: (node) => kindOf(node).works(node),
+		profilesOn: async (device, ids) =>
+			(await device.capabilities({ profiles: ids })).profiles,
+		addressesOn: (device, checks) =>
+			device.capabilities({ addresses: checks }).then((has) => has.addresses),
+		addressKey,
+	},
+});
 
 /**
  * The start block of the engine's composition (`wire.ts`): a run's start

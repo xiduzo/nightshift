@@ -1,11 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import type { FlowNode } from "@nightshift/flows";
+import type { RunFallbacks } from "../../contract";
 import type { Device } from "../../device";
 import {
 	fallbackKey,
 	foldRun,
 	type LoggedEvent,
-	type RunFallbacks,
 	type RunLog,
 	type RunRow,
 	type RunState,

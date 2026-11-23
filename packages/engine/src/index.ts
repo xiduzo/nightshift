@@ -212,7 +212,6 @@ export {
 	type PlanDevices,
 	type PlanInput,
 	type PlannedRun,
-	planNodes,
 	UNREACHABLE_DEVICE,
 } from "./placement";
 export type {
@@ -264,3 +263,4 @@ export type { MoveRows } from "./space-move";
 export type { UsageMoment, UsageNotes } from "./usage";
 export type { KeptValue } from "./variables";
 export { createEngine } from "./wire";
+export { planNodes } from "./wire-start";
