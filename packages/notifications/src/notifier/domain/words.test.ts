@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { utc } from "@nightshift/time/testing";
-import { deviceWaitWords } from "./channel";
+import { deviceWaitWords } from "./words";
 
 /** 22:00 in Amsterdam (20:00 UTC). */
 const NIGHT = utc(2026, 9, 27, 21, 0);

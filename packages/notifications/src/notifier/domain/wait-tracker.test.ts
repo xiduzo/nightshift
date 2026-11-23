@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { LandedFact } from "@nightshift/engine";
+import type { NotifierFact as LandedFact } from "./facts";
 
 import { createWaitTracker } from "./wait-tracker";
 

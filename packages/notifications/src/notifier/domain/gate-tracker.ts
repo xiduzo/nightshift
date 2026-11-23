@@ -1,8 +1,24 @@
-import type { LandedFact } from "@nightshift/engine";
 import { DEFAULT_GATE_URGENCY, type GateUrgency } from "@nightshift/flows";
+import { gateKey, parseGateKey } from "../../contract";
+import type { NotifierFact } from "./facts";
 
-import { gateKey, parseGateKey } from "../contract";
-import type { OpenGateRef } from "./sources";
+/**
+ * An open Gate, by its run and step, and what a lock-screen notification
+ * needs of it: the author's mark and the names of its options.
+ */
+export type OpenGateRef = {
+	runId: string;
+	stepId: string;
+	/** The author marked it to be answered from the lock screen. Default: false. */
+	lockScreen?: boolean;
+	/** The names of its options, in the author's order. */
+	choices?: string[];
+	/**
+	 * An answer to it waits for the Device that walks its run. The Gate
+	 * waits for nobody now: the notifier counts it as closed. Default: false.
+	 */
+	answerPending?: boolean;
+};
 
 /** What a landing did to the Gates of one Space. */
 export type GateChanges = {
@@ -38,7 +54,7 @@ export type GateTracker = {
 	 * Gates only when a Gate opened, or when a fact is of a run with a
 	 * known Gate: other facts cannot change them.
 	 */
-	apply(spaceId: string, facts: readonly LandedFact[]): Promise<GateChanges>;
+	apply(spaceId: string, facts: readonly NotifierFact[]): Promise<GateChanges>;
 	/**
 	 * What changed of the run's Gates without a fact: an answer to one of
 	 * them is now on its way, or its Walker refused it. It reads the open

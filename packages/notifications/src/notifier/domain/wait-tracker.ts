@@ -1,6 +1,5 @@
-import type { LandedFact } from "@nightshift/engine";
-
-import { deviceWaitKey, parseDeviceWaitKey } from "../contract";
+import { deviceWaitKey, parseDeviceWaitKey } from "../../contract";
+import type { NotifierFact } from "./facts";
 
 /**
  * The steps that wait for an offline Device, from the landed facts. A step
@@ -29,7 +28,11 @@ export type WaitChanges = {
 
 export type WaitTracker = {
 	/** What the facts of one Space did. `at`: when they landed. */
-	apply(spaceId: string, facts: readonly LandedFact[], at: number): WaitChanges;
+	apply(
+		spaceId: string,
+		facts: readonly NotifierFact[],
+		at: number,
+	): WaitChanges;
 	/** The waits whose step did not sleep again within the grace: they are over now. */
 	due(at: number): { spaceId: string; key: string }[];
 	/** Knows the wait of the key as going on: one the log told before this notifier started. */

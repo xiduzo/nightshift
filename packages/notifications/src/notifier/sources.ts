@@ -8,6 +8,7 @@ import {
 	type SevereTurn,
 } from "@nightshift/engine";
 import { now } from "@nightshift/time";
+import type { OpenGateRef } from "./domain/gate-tracker";
 
 /**
  * What the notifier reads, as ports: the run events of this Replica (as
@@ -17,23 +18,8 @@ import { now } from "@nightshift/time";
  * tests use fakes (`./testing`).
  */
 
-/**
- * An open Gate, by its run and step, and what a lock-screen notification
- * needs of it: the author's mark and the names of its options.
- */
-export type OpenGateRef = {
-	runId: string;
-	stepId: string;
-	/** The author marked it to be answered from the lock screen. Default: false. */
-	lockScreen?: boolean;
-	/** The names of its options, in the author's order. */
-	choices?: string[];
-	/**
-	 * An answer to it waits for the Device that walks its run. The Gate
-	 * waits for nobody now: the notifier counts it as closed. Default: false.
-	 */
-	answerPending?: boolean;
-};
+/** An open Gate, as the notifier's rules read it (`domain/gate-tracker.ts`). */
+export type { OpenGateRef };
 
 /** What a notification about a run names, and whether the run still sleeps. */
 export type RunRef = {

@@ -5,21 +5,10 @@ import {
 } from "@nightshift/engine";
 import type { GateUrgency } from "@nightshift/flows";
 import { now as timeNow } from "@nightshift/time";
-import type { PushTarget } from "../channels";
-import {
-	deviceWaitWords,
-	type GateFacts,
-	gatesWaitingTitle,
-	type NoticeWords,
-	type NotificationMessage,
-	needsALookWords,
-	scheduleMissedWords,
-	titleOf,
-} from "../channels";
+import type { NotificationMessage, PushTarget } from "../channels";
 import {
 	needsALookKey,
 	parseGateKey,
-	runEndKey,
 	scheduleMissedKey,
 	waitingKey,
 } from "../contract";
@@ -29,87 +18,59 @@ import {
 	type NotificationSettings,
 	pushesUrgency,
 } from "../settings";
-import { createGateTracker } from "./gate-tracker";
+import { changedRuns, endedRuns, factsBySpace } from "./domain/facts";
+import { createGateTracker } from "./domain/gate-tracker";
+import {
+	claimOf,
+	type GateFacts,
+	gateFactsOf,
+	gatesWaitingMessage,
+	keptWords,
+	type NoticeIds,
+	noticeMessage,
+} from "./domain/message";
+import {
+	createBundles,
+	createPruneClock,
+	createSerialQueue,
+	DEFAULT_TICK_MS,
+} from "./domain/notifier-state";
+import {
+	byPerson,
+	duePushes,
+	heldTargetIds,
+	heldTargets,
+	pushedEntry,
+	quietEnd,
+	quietEndEntry,
+	reachable,
+	seenOnScreen,
+	sendingClaim,
+	sentHeldEntry,
+	wants,
+	withdrawnEntry,
+} from "./domain/pushes";
+import { createWaitTracker, type StartedWait } from "./domain/wait-tracker";
+import {
+	deviceWaitWords,
+	type NoticeWords,
+	needsALookWords,
+	scheduleMissedWords,
+} from "./domain/words";
 import type { Notifier, NotifierDeps } from "./types";
-import { createWaitTracker, type StartedWait } from "./wait-tracker";
 
 /**
  * The notifier: it reads the run events of this Replica and decides whom
  * to tell, about what, and on which screen. Four events: a new Gate
  * (keyed `runId:stepId`), a run that finished, a run that failed, and a
  * step that waits for an offline Device (keyed `runId:wait:<stepId>`).
+ * What it does, rule by rule, is the comment of `Notifier` (`types.ts`).
  *
- * The rules:
- * - Who: the Members of the run's Space. A device wait goes only to the
- *   Person the run runs for: "<flow> waits for <device>", with the stop
- *   time. It is withdrawn when the wait is over (`wait-tracker.ts`).
- * - Every open page and app (the in-app stream) hears of every event at
- *   once, also in quiet hours. It shows a notification only when this
- *   daemon sends for the Space, the person wants that event, and it is
- *   not quiet hours.
- * - One sender per Space (`sendsFor`): only that daemon pushes to the
- *   browsers and phones. This computer's own desktop is not a push: the
- *   daemon shows it for every Space it has, also for a Space another
- *   Host keeps and sends for (`LOCAL_KINDS`).
- * - Once per key: the delivery log claims each (Person, key) once.
- * - Quiet hours hold pushes. When they end, each screen gets one push that
- *   says how many of the Gates it held still wait (or the one Gate
- *   itself). Runs that ended meanwhile go without a push.
- * - The active screen first: while the person has a page or the app open,
- *   a push to a phone or a closed browser waits, at most `holdMinutes`.
- *   It goes once the person has no screen open (`isActive`: a page counts
- *   for a minute after it closes, the phone app not after it leaves the
- *   front). A Gate answered meanwhile is not pushed at all. A run that
- *   ended is pushed only when the person closed every screen meanwhile.
- *   The desktop app is a screen of its own: it is not held. Its channel
- *   skips what the person already looks at on this computer (`desktop/`).
- * - Open screens hear when a run changes (`run-changed`): it starts,
- *   sleeps or wakes, moves, stops or ends, or a step starts or ends. That
- *   is quiet: no push, and the item shows nothing. A screen reads the run
- *   again instead of polling.
- * - Answer once, clear everywhere: when a Gate closes, or a device wait
- *   is over, every screen that got it gets a withdraw, and what still
- *   waits is dropped. An answer on its way to the Device that walks the
- *   run closes the Gate here at once (`commandsChanged`). When that Device
- *   refuses it, the Gate waits again without a new push.
- * - A screen that got "N Gates wait for you" counts as told of each of
- *   those Gates: each one's close withdraws it there. The last one's
- *   close also withdraws the summary, while this notifier still runs.
- * - A flow that turns severe under Needs a look (`look:<projectId>:<flow>:<runId>`):
- *   after a run ends, the notifier asks whether that end turned its flow
- *   severe. Only the turn tells: a flow that stays severe tells nobody
- *   again, one that recovered and turns severe again tells again. The
- *   turn comes from the runs themselves, and the log claims its key once,
- *   so a restart never tells it twice. It pushes like a Gate marked Now,
- *   to every Member, and has no item on the open pages (Home shows it).
- * - Lock-screen answers: a push about a Gate its author marked carries its
- *   options, only to a person whose role allows an answer (`mayAnswer`).
- *
- * At start, the open Gates are read: one the log has not told yet (it
- * opened while no notifier listened) is pushed then, the others tell
- * nobody again. A device wait the log told is withdrawn when its run no
- * longer sleeps. A push is claimed before it goes out (`sending`): one a
- * crash cut short goes out at the first check a minute after its claim
- * (`LOST_AFTER_MS`), so a reload never sends one twice that the last
- * notifier still sends. Every piece of work runs one after the other, so
- * two landings never race.
+ * The rules are pure functions in `domain/`: the words, what a Person
+ * wants, the message, which screens a push goes to, when a held push is
+ * due, the end of quiet hours, the trackers, the bundles and the queue.
+ * This file reads and sends through `NotifierDeps`.
  */
-
-const DEFAULT_TICK_MS = 15_000;
-
-/** A push still `sending` this long after its claim was cut short by a crash. */
-const LOST_AFTER_MS = 60_000;
-
-/** How often the notifier removes the entries the inbox no longer keeps. */
-const PRUNE_EVERY_MS = 60 * 60_000;
-
-/**
- * The screens of this computer itself: the desktop notification. The
- * daemon here shows them for every Space this Replica has, not only the
- * Spaces it sends for: a notification on this computer is no second
- * sender of a push. Its channel reaches no other computer.
- */
-const LOCAL_KINDS: ReadonlySet<PushTarget["kind"]> = new Set(["desktop"]);
 
 export function createNotifier(deps: NotifierDeps): Notifier {
 	const now = deps.now ?? timeNow;
@@ -122,82 +83,38 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 	/** The steps that wait for an offline Device. */
 	const waits = createWaitTracker();
 	const mayAnswer = deps.mayAnswer ?? (async () => false);
-	/**
-	 * The "N Gates wait for you" pushes that went out, and the Gates each
-	 * one still names: the last Gate's close withdraws it. Only in memory:
-	 * after a restart the screens clear it themselves when no Gate waits.
-	 */
-	const bundles: { targetId: string; key: string; gates: Set<string> }[] = [];
-	let queue: Promise<void> = Promise.resolve();
+	const bundles = createBundles();
+	const queue = createSerialQueue(onError);
+	const enqueue = queue.enqueue;
+	const pruning = createPruneClock();
 	let stopped = false;
 	let unsubscribe: (() => void) | null = null;
 	let timer: ReturnType<typeof setInterval> | null = null;
-	let prunedAt = Number.NEGATIVE_INFINITY;
 
-	function enqueue(what: string, job: () => Promise<void>): Promise<void> {
-		queue = queue.then(job).catch((error) => onError(what, error));
-		return queue;
-	}
-
-	function message(
-		kind: NoticeKind,
-		key: string,
-		ids: { spaceId: string; runId: string; stepId: string | null },
-		alert: boolean,
-		words?: NoticeWords,
-	): NotificationMessage {
-		return {
-			key,
-			kind,
-			...ids,
-			// A missed schedule names no run: its entry keeps an empty one.
-			runId: ids.runId === "" ? null : ids.runId,
-			title: words?.title ?? titleOf(kind),
-			...(words?.body ? { body: words.body } : {}),
-			alert,
-			count: null,
-			at: now(),
-		};
-	}
-
-	/** What a push about the Gate may show the Person. */
+	/** What a push about the Gate may show the Person: `mayAnswer` is asked only for a Gate marked for the lock screen. */
 	async function gateFacts(
 		key: string,
 		spaceId: string,
 		personId: string,
 	): Promise<GateFacts> {
 		const ref = gates.factsOf(spaceId, key);
-		if (!ref?.lockScreen || !(await mayAnswer(spaceId, personId))) {
-			return { lockScreen: false, options: [] };
-		}
-		return {
-			lockScreen: true,
-			options: (ref.choices ?? []).map((name) => ({ id: name, label: name })),
-		};
+		return gateFactsOf(
+			ref,
+			ref?.lockScreen === true && (await mayAnswer(spaceId, personId)),
+		);
 	}
 
 	/** The message a push sends: a Gate's adds what its notification may show. */
 	async function pushMessage(
 		kind: NoticeKind,
 		key: string,
-		ids: { spaceId: string; runId: string; stepId: string | null },
+		ids: NoticeIds,
 		personId: string,
 		words?: NoticeWords,
 	): Promise<NotificationMessage> {
-		const msg = message(kind, key, ids, true, words);
+		const msg = noticeMessage(kind, key, ids, true, now(), words);
 		if (kind !== "gate-opened") return msg;
 		return { ...msg, gate: await gateFacts(key, ids.spaceId, personId) };
-	}
-
-	function wants(settings: NotificationSettings, kind: NoticeKind): boolean {
-		if (kind === "gate-opened") return settings.events.gateOpened;
-		if (kind === "run-finished") return settings.events.runFinished;
-		if (kind === "device-wait") return settings.events.deviceWait;
-		// A run that did not start, as a person sees it: like a run that failed.
-		if (kind === "schedule-missed") return settings.events.runFailed;
-		// A Now alert: the Now urgency of the Person's push settings decides (`tell`).
-		if (kind === "flow-needs-a-look") return true;
-		return settings.events.runFailed;
 	}
 
 	/** The Person's push targets their settings allow and a channel can reach. */
@@ -240,7 +157,7 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 	async function tell(
 		kind: NoticeKind,
 		key: string,
-		ids: { spaceId: string; runId: string; stepId: string | null },
+		ids: NoticeIds,
 		options: {
 			inApp?: boolean;
 			people?: readonly string[];
@@ -261,7 +178,7 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 			if (inApp) {
 				await deps.inApp.send(
 					{ kind: "in-app", personId },
-					message(kind, key, ids, alert, words),
+					noticeMessage(kind, key, ids, alert, now(), words),
 				);
 			}
 			// A Gate of an urgency the Person does not push for: the inbox only.
@@ -271,14 +188,7 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 					pushesUrgency(settings, options.urgency));
 			if (pushes) {
 				await push(
-					{
-						personId,
-						key,
-						kind,
-						...ids,
-						title: words?.title ?? null,
-						body: words?.body ?? null,
-					},
+					claimOf(personId, key, kind, ids, words),
 					settings,
 					{
 						...(await pushMessage(kind, key, ids, personId, words)),
@@ -378,8 +288,9 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 		sends: boolean,
 	): Promise<void> {
 		const at = now();
-		const targets = (await pushTargets(claim.personId, settings)).filter(
-			(target) => sends || LOCAL_KINDS.has(target.kind),
+		const targets = reachable(
+			await pushTargets(claim.personId, settings),
+			sends,
 		);
 		if (targets.length === 0) {
 			if (sends) await deps.deliveries.claim(claim, { status: "dropped" }, at);
@@ -395,29 +306,17 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 		}
 		const holding =
 			settings.holdMinutes > 0 && deps.inApp.isActive(claim.personId);
-		const held = holding ? targets.filter((t) => t.kind !== "desktop") : [];
+		const held = heldTargets(targets, holding);
 		const immediate = targets.filter((t) => !held.includes(t));
-		// Every target until the push went out: a crash before then leaves
-		// them all to the next check (`sendDue`).
-		const claimed = await deps.deliveries.claim(
-			claim,
-			{
-				status: "sending",
-				heldFor: targets.map((t) => t.id),
-				...(held.length > 0
-					? { dueAt: at + settings.holdMinutes * 60_000 }
-					: {}),
-			},
-			at,
-		);
-		if (!claimed) return;
+		const ids = targets.map((t) => t.id);
+		const holdMinutes = settings.holdMinutes;
+		// Every target until the push went out (`sendDue` checks them).
+		const sending = sendingClaim(ids, held.length > 0, at, holdMinutes);
+		if (!(await deps.deliveries.claim(claim, sending, at))) return;
 		const sentTo = await sendTo(immediate, msg);
-		await deps.deliveries.update(claim.personId, claim.key, {
-			sentTo,
-			sentAt: sentTo.length > 0 ? at : null,
-			heldFor: held.map((t) => t.id),
-			status: held.length > 0 ? "held" : sentTo.length > 0 ? "sent" : "dropped",
-		});
+		const heldIds = held.map((t) => t.id);
+		const entry = pushedEntry(sentTo, heldIds, at);
+		await deps.deliveries.update(claim.personId, claim.key, entry);
 	}
 
 	/** A Gate closed, or a device wait is over: withdraw it everywhere, and drop what still waits. */
@@ -426,45 +325,29 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 			await deps.inApp.withdraw({ kind: "in-app", personId }, key);
 		}
 		for (const row of await deps.deliveries.live(key)) {
-			for (const target of await deps.targets.byIds(row.sentTo)) {
-				try {
-					await deps.push[target.kind]?.withdraw(target, key);
-				} catch (error) {
-					onError(`A ${target.kind} withdraw did not go out.`, error);
-				}
-			}
-			await deps.deliveries.update(row.personId, key, {
-				status: row.sentTo.length > 0 ? "withdrawn" : "dropped",
-				heldFor: [],
-				withdrawnAt: now(),
-			});
+			await withdrawFrom(row.sentTo, key);
+			const entry = withdrawnEntry(row, now());
+			await deps.deliveries.update(row.personId, key, entry);
 		}
-		await withdrawBundles(key);
+		// Each "N Gates wait for you" push whose last Gate just closed.
+		for (const bundle of bundles.closed(key)) {
+			await withdrawFrom([bundle.targetId], bundle.key);
+		}
 	}
 
-	/** Withdraws each "N Gates wait for you" push whose last Gate just closed. */
-	async function withdrawBundles(key: string): Promise<void> {
-		for (const bundle of [...bundles]) {
-			if (!bundle.gates.delete(key) || bundle.gates.size > 0) continue;
-			bundles.splice(bundles.indexOf(bundle), 1);
-			for (const target of await deps.targets.byIds([bundle.targetId])) {
-				try {
-					await deps.push[target.kind]?.withdraw(target, bundle.key);
-				} catch (error) {
-					onError(`A ${target.kind} withdraw did not go out.`, error);
-				}
+	/** Takes the push of the key back from each target of the ids. */
+	async function withdrawFrom(ids: string[], key: string): Promise<void> {
+		for (const target of await deps.targets.byIds(ids)) {
+			try {
+				await deps.push[target.kind]?.withdraw(target, key);
+			} catch (error) {
+				onError(`A ${target.kind} withdraw did not go out.`, error);
 			}
 		}
 	}
 
 	async function handle(facts: readonly LandedFact[]): Promise<void> {
-		const bySpace = new Map<string, LandedFact[]>();
-		for (const fact of facts) {
-			const list = bySpace.get(fact.spaceId) ?? [];
-			list.push(fact);
-			bySpace.set(fact.spaceId, list);
-		}
-		for (const [spaceId, list] of bySpace) {
+		for (const [spaceId, list] of factsBySpace(facts)) {
 			/** The runs of this landing an item already tells of: a screen reads them again. */
 			const told = new Set<string>();
 			const { opened, closed } = await gates.apply(spaceId, list);
@@ -481,15 +364,13 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 			const { started, ended } = waits.apply(spaceId, list, now());
 			for (const key of ended) await close(spaceId, key);
 			for (const wait of started) await tellWait(spaceId, wait);
-			for (const fact of list) {
-				if (fact.kind !== "run-ended") continue;
-				if (fact.status !== "finished" && fact.status !== "failed") continue;
-				await tell(
-					fact.status === "finished" ? "run-finished" : "run-failed",
-					runEndKey(fact.runId, fact.seq),
-					{ spaceId, runId: fact.runId, stepId: null },
-				);
-				told.add(fact.runId);
+			for (const end of endedRuns(list)) {
+				await tell(end.kind, end.key, {
+					spaceId,
+					runId: end.runId,
+					stepId: null,
+				});
+				told.add(end.runId);
 			}
 			for (const fact of list) {
 				if (fact.kind === "run-ended") await tellSevere(spaceId, fact.runId);
@@ -508,16 +389,7 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 		facts: readonly LandedFact[],
 		told: ReadonlySet<string>,
 	): Promise<void> {
-		const runs = new Set(
-			facts
-				.filter(
-					(f) =>
-						f.changes === "summary" &&
-						f.kind !== "gate-opened" &&
-						!told.has(f.runId),
-				)
-				.map((f) => f.runId),
-		);
+		const runs = changedRuns(facts, told);
 		if (runs.size === 0) return;
 		const audience = await deps.audience(spaceId);
 		for (const runId of runs) {
@@ -534,9 +406,7 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 			row.key,
 			{ spaceId: row.spaceId, runId: row.runId, stepId: row.stepId },
 			row.personId,
-			row.title === null
-				? undefined
-				: { title: row.title, ...(row.body ? { body: row.body } : {}) },
+			keptWords(row),
 		);
 	}
 
@@ -547,17 +417,10 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 	 */
 	async function sendDue(at: number): Promise<void> {
 		const held = await deps.deliveries.held();
-		const lost = (await deps.deliveries.sending()).filter(
-			(row) => row.createdAt + LOST_AFTER_MS <= at,
+		const sending = await deps.deliveries.sending();
+		const due = duePushes(held, sending, at, (personId) =>
+			deps.inApp.isActive(personId),
 		);
-		const due = [
-			...held.filter(
-				(row) =>
-					(row.dueAt !== null && row.dueAt <= at) ||
-					!deps.inApp.isActive(row.personId),
-			),
-			...lost,
-		];
 		for (const row of due) {
 			const settings = await deps.settings.get(row.personId);
 			if (inQuietHours(settings, at)) {
@@ -567,57 +430,30 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 				continue;
 			}
 			// A run's end showed on the open screen: no push after it.
-			const seen =
-				row.kind !== "gate-opened" &&
-				// No page shows a missed schedule, or a flow that needs a look, as an item: it goes out.
-				row.kind !== "schedule-missed" &&
-				row.kind !== "flow-needs-a-look" &&
-				deps.inApp.isActive(row.personId);
+			const seen = seenOnScreen(row.kind, () =>
+				deps.inApp.isActive(row.personId),
+			);
 			const sent = seen
 				? []
 				: await sendTo(
 						await deps.targets.byIds(row.heldFor),
 						await messageOf(row),
 					);
-			const sentTo = [...row.sentTo, ...sent];
-			await deps.deliveries.update(row.personId, row.key, {
-				status: sentTo.length > 0 ? "sent" : "dropped",
-				sentTo,
-				heldFor: [],
-				sentAt: sent.length > 0 ? at : row.sentAt,
-			});
+			await deps.deliveries.update(
+				row.personId,
+				row.key,
+				sentHeldEntry(row, sent, at),
+			);
 		}
 	}
 
 	async function endQuietHours(at: number): Promise<void> {
-		const byPerson = new Map<string, Delivery[]>();
-		for (const row of await deps.deliveries.quiet()) {
-			const list = byPerson.get(row.personId) ?? [];
-			list.push(row);
-			byPerson.set(row.personId, list);
-		}
-		for (const [personId, rows] of byPerson) {
+		for (const [personId, rows] of byPerson(await deps.deliveries.quiet())) {
 			const settings = await deps.settings.get(personId);
 			if (inQuietHours(settings, at)) continue;
-			const gates = rows.filter((row) => row.kind === "gate-opened");
-			// A wait that is over was withdrawn: what is left still waits.
-			// A missed schedule, and a flow that needs a look, are still news
-			// when quiet hours end: they go out too.
-			const stillWait = rows.filter(
-				(row) =>
-					row.kind === "device-wait" ||
-					row.kind === "schedule-missed" ||
-					row.kind === "flow-needs-a-look",
-			);
+			const { gates, stillWait, dropped } = quietEnd(rows);
 			// Runs that ended meanwhile go without a push.
-			for (const row of rows) {
-				if (
-					row.kind === "gate-opened" ||
-					row.kind === "device-wait" ||
-					row.kind === "schedule-missed" ||
-					row.kind === "flow-needs-a-look"
-				)
-					continue;
+			for (const row of dropped) {
 				await deps.deliveries.update(personId, row.key, {
 					status: "dropped",
 					heldFor: [],
@@ -625,8 +461,7 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 			}
 			// Each screen hears of the Gates it held, and only of those: a
 			// Space another Host sends for held this computer's own screens.
-			const held = [...new Set(gates.flatMap((row) => row.heldFor))];
-			const targets = (await deps.targets.byIds(held)).filter(
+			const targets = (await deps.targets.byIds(heldTargetIds(gates))).filter(
 				(target) => settings.screens[target.kind],
 			);
 			const sentTo = new Map<string, string[]>();
@@ -640,22 +475,15 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 				} else if (waiting.length > 1) {
 					const key = waitingKey(at);
 					// The screen was told of each Gate: each one's close withdraws it there.
-					const sent = await sendTo([target], {
-						key,
-						kind: "gates-waiting",
-						spaceId: null,
-						runId: null,
-						stepId: null,
-						title: gatesWaitingTitle(waiting.length),
-						alert: true,
-						count: waiting.length,
-						at,
-					});
+					const sent = await sendTo(
+						[target],
+						gatesWaitingMessage(key, waiting.length, at),
+					);
 					for (const row of waiting) {
 						sentTo.set(row.key, [...(sentTo.get(row.key) ?? []), ...sent]);
 					}
 					if (sent.length > 0) {
-						bundles.push({
+						bundles.add({
 							targetId: target.id,
 							key,
 							gates: new Set(waiting.map((row) => row.key)),
@@ -671,12 +499,11 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 			}
 			for (const row of [...gates, ...stillWait]) {
 				const sent = sentTo.get(row.key) ?? [];
-				await deps.deliveries.update(personId, row.key, {
-					status: sent.length > 0 ? "sent" : "dropped",
-					sentTo: sent,
-					heldFor: [],
-					sentAt: sent.length > 0 ? at : null,
-				});
+				await deps.deliveries.update(
+					personId,
+					row.key,
+					quietEndEntry(sent, at),
+				);
 			}
 		}
 	}
@@ -754,7 +581,7 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 						const { closed } = await gates.recheck(spaceId, runId);
 						for (const key of closed) await close(spaceId, key);
 					}),
-		idle: () => queue,
+		idle: () => queue.idle(),
 	};
 
 	async function tick(): Promise<void> {
@@ -767,8 +594,7 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 
 	/** Removes the entries older than the inbox keeps (90 days), once an hour. */
 	async function prune(at: number): Promise<void> {
-		if (at - prunedAt < PRUNE_EVERY_MS) return;
-		prunedAt = at;
+		if (!pruning.due(at)) return;
 		await deps.deliveries.prune(at - INBOX_KEEP_MS);
 	}
 }
