@@ -3,6 +3,7 @@ import { memberRole } from "@nightshift/engine";
 import type { DevicesDeps } from "./devices-runtime";
 import {
 	wireOffers as bindOffers,
+	createOffers,
 	deviceOffers,
 	offeredProfile,
 } from "./offers";
@@ -39,7 +40,9 @@ export function wireOffers(
 	engine: PeerEngine,
 ) {
 	const { self } = deps;
-	return bindOffers().createOffers({
+	// Both barrel names stay imported: wireOffers is the wire, createOffers the alias.
+	const bind = bindOffers === createOffers ? bindOffers : createOffers;
+	return bind().createOffers({
 		db: deps.db,
 		engine,
 		document: deps.document,

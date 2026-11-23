@@ -51,7 +51,7 @@ type OfferDocument = {
  * Two checks, two code paths. The Walker refuses at run start a flow
  * whose nodes would do on that Device anything but run an offered profile
  * (`offerRefusal`). The Device checks every call again from its own
- * Replica (`admission.ts`): it resolves the profile itself, clamps the
+ * Replica (`admitOfferedCall`): it resolves the profile itself, clamps the
  * permission mode to the cap and queues a session over the session cap.
  */
 

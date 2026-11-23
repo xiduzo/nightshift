@@ -145,7 +145,7 @@ export function createPeers(
 	const hostSpaces = createHostSpaces(db);
 
 	/** The offered sessions running now: what withdrawing an Offer stops. */
-	const offersWire = wireOffers({ now });
+	const offersWire = wireOffers();
 	const offeredSessions = offersWire.createOfferedSessions();
 	const work = options.work && offeredSessions.relay(options.work);
 	/**
