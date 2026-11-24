@@ -3,6 +3,7 @@ import type { DeviceCopies } from "@nightshift/engine/settings";
 import type {
 	MergeRow,
 	MergeTarget,
+	PausedBySplit,
 	PausedSchedule,
 	SplitRow,
 	Unfinished,
@@ -75,18 +76,13 @@ export type MembershipRecord = {
 		plan(
 			input: Omit<
 				SplitRow,
-				"state" | "projects" | "runs" | "unpinned" | "paused"
+				"state" | "projects" | "runs" | "unpinned" | "paused" | "waiting"
 			>,
 		): Promise<SplitRow>;
-		/** The schedules the split pauses, kept before the first one pauses. None: they are on again. */
-		paused(
-			toSpace: string,
-			schedules: readonly PausedSchedule[],
-		): Promise<void>;
 		/** A split that moved no row goes. One that moved its rows stays. */
 		forget(toSpace: string): Promise<void>;
-		/** The splits off a Space of that Host that are done, oldest first. */
-		ofHost(hostId: string): Promise<SplitRow[]>;
+		/** What each split whose rows moved paused here, oldest first. */
+		paused(): Promise<PausedBySplit[]>;
 		/**
 		 * The statements that mark the split moved: they go in the batch that
 		 * moves the rows.
@@ -97,6 +93,8 @@ export type MembershipRecord = {
 				projects: readonly string[];
 				runs: number;
 				unpinned: number;
+				paused: readonly PausedSchedule[];
+				waiting: Readonly<Record<string, string>>;
 			},
 		): RowBatch;
 		/** The new Space's document has its Projects. */

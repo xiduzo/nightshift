@@ -405,6 +405,7 @@ export function createEngine(
 		db,
 		log: runLog,
 		flows: projectFlows,
+		pausedHere: options.pausedHere,
 		now,
 		tickMs: internals.scheduleTickMs,
 		access,

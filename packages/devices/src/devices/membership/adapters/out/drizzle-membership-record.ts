@@ -22,7 +22,7 @@ function mergeOf(row: typeof spaceMerge.$inferSelect): MergeRow {
 		projectMap: parse(row.projectMap, {}),
 		personMap: parse(row.personMap, {}),
 		joined: parse(row.joined, []),
-		late: parse(row.late, []),
+		late: parse(row.late, null),
 		backup: row.backup,
 		createdAt: instant(row.createdAt),
 		updatedAt: instant(row.updatedAt),
@@ -41,7 +41,8 @@ function splitOf(row: typeof spaceSplit.$inferSelect): SplitRow {
 		projects: parse(row.projects, []),
 		runs: row.runs,
 		unpinned: row.unpinned,
-		paused: parse(row.paused, null),
+		paused: parse(row.paused, []),
+		waiting: parse(row.waiting, {}),
 		backup: row.backup,
 	};
 }
@@ -143,11 +144,7 @@ export function drizzleMembershipRecord(db: Database): MembershipRecord {
 						.update(spaceMerge)
 						.set({
 							state: "moved",
-							projectMap: JSON.stringify(input.projectMap),
-							personMap: JSON.stringify(input.personMap),
-							late: JSON.stringify(
-								Object.values(input.projectMap).map((t) => t.projectId),
-							),
+							late: JSON.stringify(input),
 							updatedAt: asDate(),
 						})
 						.where(eq(spaceMerge.fromSpace, fromSpace)),
@@ -188,11 +185,13 @@ export function drizzleMembershipRecord(db: Database): MembershipRecord {
 				return splitOf(row);
 			},
 
-			async paused(toSpace, schedules) {
-				await db
-					.update(spaceSplit)
-					.set({ paused: JSON.stringify(schedules), updatedAt: asDate() })
-					.where(eq(spaceSplit.toSpace, toSpace));
+			async paused() {
+				const rows = await db
+					.select()
+					.from(spaceSplit)
+					.where(ne(spaceSplit.state, "planned"))
+					.orderBy(asc(spaceSplit.createdAt));
+				return rows.map(splitOf);
 			},
 
 			async forget(toSpace) {
@@ -206,17 +205,6 @@ export function drizzleMembershipRecord(db: Database): MembershipRecord {
 					);
 			},
 
-			async ofHost(hostId) {
-				const rows = await db
-					.select()
-					.from(spaceSplit)
-					.where(
-						and(eq(spaceSplit.hostId, hostId), eq(spaceSplit.state, "done")),
-					)
-					.orderBy(asc(spaceSplit.createdAt));
-				return rows.map(splitOf);
-			},
-
 			moved(toSpace, input) {
 				return asBatch(
 					db
@@ -226,6 +214,8 @@ export function drizzleMembershipRecord(db: Database): MembershipRecord {
 							projects: JSON.stringify(input.projects),
 							runs: input.runs,
 							unpinned: input.unpinned,
+							paused: JSON.stringify(input.paused),
+							waiting: JSON.stringify(input.waiting),
 							updatedAt: asDate(),
 						})
 						.where(eq(spaceSplit.toSpace, toSpace)),

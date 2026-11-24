@@ -161,6 +161,20 @@ export function flowStoreContract(
 				});
 			}));
 
+		test("a merge apart takes no id and no name of what comes later, and runs nothing", () =>
+			withStore(async ({ store, projects: [source, destination] }) => {
+				await store.saveSchedules(source, [nightly("build", "night")]);
+				for (let i = 0; i < 2; i++) {
+					await store.merge(source, destination, { at: 9, apart: "abcd" });
+				}
+				expect((await store.schedules(destination)).schedules).toEqual([
+					{ ...nightly("build", "night-abcd"), enabled: false },
+				]);
+				expect((await store.schedules(source)).schedules).toEqual([
+					nightly("build", "night"),
+				]);
+			}));
+
 		test("a note is added once per marker, also after it was dismissed", () =>
 			withStore(async ({ store, projects: [project] }) => {
 				const notice = {

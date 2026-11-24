@@ -90,6 +90,8 @@ export function wireEngineSchedules(deps: {
 	log: RunLog;
 	/** The flows slice: the schedules and flows of each project. */
 	flows: SchedulesDeps["flows"];
+	/** `EngineOptions.pausedHere`. */
+	pausedHere: EngineOptions["pausedHere"];
 	now(): number;
 	/** How often the scheduler looks for due schedules. Default 30 000 ms. */
 	tickMs: SchedulesDeps["tickMs"];
@@ -131,6 +133,7 @@ export function wireEngineSchedules(deps: {
 	const schedules = wireSchedules({
 		log: { db, log },
 		flows: deps.flows,
+		...(deps.pausedHere ? { pausedHere: deps.pausedHere } : {}),
 		clock: now,
 		tickMs: deps.tickMs,
 		access: deps.access,

@@ -3,9 +3,11 @@ import * as Y from "yjs";
 import type { FlowDocument } from "../../../../documents";
 import { same } from "../../domain/flow-json";
 import {
+	apartId,
 	type FlowMergePlan,
 	isRecord,
 	mergedSchedule,
+	NEVER_OLDER,
 	sameFlow,
 	withPerson,
 } from "../../domain/flow-merge";
@@ -83,6 +85,16 @@ export function planFlowMerge(
 	return plan;
 }
 
+/** Every schedule under an id of its own: those of the destination are not all here. */
+function apartPlan(source: FlowDocument, apart: string): FlowMergePlan {
+	const from = mapsOf(source);
+	const ids = orderedKeys(from.schedules, from.scheduleOrder);
+	return {
+		flows: {},
+		schedules: Object.fromEntries(ids.map((id) => [id, apartId(id, apart)])),
+	};
+}
+
 /**
  * Merges the source's flows, their revisions and its schedules into the
  * destination. The history first, then the flows and schedules in one
@@ -92,10 +104,18 @@ export function planFlowMerge(
 export async function mergeFlowDocuments(
 	source: FlowDocument,
 	destination: FlowDocument,
-	options: { persons?: Readonly<Record<string, string>>; at: number },
+	options: {
+		persons?: Readonly<Record<string, string>>;
+		at: number;
+		/** The destination is not all here: what merges keeps apart from what comes (`domain/flow-merge.ts`). */
+		apart?: string;
+	},
 ): Promise<FlowMergePlan> {
 	const persons = options.persons ?? {};
-	const plan = planFlowMerge(source, destination, persons);
+	const plan =
+		options.apart === undefined
+			? planFlowMerge(source, destination, persons)
+			: apartPlan(source, options.apart);
 
 	const history = source.history.doc;
 	const flowIds = [...history.share.keys()];
@@ -138,6 +158,9 @@ export async function mergeFlowDocuments(
 			if (renamed !== undefined && copy instanceof Y.Map) {
 				copy.set("name", renamed);
 			}
+			if (options.apart !== undefined && copy instanceof Y.Map) {
+				copy.set("createdAt", NEVER_OLDER);
+			}
 			into.flows.set(flowId, copy);
 		}
 		for (const key of orderedKeys(from.schedules, from.scheduleOrder)) {
@@ -150,7 +173,13 @@ export async function mergeFlowDocuments(
 			if (into.schedules.has(id)) continue;
 			into.schedules.set(
 				id,
-				isRecord(schedule) && id !== key ? { ...schedule, id } : schedule,
+				isRecord(schedule) && id !== key
+					? {
+							...schedule,
+							id,
+							...(options.apart === undefined ? {} : { enabled: false }),
+						}
+					: schedule,
 			);
 			into.scheduleOrder.push([id]);
 		}

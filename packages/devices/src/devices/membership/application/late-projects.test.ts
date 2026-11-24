@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { Refusal } from "@nightshift/refusal";
 import { inMemoryHome, moving } from "../adapters/out/in-memory-home";
 import { movedLate } from "../domain/words";
 import { mergeSteps } from "./merge-steps";
@@ -46,11 +47,31 @@ describe("a Project that a done merge left", () => {
 		expect(world.databaseCopy.copies).toHaveLength(2);
 	});
 
-	test("a batch that failed is not tried again in this process, and the next one tries", async () => {
+	test("a Host that refuses them is asked again after an hour, and a batch that failed is not tried again in this process, and the next one tries", async () => {
 		const { deps, world } = inMemoryHome();
-		const steps = mergeSteps(deps);
+		const clock = { now: 1 };
+		const steps = mergeSteps({ ...deps, now: () => clock.now });
 		await steps.start({});
 		world.projects.push(moving("late"));
+		let refused = new Refusal("conflict", "Not here.");
+		world.callFails = refused;
+		const warn = console.warn;
+		const lines: unknown[] = [];
+		console.warn = (line) => lines.push(line);
+		await expect(steps.moveLate()).rejects.toThrow("Not here.");
+		await steps.moveLate();
+		clock.now += 3_600_001;
+		await expect(steps.moveLate()).rejects.toThrow("Not here.");
+		clock.now += 3_600_001;
+		refused = new Refusal("unavailable", "Offline.");
+		world.callFails = refused;
+		for (let i = 0; i < 2; i++) {
+			await expect(steps.moveLate()).rejects.toThrow("Offline.");
+		}
+		console.warn = warn;
+		expect(lines).toHaveLength(1);
+		expect(world.databaseCopy.copies).toHaveLength(1);
+		world.callFails = null;
 		world.batchFails = new Error("disk full");
 		await expect(steps.moveLate()).rejects.toThrow("disk full");
 		await steps.moveLate();
@@ -73,7 +94,10 @@ describe("a Project that a done merge left", () => {
 		const row = await world.record.merges.latest();
 		expect(row).toMatchObject({
 			state: "moved",
-			late: ["late"],
+			late: {
+				projectMap: { late: { spaceId: "theirs", projectId: "late" } },
+			},
+			projectMap: { p1: { spaceId: "theirs", projectId: "p1" } },
 			backup: "/tmp/before-personal-merge.db",
 		});
 		world.pushed = true;

@@ -1,3 +1,4 @@
+import { Refusal } from "@nightshift/refusal";
 import { now as timeNow } from "@nightshift/time";
 import type { PersonalMerge as HostAnswer } from "../../../contract";
 import type { Link } from "../../../links";
@@ -10,6 +11,9 @@ import {
 } from "../domain/words";
 import type { MergeDeps, MergeReady } from "./merge-steps";
 import type { MembershipRecord } from "./ports";
+
+/** How long a Host that refused the Projects is not asked again: 1 hour. */
+const REFUSED_FOR_MS = 60 * 60_000;
 
 /** The steps of a merge that its late Projects take too. */
 type Steps = {
@@ -43,10 +47,10 @@ export function lateProjects(
 
 	/** Tells the person on the Flows page of each Project that moved later than the merge. */
 	async function say(row: MergeRow): Promise<void> {
-		if (row.late.length === 0) return;
+		if (!row.late) return;
 		const home = await deps.hostLinks.home();
 		const name = home?.hostId === row.hostId ? home.name : "your home Host";
-		for (const projectId of row.late) {
+		for (const { projectId } of Object.values(row.late.projectMap)) {
 			await engine.flows.note(projectId, `movedLate:${row.fromSpace}`, {
 				kind: "project-moved",
 				message: movedLate(name),
@@ -54,8 +58,8 @@ export function lateProjects(
 		}
 	}
 
-	/** The old Spaces whose Projects did not move in this process: the next start tries again. */
-	const notMoved = new Set<string>();
+	/** The old Spaces whose Projects did not move: when a try may come again. */
+	const waits = new Map<string, number>();
 
 	/**
 	 * Moves the Projects a done merge left in its old Space to the Host, when
@@ -64,7 +68,7 @@ export function lateProjects(
 	 */
 	async function moveOf(row: MergeRow): Promise<MergeRow | null> {
 		const { fromSpace: from, toSpace: to } = row;
-		if (to === null || notMoved.has(from)) return null;
+		if (to === null || now() < (waits.get(from) ?? 0)) return null;
 		if ((await engine.projects.ofSpace(from)).length === 0) return null;
 		// Only an old Space that is gone, of the Personal this computer has now.
 		if (await deps.personalSpaces.exists(from)) return null;
@@ -74,7 +78,20 @@ export function lateProjects(
 		if ((await deps.hostLinks.home())?.hostId !== row.hostId) return null;
 		const checked = await steps.checks(row);
 		if (checked.held !== null || checked.to !== to) return null;
-		const answer = await steps.ask(checked.link, from, [], false);
+		const answer = await steps
+			.ask(checked.link, from, [], false)
+			.catch((error: unknown) => {
+				// A Host that does not answer is asked again soon.
+				if (error instanceof Refusal && error.kind !== "unavailable") {
+					if (!waits.has(from)) {
+						console.warn(
+							`[devices] Projects of ${from} stay on this computer: ${error.message}`,
+						);
+					}
+					waits.set(from, now() + REFUSED_FOR_MS);
+				}
+				throw error;
+			});
 		if (answer.spaceId !== to) return null;
 		const projectMap = steps.targetsOf(answer, to);
 		const { personMap } = answer;
@@ -105,7 +122,7 @@ export function lateProjects(
 			);
 		} catch (error) {
 			// Not on and on: each try makes a copy of the database.
-			notMoved.add(from);
+			waits.set(from, Number.POSITIVE_INFINITY);
 			throw error;
 		}
 		return rows.latest();

@@ -211,6 +211,16 @@ describe("leaving", () => {
 		}
 	});
 
+	test("a key store that does not answer holds neither the leave nor the next start", async () => {
+		const { deps, world } = setUp();
+		world.joined();
+		deps.keys.delete = () => new Promise(() => {});
+		const membership = createHomeMembership({ ...deps, keyWaitMs: 5 });
+		expect((await membership.leave()).keyKept).toBe(true);
+		await membership.beforeLinks();
+		await membership.beforeJoin();
+	});
+
 	test("a key of a Host that gave access back meanwhile stays", async () => {
 		const { world, membership } = setUp();
 		world.joined();
@@ -369,7 +379,6 @@ describe("a split that waits", () => {
 
 	test("is forgotten when the same Host gave access back, and its pauses never reach the Host", async () => {
 		const { world, membership, steps, finishing } = await waiting();
-		expect(world.schedules.get("p1")?.[0]?.enabled).toBe(false);
 
 		joinAgain(world);
 		await membership.beforeJoin();
@@ -430,6 +439,17 @@ describe("a split that waits", () => {
 		world.run("done");
 		await expect(membership.merge()).rejects.toThrow(MERGE_WORDS.leaving);
 		expect(world.record.mergesRows).toEqual([]);
+	});
+
+	test("a join as a guest does not forget it: the split ends", async () => {
+		const { world, membership } = await waiting();
+		world.hosts = world.hosts.map((h) => ({
+			...h,
+			role: "guest",
+			revokedAt: null,
+		}));
+		await membership.beforeJoin();
+		expect(world.record.splitsRows.map((s) => s.state)).toEqual(["done"]);
 	});
 
 	test("that cannot go on now holds a merge, and the page says why", async () => {

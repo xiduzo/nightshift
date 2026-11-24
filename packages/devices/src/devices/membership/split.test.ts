@@ -24,7 +24,7 @@ import {
 	seedFlows,
 	waitFor,
 } from "@nightshift/engine/testing";
-import type { Flow } from "@nightshift/flows";
+import type { Flow, Schedule } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { asDate } from "@nightshift/time";
@@ -36,6 +36,7 @@ import { createDeviceExchange } from "../../exchange";
 import { createHostLinks, type Link } from "../../links";
 import { httpsLink } from "../../links/link";
 import { type PairedReplicas, pairedReplicas } from "../../testing";
+import { pausedHere } from "../../wire-peers-paused";
 import { LEAVE_WORDS, SPLIT_WORDS } from "./domain/words";
 import { type MembershipTestDeps, membershipOver } from "./test-support";
 
@@ -344,6 +345,69 @@ async function joinAgain() {
 	await links.save(link);
 }
 
+/** B's project joined A's of the same remote; its flows wait for A's copy. */
+async function waitingForHost(joined = false) {
+	const remote = "https://github.com/acme/app.git";
+	const repo = async (sandbox: Sandbox, name: string) => {
+		const path = join(sandbox.root, name);
+		await mkdir(path, { recursive: true });
+		await mustGit(path, ["init", "-q", "-b", "main"]);
+		await mustGit(path, ["remote", "add", "origin", remote]);
+		return path;
+	};
+	let into = a.spaceId;
+	if (joined) {
+		into = "team";
+		await a.db.insert(organization).values({
+			id: into,
+			name: "Team",
+			slug: "team",
+			createdAt: asDate(),
+		});
+		await a.db.insert(member).values({
+			id: "in-team",
+			organizationId: into,
+			userId: paired.personId,
+			role: "owner",
+			createdAt: asDate(),
+		});
+	}
+	const onA = await paired.host
+		.space(into, NIGHT_SHIFT)
+		.addProject({ repoPath: await repo(a, "app") });
+	const space = paired.device.space(b.spaceId, NIGHT_SHIFT);
+	const added = await space.addProject({ repoPath: await repo(b, "app") });
+	await seedFlows(space, added.id, { hello: quickFlow }, [
+		{
+			id: "nightly",
+			flow: "hello",
+			inputs: {},
+			cron: "0 22 * * *",
+			enabled: true,
+		},
+	]);
+	const { link } = linkToA();
+	await ready(link);
+	const waits: Link = { ...link, inStep: async () => false };
+	if (joined) {
+		// The Host's copies of the shared Space's rows.
+		await paired.projectOnDevice(onA.id);
+	}
+	await expect(
+		membershipOf(waits).merge({ join: joined ? [added.id] : [] }),
+	).rejects.toBeInstanceOf(Refusal);
+	expect((await b.db.select().from(spaceMerge))[0]?.state).toBe("moved");
+	return { onA, source: added.id, link: waits };
+}
+const flowNames = async (projectId: string) =>
+	Object.keys(
+		await createProjectFlows({
+			documents: paired.flows,
+			project: async () => ({ spaceId: "" }),
+			deviceId: b.deviceId,
+		}).flows(projectId),
+	);
+
 describe("leaving and joining the same Host again", () => {
 	/** B merged into A with its schedules on, in step with A, with a person on one. */
 	async function merged() {
@@ -356,7 +420,7 @@ describe("leaving and joining the same Host again", () => {
 			{ ...nightly, person: paired.personId },
 			{ ...nightly, id: "off", enabled: false },
 		];
-		await flows.saveSchedules(projectId, before);
+		await docFlows().saveSchedules(projectId, before);
 		expect(await syncedSchedules(projectId)).toEqual(before);
 		return { projectId, before };
 	}
@@ -372,98 +436,183 @@ describe("leaving and joining the same Host again", () => {
 		}
 		return { steps, membership };
 	}
+	/** The schedules as the document of this computer has them. */
 	const ownSchedules = async (projectId: string) =>
 		(await paired.device.flows.schedules(projectId, { validate: false }))
 			.schedules;
+	const docFlows = () =>
+		createProjectFlows({
+			documents: paired.flows,
+			project: async () => ({ spaceId: "" }),
+			deviceId: b.deviceId,
+		});
 
-	test("the schedules that the leave paused are on again on the Host, with their person", async () => {
+	/** The schedules as a person of this computer reads them. */
+	async function shown(projectId: string): Promise<Schedule[]> {
+		const own = await personalSpaceId(b.db, localPerson);
+		const { schedules } = await paired.device
+			.space(own as string, NIGHT_SHIFT)
+			.listSchedules(projectId);
+		return schedules.map(
+			({ nextAt: _n, last: _l, deliveries: _d, issues: _i, ...schedule }) =>
+				schedule as Schedule,
+		);
+	}
+
+	test("the schedules that the leave paused here run on on the Host, with their person", async () => {
 		const { projectId, before } = await merged();
 		await revoke();
 		expect((await splitter().revoked(home))?.unpinned).toBe(1);
-		expect((await ownSchedules(projectId)).map((s) => s.enabled)).toEqual([
+		expect((await shown(projectId)).map((s) => s.enabled)).toEqual([
 			false,
 			false,
 		]);
+		expect(await ownSchedules(projectId)).toEqual(before);
 
 		expect((await rejoined()).steps).toEqual(["merge-preview", "merged"]);
 
 		expect(await syncedSchedules(projectId)).toEqual(before);
-		// Once: a person who turns one off later keeps it off.
+		expect(await shown(projectId)).toEqual(before);
+		// A person who turns one off there keeps it off.
 		const off = before.map((s) => ({ ...s, enabled: false }));
-		await paired.device.flows.saveSchedules(projectId, off);
+		await docFlows().saveSchedules(projectId, off);
 		await revoke();
 		await splitter().revoked(home);
 		await rejoined();
 		expect(await syncedSchedules(projectId)).toEqual(off);
 	});
 
-	test("a schedule that a person changed while apart keeps the change, and so does one that a person removed", async () => {
-		const { projectId, before } = await merged();
-		await revoke();
-		await splitter().revoked(home);
-		const [nightly, off] = await ownSchedules(projectId);
-		if (!nightly || !off) throw new Error("No schedules.");
-		const changed = [{ ...nightly, cron: "0 5 * * *" }, off];
-		await paired.device.flows.saveSchedules(projectId, changed);
-		await rejoined();
-		expect(await syncedSchedules(projectId)).toEqual(changed);
-
-		await paired.device.flows.saveSchedules(projectId, before);
-		await revoke();
-		await splitter().revoked(home);
-		await paired.device.flows.saveSchedules(projectId, [off]);
-		await rejoined();
-		expect(await syncedSchedules(projectId)).toEqual([off]);
-	});
-
-	test("a stop between the batch and the schedules goes on to the same end", async () => {
-		const { projectId, before } = await merged();
-		await revoke();
-		await splitter().revoked(home);
-		const engine = {
-			...paired.device,
-			flows: {
-				...paired.device.flows,
-				saveSchedules: () => Promise.reject(new Error("stop")),
-			},
-		} as MembershipTestDeps["engine"];
-		const error = console.error;
-		console.error = () => {};
-		const { steps } = await rejoined({ engine }).finally(() => {
-			console.error = error;
-		});
-		expect(steps).toEqual(["merge-preview", "merge-skipped"]);
-		expect((await b.db.select().from(spaceMerge)).at(-1)?.state).toBe("moved");
-
-		// The next start, before the links: no document of it synced yet.
-		await membershipOf(undefined).beforeLinks();
-		expect(await syncedSchedules(projectId)).toEqual(before);
-	});
-
-	test("a stop of the batch of the leave pauses them once, and keeps what they were", async () => {
-		const { projectId, before } = await merged();
-		await revoke();
-		await expect(
-			splitter({
-				engine: beforeBatch(() => {
-					throw new Error("stop");
-				}),
-			}).revoked(home),
-		).rejects.toThrow("stop");
-		expect((await ownSchedules(projectId))[0]?.enabled).toBe(false);
-		await splitter().revoked(home);
-		await rejoined();
-		expect(await syncedSchedules(projectId)).toEqual(before);
-	});
-
-	test("a split from before this column leaves them as they are", async () => {
+	test("a paused schedule does not fire here, and one that a person turns on does, also in another Space of this computer", async () => {
 		const { projectId } = await merged();
 		await revoke();
 		await splitter().revoked(home);
-		await b.db.update(spaceSplit).set({ paused: null });
-		const paused = await ownSchedules(projectId);
+		const own = (await personalSpaceId(b.db, localPerson)) as string;
+		const here = pausedHere(b.db);
+		expect([...(await here.of(projectId))].sort()).toEqual(["nightly", "off"]);
+		await b.db.insert(organization).values({
+			id: "other",
+			name: "Other",
+			slug: "other",
+			createdAt: asDate(),
+		});
+		await paired.device.space(own, NIGHT_SHIFT).moveProject(projectId, "other");
+		const space = paired.device.space("other", NIGHT_SHIFT);
+		const { schedules } = await space.listSchedules(projectId);
+		expect(schedules.map((s) => s.enabled)).toEqual([false, false]);
+		// A save of the list as it reads changes nothing.
+		await space.saveSchedules(projectId, schedules);
+		expect((await ownSchedules(projectId))[0]?.enabled).toBe(true);
+		await space.saveSchedules(
+			projectId,
+			schedules.map((s) => ({ ...s, enabled: s.id === "nightly" })),
+		);
+		expect((await here.of(projectId)).has("nightly")).toBe(false);
+		expect((await space.listSchedules(projectId)).schedules[0]?.enabled).toBe(
+			true,
+		);
+	});
+
+	/** A person edits the schedules on the Host, as the writer `clientId` of its document. */
+	async function editOnHost(
+		projectId: string,
+		edit: (schedules: Schedule[]) => Schedule[],
+		clientId: number,
+	) {
+		const onA = createFlowDocuments({ db: a.db });
+		(await onA.open(projectId)).current.doc.clientID = clientId;
+		const flows = createProjectFlows({
+			documents: onA,
+			project: async () => ({ spaceId: "" }),
+			deviceId: "a",
+		});
+		const { schedules } = await flows.schedules(projectId, { validate: false });
+		await flows.saveSchedules(projectId, edit(schedules));
+		await onA.flush();
+	}
+	const hostEdits: Record<string, (schedules: Schedule[]) => Schedule[]> = {
+		off: (all) => all.map((s) => ({ ...s, enabled: false })),
+		removed: (all) => all.filter((s) => s.id !== "nightly"),
+		cron: (all) => all.map((s) => ({ ...s, cron: "0 5 * * *" })),
+		nothing: (all) => all,
+	};
+	for (const [what, edit] of Object.entries(hostEdits)) {
+		for (const wins of ["the Host", "this computer"] as const) {
+			for (const state of ["done", "planned"] as const) {
+				test(`what a person did on the Host stays (${what}, ${state} split, ${wins} writes last)`, async () => {
+					const { projectId, before } = await merged();
+					// Yjs gives the key to the higher writer of two at once.
+					(await paired.flows.open(projectId)).current.doc.clientID =
+						wins === "the Host" ? 1_000 : 900_000;
+					await revoke();
+					if (state === "done") {
+						await splitter().revoked(home);
+					} else {
+						await splitter({
+							engine: beforeBatch(() => {
+								throw new Error("stop");
+							}),
+						})
+							.revoked(home)
+							.catch(() => {});
+					}
+					await editOnHost(projectId, edit, 500_000);
+					if (state === "planned") {
+						await joinAgain();
+						await membershipOf(undefined).beforeJoin();
+					}
+					await rejoined();
+					expect(await syncedSchedules(projectId)).toEqual(edit(before));
+				});
+			}
+		}
+	}
+
+	test("what a person did here while apart goes along: a change, a removal, on and off again", async () => {
+		const { projectId, before } = await merged();
+		await revoke();
+		await splitter().revoked(home);
+		const edit = async (change: (all: Schedule[]) => Schedule[]) => {
+			const own = (await personalSpaceId(b.db, localPerson)) as string;
+			await paired.device
+				.space(own, NIGHT_SHIFT)
+				.saveSchedules(projectId, change(await shown(projectId)));
+		};
+		await edit((all) => all.map((s) => ({ ...s, cron: "0 5 * * *" })));
 		await rejoined();
-		expect(await syncedSchedules(projectId)).toEqual(paused);
+		const changed = before.map((s) => ({ ...s, cron: "0 5 * * *" }));
+		expect(await syncedSchedules(projectId)).toEqual(changed);
+
+		await revoke();
+		await splitter().revoked(home);
+		await edit((all) => all.map((s) => ({ ...s, enabled: s.id !== "off" })));
+		await edit((all) => all.map((s) => ({ ...s, enabled: false })));
+		await rejoined();
+		expect((await syncedSchedules(projectId)).map((s) => s.enabled)).toEqual([
+			false,
+			false,
+		]);
+
+		await revoke();
+		await splitter().revoked(home);
+		await edit((all) => all.filter((s) => s.id === "off"));
+		await rejoined();
+		expect((await syncedSchedules(projectId)).map((s) => s.id)).toEqual([
+			"off",
+		]);
+	});
+
+	test("a split from before, whose pause is in the document, leaves it off", async () => {
+		const { projectId, before } = await merged();
+		await revoke();
+		await splitter().revoked(home);
+		await b.db.update(spaceSplit).set({ paused: null, waiting: null });
+		const off = before.map(({ person: _person, ...s }) => ({
+			...s,
+			enabled: false,
+		}));
+		await docFlows().saveSchedules(projectId, off);
+		await rejoined();
+		expect(await syncedSchedules(projectId)).toEqual(off);
 	});
 
 	/** A leave whose batch failed: the split is planned, and its pauses are made. */
@@ -477,7 +626,7 @@ describe("leaving and joining the same Host again", () => {
 				}),
 			}).revoked(home),
 		).rejects.toThrow("stop");
-		expect((await ownSchedules(projectId))[0]?.enabled).toBe(false);
+		expect(await ownSchedules(projectId)).toEqual(before);
 		return { projectId, before };
 	}
 
@@ -487,23 +636,6 @@ describe("leaving and joining the same Host again", () => {
 			const backups = await readdir(join(b.dataDir, "backups"));
 
 			await joinAgain();
-			// Before the link starts: no document synced yet. A stop comes first.
-			const error = console.error;
-			console.error = () => {};
-			await membershipOf(undefined, {
-				engine: {
-					...paired.device,
-					flows: {
-						...paired.device.flows,
-						saveSchedules: () => Promise.reject(new Error("stop")),
-					},
-				} as MembershipTestDeps["engine"],
-			})
-				[step]()
-				.finally(() => {
-					console.error = error;
-				});
-			expect(await b.db.select().from(spaceSplit)).toHaveLength(1);
 			await membershipOf(undefined)[step]();
 			expect(await syncedSchedules(projectId)).toEqual(before);
 
@@ -525,6 +657,14 @@ describe("leaving and joining the same Host again", () => {
 			expect(await syncedSchedules(projectId)).toEqual(before);
 		});
 	}
+
+	test("a join as a guest does not forget a split that moved no row", async () => {
+		await plannedSplit();
+		await joinAgain();
+		await b.db.update(hostLinkTable).set({ role: "guest" });
+		await membershipOf(undefined).beforeJoin();
+		expect((await b.db.select().from(spaceSplit))[0]?.state).toBe("done");
+	});
 
 	test("a split that moved no row goes on when the Host knows this computer as another Person now", async () => {
 		await plannedSplit();
@@ -550,18 +690,9 @@ describe("leaving and joining the same Host again", () => {
 		await membershipOf(undefined).beforeJoin();
 		expect((await b.db.select().from(spaceSplit))[0]?.state).toBe("done");
 		// Personal is this computer's own: on here, they would fire here too.
-		expect((await ownSchedules(projectId))[0]?.enabled).toBe(false);
+		expect((await shown(projectId))[0]?.enabled).toBe(false);
 		await rejoined();
 		expect(await syncedSchedules(projectId)).toEqual(before);
-	});
-
-	test("a planned split with no record of its schedules is forgotten, and none is turned on", async () => {
-		const { projectId } = await plannedSplit();
-		await b.db.update(spaceSplit).set({ paused: null });
-		await joinAgain();
-		await membershipOf(undefined).beforeJoin();
-		expect(await b.db.select().from(spaceSplit)).toEqual([]);
-		expect((await ownSchedules(projectId))[0]?.enabled).toBe(false);
 	});
 
 	test("a planned split off one Host ends before Personal goes to another one", async () => {
@@ -588,27 +719,18 @@ describe("leaving and joining the same Host again", () => {
 		{ hostPersonId: "other" },
 		{ fromSpace: "other" },
 	]) {
-		test(`the record of another leave turns none on: ${Object.keys(other)}`, async () => {
+		test(`a schedule paused by another leave goes off to the Host: ${Object.keys(other)}`, async () => {
 			const { projectId } = await merged();
 			await revoke();
 			await splitter().revoked(home);
 			await b.db.update(spaceSplit).set(other);
-			const paused = await ownSchedules(projectId);
 			await rejoined();
-			expect(await syncedSchedules(projectId)).toEqual(paused);
+			expect((await syncedSchedules(projectId)).map((s) => s.enabled)).toEqual([
+				false,
+				false,
+			]);
 		});
 	}
-
-	test("a schedule that a person changes and turns on while a split waits comes back as they left it", async () => {
-		const { projectId, before } = await plannedSplit();
-		const [nightly, off] = before;
-		if (!nightly || !off) throw new Error("No schedules.");
-		const changed = [{ ...nightly, cron: "0 5 * * *" }, off];
-		await paired.device.flows.saveSchedules(projectId, changed);
-		await splitter().revoked(home);
-		await rejoined();
-		expect(await syncedSchedules(projectId)).toEqual(changed);
-	});
 });
 
 describe("leaving the home Host keeps a copy", () => {
@@ -755,68 +877,8 @@ describe("leaving the home Host keeps a copy", () => {
 	});
 
 	describe("flows that still wait for the Host", () => {
-		/** B's project joined A's of the same remote; its flows wait for A's copy. */
-		async function waiting(joined = false) {
-			const remote = "https://github.com/acme/app.git";
-			const repo = async (sandbox: Sandbox, name: string) => {
-				const path = join(sandbox.root, name);
-				await mkdir(path, { recursive: true });
-				await mustGit(path, ["init", "-q", "-b", "main"]);
-				await mustGit(path, ["remote", "add", "origin", remote]);
-				return path;
-			};
-			let into = a.spaceId;
-			if (joined) {
-				into = "team";
-				await a.db.insert(organization).values({
-					id: into,
-					name: "Team",
-					slug: "team",
-					createdAt: asDate(),
-				});
-				await a.db.insert(member).values({
-					id: "in-team",
-					organizationId: into,
-					userId: paired.personId,
-					role: "owner",
-					createdAt: asDate(),
-				});
-			}
-			const onA = await paired.host
-				.space(into, NIGHT_SHIFT)
-				.addProject({ repoPath: await repo(a, "app") });
-			const space = paired.device.space(b.spaceId, NIGHT_SHIFT);
-			const added = await space.addProject({ repoPath: await repo(b, "app") });
-			await seedFlows(space, added.id, { hello: quickFlow }, [
-				{
-					id: "nightly",
-					flow: "hello",
-					inputs: {},
-					cron: "0 22 * * *",
-					enabled: true,
-				},
-			]);
-			const { link } = linkToA();
-			await ready(link);
-			const waits: Link = { ...link, inStep: async () => false };
-			if (joined) {
-				// The Host's copies of the shared Space's rows.
-				await paired.projectOnDevice(onA.id);
-			}
-			await expect(
-				membershipOf(waits).merge({ join: joined ? [added.id] : [] }),
-			).rejects.toBeInstanceOf(Refusal);
-			expect((await b.db.select().from(spaceMerge))[0]?.state).toBe("moved");
-			return { onA, source: added.id, link: waits };
-		}
-		const flowsIn = async (projectId: string) =>
-			Object.keys(
-				await createProjectFlows({
-					documents: paired.flows,
-					project: async () => ({ spaceId: "" }),
-					deviceId: b.deviceId,
-				}).flows(projectId),
-			);
+		const waiting = waitingForHost;
+		const flowsIn = flowNames;
 
 		test("come along when this computer leaves, with their schedules paused", async () => {
 			const { onA, link } = await waiting();
@@ -830,11 +892,11 @@ describe("leaving the home Host keeps a copy", () => {
 			]);
 			const { schedules } = await own.listSchedules(onA.id);
 			expect(schedules.map((s) => [s.id, s.enabled])).toEqual([
-				["nightly", false],
+				[`nightly-${result.split?.spaceId.slice(0, 8)}`, false],
 			]);
 		});
 
-		test("come along after a stop between their merge and the batch, once", async () => {
+		test("come along after a stop before the batch, and one behind it, once", async () => {
 			const { onA, source, link } = await waiting();
 			await revoke();
 			await expect(
@@ -845,6 +907,10 @@ describe("leaving the home Host keeps a copy", () => {
 				}).revoked(home),
 			).rejects.toThrow("stop");
 			expect(await b.db.select().from(spaceMerge)).toHaveLength(1);
+			const broken = membershipOf(link, {
+				spaces: { open: () => Promise.reject(new Error("stop")) },
+			});
+			await expect(broken.revoked(home)).rejects.toThrow("stop");
 			const split = await membershipOf(link).revoked(home);
 			const own = paired.device.space(split?.spaceId as string, NIGHT_SHIFT);
 			expect((await own.flows.list(onA.id)).map((f) => f.name)).toEqual([
@@ -861,8 +927,8 @@ describe("leaving the home Host keeps a copy", () => {
 			expect(await flowsIn(onA.id)).toEqual(["hello"]);
 		});
 
-		test("that do not merge hold the split: nothing of the merge is forgotten", async () => {
-			const { link } = await waiting();
+		test("that do not merge keep the split going: the Project each goes to is not forgotten", async () => {
+			const { onA, link } = await waiting();
 			await revoke();
 			const engine = {
 				...paired.device,
@@ -874,11 +940,67 @@ describe("leaving the home Host keeps a copy", () => {
 			await expect(
 				membershipOf(link, { engine }).revoked(home),
 			).rejects.toThrow("unreadable");
-			expect(await b.db.select().from(spaceMerge)).toHaveLength(1);
-			expect((await b.db.select().from(spaceSplit))[0]?.state).toBe("planned");
-			expect(await personalSpaceId(b.db, localPerson)).toBe(a.spaceId);
+			const [row] = await b.db.select().from(spaceSplit);
+			expect(row?.state).toBe("moved");
+			const split = await membershipOf(link).revoked(home);
+			const own = paired.device.space(split?.spaceId as string, NIGHT_SHIFT);
+			expect((await own.flows.list(onA.id)).map((f) => f.name)).toEqual([
+				"hello",
+			]);
 		});
 	});
+
+	for (const state of ["done", "planned"] as const) {
+		for (const wins of [1, 4_000_000_000]) {
+			test(`flows that wait never take the place of those the Host has (${state} split, writer ${wins})`, async () => {
+				const { onA, source, link } = await waitingForHost();
+				const flowsOnA = createProjectFlows({
+					documents: createFlowDocuments({ db: a.db }),
+					project: async () => ({ spaceId: "" }),
+					deviceId: "a",
+				});
+				const theirFlow = {
+					...quickFlow,
+					nodes: [{ ...quickFlow.nodes[0], command: "echo host" }],
+				} as Flow;
+				await flowsOnA.save(onA.id, "hello", theirFlow);
+				await flowsOnA.saveSchedules(onA.id, [
+					{
+						id: "nightly",
+						flow: "hello",
+						inputs: {},
+						cron: "0 5 * * *",
+						enabled: false,
+					},
+				]);
+				(await paired.flows.open(onA.id)).current.doc.clientID = wins;
+				await revoke();
+				const membership = membershipOf(link, {
+					engine:
+						state === "done"
+							? paired.device
+							: beforeBatch(() => {
+									throw new Error("stop");
+								}),
+				});
+				await membership.revoked(home).catch(() => {});
+				await joinAgain();
+				await membershipOf(undefined).beforeJoin();
+				const schedules = await syncedSchedules(onA.id);
+				const onHost = schedules.find((s) => s.id === "nightly");
+				expect(onHost).toMatchObject({ cron: "0 5 * * *", enabled: false });
+				expect(schedules.filter((s) => s.enabled)).toEqual([]);
+				const flows = await createProjectFlows({
+					documents: createFlowDocuments({ db: a.db }),
+					project: async () => ({ spaceId: "" }),
+					deviceId: "a",
+				}).flows(onA.id);
+				expect(JSON.stringify(flows.hello)).toContain("echo host");
+				expect(Object.keys(flows)).toHaveLength(state === "done" ? 2 : 1);
+				expect(await flowNames(source)).toEqual(["hello"]);
+			});
+		}
+	}
 
 	test("a project without a folder comes along: every Device has it", async () => {
 		const { projectId } = await mergedIntoA();

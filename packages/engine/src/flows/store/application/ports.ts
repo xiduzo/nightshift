@@ -106,11 +106,20 @@ export type FlowStore = {
 		destination: string,
 		persons: Readonly<Record<string, string>>,
 	): Promise<FlowMergePlan>;
-	/** Merges the flows of `source`, their revisions and its schedules into `destination`. Runs again safely. */
+	/**
+	 * Merges the flows of `source`, their revisions and its schedules into
+	 * `destination`. Runs again safely. `apart`: `destination` is not all
+	 * here, so each schedule takes an id of its own with this suffix and is
+	 * off, and each flow reads as younger than every other one.
+	 */
 	merge(
 		source: string,
 		destination: string,
-		merge: { persons?: Readonly<Record<string, string>>; at: number },
+		merge: {
+			persons?: Readonly<Record<string, string>>;
+			at: number;
+			apart?: string;
+		},
 	): Promise<FlowMergePlan>;
 };
 

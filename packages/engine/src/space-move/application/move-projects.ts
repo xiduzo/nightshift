@@ -36,7 +36,7 @@ export type MoveProjectsPorts = {
 async function editSchedules(
 	schedules: Pick<ProjectFlows, "schedules" | "saveSchedules">,
 	projectIds: readonly string[],
-	edit: (schedule: Schedule) => Schedule,
+	edit: (schedule: Schedule, projectId: string) => Schedule,
 ): Promise<number> {
 	let changed = 0;
 	for (const projectId of projectIds) {
@@ -50,7 +50,7 @@ async function editSchedules(
 				throw error;
 			});
 		if (!read) continue;
-		const edited = read.schedules.map(edit);
+		const edited = read.schedules.map((s) => edit(s, projectId));
 		const count = edited.filter((s, i) => s !== read.schedules[i]).length;
 		if (count === 0) continue;
 		await schedules.saveSchedules(projectId, edited);

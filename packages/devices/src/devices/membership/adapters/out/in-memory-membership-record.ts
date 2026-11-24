@@ -52,7 +52,7 @@ export function inMemoryMembershipRecord(): MembershipRecord & {
 					projectMap: {},
 					personMap: {},
 					joined: [...input.joined],
-					late: [],
+					late: null,
 					backup: input.backup,
 					createdAt: nextTime(),
 					updatedAt: nextTime(),
@@ -83,8 +83,7 @@ export function inMemoryMembershipRecord(): MembershipRecord & {
 					if (!row) return;
 					Object.assign(row, {
 						state: "moved",
-						...input,
-						late: Object.values(input.projectMap).map((t) => t.projectId),
+						late: { ...input },
 						updatedAt: nextTime(),
 					});
 				});
@@ -119,25 +118,22 @@ export function inMemoryMembershipRecord(): MembershipRecord & {
 					projects: [],
 					runs: 0,
 					unpinned: 0,
-					paused: null,
+					paused: [],
+					waiting: {},
 				};
 				splitsRows.push(row);
 				return { ...row };
 			},
-			async paused(toSpace, schedules) {
-				const row = splitsRows.find((s) => s.toSpace === toSpace);
-				if (row) row.paused = [...schedules];
+			async paused() {
+				return splitsRows
+					.filter((row) => row.state !== "planned")
+					.map((row) => ({ ...row }));
 			},
 			async forget(toSpace) {
 				const at = splitsRows.findIndex(
 					(s) => s.toSpace === toSpace && s.state === "planned",
 				);
 				if (at >= 0) splitsRows.splice(at, 1);
-			},
-			async ofHost(hostId) {
-				return splitsRows
-					.filter((row) => row.hostId === hostId && row.state === "done")
-					.map((row) => ({ ...row }));
 			},
 			moved(toSpace, input) {
 				return inMemoryBatch(() => {
@@ -147,6 +143,8 @@ export function inMemoryMembershipRecord(): MembershipRecord & {
 					row.projects = [...input.projects];
 					row.runs = input.runs;
 					row.unpinned = input.unpinned;
+					row.paused = [...input.paused];
+					row.waiting = { ...input.waiting };
 				});
 			},
 			async done(toSpace) {

@@ -38,7 +38,7 @@ export type ProjectsMovePlan = {
 	 * Each schedule of a moved Project as it is to be after the move. It
 	 * returns the schedule itself to keep it as it is.
 	 */
-	schedule?(schedule: Schedule): Schedule;
+	schedule?(schedule: Schedule, projectId: string): Schedule;
 };
 
 /** A move of Projects out of one Space. */

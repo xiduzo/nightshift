@@ -4,6 +4,7 @@ import type {
 	PeerProjects,
 	RowBatch,
 } from "@nightshift/engine";
+import type { Schedule } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { now as timeNow } from "@nightshift/time";
 import type {
@@ -25,7 +26,6 @@ import {
 	notDoneHeld,
 } from "../domain/words";
 import { lateProjects } from "./late-projects";
-import { pausedSchedules } from "./paused-schedules";
 import type {
 	DatabaseCopy,
 	EngineKernel,
@@ -268,7 +268,39 @@ export function mergeSteps(deps: MergeDeps & { record: MembershipRecord }) {
 		);
 	}
 
-	const paused = pausedSchedules(deps);
+	/**
+	 * A schedule that a leave paused here only, as it goes to this Host: as it
+	 * is to the Host that has the same document and goes on with it. Off in
+	 * the document to any other one: nobody turned it on there.
+	 */
+	async function pausedElsewhere(
+		hostId: string,
+		targets: Record<string, MergeTarget>,
+		personMap: Record<string, string>,
+		to: string,
+	) {
+		const there = personMap[deps.ownerId] ?? deps.ownerId;
+		const splits = await deps.record.splits.paused();
+		return (schedule: Schedule, projectId: string): Schedule => {
+			const last = splits.findLast((split) =>
+				split.paused.some(
+					(p) => p.projectId === projectId && p.scheduleId === schedule.id,
+				),
+			);
+			if (!last || !schedule.enabled) return schedule;
+			const target = targets[projectId];
+			const same =
+				last.hostId === hostId &&
+				last.hostPersonId === there &&
+				last.fromSpace === to &&
+				target?.projectId === projectId &&
+				target.spaceId === to;
+			if (same) return schedule;
+			const { person: _person, ...rest } = schedule;
+			return { ...rest, enabled: false };
+		};
+	}
+
 	const late = lateProjects(deps, { checks, ask, targetsOf, changed, runsOf });
 
 	/** How many schedules of the project move to the Host. A removed project has none that fire. */
@@ -346,8 +378,8 @@ export function mergeSteps(deps: MergeDeps & { record: MembershipRecord }) {
 	async function resume(row: MergeRow): Promise<MergeResult> {
 		const from = row.fromSpace;
 		let state: MergeState = row.state;
-		let projectMap = row.projectMap;
-		let personMap = row.personMap;
+		let { projectMap, personMap } =
+			row.state === "moved" && row.late ? row.late : row;
 		let to = row.toSpace;
 		const runIds: string[] = [];
 
@@ -382,6 +414,7 @@ export function mergeSteps(deps: MergeDeps & { record: MembershipRecord }) {
 						personMap,
 						renumber: true,
 						empties: true,
+						schedule: await pausedElsewhere(row.hostId, targets, personMap, to),
 					};
 				},
 				statements: async () =>
@@ -411,8 +444,6 @@ export function mergeSteps(deps: MergeDeps & { record: MembershipRecord }) {
 		}
 
 		if (state === "moved") {
-			// Before any wait: the documents of the moved Projects sync soon.
-			await paused.afterMerge({ ...row, toSpace: to, projectMap, personMap });
 			await finishMoved(row.hostId, from, projectMap, personMap);
 			await late.say(row);
 			if (await pushed(row.hostId, projectMap)) {
@@ -533,9 +564,6 @@ export function mergeSteps(deps: MergeDeps & { record: MembershipRecord }) {
 				blocked: checked.held === null ? null : checked.refusal.message,
 			};
 		},
-
-		/** Turns on what a leave paused, of a merge whose rows moved. Runs again safely. */
-		turnOnPaused: paused.afterMerge,
 
 		/** Moves the Projects that done merges left here: a merge of an older version did. */
 		async moveLate(): Promise<void> {

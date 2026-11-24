@@ -241,6 +241,7 @@ export {
 	UNREACHABLE_DEVICE,
 } from "./runs";
 export type {
+	PausedHere,
 	ScheduleList,
 	ScheduleMissed,
 	SchedulePause,

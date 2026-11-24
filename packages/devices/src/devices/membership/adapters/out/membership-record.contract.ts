@@ -51,7 +51,7 @@ export function membershipRecordContract(
 			expect((await record.merges.latest())?.state).toBe("pushed");
 		});
 
-		test("a split keeps the schedules it pauses, and only a done split of that Host says so", async () => {
+		test("a split says what it paused once its rows moved, and only a planned one is forgotten", async () => {
 			const { record, run } = await make();
 			await record.splits.plan({
 				toSpace: "to",
@@ -62,38 +62,31 @@ export function membershipRecordContract(
 				hostPersonId: "ada-there",
 				backup: "/b",
 			});
-			const row = async () => (await record.splits.of("from"))?.paused;
-			expect(await row()).toBeNull();
-			const paused = [
-				{
-					projectId: "p1",
-					schedule: {
-						id: "night",
-						flow: "f",
-						inputs: {},
-						cron: "0 6 * * *",
-						enabled: true,
-					},
-				},
-			];
-			await record.splits.paused("to", paused);
-			expect(await row()).toEqual(paused);
-			expect(await record.splits.ofHost("host")).toEqual([]);
 			await record.splits.forget("other");
-			expect(await row()).toEqual(paused);
+			expect(await record.splits.of("from")).toMatchObject({
+				paused: [],
+				waiting: {},
+			});
+			expect(await record.splits.paused()).toEqual([]);
+			const paused = [{ projectId: "p1", scheduleId: "night" }];
 			await run(
-				record.splits.moved("to", { projects: ["p1"], runs: 0, unpinned: 1 }),
+				record.splits.moved("to", {
+					projects: ["p1"],
+					runs: 0,
+					unpinned: 1,
+					paused,
+					waiting: { old: "p1" },
+				}),
 			);
+			const moved = { hostId: "host", fromSpace: "from", paused };
+			expect(await record.splits.paused()).toMatchObject([moved]);
+			expect(await record.splits.of("from")).toMatchObject({
+				waiting: { old: "p1" },
+			});
 			await record.splits.forget("to");
 			await record.splits.done("to");
-			expect((await record.splits.ofHost("host")).map((s) => s.paused)).toEqual(
-				[paused],
-			);
-			expect(await record.splits.ofHost("other")).toEqual([]);
-			await record.splits.paused("to", []);
-			expect(await row()).toEqual([]);
 			await record.splits.forget("to");
-			expect(await row()).toEqual([]);
+			expect(await record.splits.paused()).toMatchObject([moved]);
 		});
 
 		test("a planned split can be forgotten", async () => {
@@ -123,7 +116,7 @@ export function membershipRecordContract(
 			await record.merges.plan({ fromSpace: "from", ...from });
 			expect(await record.merges.done()).toEqual([]);
 			await record.merges.pushed("from");
-			expect((await record.merges.done()).map((m) => m.late)).toEqual([[]]);
+			expect((await record.merges.done()).map((m) => m.late)).toEqual([null]);
 			const late = {
 				projectMap: { p9: { spaceId: "to", projectId: "there" } },
 				personMap: { ada: "ada-there" },
@@ -131,7 +124,7 @@ export function membershipRecordContract(
 			await run(record.merges.late("from", late));
 			expect(await record.unfinished()).toMatchObject({
 				step: "merge",
-				row: { state: "moved", late: ["there"], backup: "/b", ...late },
+				row: { state: "moved", late, backup: "/b", projectMap: {} },
 			});
 			expect(await record.merges.done()).toEqual([]);
 		});

@@ -16,6 +16,7 @@ import {
 	type SpaceMembers,
 } from "./wire-peers";
 import { deviceDirectory } from "./wire-peers-directory";
+import { pausedHere } from "./wire-peers-paused";
 
 /** The engine of this Device among its peers, with the devices' half beside it. */
 export type PeerEngine = Engine & {
@@ -99,6 +100,7 @@ export function createPeerEngine(
 			directory: deviceDirectory(options.db),
 			// A Space move takes the Commands of its runs along, beside the
 			// rows of the packages above (the notifier's deliveries).
+			pausedHere: pausedHere(options.db),
 			moveRows: [commandMoves(options.db), ...(options.moveRows ?? [])],
 			peers: (context) => {
 				built = createPeers(context, options, {

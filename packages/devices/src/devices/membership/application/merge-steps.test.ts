@@ -6,6 +6,7 @@ import {
 	moving,
 	schedule,
 } from "../adapters/out/in-memory-home";
+import { runInMemory } from "../adapters/out/in-memory-neighbours";
 import { MERGE_WORDS } from "../domain/words";
 import { mergeSteps } from "./merge-steps";
 
@@ -199,7 +200,8 @@ describe("where the Projects go", () => {
 			personMap: { ada: "ada-there" },
 			renumber: true,
 			empties: true,
-		});
+			schedule: expect.any(Function),
+		} as never);
 		expect(world.personalSpaces.adopted).toEqual([
 			{ personId: "ada", from: "own", to: "theirs" },
 		]);
@@ -296,6 +298,68 @@ describe("Projects that change on the way", () => {
 		const row = await world.record.merges.latest();
 		if (!row) throw new Error("No merge.");
 		expect(await steps.resume(row)).toMatchObject({ state: "pushed" });
+	});
+});
+
+describe("the schedules that a leave paused here", () => {
+	const left = async (
+		world: ReturnType<typeof setUp>["world"],
+		more: Partial<{ hostId: string; hostPersonId: string; fromSpace: string }>,
+	) => {
+		await world.record.splits.plan({
+			toSpace: "own",
+			fromSpace: "theirs",
+			hostId: "host",
+			hostName: "Studio",
+			personId: "ada",
+			hostPersonId: "ada-there",
+			backup: "/b",
+			...more,
+		});
+		runInMemory(
+			world.record.splits.moved("own", {
+				projects: ["p1"],
+				runs: 0,
+				unpinned: 1,
+				paused: [{ projectId: "p1", scheduleId: "on" }],
+				waiting: {},
+			}),
+		);
+		await world.record.splits.done("own");
+		world.schedules.set("p1", [
+			schedule("on", { person: "ada-there" }),
+			schedule("new"),
+		]);
+	};
+
+	test("go to the Host they came from as they are", async () => {
+		const { world, steps } = setUp();
+		await left(world, {});
+		await steps.start({});
+		expect(world.schedules.get("p1")).toEqual([
+			schedule("on", { person: "ada-there" }),
+			schedule("new"),
+		]);
+	});
+
+	test("go off to another Host, another Person, another Space or another Project", async () => {
+		for (const other of [
+			{ hostId: "other" },
+			{ hostPersonId: "other" },
+			{ fromSpace: "other" },
+			{},
+		]) {
+			const { world, steps } = setUp();
+			await left(world, other);
+			if (Object.keys(other).length === 0) {
+				world.answer = answers({ p1: "there" });
+			}
+			await steps.start({});
+			expect(world.schedules.get("p1")).toEqual([
+				schedule("on", { enabled: false }),
+				schedule("new"),
+			]);
+		}
 	});
 });
 

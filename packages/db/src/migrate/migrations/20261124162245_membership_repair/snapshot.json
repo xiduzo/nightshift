@@ -1,7 +1,7 @@
 {
 	"version": "7",
 	"dialect": "sqlite",
-	"id": "624083de-e880-4408-9c99-2b94429bebf1",
+	"id": "8975a51f-c4f1-463a-89a9-365e22766a65",
 	"prevIds": ["1ae095ec-94ff-41c4-aae0-a56be181ded5"],
 	"ddl": [
 		{
@@ -2411,6 +2411,16 @@
 		{
 			"table": "space_split",
 			"name": "paused",
+			"type": "text",
+			"notNull": false,
+			"autoincrement": false,
+			"default": null,
+			"generated": null,
+			"entityType": "columns"
+		},
+		{
+			"table": "space_split",
+			"name": "waiting",
 			"type": "text",
 			"notNull": false,
 			"autoincrement": false,

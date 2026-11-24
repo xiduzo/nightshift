@@ -20,6 +20,12 @@ import { same } from "./flow-json";
  * - `persons` gives a Person of the source their id in the destination:
  *   a schedule's Person and a revision's Person take it.
  *
+ * A merge into a Project whose document is not all here (`apart`: a split
+ * of a Project whose flows still wait for the Host) keeps what it adds
+ * apart from what comes later. Each schedule takes an id of its own and is
+ * off. Each flow reads as younger than every other one, so a flow of the
+ * Host keeps its name.
+ *
  * A merge that runs again changes nothing: a revision that the
  * destination has stays one, and the flows and schedules of a source
  * that merged into the destination before are not added again.
@@ -32,6 +38,14 @@ export type FlowMergePlan = {
 	/** A schedule of the source: the id it takes in the destination. */
 	schedules: Record<string, string>;
 };
+
+/** The creation time of a flow that is never the older of two. */
+export const NEVER_OLDER = 8_640_000_000_000_000;
+
+/** The id of a schedule that keeps apart: no other document has it. */
+export function apartId(id: string, apart: string): string {
+	return `${id.slice(0, 60 - apart.length - 1).replace(/-+$/, "")}-${apart}`;
+}
 
 /** The same flow on both sides: both read, with the same content. */
 export function sameFlow(a: FlowSource | undefined, b: FlowSource | undefined) {

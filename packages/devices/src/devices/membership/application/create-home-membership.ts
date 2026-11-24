@@ -23,6 +23,9 @@ import { type SplitDeps, splitSteps } from "./split-steps";
 /** How long a new join waits for its home Host to list the personal Space. */
 const LISTED_WAIT_MS = 30_000;
 
+/** How long a step waits for the store of the keys. */
+const KEY_WAIT_MS = 5_000;
+
 export type HomeMembershipDeps = MergeDeps &
 	SplitDeps & {
 		record: MembershipRecord;
@@ -36,6 +39,8 @@ export type HomeMembershipDeps = MergeDeps &
 		isNotPaired(error: unknown): boolean;
 		/** How long the merge on join waits for the Host's list. Default 30 s. */
 		listedWaitMs?: number;
+		/** How long a step waits for the store of the keys. Default 5 s. */
+		keyWaitMs?: number;
 	};
 
 /**
@@ -84,7 +89,7 @@ export function createHomeMembership(deps: HomeMembershipDeps) {
 		const started = await record.unfinished();
 		if (started?.step !== "split" || started.row.state !== "planned") return;
 		const link = await deps.hostLinks.get(started.row.hostId);
-		if (link?.revokedAt !== null) return;
+		if (link?.revokedAt !== null || link.role !== "home") return;
 		if (link.personId !== started.row.hostPersonId) return;
 		await splits.forget(started.row);
 	}
@@ -118,11 +123,17 @@ export function createHomeMembership(deps: HomeMembershipDeps) {
 		hostId: string,
 		options?: { ownOnly: boolean },
 	): Promise<boolean> {
-		return attempted("the key of a Host stays", async () => {
+		const dropped = attempted("the key of a Host stays", async () => {
 			const link = await deps.hostLinks.get(hostId);
 			if (link?.revokedAt === null) return;
 			await deps.keys.delete(hostId, options);
 		});
+		// A key store may wait for a person: nothing here waits with it.
+		let timer: ReturnType<typeof setTimeout> | undefined;
+		const late = new Promise<boolean>((resolve) => {
+			timer = setTimeout(() => resolve(false), deps.keyWaitMs ?? KEY_WAIT_MS);
+		});
+		return Promise.race([dropped, late]).finally(() => clearTimeout(timer));
 	}
 
 	/** The copies of the Person's other Devices go: the home Host gave them. */
@@ -242,8 +253,7 @@ export function createHomeMembership(deps: HomeMembershipDeps) {
 
 		/**
 		 * A join saved the link of a Host, and it did not start yet: what an
-		 * earlier leave left ends first. Else the pauses of a split that does
-		 * not go on reach the Host with the flow documents.
+		 * earlier leave left ends first.
 		 */
 		async beforeJoin(): Promise<void> {
 			await attempted("the leave of a Host goes on", () =>
@@ -264,17 +274,9 @@ export function createHomeMembership(deps: HomeMembershipDeps) {
 		 *   Host without access. Not later: a join saves its new key first, then
 		 *   its link.
 		 * - A split that a join came before is forgotten.
-		 * - The schedules of a merge whose rows moved are on again before their
-		 *   documents sync.
 		 */
 		async beforeLinks(): Promise<void> {
 			await attempted("a split is not forgotten yet", forgetSplit);
-			await attempted("schedules of a merge stay paused", async () => {
-				const started = await record.unfinished();
-				if (started?.step === "merge" && started.row.state === "moved") {
-					await merges.turnOnPaused(started.row);
-				}
-			});
 			const left = (await deps.hostLinks.list()).filter(
 				(link) => link.revokedAt !== null,
 			);
@@ -284,7 +286,9 @@ export function createHomeMembership(deps: HomeMembershipDeps) {
 			) {
 				await dropCopies();
 			}
-			for (const link of left) await dropKey(link.hostId, { ownOnly: true });
+			await Promise.all(
+				left.map((link) => dropKey(link.hostId, { ownOnly: true })),
+			);
 		},
 
 		keepFinishing(signal: AbortSignal, everyMs = 30_000): void {

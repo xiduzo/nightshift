@@ -48,6 +48,18 @@ export type ScheduleStore = {
 	flows(projectId: string): Promise<FlowSources>;
 };
 
+/**
+ * The schedules a leave of a Host paused on this computer only. None in a
+ * Space a Host keeps: that Host fires them.
+ * @filledBy devices
+ */
+export type PausedHere = {
+	/** The ids of the project's schedules that are paused here. */
+	of(projectId: string): Promise<ReadonlySet<string>>;
+	/** A person turned these on here, or removed them. */
+	ended(projectId: string, scheduleIds: readonly string[]): Promise<void>;
+};
+
 /** What the event log knows of schedules, and the facts the slice adds to it. */
 export type ScheduleLog = {
 	/**

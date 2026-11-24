@@ -34,6 +34,7 @@ type Plan = {
 	empties?: boolean;
 	ownRunsOnly?: boolean;
 };
+type MergeOptions = { persons?: unknown; apart?: string };
 type HostRow = NonNullable<
 	Awaited<ReturnType<HomeMembershipDeps["hostLinks"]["home"]>>
 >;
@@ -97,7 +98,7 @@ export function inMemoryHome() {
 		revokedAt: null,
 	} as HostRow;
 	const asked: PersonalMergeInput[] = [];
-	const merged: { from: string; to: string; persons: unknown }[] = [];
+	const merged: ({ from: string; to: string } & MergeOptions)[] = [];
 	const planned: unknown[] = [];
 	const marked = new Set<string>();
 	const plans: Plan[] = [];
@@ -262,7 +263,7 @@ export function inMemoryHome() {
 			let changed = 0;
 			for (const id of sources) {
 				const before = world.schedules.get(id) ?? [];
-				const after = before.map((s) => plan.schedule?.(s) ?? s);
+				const after = before.map((s) => plan.schedule?.(s, id) ?? s);
 				changed += after.filter((s, i) => s !== before[i]).length;
 				world.schedules.set(id, after);
 			}
@@ -309,9 +310,6 @@ export function inMemoryHome() {
 			schedules: async (id: string) => ({
 				schedules: world.schedules.get(id) ?? [],
 			}),
-			async saveSchedules(id: string, schedules: Schedule[]) {
-				world.schedules.set(id, schedules);
-			},
 			async planMerge(...args: unknown[]) {
 				planned.push(args);
 				return { flows: { hello: "hello-2" } };
@@ -322,8 +320,8 @@ export function inMemoryHome() {
 				marked.add(`${id} ${marker}`);
 				world.notes.set(id, [...notes, notice.message]);
 			},
-			async merge(from: string, to: string, options: { persons: unknown }) {
-				merged.push({ from, to, persons: options.persons });
+			async merge(from: string, to: string, options: MergeOptions) {
+				merged.push({ from, to, ...options });
 			},
 		},
 		exchange: {

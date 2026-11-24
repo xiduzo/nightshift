@@ -64,7 +64,9 @@ export const addProject =
 			spaceId: request.spaceId,
 			need: ADD_PROJECTS,
 		});
-		const add = () => addFolder(ports, request);
+		// git reads the folder before the hold: a Space move waits for none of it.
+		const folder = await readFolder(ports, request.repoPath);
+		const add = () => addFolder(ports, request, folder);
 		const row = (await ports.directory.hostedElsewhere(request.spaceId))
 			? await add()
 			: await ports.spaceHolds.unlessHeld(request.spaceId, add);
@@ -80,8 +82,19 @@ export const addProject =
 		return added;
 	};
 
+/** The top of the repository at a path, and its remote. */
+async function readFolder(ports: AddProjectPorts, repoPath: string) {
+	const path = await ports.repos.topLevel(repoPath);
+	const url = await ports.repos.origin(path);
+	return { path, remote: url === null ? null : normaliseRemote(url) };
+}
+
 /** The project of the folder, with the folder as its Clone here. */
-async function addFolder(ports: AddProjectPorts, request: AddProject) {
+async function addFolder(
+	ports: AddProjectPorts,
+	request: AddProject,
+	{ path, remote }: { path: string; remote: string | null },
+) {
 	const { spaceId } = request;
 	const { store, spaceProjects, projectLog } = ports;
 	const restore = <T extends ProjectRecord>(row: T) =>
@@ -95,13 +108,10 @@ async function addFolder(ports: AddProjectPorts, request: AddProject) {
 		relay: ports.relay,
 	};
 
-	const path = await ports.repos.topLevel(request.repoPath);
 	const deviceId = await ports.thisDevice.deviceId();
 	const [here] = await store.here({ path });
 	if (here) return restore(ownSpace(here, spaceId));
 
-	const url = await ports.repos.origin(path);
-	const remote = url === null ? null : normaliseRemote(url);
 	const found = remote ? await store.byRemote(remote) : null;
 	if (found) ownSpace(found, spaceId);
 	// A Space a Host keeps: the Host adds a new Project, or restores a

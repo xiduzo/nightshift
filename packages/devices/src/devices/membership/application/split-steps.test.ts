@@ -89,19 +89,20 @@ describe("what comes along", () => {
 		expect(result).toMatchObject({ state: "done", projects: 3 });
 	});
 
-	test("a schedule that is off stays as it is, one that is on pauses, and only that one counts", async () => {
+	test("no schedule changes: each is paused here, and those that are on count", async () => {
 		const { world, steps, row } = setUp();
-		const off = schedule("off", { enabled: false, person: "ada-there" });
-		world.schedules.set("p1", [
-			off,
+		const before = [
+			schedule("off", { enabled: false, person: "ada-there" }),
 			schedule("on", { person: "ada-there", cron: "0 7 * * *" }),
-		]);
+		];
+		world.schedules.set("p1", before);
 
 		const result = await steps.splitOff(null);
 
-		expect(world.schedules.get("p1")).toEqual([
-			off,
-			schedule("on", { enabled: false, cron: "0 7 * * *" }),
+		expect(world.schedules.get("p1")).toEqual(before);
+		expect(row()?.paused).toEqual([
+			{ projectId: "p1", scheduleId: "off" },
+			{ projectId: "p1", scheduleId: "on" },
 		]);
 		expect(result?.unpinned).toBe(1);
 		// The latest split of that Space says the same to a later ask.
@@ -110,7 +111,7 @@ describe("what comes along", () => {
 		expect(row()).toMatchObject({ hostId: "host", hostPersonId: "ada-there" });
 	});
 
-	test("the flows that wait for the Host merge before the batch that ends their merge, again after a stop", async () => {
+	test("the flows that wait for the Host merge after the batch that ends their merge, apart, again after a stop", async () => {
 		const { world, steps, row } = setUp();
 		const waiting = { fromSpace: "own", hostId: "host", personId: "ada" };
 		await world.record.merges.plan({ ...waiting, joined: [], backup: "/b" });
@@ -126,17 +127,22 @@ describe("what comes along", () => {
 		runInMemory(world.record.merges.moved("own"));
 		world.batchFails = new Error("disk full");
 		await expect(steps.splitOff(null)).rejects.toThrow("disk full");
-		const merged = [
-			{ from: "old", to: "new", persons: {} },
-			{ from: "shared", to: "team-project", persons: {} },
-		];
-		expect(world.merged).toEqual(merged);
+		expect(world.merged).toEqual([]);
 		expect(world.record.mergesRows).toHaveLength(1);
 
 		world.batchFails = null;
+		world.openFails = new Error("stop");
+		await expect(steps.splitOff(row())).rejects.toThrow("stop");
+		const merged = [
+			{ from: "old", to: "new", persons: {}, apart: "fresh" },
+			{ from: "shared", to: "team-project", persons: {}, apart: "fresh" },
+		];
+		expect(world.merged).toEqual(merged);
+		expect(world.record.mergesRows).toEqual([]);
+		world.openFails = null;
 		await steps.splitOff(row());
 		expect(world.merged).toEqual([...merged, ...merged]);
-		expect(world.record.mergesRows).toEqual([]);
+		expect(row()?.state).toBe("done");
 	});
 
 	test("the flows of a merge that moved no row, or that is done, stay", async () => {
