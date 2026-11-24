@@ -5,7 +5,7 @@ import {
 	type LoggedEvent,
 } from "../../../../log";
 import type { OpenWork } from "../../application/ports";
-import { LIFECYCLE_EVENT_TYPES } from "./drizzle-open-work";
+import { LIFECYCLE_EVENT_TYPES } from "../../domain/lifecycle-events";
 
 /** The Walker the in-memory runs name when a test gives none: this computer. */
 const THIS_COMPUTER = "this-computer";

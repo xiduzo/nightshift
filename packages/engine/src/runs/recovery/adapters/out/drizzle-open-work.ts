@@ -13,21 +13,7 @@ import {
 	runsArriving,
 } from "../../../../log";
 import type { OpenWork } from "../../application/ports";
-
-/** Event types that open or close work. Startup recovery reads only these. */
-export const LIFECYCLE_EVENT_TYPES = [
-	"RunStarted",
-	"RunResumed",
-	"RunEnded",
-	"StepStarted",
-	"StepReopened",
-	"StepEnded",
-	"SessionStarted",
-	"SessionEnded",
-	"GateOpened",
-	"WaitStarted",
-	"WaitEnded",
-] as const satisfies readonly EngineEventType[];
+import { LIFECYCLE_EVENT_TYPES } from "../../domain/lifecycle-events";
 
 /** What a cut of a run's open work needs: the run log, the run bus and the run's flows. */
 type CloseDeps = Parameters<typeof closeOpenWork>[0];
@@ -63,7 +49,9 @@ export function drizzleOpenWork(deps: DrizzleOpenWorkDeps): OpenWork {
 					and(
 						isNotNull(event.runId),
 						inArray(event.runId, walkedHere),
-						inArray(event.type, [...LIFECYCLE_EVENT_TYPES]),
+						inArray(event.type, [
+							...LIFECYCLE_EVENT_TYPES,
+						] satisfies EngineEventType[]),
 					),
 				)
 				.orderBy(asc(event.seq));
