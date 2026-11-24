@@ -302,12 +302,15 @@ export function portProblems(
 		const twin = join(out, `in-memory-${name}.ts`);
 		const test = join(out, `${name}.contract.test.ts`);
 		const twinned = existsSync(twin);
-		if (
-			reals.length &&
-			reals.every((file) => file.startsWith("drizzle-")) &&
-			!twinned &&
-			!existsSync(join(out, `${name}.contract.ts`))
-		) {
+		if (reals.length && reals.every((file) => file.startsWith("drizzle-"))) {
+			if (twinned)
+				problems.push(
+					`${rel(twin)}: ${port} is a port of the database, so it has no in-memory adapter. Its use-case tests run on ${reals[0]}, over migratedDb() of @nightshift/db/testing (ADR 44).`,
+				);
+			if (existsSync(join(out, `${name}.contract.ts`)))
+				problems.push(
+					`${rel(join(out, `${name}.contract.ts`))}: ${port} has one adapter, so it has no contract suite. Move the tests to ${reals[0]?.replace(/\.ts$/, ".test.ts")}.`,
+				);
 			problems.push(...databasePortProblems(rel, out, port, reals));
 			continue;
 		}

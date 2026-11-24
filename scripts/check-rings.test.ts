@@ -779,6 +779,26 @@ describe("a port of the database (H7, ADR 44)", () => {
 		expect(await check(files)).toEqual([]);
 	});
 
+	test("an in-memory adapter of it, and a contract suite, fail", async () => {
+		expect(
+			await check({
+				...files,
+				[`${OUT}/in-memory-fired-times.ts`]: [
+					'import type { FiredTimes } from "../../application/ports";',
+					"export const inMemoryFiredTimes = (): FiredTimes => ({ last: () => 1 });",
+				],
+				[`${OUT}/fired-times.contract.ts`]: [
+					"export function firedTimesContract(make: () => unknown): void {",
+					"\texpect(make()).toBeDefined();",
+					"}",
+				],
+			}),
+		).toEqual([
+			`${OUT}/in-memory-fired-times.ts: FiredTimes is a port of the database, so it has no in-memory adapter. Its use-case tests run on drizzle-fired-times.ts, over migratedDb() of @nightshift/db/testing (ADR 44).`,
+			`${OUT}/fired-times.contract.ts: FiredTimes has one adapter, so it has no contract suite. Move the tests to drizzle-fired-times.test.ts.`,
+		]);
+	});
+
 	test("its adapter without a test, and a test that imports another thing or expects nothing, fail", async () => {
 		expect(await check({ ...files, [TEST]: null })).toEqual([
 			`${ADAPTER}: the adapter of FiredTimes has no test. Add drizzle-fired-times.test.ts beside it, over migratedDb() of @nightshift/db/testing.`,
