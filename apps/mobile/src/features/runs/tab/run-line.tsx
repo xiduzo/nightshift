@@ -62,7 +62,7 @@ export const RunLine = memo(function RunLine({ line }: { line: Line }) {
 				<ProblemLine
 					title="The run did not stop"
 					message={act.stop.error.message}
-					fix="Check that this phone is online and that your role in this Space lets you do this."
+					fix="Check that this phone is online, then try again."
 				/>
 			) : null}
 		</>

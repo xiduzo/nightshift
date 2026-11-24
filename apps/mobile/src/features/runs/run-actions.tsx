@@ -232,7 +232,7 @@ export function RunActionFailure({ act }: { act: RunAct }) {
 		<ErrorAlert
 			title={FAILED[failed]}
 			message={act[failed].error?.message ?? ""}
-			fix="Check that this phone is online and that your role in this Space lets you do this."
+			fix="Check that this phone is online, then try again."
 		/>
 	);
 }

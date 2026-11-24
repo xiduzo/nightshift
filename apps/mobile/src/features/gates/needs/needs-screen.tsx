@@ -180,7 +180,7 @@ export function NeedsScreen() {
 				<ErrorSection
 					title={retry.failure.title}
 					message={retry.failure.message}
-					fix="Check that this phone is online and that your role in this Space lets you do this."
+					fix="Check that this phone is online, then try again."
 				/>
 			) : null}
 		</>
