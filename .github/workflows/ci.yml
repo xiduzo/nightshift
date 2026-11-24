@@ -1,19 +1,27 @@
-# Checks every pull request and every push to main: lint and format, the
+# Checks every pull request and every push to main or arch/**: lint and format, the
 # layer map, the verticals, types, the tests of each workspace, and that the
 # compiled binary starts. The same commands run on your computer (see
 # CONTRIBUTING.md, "Check your change").
+#
+# Branch protection on main requires the check "CI passed", the last job. So
+# push a commit to arch/** or open a pull request first. Push it to main when
+# that check is green. nightly.yml and release.yml read the same check. Do not
+# rename it.
 name: CI
 
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, "arch/**"]
 
 permissions:
   contents: read
 
+# A pull request stops its older run. Each pushed commit has its own group: in
+# a shared one, GitHub drops the waiting run when a newer commit arrives, and
+# that commit never gets its "CI passed".
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.ref }}-${{ github.event_name == 'pull_request' && 'latest' || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
@@ -193,3 +201,20 @@ jobs:
             -type f \( -name '*.test.ts' -o -name '*.test.tsx' \) \
             ! -name '*.live.test.ts' -print0 \
             | xargs -0 --no-run-if-empty bun test
+
+  # The one check that branch protection, nightly.yml and release.yml read. It
+  # always runs: GitHub counts a skipped required check as a pass. It passes
+  # only when each job of `needs` succeeded, so a job that failed, was skipped
+  # or was cancelled fails it. Add a new job to `needs`.
+  passed:
+    name: CI passed
+    needs: [check, binary, workspaces, test]
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Each job succeeded
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          jq -r 'to_entries[] | "\(.key): \(.value.result)"' <<< "$NEEDS"
+          jq -e 'length > 0 and all(.[]; .result == "success")' <<< "$NEEDS"

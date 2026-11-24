@@ -1,0 +1,34 @@
+# Fails unless CI tested a commit and it passed. nightly.yml and release.yml
+# call it before they build or tag anything.
+#
+# It reads the check runs named "CI passed" (the last job of ci.yml). A commit
+# can have more than one: from arch/** and from main, or from a run that
+# somebody started again. The one that completed last counts.
+#
+# The job that calls it needs the permission `checks: read`.
+name: CI passed
+description: Fails unless the last "CI passed" check of a commit succeeded.
+
+inputs:
+  sha:
+    description: The commit, as a full SHA.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: CI passed on the commit
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        SHA: ${{ inputs.sha }}
+      run: |
+        conclusion="$(gh api --method GET "repos/$GITHUB_REPOSITORY/commits/$SHA/check-runs" \
+          -f check_name="CI passed" -f filter=all -F per_page=100 \
+          --jq '[.check_runs[] | select(.app.slug == "github-actions" and .status == "completed")]
+            | sort_by(.completed_at) | last | .conclusion // "missing"')"
+        if [ "$conclusion" != success ]; then
+          echo "::error::CI did not pass on $SHA: the check \"CI passed\" is \"$conclusion\". Nothing is built. Wait for CI or fix the commit, then start this workflow again."
+          exit 1
+        fi
+        echo "CI passed on $SHA."

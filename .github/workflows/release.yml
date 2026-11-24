@@ -6,6 +6,9 @@
 #
 # A version with a prerelease part (0.2.0-beta.1) becomes a prerelease. Apps
 # on the stable feed skip it: they follow the latest full release only.
+#
+# It releases only a commit that passed CI. A tag you push on another commit
+# publishes nothing: delete the tag.
 name: Release
 
 on:
@@ -29,6 +32,9 @@ concurrency:
 jobs:
   tag:
     runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      checks: read
     outputs:
       version: ${{ steps.version.outputs.version }}
       tag: ${{ steps.version.outputs.tag }}
@@ -54,6 +60,16 @@ jobs:
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "tag=v$version" >> "$GITHUB_OUTPUT"
+
+      - id: commit
+        name: Resolve the commit
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      # Before the tag. Every other job needs this one, so a red commit
+      # releases nothing.
+      - uses: ./.github/actions/ci-passed
+        with:
+          sha: ${{ steps.commit.outputs.sha }}
 
       # A tag pushed with GITHUB_TOKEN does not start this workflow again.
       - name: Tag the commit

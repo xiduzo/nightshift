@@ -3,6 +3,8 @@
 # image of the same build gets the `nightly` tag. A night without new
 # commits skips the apps, but builds the image again: it then gets the newest
 # Wolfi security fixes. Run it from the Actions tab to build now.
+#
+# It builds only a commit that passed CI, also when you run it yourself.
 name: Nightly
 
 on:
@@ -20,6 +22,9 @@ concurrency:
 jobs:
   plan:
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      checks: read
     outputs:
       build: ${{ steps.plan.outputs.build }}
       sha: ${{ steps.plan.outputs.sha }}
@@ -50,6 +55,11 @@ jobs:
           echo "build=$build" >> "$GITHUB_OUTPUT"
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
           echo "version=$next-nightly.$(date -u +%Y%m%d).$GITHUB_RUN_NUMBER" >> "$GITHUB_OUTPUT"
+
+      # Every other job needs this one, so a red commit builds nothing.
+      - uses: ./.github/actions/ci-passed
+        with:
+          sha: ${{ steps.plan.outputs.sha }}
 
   build:
     needs: plan
