@@ -332,6 +332,7 @@ export function inMemoryHome() {
 				null,
 			get: async (hostId: string) =>
 				world.hosts.find((h) => h.hostId === hostId) ?? null,
+			list: async () => world.hosts,
 			async revoked(hostId: string) {
 				log.push(`revoked ${hostId}`);
 				world.revoke(hostId);

@@ -414,6 +414,48 @@ describe("leaving the home Host keeps a copy", () => {
 		).toHaveLength(1);
 	});
 
+	test("a leave ends with its split also when the store of the key fails, and the next start takes the rest", async () => {
+		await mergedIntoA();
+		const { link } = linkToA();
+		await ready(link);
+		const kept: unknown[] = [];
+		const added: unknown[] = [];
+		const deleted: string[] = [];
+		let locked = true;
+		const membership = membershipOf(link, {
+			keys: {
+				delete: async (hostId) => {
+					if (locked) throw new Error("locked");
+					deleted.push(hostId);
+				},
+			},
+			copies: {
+				keep: async (devices) => {
+					kept.push(devices);
+					return [];
+				},
+			},
+			links: {
+				get: () => link,
+				add: async (left) => {
+					added.push(left.revokedAt !== null);
+				},
+			},
+		});
+		const error = console.error;
+		console.error = () => {};
+		const result = await membership.leave().finally(() => {
+			console.error = error;
+		});
+		expect(result).toMatchObject({ split: { state: "done" }, keyKept: true });
+		expect(kept).toEqual([[]]);
+		expect(added).toEqual([true]);
+
+		locked = false;
+		await membership.forgetLeft();
+		expect(deleted).toEqual([paired.hostId]);
+	});
+
 	test("a project without a folder comes along: every Device has it", async () => {
 		const { projectId } = await mergedIntoA();
 		const leads = await paired.host

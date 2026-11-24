@@ -53,6 +53,16 @@ function sharedKeychain(): DeviceKeyStore & { names(): string[] } {
 }
 
 describe("Device keys in a keychain two installs share", () => {
+	test("a delete of its own key only never takes the one from before", async () => {
+		const keychain = sharedKeychain();
+		await keychain.set("host", "nsd_of_another_install");
+		const keys = deviceKeysOf(keychain, "desktop");
+		await keys.set("host", "nsd_own");
+		await keys.delete("host", { ownOnly: true });
+		await keys.delete("host", { ownOnly: true });
+		expect(keychain.names()).toEqual(["host"]);
+	});
+
 	test("each Device keeps its own key for the same Host", async () => {
 		const keychain = sharedKeychain();
 		const desktop = deviceKeysOf(keychain, "desktop");

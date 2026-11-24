@@ -79,6 +79,29 @@ export function createDeviceLinks(deps: {
 		running.delete(hostId);
 	}
 
+	/** The Host refused the key. What follows does not stop when one step of it fails. */
+	async function lostAccess(link: HostLink) {
+		try {
+			await deps.links.revoked(link.hostId);
+		} catch (error) {
+			// The link keeps its access here: the next start asks the Host again.
+			console.error(`The link to ${link.name} was not marked:`, error);
+			return;
+		}
+		const steps = await Promise.allSettled([
+			deps.revoked?.(link),
+			deps.keys.delete(link.hostId),
+		]);
+		for (const step of steps) {
+			if (step.status === "rejected") {
+				console.error(
+					`Not everything of ${link.name} went from this computer:`,
+					step.reason,
+				);
+			}
+		}
+	}
+
 	async function add(link: HostLink, key?: string) {
 		await stop(link.hostId);
 		if (link.revokedAt) return;
@@ -112,11 +135,7 @@ export function createDeviceLinks(deps: {
 				deps.links.setAddresses(link.hostId, addresses).catch(() => {});
 			},
 			onRevoked: () => {
-				void deps.links
-					.revoked(link.hostId)
-					.then(() => deps.keys.delete(link.hostId))
-					.then(() => deps.revoked?.(link))
-					.catch(() => {});
+				void lostAccess(link);
 			},
 		});
 		running.set(link.hostId, started);

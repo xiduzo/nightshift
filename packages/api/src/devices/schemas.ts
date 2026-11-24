@@ -201,6 +201,7 @@ export const leaveResultSchema = exact<LeaveResult>()(
 			})
 			.nullable(),
 		waiting: z.string().nullable(),
+		keyKept: z.boolean(),
 	}),
 );
 

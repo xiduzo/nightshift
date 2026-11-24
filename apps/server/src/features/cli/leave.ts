@@ -71,6 +71,11 @@ export function leaveResultLines(result: LeaveResult): string[] {
 	} else if (!split) {
 		lines.push("Your Personal stays as it is.");
 	}
+	if (result.keyKept) {
+		lines.push(
+			"The old key stays on this computer. Night Shift tries again when it starts.",
+		);
+	}
 	return lines;
 }
 

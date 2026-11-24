@@ -178,7 +178,11 @@ export type DeviceKeyStore = {
 	readonly kind: KeyStoreKind;
 	get(hostId: string): Promise<string | null>;
 	set(hostId: string, key: string): Promise<void>;
-	delete(hostId: string): Promise<void>;
+	/**
+	 * Deletes the key. `ownOnly`: only the key of this Device, never one from
+	 * before that another install may use (`deviceKeysOf`).
+	 */
+	delete(hostId: string, options?: { ownOnly: boolean }): Promise<void>;
 };
 
 const KEYCHAIN_SERVICE = "nightshift-device-keys";
@@ -227,9 +231,9 @@ export function deviceKeysOf(
 			return (await store.get(own(hostId))) ?? store.get(hostId);
 		},
 		set: (hostId, key) => store.set(own(hostId), key),
-		async delete(hostId) {
+		async delete(hostId, options) {
 			// A key from before goes only when it was the one in use.
-			if ((await store.get(own(hostId))) === null) {
+			if (!options?.ownOnly && (await store.get(own(hostId))) === null) {
 				await store.delete(hostId);
 				return;
 			}

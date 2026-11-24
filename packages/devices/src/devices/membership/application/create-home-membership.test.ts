@@ -40,6 +40,17 @@ function setUp() {
 	return { deps, world, membership, merges, planned, steps, finishing };
 }
 
+/** Runs `work` without its lines on the console. */
+async function quietly<T>(work: () => Promise<T>): Promise<T> {
+	const error = console.error;
+	console.error = () => {};
+	try {
+		return await work();
+	} finally {
+		console.error = error;
+	}
+}
+
 /** Waits a while, or until `done`: the test fails when it never comes. */
 async function pass(done?: () => boolean) {
 	const end = performance.now() + (done ? 2_000 : 40);
@@ -167,17 +178,72 @@ describe("leaving", () => {
 		expect(world.log).toEqual([
 			"told",
 			"revoked host",
-			"key host",
 			"added host gone",
 			"moved",
 			"opened fresh",
+			"key host",
 		]);
 		expect(world.copies.kept).toEqual([[]]);
 		expect(result).toMatchObject({
 			host: { id: "host", name: "Studio" },
 			told: true,
 			waiting: null,
+			keyKept: false,
 		});
+	});
+
+	test("a step of a leave that fails does not stop the next one, and the key that stays is said", async () => {
+		for (const failing of ["key", "copies", "link"] as const) {
+			const { deps, world, membership } = setUp();
+			world.joined();
+			const fail = () => Promise.reject(new Error("locked"));
+			if (failing === "key") deps.keys.delete = fail;
+			if (failing === "copies") deps.copies.keep = fail;
+			if (failing === "link") deps.links.add = fail;
+
+			const result = await quietly(() => membership.leave());
+
+			expect(result.split).toMatchObject({ state: "done" });
+			expect(result.keyKept).toBe(failing === "key");
+			expect(world.copies.kept).toEqual(failing === "copies" ? [] : [[]]);
+			expect(world.log.includes("key host")).toBe(failing !== "key");
+		}
+	});
+
+	test("a key of a Host that gave access back meanwhile stays", async () => {
+		const { world, membership } = setUp();
+		world.joined();
+		world.underHold = async () => {
+			world.hosts = world.hosts.map((h) => ({ ...h, revokedAt: null }));
+		};
+
+		expect((await membership.leave()).keyKept).toBe(false);
+
+		expect(world.log).not.toContain("key host");
+	});
+
+	test("what a leave left goes at the next start: the copies and the key, of Hosts without access only", async () => {
+		const { deps, world, membership } = setUp();
+		const deleted: unknown[] = [];
+		deps.keys.delete = async (...args) => {
+			deleted.push(args);
+		};
+		await membership.forgetLeft();
+		expect(deleted).toEqual([]);
+		expect(world.copies.kept).toEqual([]);
+
+		const guest = { ...world.hosts[0], hostId: "guest", role: "guest" };
+		world.hosts = [...world.hosts, guest as never];
+		world.revoke("guest");
+		await membership.forgetLeft();
+		// Only this install's own key: another one may share the store.
+		expect(deleted).toEqual([["guest", { ownOnly: true }]]);
+		expect(world.copies.kept).toEqual([]);
+
+		world.revoke();
+		deps.keys.delete = () => Promise.reject(new Error("locked"));
+		await quietly(() => membership.forgetLeft());
+		expect(world.copies.kept).toEqual([[]]);
 	});
 
 	test("a Host that no longer knows this computer was told: without a link, it was not", async () => {
@@ -251,6 +317,17 @@ describe("when a Host removes this computer's access", () => {
 		);
 
 		expect(world.copies.kept).toEqual([[]]);
+	});
+
+	test("the split follows also when the copies of the other Devices stay", async () => {
+		const { deps, world, membership } = setUp();
+		world.joined();
+		world.revoke();
+		deps.copies.keep = () => Promise.reject(new Error("disk full"));
+
+		const split = await quietly(() => membership.revoked({ role: "home" }));
+
+		expect(split).toMatchObject({ state: "done" });
 	});
 
 	test("a merge that did not move a row ends only when its own Host is gone", async () => {

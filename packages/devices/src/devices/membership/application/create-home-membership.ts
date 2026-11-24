@@ -28,7 +28,7 @@ export type HomeMembershipDeps = MergeDeps &
 		record: MembershipRecord;
 		batches: Batches;
 		links: Pick<DeviceLinks, "get" | "add">;
-		hostLinks: Pick<HostLinks, "home" | "get" | "revoked">;
+		hostLinks: Pick<HostLinks, "home" | "get" | "list" | "revoked">;
 		keys: Pick<DeviceKeyStore, "delete">;
 		/** The copies of the Person's other Devices, which only the home Host gives. */
 		copies: DeviceCopiesPort;
@@ -94,6 +94,28 @@ export function createHomeMembership(deps: HomeMembershipDeps) {
 			}
 		}
 		return null;
+	}
+
+	/**
+	 * Deletes the key of a Host without access. False: it stays. A Host that
+	 * gave access back has a new key, which stays too.
+	 */
+	async function dropKey(
+		hostId: string,
+		options?: { ownOnly: boolean },
+	): Promise<boolean> {
+		return attempted("the key of a Host stays", async () => {
+			const link = await deps.hostLinks.get(hostId);
+			if (link?.revokedAt === null) return;
+			await deps.keys.delete(hostId, options);
+		});
+	}
+
+	/** The copies of the Person's other Devices go: the home Host gave them. */
+	function dropCopies(): Promise<boolean> {
+		return attempted("the copies of other Devices stay", () =>
+			deps.copies.keep([]),
+		);
 	}
 
 	/**
@@ -168,31 +190,56 @@ export function createHomeMembership(deps: HomeMembershipDeps) {
 
 				const told = await tell(deps.links.get(link.hostId), deps.isNotPaired);
 				await deps.hostLinks.revoked(link.hostId);
-				await deps.keys.delete(link.hostId);
-				const left = await deps.hostLinks.get(link.hostId);
-				if (left) await deps.links.add(left);
-				await deps.copies.keep([]);
+				// From here on no step stops the next one. The link stops first: it
+				// gives the copies. The key is last: its store may wait for a person.
+				await attempted("the link of a Host goes on", async () => {
+					const left = await deps.hostLinks.get(link.hostId);
+					if (left) await deps.links.add(left);
+				});
+				await dropCopies();
 
 				let waiting: string | null = null;
+				let failed: { error: unknown } | null = null;
 				try {
 					await settle();
 				} catch (error) {
-					if (!(error instanceof Refusal)) throw error;
-					waiting = error.message;
+					if (error instanceof Refusal) waiting = error.message;
+					else failed = { error };
 				}
+				const keyKept = !(await dropKey(link.hostId));
+				if (failed) throw failed.error;
 				return {
 					host: { id: link.hostId, name: link.name },
 					told,
 					split: from === null ? null : await splits.of(from),
 					waiting,
+					keyKept,
 				};
 			}, "wait");
 		},
 
 		async revoked(link: { role: HostRole }): Promise<SplitResult | null> {
 			if (link.role !== "home") return null;
-			await deps.copies.keep([]);
+			await dropCopies();
 			return exclusive(settle, "wait");
+		},
+
+		/**
+		 * What a leave that stopped left here goes: the copies and the key of a
+		 * Host without access. Only at start, before the links and before a
+		 * join: a join saves its new key first, then its link.
+		 */
+		async forgetLeft(): Promise<void> {
+			const left = (await deps.hostLinks.list()).filter(
+				(link) => link.revokedAt !== null,
+			);
+			if (
+				left.some((link) => link.role === "home") &&
+				(await deps.hostLinks.home()) === null
+			) {
+				await dropCopies();
+			}
+			for (const link of left) await dropKey(link.hostId, { ownOnly: true });
 		},
 
 		keepFinishing(signal: AbortSignal, everyMs = 30_000): void {
@@ -228,6 +275,20 @@ export function createHomeMembership(deps: HomeMembershipDeps) {
 			);
 		},
 	};
+}
+
+/** Runs a step whose failure does not stop the next one. False: it failed. */
+async function attempted(
+	failure: string,
+	work: () => Promise<unknown>,
+): Promise<boolean> {
+	try {
+		await work();
+		return true;
+	} catch (error) {
+		console.error(`[devices] ${failure}:`, error);
+		return false;
+	}
 }
 
 /** Asks the Host to remove this computer's access. False: it did not. */

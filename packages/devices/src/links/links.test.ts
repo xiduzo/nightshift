@@ -1,4 +1,6 @@
 import { afterEach, expect, mock, test } from "bun:test";
+import { ORPCError } from "@orpc/client";
+import type { HostClient } from "../contract";
 import type { HostLink, HostLinks } from "./host-links";
 import { createDeviceLinks } from "./links";
 
@@ -60,4 +62,50 @@ test("a link to a Host on this computer starts", async () => {
 test("with the person's allowance, a link to a Host on another computer starts", async () => {
 	expect(await started(link(["https://studio.invalid"]), false)).toBe(true);
 	expect(warnings).not.toHaveBeenCalled();
+});
+
+test("a Host that refuses the key: what follows goes on when one step of it fails", async () => {
+	const error = console.error;
+	const lines = mock(() => {});
+	console.error = lines;
+	const marked: string[] = [];
+	const gone = Promise.withResolvers<void>();
+	const deleted = Promise.withResolvers<void>();
+	const links = createDeviceLinks({
+		links: {
+			list: async () => [link(["https://studio.invalid"])],
+			revoked: async (hostId: string) => {
+				marked.push(hostId);
+			},
+		} as unknown as HostLinks,
+		keys: {
+			kind: "file",
+			get: async () => "device-key",
+			set: async () => {},
+			delete: async () => {
+				deleted.resolve();
+				throw new Error("locked");
+			},
+		},
+		revoked: async () => gone.resolve(),
+		hostClient: () =>
+			({
+				link: {
+					hello: async () => {
+						throw new ORPCError("UNAUTHORIZED");
+					},
+				},
+			}) as unknown as HostClient,
+		linkOptions: { heartbeatMs: 20, firstBackoffMs: 5, maxBackoffMs: 20 },
+	});
+	try {
+		await links.start();
+		await Promise.all([gone.promise, deleted.promise]);
+		await new Promise((resolve) => setTimeout(resolve, 5));
+	} finally {
+		console.error = error;
+		await links.close();
+	}
+	expect(marked).toEqual(["host-a"]);
+	expect(lines).toHaveBeenCalledTimes(1);
 });
