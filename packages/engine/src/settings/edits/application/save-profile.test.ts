@@ -74,4 +74,20 @@ describe("saveProfile", () => {
 		expect(quick.id).toBe(fast.id);
 		expect(ports.profiles.list().map((p) => p.name)).toEqual(["quick"]);
 	});
+
+	test("a model profile keeps its address, and a vendor API refuses one", async () => {
+		const { ports, save } = wired();
+		const address = { baseUrl: "http://gpu-box:11434", apiKey: "PROXY_KEY" };
+		const saved = await save(NIGHT_SHIFT, {
+			profile: { name: "remote", decider: "ollama", address },
+		});
+		expect(ports.profiles.get(saved.id)).toMatchObject({ address });
+		await expect(
+			save(NIGHT_SHIFT, {
+				profile: { name: "jev", decider: "typesafe", address },
+			}),
+		).rejects.toThrow(
+			'The decider "typesafe" always uses its own service, so it takes no address. Remove the address, or choose another decider.',
+		);
+	});
 });

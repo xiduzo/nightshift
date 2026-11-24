@@ -50,31 +50,6 @@ const computerWith =
 		programs.includes(program) ? `/usr/local/bin/${program}` : null;
 
 describe("the programs found on this computer", () => {
-	test("offers the agent CLIs and the kits' tools it finds, agents first", async () => {
-		const stores = await makeStores();
-		const which = computerWith("claude", "pi", "gh", "aws");
-		expect(found(stores, which)).toEqual([
-			{
-				kind: "agent",
-				program: "claude",
-				harness: "claude-code",
-				label: "Claude Code",
-			},
-			{ kind: "agent", program: "pi", harness: "pi", label: "pi" },
-			{ kind: "tool", program: "gh", label: "GitHub CLI" },
-		]);
-		expect(found(stores, computerWith())).toEqual([]);
-	});
-
-	test("looks for the program the harness's setting names", async () => {
-		const stores = await makeStores({ NIGHTSHIFT_CLAUDE_BIN: "claude-beta" });
-		expect(
-			found(stores, computerWith("claude", "claude-beta")).map(
-				(found) => found.program,
-			),
-		).toEqual(["claude-beta"]);
-	});
-
 	test("an agent CLI with a profile, and a tool that runs the program, are set up", async () => {
 		const stores = await makeStores();
 		const which = computerWith("claude", "codex", "gh", "acli");
@@ -100,43 +75,5 @@ describe("the programs found on this computer", () => {
 			harness: "pi",
 			permissionMode: "acceptEdits",
 		});
-	});
-
-	test("a taken profile name gets a number", async () => {
-		const stores = await makeStores();
-		const which = computerWith("claude", "codex");
-		await setUp(stores, "codex", which);
-		const codex = stores.profiles.byName("codex");
-		if (!codex) throw new Error("Expected the codex profile.");
-		// Rename it to the name the claude profile wants.
-		await stores.profiles.save(
-			{ ...codex, name: "claude" } as Parameters<
-				typeof stores.profiles.save
-			>[0],
-			codex.id,
-		);
-		expect(await setUp(stores, "claude", which)).toMatchObject({
-			kind: "agent",
-			name: "claude_2",
-		});
-	});
-
-	test("setting up a CLI tool saves a tool of its name", async () => {
-		const stores = await makeStores();
-		expect(await setUp(stores, "acli", computerWith("acli"))).toEqual({
-			kind: "tool",
-			name: "acli",
-		});
-		expect(stores.cliTools.get("acli")).not.toBeNull();
-	});
-
-	test("refuses a program that is not found, or is set up already", async () => {
-		const stores = await makeStores();
-		const which = computerWith("gh");
-		await expect(setUp(stores, "acli", which)).rejects.toThrow(
-			"does not find acli",
-		);
-		await setUp(stores, "gh", which);
-		await expect(setUp(stores, "gh", which)).rejects.toThrow("set up already");
 	});
 });

@@ -14,14 +14,6 @@ afterEach(async () => {
 });
 
 describe("createCliToolStore", () => {
-	test("a new daemon has no CLI tools", async () => {
-		const store = createCliToolStore({
-			document: await sandbox.openDocument(),
-		});
-		await store.load();
-		expect(store.list()).toEqual([]);
-	});
-
 	test("saves, lists sorted, changes a description, and removes", async () => {
 		const document = await sandbox.openDocument();
 		const store = createCliToolStore({ document });
@@ -120,60 +112,6 @@ describe("createCliToolStore", () => {
 				input: "${ACLI_WORK_TOKEN}",
 			},
 		});
-	});
-
-	test("a program of the same name and an empty login are none", async () => {
-		const store = createCliToolStore({
-			document: await sandbox.openDocument(),
-		});
-		const saved = await store.save({
-			name: "gh",
-			program: "gh",
-			login: { env: {} },
-		});
-		expect(saved).toMatchObject({ program: null, login: null, git: null });
-	});
-
-	test("a sign-in needs a folder of its own", async () => {
-		const store = createCliToolStore({
-			document: await sandbox.openDocument(),
-		});
-		await expect(
-			store.save({
-				name: "acli",
-				login: { signIn: { command: "acli jira auth login" } },
-			}),
-		).rejects.toThrow(/folder of its own/);
-	});
-
-	test("an older entry, or a login this version cannot read, runs without one", async () => {
-		const document = await sandbox.openDocument();
-		await document.change(() => {
-			document.cliTools.set("aws", { description: null, updatedAt: 1 });
-			document.cliTools.set("gh", {
-				description: "GitHub",
-				login: { env: { "not a name": "x" } },
-				updatedAt: 2,
-			});
-		});
-		const store = createCliToolStore({ document });
-		expect(store.get("aws")).toMatchObject({
-			program: null,
-			login: null,
-			git: null,
-		});
-		expect(store.get("gh")).toMatchObject({
-			description: "GitHub",
-			login: null,
-		});
-	});
-
-	test("a name that is not a program name is refused", async () => {
-		const store = createCliToolStore({
-			document: await sandbox.openDocument(),
-		});
-		await expect(store.save({ name: "gh pr" })).rejects.toThrow();
-		await expect(store.save({ name: "../gh" })).rejects.toThrow();
 	});
 });
 

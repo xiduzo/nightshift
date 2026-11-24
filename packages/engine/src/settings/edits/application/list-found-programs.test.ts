@@ -28,6 +28,20 @@ describe("listFoundPrograms", () => {
 		]);
 	});
 
+	test("nothing on this computer offers nothing, and a harness's setting names its program", () => {
+		const list = (programs: string[]) =>
+			listFoundPrograms({
+				settings: inMemoryEditedSettings({
+					bins: { "claude-code": "claude-beta" },
+				}),
+				profiles: inMemoryEditedProfiles(),
+				cliTools: inMemoryEditedCliTools(),
+				programs: inMemoryPrograms(programs),
+			})(NIGHT_SHIFT).map((found) => found.program);
+		expect(list([])).toEqual([]);
+		expect(list(["claude", "claude-beta"])).toEqual(["claude-beta"]);
+	});
+
 	test("a tool that runs the program counts as set up", async () => {
 		const cliTools = inMemoryEditedCliTools();
 		await cliTools.save({ name: "gh-work", program: "gh" });

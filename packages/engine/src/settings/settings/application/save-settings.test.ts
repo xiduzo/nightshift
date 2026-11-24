@@ -49,6 +49,19 @@ describe("save", () => {
 		});
 	});
 
+	test("custom agents are saved with their command, arguments and env", async () => {
+		const { save } = saving();
+		const goose = {
+			slug: "goose",
+			label: "Goose",
+			command: "goose",
+			args: ["acp"],
+			env: { GOOSE_API_KEY: "${GOOSE_API_KEY}" },
+		};
+		const view = await save({ customAgents: [goose] });
+		expect(view.values.customAgents).toEqual([goose]);
+	});
+
 	test("one save is one write, in the order of the settings", async () => {
 		const { saved, save } = saving();
 		await save({ agentModel: "opus", maxConcurrentRuns: 3 });
@@ -66,7 +79,28 @@ describe("save", () => {
 	test.each([
 		["an unknown key", { nope: 1 }],
 		["a run cap of 0", { maxConcurrentRuns: 0 }],
+		["a run cap over 16", { maxConcurrentRuns: 17 }],
+		["a fractional run cap", { maxConcurrentRuns: 1.5 }],
+		["a negative wait", { networkGraceMinutes: -1 }],
+		["a wait over a week", { networkGraceMinutes: 10_081 }],
+		["an offline limit of 0", { offlineWorkMinutes: 0 }],
 		["a blank binary", { codexBin: "  " }],
+		["an unknown harness", { agentHarness: "aider" }],
+		["an Ollama address without a scheme", { ollamaAddress: "studio.local" }],
+		["an embedding model of two words", { embeddingModel: "two words" }],
+		[
+			"two custom agents with one slug",
+			{
+				customAgents: [
+					{ slug: "goose", label: "Goose", command: "goose", args: ["acp"] },
+					{ slug: "goose", label: "Goose 2", command: "goose2", args: [] },
+				],
+			},
+		],
+		[
+			"a custom agent slug with capitals",
+			{ customAgents: [{ slug: "Goose", label: "Goose", command: "goose" }] },
+		],
 		["a wrong type", { scheduler: "yes" }],
 	])("refuses %s and saves nothing", async (_label, patch) => {
 		const { saved, save } = saving();

@@ -48,6 +48,26 @@ describe("saveCliTool", () => {
 		});
 	});
 
+	test.each([
+		["gh pr", undefined],
+		["../gh", undefined],
+		["acli", { signIn: { command: "acli jira auth login" } }],
+	])(
+		"%s is refused when its name is no program or its sign-in has no folder",
+		async (name, login) => {
+			const { saved, save } = saving();
+			await expect(save({ name, login })).rejects.toThrow();
+			expect(saved.writes).toEqual([]);
+		},
+	);
+
+	test("a blank description is saved as none", async () => {
+		const { save } = saving();
+		expect((await save({ name: "gh", description: "  " })).description).toBe(
+			null,
+		);
+	});
+
 	test("a git host with a path is refused, and nothing is written", async () => {
 		const { saved, save } = saving();
 		await expect(

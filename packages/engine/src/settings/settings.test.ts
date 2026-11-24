@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { setting } from "@nightshift/db/schema";
-import { DEFAULT_POLICY } from "@nightshift/flows";
 import type { DeviceDocument } from "../documents";
 import { createSandbox, type Sandbox } from "../testing/test-support";
 import {
@@ -19,9 +18,6 @@ afterEach(async () => {
 	await sandbox.cleanup();
 });
 
-/** `${NAME}`: a reference to a secret. */
-const ref = (name: string) => `\${${name}}`;
-
 /** A store over the Device document as a daemon start opens it. */
 async function store(
 	env: Record<string, string | undefined> = {},
@@ -34,140 +30,6 @@ async function store(
 	await s.load();
 	return s;
 }
-
-/** The keys with a saved value, as the next start reads them. */
-async function savedKeys(): Promise<string[]> {
-	return [...(await sandbox.openDocument()).settings.keys()].sort();
-}
-
-describe("precedence", () => {
-	test("with nothing saved and no environment, every setting is its default", async () => {
-		const s = await store();
-		expect(s.current().maxConcurrentRuns).toBe(2);
-		expect(s.current().scheduler).toBe(true);
-		expect(s.current().claudeBin).toBe("claude");
-		expect(s.view().fields.maxConcurrentRuns).toEqual({
-			source: "default",
-			default: 2,
-			env: "NIGHTSHIFT_MAX_CONCURRENT_RUNS",
-		});
-		// A setting with no environment variable says so by leaving `env` out.
-		expect(s.view().fields.networkGraceMinutes).toEqual({
-			source: "default",
-			default: 240,
-		});
-		expect(s.run()).toEqual(defaultRunSettings());
-	});
-
-	test("the run policy settings fall back to the flow's built-in policy", async () => {
-		const { fields } = (await store()).view();
-		expect({
-			usageLimitFirstWaitMinutes: fields.usageLimitFirstWaitMinutes.default,
-			usageLimitMaxWaitMinutes: fields.usageLimitMaxWaitMinutes.default,
-			networkGraceMinutes: fields.networkGraceMinutes.default,
-			maxSteps: fields.maxStepsPerRun.default,
-			resumeInterruptedRuns: fields.resumeInterruptedRuns.default,
-			budgetUsd: fields.budgetUsd.default,
-			maxTurns: fields.maxTurns.default,
-			idleMinutes: fields.idleMinutes.default,
-		}).toEqual(DEFAULT_POLICY);
-	});
-
-	test("the environment beats the default, and a saved value beats both", async () => {
-		const s = await store({
-			NIGHTSHIFT_MAX_CONCURRENT_RUNS: " 4 ",
-			NIGHTSHIFT_CLAUDE_BIN: "  /opt/claude  ",
-		});
-		expect(s.current().maxConcurrentRuns).toBe(4);
-		expect(s.current().claudeBin).toBe("/opt/claude");
-		expect(s.view().fields.maxConcurrentRuns).toEqual({
-			source: "env",
-			default: 2,
-			env: "NIGHTSHIFT_MAX_CONCURRENT_RUNS",
-			envValue: 4,
-		});
-
-		const view = await s.save({ maxConcurrentRuns: 6 });
-		expect(view.values.maxConcurrentRuns).toBe(6);
-		// The environment's value still shows, as what forgetting goes back to.
-		expect(view.fields.maxConcurrentRuns).toEqual({
-			source: "saved",
-			default: 2,
-			env: "NIGHTSHIFT_MAX_CONCURRENT_RUNS",
-			envValue: 4,
-		});
-		expect(s.run().maxConcurrentRuns).toBe(6);
-	});
-
-	test.each([
-		["NIGHTSHIFT_MAX_CONCURRENT_RUNS", "abc"],
-		["NIGHTSHIFT_MAX_CONCURRENT_RUNS", "0"],
-		["NIGHTSHIFT_MAX_CONCURRENT_RUNS", "2.5"],
-		["NIGHTSHIFT_MAX_CONCURRENT_RUNS", "17"],
-		["NIGHTSHIFT_MAX_CONCURRENT_RUNS", ""],
-		["NIGHTSHIFT_MAX_STEPS_PER_RUN", "-1"],
-	])("an invalid %s=%p is ignored", async (name, raw) => {
-		const s = await store({ [name]: raw });
-		expect(s.current().maxConcurrentRuns).toBe(2);
-		expect(s.current().maxStepsPerRun).toBe(500);
-		const fields = s.view().fields;
-		expect(fields.maxConcurrentRuns.source).toBe("default");
-		expect(fields.maxConcurrentRuns.envValue).toBeUndefined();
-		expect(fields.maxStepsPerRun.source).toBe("default");
-	});
-
-	test("a blank binary path in the environment is ignored", async () => {
-		const s = await store({ NIGHTSHIFT_CODEX_BIN: "   " });
-		expect(s.current().codexBin).toBe("codex");
-		expect(s.view().fields.codexBin.source).toBe("default");
-	});
-});
-
-describe("Ollama", () => {
-	test.each([
-		["studio.local", "http://studio.local:11434"],
-		["studio.local:11500", "http://studio.local:11500"],
-		["0.0.0.0", "http://0.0.0.0:11434"],
-		["http://studio.local", "http://studio.local:11434"],
-		["https://gpu.example.com/ollama/", "https://gpu.example.com/ollama"],
-		["http://studio.local:80", "http://studio.local"],
-	])("OLLAMA_HOST=%p is the address %p", async (raw, address) => {
-		const s = await store({ OLLAMA_HOST: raw });
-		expect(s.current().ollamaAddress).toBe(address);
-		expect(s.view().fields.ollamaAddress.source).toBe("env");
-	});
-
-	test("a saved address wins over OLLAMA_HOST, and none is this computer's", async () => {
-		expect((await store()).current().ollamaAddress).toBe("");
-		const s = await store({ OLLAMA_HOST: "studio.local" });
-		await s.save({ ollamaAddress: "https://gpu.example.com" });
-		expect(s.current().ollamaAddress).toBe("https://gpu.example.com");
-		await expect(s.save({ ollamaAddress: "studio.local" })).rejects.toThrow();
-	});
-
-	test.each([
-		["off", "off"],
-		["false", "off"],
-		["on", "on"],
-		["auto", "auto"],
-		["maybe", "auto"],
-	])("NIGHTSHIFT_OLLAMA=%p is %p", async (raw, mode) => {
-		expect((await store({ NIGHTSHIFT_OLLAMA: raw })).current().ollama).toBe(
-			mode as "auto",
-		);
-	});
-
-	test("NIGHTSHIFT_EMBEDDING_MODEL picks the model, a saved one wins", async () => {
-		expect((await store()).current().embeddingModel).toBe(
-			"qwen3-embedding:0.6b",
-		);
-		const s = await store({ NIGHTSHIFT_EMBEDDING_MODEL: "nomic-embed-text" });
-		expect(s.current().embeddingModel).toBe("nomic-embed-text");
-		await s.save({ embeddingModel: "bge-m3" });
-		expect(s.current().embeddingModel).toBe("bge-m3");
-		await expect(s.save({ embeddingModel: "two words" })).rejects.toThrow();
-	});
-});
 
 describe("the decider of new Decision nodes", () => {
 	test("never saved: Ollama without a TypeSafe key, TypeSafe with one", async () => {
@@ -206,32 +68,6 @@ describe("the decider of new Decision nodes", () => {
 	});
 });
 
-describe("the scheduler switch", () => {
-	test("NIGHTSHIFT_SCHEDULER=off locks the scheduler off, even over a saved true", async () => {
-		const s = await store({ NIGHTSHIFT_SCHEDULER: " OFF " });
-		await s.save({ scheduler: true });
-		expect(s.current().scheduler).toBe(false);
-		expect(s.run().scheduler).toBe(false);
-		const field = s.view().fields.scheduler;
-		expect(field.source).toBe("env");
-		expect(field.envValue).toBe(false);
-		expect(field.locked).toContain("started with schedules turned off");
-	});
-
-	test("any other NIGHTSHIFT_SCHEDULER value leaves it on, and a saved false wins", async () => {
-		const s = await store({ NIGHTSHIFT_SCHEDULER: "on" });
-		expect(s.current().scheduler).toBe(true);
-		expect(s.view().fields.scheduler).toMatchObject({
-			source: "env",
-			envValue: true,
-		});
-		expect(s.view().fields.scheduler.locked).toBeUndefined();
-		await s.save({ scheduler: false });
-		expect(s.current().scheduler).toBe(false);
-		expect(s.view().fields.scheduler.source).toBe("saved");
-	});
-});
-
 describe("web requests to this network", () => {
 	test("a computer that is not a Host always reaches its own network", async () => {
 		const s = await store();
@@ -246,75 +82,6 @@ describe("web requests to this network", () => {
 		expect(reachesPrivateNetwork(s.current())).toBe(false);
 		await s.save({ webRequestsPrivateNetwork: true });
 		expect(reachesPrivateNetwork(s.current())).toBe(true);
-	});
-});
-
-describe("anonymous usage", () => {
-	test("on by default, and the notice is unseen until the switch is saved", async () => {
-		const s = await store();
-		expect(s.current().usage).toBe(true);
-		expect(s.current().usageSeen).toBe(false);
-		expect(s.view().fields.usage).toMatchObject({
-			source: "default",
-			default: true,
-			env: "NIGHTSHIFT_USAGE",
-		});
-		await s.save({ usage: false });
-		expect(s.current().usage).toBe(false);
-		expect(s.current().usageSeen).toBe(true);
-	});
-
-	test("NIGHTSHIFT_USAGE beats the default, and a saved value beats it", async () => {
-		const s = await store({ NIGHTSHIFT_USAGE: "off" });
-		expect(s.current().usage).toBe(false);
-		expect(s.view().fields.usage.locked).toContain(
-			"anonymous usage turned off",
-		);
-		const open = await store({ NIGHTSHIFT_USAGE: "on" });
-		expect(open.current().usage).toBe(true);
-		expect(open.view().fields.usage.locked).toBeUndefined();
-		await open.save({ usage: false });
-		expect(open.current().usage).toBe(false);
-		expect(open.current().usageSeen).toBe(true);
-	});
-
-	test.each([
-		["DO_NOT_TRACK", "1"],
-		["DO_NOT_TRACK", " 1 "],
-		["OTEL_SDK_DISABLED", "true"],
-		["OTEL_SDK_DISABLED", "TRUE"],
-		["NIGHTSHIFT_USAGE", "OFF"],
-	])("%s=%s locks usage off over a saved true", async (name, raw) => {
-		const s = await store({ [name]: raw });
-		await s.save({ usage: true });
-		expect(s.current().usage).toBe(false);
-		expect(s.view().fields.usage.source).toBe("env");
-		expect(s.view().fields.usage.locked).toContain(
-			"anonymous usage turned off",
-		);
-		expect(s.current().usageSeen).toBe(true);
-	});
-});
-
-describe("automatic resume", () => {
-	test("on by default; NIGHTSHIFT_RESUME_INTERRUPTED_RUNS turns it off, and a saved value wins", async () => {
-		expect((await store()).run().resumeInterruptedRuns).toBe(true);
-		const s = await store({ NIGHTSHIFT_RESUME_INTERRUPTED_RUNS: " Off " });
-		expect(s.run().resumeInterruptedRuns).toBe(false);
-		expect(s.view().fields.resumeInterruptedRuns).toEqual({
-			source: "env",
-			default: true,
-			env: "NIGHTSHIFT_RESUME_INTERRUPTED_RUNS",
-			envValue: false,
-		});
-		await s.save({ resumeInterruptedRuns: true });
-		expect(s.run().resumeInterruptedRuns).toBe(true);
-	});
-
-	test("a NIGHTSHIFT_RESUME_INTERRUPTED_RUNS that is not on or off is ignored", async () => {
-		const s = await store({ NIGHTSHIFT_RESUME_INTERRUPTED_RUNS: "maybe" });
-		expect(s.run().resumeInterruptedRuns).toBe(true);
-		expect(s.view().fields.resumeInterruptedRuns.source).toBe("default");
 	});
 });
 
@@ -337,127 +104,6 @@ describe("save", () => {
 		const third = await store(env);
 		expect(third.current().maxStepsPerRun).toBe(800);
 		expect(third.current().agentModel).toBe("opus");
-	});
-
-	test("custom agents are saved with their command, arguments and env", async () => {
-		const s = await store();
-		expect(s.current().customAgents).toEqual([]);
-		await s.save({
-			customAgents: [
-				{
-					slug: "goose",
-					label: "Goose",
-					command: "goose",
-					args: ["acp"],
-					env: { GOOSE_API_KEY: ref("GOOSE_API_KEY") },
-				},
-			],
-		});
-		expect((await store()).current().customAgents).toEqual([
-			{
-				slug: "goose",
-				label: "Goose",
-				command: "goose",
-				args: ["acp"],
-				env: { GOOSE_API_KEY: ref("GOOSE_API_KEY") },
-			},
-		]);
-	});
-
-	test("the offline limit of the work for other Devices is 10 min, and a saved value wins", async () => {
-		const s = await store();
-		expect(s.current().offlineWorkMinutes).toBe(10);
-		expect(s.view().fields.offlineWorkMinutes).toEqual({
-			source: "default",
-			default: 10,
-		});
-		await s.save({ offlineWorkMinutes: 30 });
-		expect((await store()).current().offlineWorkMinutes).toBe(30);
-		await expect(s.save({ offlineWorkMinutes: 0 })).rejects.toThrow();
-	});
-
-	test("saving again replaces the value", async () => {
-		const s = await store();
-		await s.save({ networkGraceMinutes: 30 });
-		await s.save({ networkGraceMinutes: 45 });
-		expect((await store()).current().networkGraceMinutes).toBe(45);
-		expect(await savedKeys()).toEqual(["networkGraceMinutes"]);
-	});
-
-	test.each([
-		["an unknown key", { nope: 1 }],
-		["a run cap of 0", { maxConcurrentRuns: 0 }],
-		["a run cap over 16", { maxConcurrentRuns: 17 }],
-		["a fractional run cap", { maxConcurrentRuns: 1.5 }],
-		["a negative wait", { networkGraceMinutes: -1 }],
-		["a wait over a week", { networkGraceMinutes: 10_081 }],
-		["a blank binary", { codexBin: "  " }],
-		["an unknown harness", { agentHarness: "aider" }],
-		[
-			"two custom agents with one slug",
-			{
-				customAgents: [
-					{ slug: "goose", label: "Goose", command: "goose", args: ["acp"] },
-					{ slug: "goose", label: "Goose 2", command: "goose2", args: [] },
-				],
-			},
-		],
-		[
-			"a custom agent slug with capitals",
-			{ customAgents: [{ slug: "Goose", label: "Goose", command: "goose" }] },
-		],
-		["a wrong type", { scheduler: "yes" }],
-	])("refuses %s and saves nothing", async (_label, patch) => {
-		const s = await store();
-		// biome-ignore lint/suspicious/noExplicitAny: the patch is invalid on purpose.
-		await expect(s.save(patch as any)).rejects.toThrow();
-		expect(await savedKeys()).toEqual([]);
-		expect(s.view().fields.maxConcurrentRuns.source).toBe("default");
-	});
-
-	test("refuses a first usage-limit wait longer than the longest one", async () => {
-		const s = await store();
-		await expect(s.save({ usageLimitFirstWaitMinutes: 90 })).rejects.toThrow(
-			"The first usage-limit wait cannot be longer than the longest one.",
-		);
-		await expect(s.save({ usageLimitMaxWaitMinutes: 3 })).rejects.toThrow(
-			"cannot be longer",
-		);
-		// Both at once is fine when they fit together.
-		await s.save({
-			usageLimitFirstWaitMinutes: 90,
-			usageLimitMaxWaitMinutes: 120,
-		});
-		expect(s.run().policy).toEqual({
-			usageLimitFirstWaitMinutes: 90,
-			usageLimitMaxWaitMinutes: 120,
-			networkGraceMinutes: 240,
-			idleMinutes: 15,
-		});
-		expect(await savedKeys()).toEqual([
-			"usageLimitFirstWaitMinutes",
-			"usageLimitMaxWaitMinutes",
-		]);
-	});
-
-	test("forgetting the longest wait checks the first wait against the default it falls back to", async () => {
-		const s = await store();
-		await s.save({
-			usageLimitFirstWaitMinutes: 80,
-			usageLimitMaxWaitMinutes: 100,
-		});
-		// Forgetting the longest wait brings back its default of 60, under the first wait of 80.
-		await expect(s.save({ usageLimitMaxWaitMinutes: null })).rejects.toThrow(
-			"cannot be longer",
-		);
-		expect(s.current().usageLimitMaxWaitMinutes).toBe(100);
-		// Forgetting the first wait too brings both back to their defaults.
-		await s.save({
-			usageLimitFirstWaitMinutes: null,
-			usageLimitMaxWaitMinutes: null,
-		});
-		expect(s.current().usageLimitFirstWaitMinutes).toBe(5);
-		expect(s.current().usageLimitMaxWaitMinutes).toBe(60);
 	});
 });
 
@@ -501,6 +147,10 @@ describe("load", () => {
 });
 
 test("run() is the engine's part of the current values", async () => {
+	const fresh = await store();
+	expect(fresh.run()).toEqual(defaultRunSettings());
+	// The wiring gives the default model of the knowledge.
+	expect(fresh.current().embeddingModel).toBe("qwen3-embedding:0.6b");
 	const s = await store({ NIGHTSHIFT_MAX_CONCURRENT_RUNS: "3" });
 	await s.save({
 		maxStepsPerRun: 50,

@@ -43,6 +43,18 @@ export function savedSettingsContract(
 			expect(read.size).toBe(2);
 		});
 
+		test("a second write of a key replaces its value", async () => {
+			await under.saved.write({
+				set: [["networkGraceMinutes", 30]],
+				forget: [],
+			});
+			await under.saved.write({
+				set: [["networkGraceMinutes", 45]],
+				forget: [],
+			});
+			expect([...under.saved.read()]).toEqual([["networkGraceMinutes", 45]]);
+		});
+
 		test("a write forgets values and keeps the others", async () => {
 			await under.saved.write({
 				set: [

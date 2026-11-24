@@ -64,6 +64,11 @@ export function savedCliToolsContract(
 			});
 		});
 
+		test("a login this version cannot read reads as none", async () => {
+			await under.put("gh", { ...gh, login: { env: { "not a name": "x" } } });
+			expect(under.saved.read().get("gh")).toEqual({ name: "gh", ...gh });
+		});
+
 		test("an entry or a name this version cannot read is left out", async () => {
 			await under.put("gh", { description: null });
 			await under.put("not a name", { ...gh });
