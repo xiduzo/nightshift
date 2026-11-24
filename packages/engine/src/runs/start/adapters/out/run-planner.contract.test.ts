@@ -1,6 +1,5 @@
-import { createDb } from "@nightshift/db";
-import { migrateDb } from "@nightshift/db/migrate";
 import { project, run } from "@nightshift/db/schema";
+import { migratedDb } from "@nightshift/db/testing";
 import { FLOW_VERSION } from "@nightshift/flows";
 import { asDate } from "@nightshift/time";
 import type { OwnDevice, Placement } from "../../../../contract";
@@ -72,8 +71,7 @@ runPlannerContract("in memory", async () => {
 });
 
 runPlannerContract("over Placement, on libsql in memory", async () => {
-	const db = createDb({ DATABASE_URL: ":memory:" });
-	await migrateDb(db);
+	const db = await migratedDb();
 	const spaceId = await localSpaceId(db);
 	await db.insert(project).values([
 		{ id: "project-1", spaceId, name: "one", folder: false },

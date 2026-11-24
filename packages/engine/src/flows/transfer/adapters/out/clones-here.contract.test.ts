@@ -1,6 +1,5 @@
-import { createDb } from "@nightshift/db";
-import { migrateDb } from "@nightshift/db/migrate";
 import { clone, device, project } from "@nightshift/db/schema";
+import { migratedDb } from "@nightshift/db/testing";
 import { asDate } from "@nightshift/time";
 import { ownDevice } from "../../../../testing/alone-directory";
 import { localSpaceId } from "../../../../testing/test-support";
@@ -37,8 +36,7 @@ clonesHereContract("in memory", async () => {
 });
 
 clonesHereContract("drizzle, on libsql in memory", async () => {
-	const db = createDb({ DATABASE_URL: ":memory:" });
-	await migrateDb(db);
+	const db = await migratedDb();
 	const deviceId = (await ownDevice(db)).id;
 	const spaceId = await localSpaceId(db);
 	await db

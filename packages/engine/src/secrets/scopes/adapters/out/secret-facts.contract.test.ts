@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { createDb } from "@nightshift/db";
-import { migrateDb } from "@nightshift/db/migrate";
+import { migratedDb } from "@nightshift/db/testing";
 import { openDeviceDocument } from "../../../../documents";
 import { inMemorySecretFacts } from "./in-memory-secret-facts";
 import { secretFactsContract } from "./secret-facts.contract";
@@ -17,8 +16,7 @@ secretFactsContract("in memory", async () => ({
 }));
 
 async function deviceDocument() {
-	const db = createDb({ DATABASE_URL: ":memory:" });
-	await migrateDb(db);
+	const db = await migratedDb();
 	return openDeviceDocument({ db, deviceId: "device-1" });
 }
 

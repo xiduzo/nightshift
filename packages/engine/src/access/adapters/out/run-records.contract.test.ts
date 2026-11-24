@@ -1,7 +1,6 @@
 import { expect, test } from "bun:test";
-import { createDb } from "@nightshift/db";
-import { migrateDb } from "@nightshift/db/migrate";
 import { project, run } from "@nightshift/db/schema";
+import { migratedDb } from "@nightshift/db/testing";
 import { applyWalkerMoves, createRunLog, RUN_NOT_FOUND } from "../../../log";
 import { appendEvent } from "../../../log/run-log/append";
 import { ownDevice } from "../../../testing/alone-directory";
@@ -30,8 +29,7 @@ runRecordsContract("in memory", async () => {
 });
 
 runRecordsContract("over the run log, on libsql in memory", async () => {
-	const db = createDb({ DATABASE_URL: ":memory:" });
-	await migrateDb(db);
+	const db = await migratedDb();
 	const deviceId = (await ownDevice(db)).id;
 	const spaceId = await localSpaceId(db);
 	const otherSpaceId = await otherSpace(db);

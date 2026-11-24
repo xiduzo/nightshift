@@ -1,6 +1,5 @@
-import { createDb } from "@nightshift/db";
-import { migrateDb } from "@nightshift/db/migrate";
 import { project } from "@nightshift/db/schema";
+import { migratedDb } from "@nightshift/db/testing";
 import { createFlowDocuments } from "../../../../documents";
 import { localSpaceId } from "../../../../testing/test-support";
 import { flowStoreContract } from "./flow-store.contract";
@@ -21,8 +20,7 @@ flowStoreContract("in memory", async () => {
 });
 
 flowStoreContract("the flow documents, on libsql in memory", async () => {
-	const db = createDb({ DATABASE_URL: ":memory:" });
-	await migrateDb(db);
+	const db = await migratedDb();
 	const spaceId = await localSpaceId(db);
 	await db.insert(project).values([
 		{ id: "project-1", spaceId, name: "one", folder: false },

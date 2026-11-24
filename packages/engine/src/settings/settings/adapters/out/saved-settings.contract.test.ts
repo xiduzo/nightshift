@@ -1,5 +1,4 @@
-import { createDb } from "@nightshift/db";
-import { migrateDb } from "@nightshift/db/migrate";
+import { migratedDb } from "@nightshift/db/testing";
 import { openDeviceDocument } from "../../../../documents";
 import { inMemorySavedSettings } from "./in-memory-saved-settings";
 import { savedSettingsContract } from "./saved-settings.contract";
@@ -16,8 +15,7 @@ savedSettingsContract("in memory", async () => ({
 }));
 
 savedSettingsContract("the Device document, on libsql in memory", async () => {
-	const db = createDb({ DATABASE_URL: ":memory:" });
-	await migrateDb(db);
+	const db = await migratedDb();
 	const document = await openDeviceDocument({ db, deviceId: "device-1" });
 	return { saved: yjsSavedSettings(document), close: async () => {} };
 });

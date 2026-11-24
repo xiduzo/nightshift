@@ -8,9 +8,9 @@ import type {
 	AgentSessionInput,
 	McpServerConfig,
 } from "@nightshift/agents/types";
-import { createDb, type Database } from "@nightshift/db";
-import { migrateDb } from "@nightshift/db/migrate";
+import type { Database } from "@nightshift/db";
 import { device, event, organization } from "@nightshift/db/schema";
+import { migratedDb } from "@nightshift/db/testing";
 import type { AgentHarnessName } from "@nightshift/flows";
 import { asDate, now } from "@nightshift/time";
 import { asc, eq, sql } from "drizzle-orm";
@@ -290,8 +290,7 @@ export async function createSandbox(): Promise<Sandbox> {
 	await mustGit(repoPath, [...gitIdentity, "commit", "-q", "-m", "initial"]);
 
 	const dbPath = join(root, "nightshift.db");
-	const db = createDb({ DATABASE_URL: `file:${dbPath}` });
-	await migrateDb(db);
+	const db = await migratedDb(`file:${dbPath}`);
 	const deviceId = (await ownDevice(db)).id;
 	return {
 		root,

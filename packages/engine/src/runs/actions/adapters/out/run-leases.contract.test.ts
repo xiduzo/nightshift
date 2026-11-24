@@ -1,5 +1,4 @@
-import { createDb } from "@nightshift/db";
-import { migrateDb } from "@nightshift/db/migrate";
+import { migratedDb } from "@nightshift/db/testing";
 import { createLeaseKeeper, createLeaseStore } from "../../../../leases";
 import { inMemoryRunLeases } from "./in-memory-run-leases";
 import { keeperRunLeases } from "./keeper-run-leases";
@@ -23,8 +22,7 @@ runLeasesContract("in memory", async () => {
 runLeasesContract(
 	"over the lease keeper and its store, on libsql in memory",
 	async () => {
-		const db = createDb({ DATABASE_URL: ":memory:" });
-		await migrateDb(db);
+		const db = await migratedDb();
 		const store = createLeaseStore({ db, now: () => 1_000_000 });
 		const keeper = createLeaseKeeper({
 			db,

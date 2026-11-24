@@ -1,5 +1,4 @@
-import { createDb } from "@nightshift/db";
-import { migrateDb } from "@nightshift/db/migrate";
+import { migratedDb } from "@nightshift/db/testing";
 import {
 	createSyncedDocuments,
 	documentName,
@@ -37,8 +36,7 @@ deviceDocumentsContract("in memory", async () => {
 });
 
 deviceDocumentsContract("the ydoc rows, on libsql in memory", async () => {
-	const db = createDb({ DATABASE_URL: ":memory:" });
-	await migrateDb(db);
+	const db = await migratedDb();
 	const synced = createSyncedDocuments({ db });
 	return {
 		documents: drizzleDeviceDocuments({ db, documents: synced }),

@@ -1,6 +1,5 @@
-import { createDb } from "@nightshift/db";
-import { migrateDb } from "@nightshift/db/migrate";
 import { session, user } from "@nightshift/db/schema";
+import { migratedDb } from "@nightshift/db/testing";
 import { asDate } from "@nightshift/time";
 import { drizzleSessionStore } from "./drizzle-session-store";
 import { inMemorySessionStore } from "./in-memory-session-store";
@@ -18,8 +17,7 @@ sessionStoreContract("in memory", async () => {
 });
 
 sessionStoreContract("over drizzle", async () => {
-	const db = createDb({ DATABASE_URL: ":memory:" });
-	await migrateDb(db);
+	const db = await migratedDb();
 	const people = new Set<string>();
 	return {
 		sessionStore: drizzleSessionStore(db),

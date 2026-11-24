@@ -1,6 +1,5 @@
-import { createDb } from "@nightshift/db";
-import { migrateDb } from "@nightshift/db/migrate";
 import { project, run, user } from "@nightshift/db/schema";
+import { migratedDb } from "@nightshift/db/testing";
 import { runRecord } from "../../../../access/adapters/out/in-memory-run-records";
 import { createRunLog } from "../../../../log";
 import { appendEvent } from "../../../../log/run-log/append";
@@ -36,8 +35,7 @@ startersContract("in memory", async () => {
 });
 
 startersContract("over the read model, on libsql in memory", async () => {
-	const db = createDb({ DATABASE_URL: ":memory:" });
-	await migrateDb(db);
+	const db = await migratedDb();
 	const walkerId = (await ownDevice(db)).id;
 	const spaceId = await localSpaceId(db);
 	await db

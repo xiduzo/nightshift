@@ -1,6 +1,5 @@
-import { createDb } from "@nightshift/db";
-import { migrateDb } from "@nightshift/db/migrate";
 import { clone, device, organization, project } from "@nightshift/db/schema";
+import { migratedDb } from "@nightshift/db/testing";
 import { asDate } from "@nightshift/time";
 import { eq } from "drizzle-orm";
 import { drizzleProjectStore } from "./drizzle-project-store";
@@ -44,8 +43,7 @@ projectStoreContract("in memory", async () => {
 });
 
 projectStoreContract("over drizzle", async () => {
-	const db = createDb({ DATABASE_URL: ":memory:" });
-	await migrateDb(db);
+	const db = await migratedDb();
 	for (const id of ["s1", "s2"]) {
 		await db
 			.insert(organization)

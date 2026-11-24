@@ -1,6 +1,5 @@
-import { createDb } from "@nightshift/db";
-import { migrateDb } from "@nightshift/db/migrate";
 import { member, user } from "@nightshift/db/schema";
+import { migratedDb } from "@nightshift/db/testing";
 import { asDate } from "@nightshift/time";
 import { otherSpace } from "../../../testing/test-support";
 import { authMemberSpaces } from "./auth-member-spaces";
@@ -27,8 +26,7 @@ memberSpacesContract("in memory", async () => {
 });
 
 memberSpacesContract("over @nightshift/auth, on libsql in memory", async () => {
-	const db = createDb({ DATABASE_URL: ":memory:" });
-	await migrateDb(db);
+	const db = await migratedDb();
 	const platform = await otherSpace(db, "Platform");
 	const research = await otherSpace(db, "Research");
 	let rows = 0;

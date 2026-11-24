@@ -1,6 +1,5 @@
-import { createDb } from "@nightshift/db";
-import { migrateDb } from "@nightshift/db/migrate";
 import { organization, project, run } from "@nightshift/db/schema";
+import { migratedDb } from "@nightshift/db/testing";
 import { asDate } from "@nightshift/time";
 import { drizzleMoveStore } from "./drizzle-move-store";
 import { inMemoryMoveStore, moveRecords } from "./in-memory-move-store";
@@ -37,8 +36,7 @@ moveStoreContract("in memory", async () => {
 });
 
 moveStoreContract("over drizzle", async () => {
-	const db = createDb({ DATABASE_URL: ":memory:" });
-	await migrateDb(db);
+	const db = await migratedDb();
 	return {
 		moveStore: drizzleMoveStore(db),
 		seed: {

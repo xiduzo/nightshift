@@ -1,6 +1,6 @@
-import { createDb, type Database } from "@nightshift/db";
-import { migrateDb } from "@nightshift/db/migrate";
+import type { Database } from "@nightshift/db";
 import { member, organization, user } from "@nightshift/db/schema";
+import { migratedDb } from "@nightshift/db/testing";
 import { asDate } from "@nightshift/time";
 import type { RowBatch } from "./domain/personal-space";
 
@@ -31,8 +31,7 @@ export type PersonalSeed = {
  * personal Space that the migrations make: an empty Replica.
  */
 export async function memoryDb(): Promise<Database> {
-	const db = createDb({ DATABASE_URL: ":memory:" });
-	await migrateDb(db);
+	const db = await migratedDb();
 	await db.delete(member);
 	await db.delete(organization);
 	await db.delete(user);

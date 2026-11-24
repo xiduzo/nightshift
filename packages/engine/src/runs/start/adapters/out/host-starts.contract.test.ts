@@ -1,6 +1,6 @@
 import { createDb } from "@nightshift/db";
-import { migrateDb } from "@nightshift/db/migrate";
 import { project, run } from "@nightshift/db/schema";
+import { migratedDb } from "@nightshift/db/testing";
 import { now } from "@nightshift/time";
 import type { StartRunInput } from "../../../../contract";
 import { createRunLog } from "../../../../log";
@@ -42,8 +42,7 @@ hostStartsContract(
 hostStartsContract(
 	"over a Host's Link, on libsql in memory",
 	async () => {
-		const db = createDb({ DATABASE_URL: ":memory:" });
-		await migrateDb(db);
+		const db = await migratedDb();
 		const walkerId = (await ownDevice(db)).id;
 		const spaceId = await localSpaceId(db);
 		await db

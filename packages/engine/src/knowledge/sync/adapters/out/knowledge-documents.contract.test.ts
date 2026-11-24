@@ -1,13 +1,11 @@
-import { createDb } from "@nightshift/db";
-import { migrateDb } from "@nightshift/db/migrate";
+import { migratedDb } from "@nightshift/db/testing";
 import { inMemoryKnowledgeDocuments } from "./in-memory-knowledge-documents";
 import { knowledgeDocumentsContract } from "./knowledge-documents.contract";
 import { yjsKnowledgeDocuments } from "./yjs-knowledge-documents";
 
 /**
  * The contract of `KnowledgeDocuments`, on both adapters. The real side
- * runs on libsql in memory: `createDb({ DATABASE_URL: ":memory:" })` with
- * `migrateDb`.
+ * runs on libsql in memory: `migratedDb()`.
  */
 
 knowledgeDocumentsContract("in memory", async () => ({
@@ -16,8 +14,7 @@ knowledgeDocumentsContract("in memory", async () => ({
 }));
 
 knowledgeDocumentsContract("over yjs", async () => {
-	const db = createDb({ DATABASE_URL: ":memory:" });
-	await migrateDb(db);
+	const db = await migratedDb();
 	return {
 		knowledgeDocuments: yjsKnowledgeDocuments({ db }),
 		close: async () => {},

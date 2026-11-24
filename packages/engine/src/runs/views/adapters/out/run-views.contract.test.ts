@@ -1,6 +1,5 @@
-import { createDb } from "@nightshift/db";
-import { migrateDb } from "@nightshift/db/migrate";
 import { project, run } from "@nightshift/db/schema";
+import { migratedDb } from "@nightshift/db/testing";
 import { asDate, now } from "@nightshift/time";
 import { eq } from "drizzle-orm";
 import { runRecord } from "../../../../access/adapters/out/in-memory-run-records";
@@ -53,8 +52,7 @@ runViewsContract("in memory", async (neighbours) => {
 runViewsContract(
 	"over the database and the run log, on libsql in memory",
 	async (neighbours) => {
-		const db = createDb({ DATABASE_URL: ":memory:" });
-		await migrateDb(db);
+		const db = await migratedDb();
 		const deviceId = (await ownDevice(db)).id;
 		const spaceId = await localSpaceId(db);
 		const log = createRunLog(db, { walkerId: deviceId, dataDir: "/nowhere" });

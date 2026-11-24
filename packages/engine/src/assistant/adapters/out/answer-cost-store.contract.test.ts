@@ -1,5 +1,4 @@
-import { createDb } from "@nightshift/db";
-import { migrateDb } from "@nightshift/db/migrate";
+import { migratedDb } from "@nightshift/db/testing";
 import { answerCostStoreContract } from "./answer-cost-store.contract";
 import { drizzleAnswerCostStore } from "./drizzle-answer-cost-store";
 import { inMemoryAnswerCostStore } from "./in-memory-answer-cost-store";
@@ -15,7 +14,6 @@ answerCostStoreContract("in memory", async () => ({
 }));
 
 answerCostStoreContract("over drizzle", async () => {
-	const db = createDb({ DATABASE_URL: ":memory:" });
-	await migrateDb(db);
+	const db = await migratedDb();
 	return { answerCostStore: drizzleAnswerCostStore(db), close: async () => {} };
 });

@@ -1,6 +1,5 @@
-import { createDb } from "@nightshift/db";
-import { migrateDb } from "@nightshift/db/migrate";
 import { project } from "@nightshift/db/schema";
+import { migratedDb } from "@nightshift/db/testing";
 import { FLOW_VERSION, type Flow } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { createFlowDocuments } from "../../../documents";
@@ -42,8 +41,7 @@ scheduleStoreContract("in memory", async () => {
 });
 
 scheduleStoreContract("the flow documents, on libsql in memory", async () => {
-	const db = createDb({ DATABASE_URL: ":memory:" });
-	await migrateDb(db);
+	const db = await migratedDb();
 	const deviceId = (await ownDevice(db)).id;
 	const spaceId = await localSpaceId(db);
 	await db

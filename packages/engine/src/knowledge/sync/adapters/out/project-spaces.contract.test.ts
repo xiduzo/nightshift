@@ -1,6 +1,5 @@
-import { createDb } from "@nightshift/db";
-import { migrateDb } from "@nightshift/db/migrate";
 import { organization, project } from "@nightshift/db/schema";
+import { migratedDb } from "@nightshift/db/testing";
 import { asDate } from "@nightshift/time";
 import { drizzleProjectSpaces } from "./drizzle-project-spaces";
 import { inMemoryProjectSpaces } from "./in-memory-project-spaces";
@@ -8,8 +7,7 @@ import { projectSpacesContract } from "./project-spaces.contract";
 
 /**
  * The contract of `ProjectSpaces`, on both adapters. The real side runs
- * on libsql in memory: `createDb({ DATABASE_URL: ":memory:" })` with
- * `migrateDb`.
+ * on libsql in memory: `migratedDb()`.
  */
 
 projectSpacesContract("in memory", async () => {
@@ -22,8 +20,7 @@ projectSpacesContract("in memory", async () => {
 });
 
 projectSpacesContract("over drizzle", async () => {
-	const db = createDb({ DATABASE_URL: ":memory:" });
-	await migrateDb(db);
+	const db = await migratedDb();
 	await db.insert(organization).values([
 		{ id: "s1", name: "s1", slug: "s1", createdAt: asDate(0) },
 		{ id: "s2", name: "s2", slug: "s2", createdAt: asDate(0), personal: true },

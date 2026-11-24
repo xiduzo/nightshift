@@ -1,6 +1,5 @@
-import { createDb } from "@nightshift/db";
-import { migrateDb } from "@nightshift/db/migrate";
 import { member, organization, user } from "@nightshift/db/schema";
+import { migratedDb } from "@nightshift/db/testing";
 import { asDate } from "@nightshift/time";
 import { sql } from "drizzle-orm";
 import { drizzleSpaceStore } from "./drizzle-space-store";
@@ -31,8 +30,7 @@ spaceStoreContract("in memory", async () => {
 });
 
 spaceStoreContract("over drizzle", async () => {
-	const db = createDb({ DATABASE_URL: ":memory:" });
-	await migrateDb(db);
+	const db = await migratedDb();
 	// An empty Replica: without the local Person and the Space the migrations make.
 	await db.delete(member);
 	await db.delete(organization);

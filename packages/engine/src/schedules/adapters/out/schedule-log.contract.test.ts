@@ -1,6 +1,5 @@
-import { createDb } from "@nightshift/db";
-import { migrateDb } from "@nightshift/db/migrate";
 import { project, run } from "@nightshift/db/schema";
+import { migratedDb } from "@nightshift/db/testing";
 import type { EnginePayloads } from "../../../log/events/events";
 import { appendEvent } from "../../../log/run-log/append";
 import { ownDevice } from "../../../testing/alone-directory";
@@ -27,8 +26,7 @@ scheduleLogContract("in memory", async () => {
 });
 
 scheduleLogContract("drizzle, on libsql in memory", async () => {
-	const db = createDb({ DATABASE_URL: ":memory:" });
-	await migrateDb(db);
+	const db = await migratedDb();
 	const deviceId = (await ownDevice(db)).id;
 	const spaceId = await localSpaceId(db);
 	await db.insert(project).values([

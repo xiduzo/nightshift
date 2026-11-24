@@ -1,5 +1,4 @@
-import { createDb } from "@nightshift/db";
-import { migrateDb } from "@nightshift/db/migrate";
+import { migratedDb } from "@nightshift/db/testing";
 import { openDeviceDocument } from "../../../../documents";
 import { inMemorySavedCliTools } from "./in-memory-saved-cli-tools";
 import { savedCliToolsContract } from "./saved-cli-tools.contract";
@@ -20,8 +19,7 @@ savedCliToolsContract("in memory", async () => {
 });
 
 savedCliToolsContract("the Device document, on libsql in memory", async () => {
-	const db = createDb({ DATABASE_URL: ":memory:" });
-	await migrateDb(db);
+	const db = await migratedDb();
 	const document = await openDeviceDocument({ db, deviceId: "device-1" });
 	return {
 		saved: yjsSavedCliTools(document),

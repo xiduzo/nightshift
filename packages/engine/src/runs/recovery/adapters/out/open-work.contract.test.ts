@@ -1,6 +1,5 @@
-import { createDb } from "@nightshift/db";
-import { migrateDb } from "@nightshift/db/migrate";
 import { project, run } from "@nightshift/db/schema";
+import { migratedDb } from "@nightshift/db/testing";
 import {
 	createRunBus,
 	createRunLog,
@@ -64,8 +63,7 @@ openWorkContract("in memory", async () => {
 openWorkContract(
 	"over the database and the run log, on libsql in memory",
 	async () => {
-		const db = createDb({ DATABASE_URL: ":memory:" });
-		await migrateDb(db);
+		const db = await migratedDb();
 		const deviceId = (await ownDevice(db)).id;
 		const spaceId = await localSpaceId(db);
 		await db

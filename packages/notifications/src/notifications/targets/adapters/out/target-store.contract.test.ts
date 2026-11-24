@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { createDb } from "@nightshift/db";
-import { migrateDb } from "@nightshift/db/migrate";
+import { migratedDb } from "@nightshift/db/testing";
 import { Expo } from "expo-server-sdk";
 import type { PushKind } from "../../../../channels";
 import { isExpoPushToken, type TARGET_KINDS } from "../../domain/push-targets";
@@ -20,8 +19,7 @@ targetStoreContract("in memory", async () => ({
 }));
 
 targetStoreContract("over drizzle", async () => {
-	const db = createDb({ DATABASE_URL: ":memory:" });
-	await migrateDb(db);
+	const db = await migratedDb();
 	return { targetStore: drizzleTargetStore(db), close: async () => {} };
 });
 

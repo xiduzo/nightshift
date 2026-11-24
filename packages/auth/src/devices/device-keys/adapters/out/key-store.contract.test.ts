@@ -1,6 +1,5 @@
-import { createDb } from "@nightshift/db";
-import { migrateDb } from "@nightshift/db/migrate";
 import { apikey } from "@nightshift/db/schema";
+import { migratedDb } from "@nightshift/db/testing";
 import { asDate } from "@nightshift/time";
 import { drizzleKeyStore } from "./drizzle-key-store";
 import { inMemoryKeyStore } from "./in-memory-key-store";
@@ -18,8 +17,7 @@ keyStoreContract("in memory", async () => {
 });
 
 keyStoreContract("over drizzle", async () => {
-	const db = createDb({ DATABASE_URL: ":memory:" });
-	await migrateDb(db);
+	const db = await migratedDb();
 	return {
 		keyStore: drizzleKeyStore(db),
 		async add(hash, key) {

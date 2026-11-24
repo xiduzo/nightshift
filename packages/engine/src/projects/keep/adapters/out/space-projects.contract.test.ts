@@ -1,6 +1,5 @@
-import { createDb } from "@nightshift/db";
-import { migrateDb } from "@nightshift/db/migrate";
 import { organization } from "@nightshift/db/schema";
+import { migratedDb } from "@nightshift/db/testing";
 import { asDate } from "@nightshift/time";
 import { createSpaceDocuments } from "../../../../documents";
 import { inMemorySpaceProjects } from "./in-memory-space-projects";
@@ -36,8 +35,7 @@ spaceProjectsContract("in memory", async () => {
 });
 
 spaceProjectsContract("over the Space documents", async () => {
-	const db = createDb({ DATABASE_URL: ":memory:" });
-	await migrateDb(db);
+	const db = await migratedDb();
 	for (const id of ["mine", "hosted"]) {
 		await db
 			.insert(organization)

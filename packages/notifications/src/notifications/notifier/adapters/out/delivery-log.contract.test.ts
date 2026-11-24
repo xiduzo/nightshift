@@ -1,5 +1,4 @@
-import { createDb } from "@nightshift/db";
-import { migrateDb } from "@nightshift/db/migrate";
+import { migratedDb } from "@nightshift/db/testing";
 import { deliveryLogContract } from "./delivery-log.contract";
 import { drizzleDeliveryLog } from "./drizzle-delivery-log";
 import { inMemoryDeliveryLog } from "./in-memory-delivery-log";
@@ -15,7 +14,6 @@ deliveryLogContract("in memory", async () => ({
 }));
 
 deliveryLogContract("over drizzle", async () => {
-	const db = createDb({ DATABASE_URL: ":memory:" });
-	await migrateDb(db);
+	const db = await migratedDb();
 	return { deliveryLog: drizzleDeliveryLog(db), close: async () => {} };
 });

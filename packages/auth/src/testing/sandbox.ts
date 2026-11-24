@@ -1,8 +1,8 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createDb, type Database } from "@nightshift/db";
-import { migrateDb } from "@nightshift/db/migrate";
+import type { Database } from "@nightshift/db";
+import { migratedDb } from "@nightshift/db/testing";
 
 import { type Auth, type AuthOptions, createAuth } from "../auth";
 
@@ -41,8 +41,7 @@ export async function createAuthSandbox(
 	options: AuthOptions = {},
 ): Promise<AuthSandbox> {
 	const root = mkdtempSync(join(tmpdir(), "nightshift-auth-"));
-	const db = createDb({ DATABASE_URL: `file:${join(root, "nightshift.db")}` });
-	await migrateDb(db);
+	const db = await migratedDb(`file:${join(root, "nightshift.db")}`);
 	const auth = createAuth(
 		{
 			BETTER_AUTH_URL: "http://localhost:3000",

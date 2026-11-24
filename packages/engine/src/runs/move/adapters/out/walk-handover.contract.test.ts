@@ -1,8 +1,6 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { createDb } from "@nightshift/db";
-import { migrateDb } from "@nightshift/db/migrate";
 import {
 	lgCheckpoint,
 	lgWrite,
@@ -10,6 +8,7 @@ import {
 	run,
 	step,
 } from "@nightshift/db/schema";
+import { migratedDb } from "@nightshift/db/testing";
 import { eq } from "drizzle-orm";
 import type { WalkRef } from "../../../../archive";
 import { createRunWalks } from "../../../../graph";
@@ -84,8 +83,7 @@ walkHandoverContract(
 	"over the archive, the walk files and the run log, on libsql in memory",
 	async () => {
 		const dataDir = await mkdtemp(join(tmpdir(), "walk-handover-"));
-		const db = createDb({ DATABASE_URL: ":memory:" });
-		await migrateDb(db);
+		const db = await migratedDb();
 		const here = (await ownDevice(db)).id;
 		const spaceId = await localSpaceId(db);
 		await db

@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { createDb } from "@nightshift/db";
-import { migrateDb } from "@nightshift/db/migrate";
 import { notificationSettings } from "@nightshift/db/schema";
+import { migratedDb } from "@nightshift/db/testing";
 import { eq } from "drizzle-orm";
 import { drizzleSettingsStore } from "./drizzle-settings-store";
 import { inMemorySettingsStore } from "./in-memory-settings-store";
@@ -14,8 +13,7 @@ import { settingsStoreContract } from "./settings-store.contract";
  */
 
 async function memoryDb() {
-	const db = createDb({ DATABASE_URL: ":memory:" });
-	await migrateDb(db);
+	const db = await migratedDb();
 	return db;
 }
 
