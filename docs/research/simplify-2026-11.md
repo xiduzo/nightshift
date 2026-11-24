@@ -250,3 +250,14 @@ Each entry names its source. "Read" means found by reading and not reproduced.
 
 - One test of the `flows` command passed the 5 seconds of Bun on a slow runner. Bun then
   stopped the daemon of the file. The limit of that file is now 60 seconds (a301dccad).
+
+### P1r. ADR 41 and its checks (db0f83023 to ef7528fbf)
+
+- Hits of the new checks on 379 use cases: 6 forwards, 0 ignored actors, 3 tests without an
+  outcome, 0 suites without `expect`, 4 port types in a use-case file (fixed), 2 twins
+  without a reader (removed), 3 twins with a real adapter's value (1 fixed).
+- The list has 11 lines: 6 forwards, 3 tests and 2 twins. Other lanes remove 8 of them. The
+  three role writes of auth stay.
+- The checks add about 1 second to check-rings. The rules and generators add about 900
+  lines net. Their tests are the largest part.
+- A literal in the call is enough to pass the forward check. A review judges that.

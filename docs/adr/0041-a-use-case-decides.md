@@ -55,7 +55,7 @@ slice or another package.
 - **No twin for a store of SQL.** Use-case tests run on libsql in memory. A new database is
   cheap when it starts from the schema text, so time is no reason against it. Each test must
   then seed the rows of other slices. We wait for a pilot.
-- **Fail a function in the ports bag too.** 170 places write one there: the clock, a new id,
+- **Fail a function in the ports bag too.** 174 places write one there: the clock, a new id,
   another use case. Most are no hidden port, so the check does not ask for it.
 - **Keep the rule.** A new forward costs two files.
 
