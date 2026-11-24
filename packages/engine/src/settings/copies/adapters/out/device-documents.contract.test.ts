@@ -5,8 +5,8 @@ import {
 	openDeviceDocument,
 } from "../../../../documents";
 import { deviceDocumentsContract } from "./device-documents.contract";
-import { drizzleDeviceDocuments } from "./drizzle-device-documents";
 import { inMemoryDeviceDocuments } from "./in-memory-device-documents";
+import { yjsDeviceDocuments } from "./yjs-device-documents";
 
 /**
  * The contract of `DeviceDocuments`, on both adapters. The real side runs
@@ -39,7 +39,7 @@ deviceDocumentsContract("the ydoc rows, on libsql in memory", async () => {
 	const db = await migratedDb();
 	const synced = createSyncedDocuments({ db });
 	return {
-		documents: drizzleDeviceDocuments({ db, documents: synced }),
+		documents: yjsDeviceDocuments({ db, documents: synced }),
 		async writeKept(deviceId, name) {
 			const document = await openDeviceDocument({ db, deviceId });
 			await document.change(() => {

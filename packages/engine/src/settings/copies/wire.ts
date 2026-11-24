@@ -1,7 +1,7 @@
 import type { Database } from "@nightshift/db";
 import type * as Y from "yjs";
 import type { SyncedDocuments } from "../../documents";
-import { drizzleDeviceDocuments } from "./adapters/out/drizzle-device-documents";
+import { yjsDeviceDocuments } from "./adapters/out/yjs-device-documents";
 import { keepDeviceCopies } from "./application/keep-device-copies";
 import { listDeviceCopies } from "./application/list-device-copies";
 import { readDeviceCopy } from "./application/read-device-copy";
@@ -50,10 +50,10 @@ export function wireCopies(deps: {
 	/** This Replica's synced documents. Default: its own over `db`. */
 	documents?: SyncedDocuments;
 }): Copies {
-	const documents = drizzleDeviceDocuments(deps);
+	const documents = yjsDeviceDocuments(deps);
 	return {
 		forDevice(selfId) {
-			const opened = drizzleDeviceDocuments(deps);
+			const opened = yjsDeviceDocuments(deps);
 			/** The names the Host gave, for a Device that reports none itself. */
 			const named = new Map<string, string>();
 			const ports = { documents: opened, selfId, named };

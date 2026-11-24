@@ -20,7 +20,7 @@ import type { DeviceCopy, DeviceRecord } from "../../domain/device-copy";
  * row named `device-copy:<id>`, apart from the `device:<id>` rows a Host
  * keeps for the Devices whose home it is. It syncs as `device:<id>`.
  */
-export function drizzleDeviceDocuments(deps: {
+export function yjsDeviceDocuments(deps: {
 	db: Database;
 	/** This Replica's synced documents. Default: its own over `db`, made at the first open. */
 	documents?: SyncedDocuments;
