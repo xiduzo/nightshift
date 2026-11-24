@@ -560,22 +560,6 @@ describe("replies of a real engine", () => {
 		expect(transcripts.flatMap((t) => t.entries).length).toBeGreaterThan(0);
 		await read(appRouter.runs.placements, { projectId });
 		await read(appRouter.runs.devices, { projectId });
-		expect(
-			await read(appRouter.profiles.catalog, {
-				spaceId: sandbox.spaceId,
-				projectId,
-			}),
-		).toEqual([
-			{
-				deviceId: sandbox.deviceId,
-				name: expect.any(String),
-				thisDevice: true,
-				mine: true,
-				online: true,
-				// This engine knows no profiles of this computer.
-				profiles: null,
-			},
-		]);
 		await read(appRouter.runs.moveTargets, { runId: started.id });
 		await read(appRouter.gates.list);
 		const heard = await notices;

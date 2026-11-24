@@ -19,20 +19,6 @@ const OUTCOME_RULE =
 const SUMMARY_RULE =
 	"Put a one or two sentence summary of the result in `summary`.";
 
-/** Appended to the prompt when the session reports with the tool. */
-export const TOOL_REPORT_INSTRUCTION = [
-	`When you are done, call the \`${REPORT_TOOL_NAME}\` tool exactly once, as your last action.`,
-	OUTCOME_RULE,
-	SUMMARY_RULE,
-].join(" ");
-
-/** Appended to the prompt when the session reports with text (plan mode). */
-export const TEXT_REPORT_INSTRUCTION = [
-	"When you are done, end your final message with exactly one line in this format:",
-	`${REPORT_MARKER} {"outcome": "pass", "summary": "One or two sentences about the result."}`,
-	OUTCOME_RULE,
-].join("\n");
-
 function outcomeRule(rules: ReportRules): string[] {
 	if (!rules.withOutcome) return [];
 	return [

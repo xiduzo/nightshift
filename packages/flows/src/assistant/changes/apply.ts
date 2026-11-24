@@ -97,9 +97,6 @@ function commandField(node: FlowNode): TextField | undefined {
 	}
 }
 
-/** The prompt a `prompt` suggestion rewrites. Undefined: the node takes none. */
-export const promptOf = (node: FlowNode) => promptField(node)?.text;
-
 /** The command a `command` suggestion rewrites. Undefined: the node takes none. */
 export const suggestedCommandOf = (node: FlowNode) => commandField(node)?.text;
 

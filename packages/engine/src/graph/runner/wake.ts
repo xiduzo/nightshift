@@ -174,8 +174,6 @@ export type SleepDeps = {
 	wake(runId: string): void;
 };
 
-export type Sleeps = ReturnType<typeof createSleeps>;
-
 /**
  * The wake timers of sleeping runs, and of runs that wait at a Gate with a
  * deadline. One per runner, one timer per run. A timer that fires hands

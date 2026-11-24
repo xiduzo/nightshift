@@ -2,7 +2,7 @@ import { event, project, run } from "@nightshift/db/schema";
 import { migratedDb } from "@nightshift/db/testing";
 import { asc, inArray } from "drizzle-orm";
 import { type EnginePayloads, type LoggedEvent, parseEventRow } from "../log";
-import { appendEvent } from "../log/run-log/append";
+import { appendEvent } from "../testing/append-event";
 import { localSpaceId } from "../testing/test-support";
 import { drizzleScheduleLog } from "./adapters/out/drizzle-schedule-log";
 import { inMemorySchedulePorts } from "./adapters/out/in-memory-neighbours";

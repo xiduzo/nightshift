@@ -66,6 +66,3 @@ export const openReaderRoute = createLoopback<ReaderRoute>({
 		}
 	},
 });
-
-/** A step's own address and token on the listener, until `close`. */
-export type OpenedRoute = Awaited<ReturnType<typeof openReaderRoute>>;

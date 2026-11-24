@@ -354,23 +354,6 @@ export const deviceProfileSchema = exact<DeviceProfile>()(
 	}),
 );
 
-/**
- * The profiles a flow of a project can use, by Device: every profile of
- * the Person's own Devices, the offered ones of other Persons' Devices.
- * `profiles` is null when this computer cannot tell yet.
- */
-export const profileCatalogSchema = z.array(
-	z.object({
-		deviceId: z.string(),
-		name: z.string(),
-		thisDevice: z.boolean(),
-		/** One of the Person's own Devices; else another Person's, through its Offers. */
-		mine: z.boolean(),
-		online: z.boolean(),
-		profiles: z.array(deviceProfileSchema).nullable(),
-	}),
-);
-
 const profileUse = {
 	id: z.string(),
 	updatedAt: z.number(),

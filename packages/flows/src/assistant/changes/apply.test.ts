@@ -3,7 +3,6 @@ import { FLOW_VERSION, type Flow, flowSchema } from "../../flow";
 import {
 	applySuggestion,
 	outputChanges,
-	promptOf,
 	replaceRange,
 	writeChanges,
 } from "./apply";
@@ -38,6 +37,9 @@ const flow: Flow = flowSchema.parse({
 
 const nodeOf = (next: Flow, id: string) =>
 	next.nodes.find((node) => node.id === id);
+
+const promptOf = (node: Flow["nodes"][number]) =>
+	"prompt" in node ? node.prompt : undefined;
 
 describe("replaceRange", () => {
 	test("replaces the range, or the whole text without one", () => {

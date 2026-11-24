@@ -30,9 +30,6 @@ export type OwnedDevice = {
 	setOwner(personId: string): Promise<void>;
 };
 
-/** A Device that names nobody and keeps no owner. */
-export const UNOWNED: OwnedDevice = { ownerId: null, setOwner: async () => {} };
-
 declare const rows: unique symbol;
 
 /**

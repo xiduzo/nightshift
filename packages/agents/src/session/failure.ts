@@ -79,14 +79,6 @@ export function failureKind(
 	return undefined;
 }
 
-export function isUsageLimitText(text: string): boolean {
-	return failureKind(text) === "usage-limit";
-}
-
-export function isNetworkText(text: string): boolean {
-	return failureKind(text) === "network";
-}
-
 export function parseLegacyResetAt(text: string): number | undefined {
 	const match = LEGACY_RESET.exec(text);
 	return match?.[1] === undefined ? undefined : toEpochMs(Number(match[1]));

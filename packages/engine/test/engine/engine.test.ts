@@ -29,7 +29,6 @@ import { asc, eq } from "drizzle-orm";
 import { NIGHT_SHIFT } from "../../src/contract";
 import type { Engine, EngineInternals } from "../../src/engine";
 import { GateClosedError } from "../../src/gates";
-import { appendEvent } from "../../src/log/run-log/append";
 import { createRunLog, type RunLog } from "../../src/log/run-log/run-log";
 import type { TranscriptEntry } from "../../src/log/transcript/step-events";
 import type { LandedFact } from "../../src/read/landed-facts";
@@ -41,6 +40,7 @@ import {
 	type RunSettings,
 } from "../../src/settings/settings";
 import type { SpaceEngine } from "../../src/space-engine";
+import { appendEvent } from "../../src/testing/append-event";
 import { createTestEngine } from "../../src/testing/test-engine";
 import {
 	cliToolsOf,

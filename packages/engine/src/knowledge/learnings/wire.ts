@@ -79,7 +79,6 @@ export type RunLearnings = {
 /** The learnings of the projects on this computer, bound to their ports. */
 export type Learnings = {
 	propose: ReturnType<typeof proposeLearnings>;
-	proposeFromRun: ReturnType<typeof proposeFromRun>;
 	known: ReturnType<typeof listKnownLearnings>;
 	keepReported: ReturnType<typeof keepReportedLearnings>;
 	waiting: ReturnType<typeof listWaitingLearnings>;
@@ -89,7 +88,6 @@ export type Learnings = {
 	settleNote: ReturnType<typeof settleNote>;
 	tell: ReturnType<typeof tellLearning>;
 	reconciled: ReturnType<typeof hearReconcile>;
-	learnsFromRuns: ReturnType<typeof readLearnsFromRuns>;
 	setLearnsFromRuns: ReturnType<typeof setLearnsFromRuns>;
 	/** The look back at runs that end, over these learnings (`lookBackAtRun`). */
 	followRuns(deps: FollowRunsDeps): RunLearnings;
@@ -118,7 +116,6 @@ export function wireLearnings(deps: LearningsDeps): Learnings {
 
 	return {
 		propose,
-		proposeFromRun: fromRun,
 		known,
 		keepReported,
 		waiting,
@@ -128,7 +125,6 @@ export function wireLearnings(deps: LearningsDeps): Learnings {
 		settleNote: settleNote({ access, folder, documents, holds, now }),
 		tell: tellLearning({ access, folder, documents, holds, now }),
 		reconciled: hearReconcile({ notifications, known: new Map() }),
-		learnsFromRuns,
 		setLearnsFromRuns: setLearnsFromRuns({ access, documents }),
 		followRuns(late) {
 			const queue = createLookQueue();

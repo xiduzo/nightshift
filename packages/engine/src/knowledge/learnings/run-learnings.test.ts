@@ -128,7 +128,7 @@ async function ended(
 
 describe("learnings from runs that ended", () => {
 	test("a Gate answered with a reason gives a proposed learning in the run's own file", async () => {
-		const { engine, knowledge, asked } = setup([
+		const { engine, knowledge, learnings, asked } = setup([
 			"Release only from Monday to Thursday.",
 		]);
 		const space = engine.space(sandbox.spaceId, NIGHT_SHIFT);
@@ -198,8 +198,9 @@ describe("learnings from runs that ended", () => {
 			},
 		]);
 		// The next look back reads it, so the Learner does not propose it again.
-		expect(await knowledge.knowledge.knownLearnings({ projectId })).toEqual([
-			"Release only from Monday to Thursday.",
-		]);
+		await learnings.lookBack({ spaceId: sandbox.spaceId, runId: run.id });
+		expect(asked[1]?.evidence).toContain(
+			"- Release only from Monday to Thursday.",
+		);
 	});
 });

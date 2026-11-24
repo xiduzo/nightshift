@@ -1,6 +1,7 @@
 import type { Database } from "@nightshift/db";
+import { project } from "@nightshift/db/schema";
+import { eq } from "drizzle-orm";
 import { runPlaceOf } from "../log/history/history";
-import { projectSpaceOf } from "../projects/keep/adapters/out/drizzle-project-rows";
 import { drizzleProjectStore } from "../projects/keep/adapters/out/drizzle-project-store";
 import { deviceRowsOf } from "../wire-peers";
 
@@ -27,7 +28,13 @@ export function deviceRowsOn(db: Database) {
  */
 export function placesOn(db: Database) {
 	return {
-		spaceOf: (projectId: string) => projectSpaceOf(db, projectId),
+		async spaceOf(projectId: string) {
+			const [kept] = await db
+				.select({ spaceId: project.spaceId })
+				.from(project)
+				.where(eq(project.id, projectId));
+			return kept?.spaceId ?? null;
+		},
 		runPlace: (runId: string) => runPlaceOf(db, runId),
 	};
 }

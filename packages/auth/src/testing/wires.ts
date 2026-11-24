@@ -7,13 +7,16 @@ import type { Auth } from "../auth";
 import { wireDeviceKeys } from "../devices/device-keys";
 import { wirePairing } from "../devices/pairing";
 import { wireSpaces } from "../spaces";
-import { UNOWNED } from "../spaces/personal/domain/personal-space";
+import type { OwnedDevice } from "../spaces/personal/domain/personal-space";
 
 /**
  * Bound auth wires for tests: the same composition roots production uses,
  * without the deleted per-call facades. Only `@nightshift/auth/testing`
  * exports these.
  */
+
+/** A Device that names nobody and keeps no owner. */
+export const UNOWNED: OwnedDevice = { ownerId: null, setOwner: async () => {} };
 
 export function testSpaces(db: Database) {
 	return wireSpaces({ db });

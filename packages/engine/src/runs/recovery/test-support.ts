@@ -8,7 +8,7 @@ import {
 	type EngineEventType,
 	type EnginePayloads,
 } from "../../log";
-import { appendEvent } from "../../log/run-log/append";
+import { appendEvent } from "../../testing/append-event";
 import { localSpaceId } from "../../testing/test-support";
 import {
 	type DrizzleOpenWorkDeps,

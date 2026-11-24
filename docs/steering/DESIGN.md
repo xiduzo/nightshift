@@ -35,9 +35,8 @@ Tokens live in `packages/ui/src/styles/globals.css` as CSS custom properties in 
 | `--chart-1` … `--chart-5` | blue scale | Cost and run history charts |
 | `--sidebar-*` | mirrors the page set | Project navigation |
 | `--family-do`, `-decide`, `-shape`, `-hold`, `-compose` | indigo 600 / 400, fuchsia 600 / 400, teal 700 / 400, sky 600 / 400, `--muted-foreground` | The family of a node type on its icon tile: the editor canvas, the node dock and the node grid. A run view shows the run status instead. Each icon keeps 3:1 on its tile. |
-| `--ladder-rule`, `-first`, `-later`, `-person`, `-deadline`, `-none` | sky 400 / sky 800, blue 500 / blue 500, blue 800 / indigo 300, `--metric-needed`, amber 800 / amber 700, `--muted-foreground` | The rungs of a ladder in Flow health. The machine rungs climb one blue ramp, which turns around in the dark theme. A person takes the Needed you color, a deadline a darker step of it. Never a status color. Each neighbour pair passes the dataviz validator for color-blind readers in both themes. |
 
-The palette is neutral. The web app adds its run status, outcome, metric, family and ladder colors as tokens in `apps/web/src/index.css`. Add a color as a token before a screen hardcodes it.
+The palette is neutral. The web app adds its run status, outcome, metric and family colors as tokens in `apps/web/src/index.css`. Add a color as a token before a screen hardcodes it.
 
 ### Typography
 

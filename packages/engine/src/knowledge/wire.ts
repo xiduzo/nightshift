@@ -106,9 +106,6 @@ export type Knowledge = {
 	settleLearning: Learnings["settle"];
 	settleNote: Learnings["settleNote"];
 	tellLearning: Learnings["tell"];
-	proposeFromRun: Learnings["proposeFromRun"];
-	knownLearnings: Learnings["known"];
-	learnsFromRuns: Learnings["learnsFromRuns"];
 	setLearnsFromRuns: Learnings["setLearnsFromRuns"];
 	followRuns: Learnings["followRuns"];
 
@@ -367,9 +364,6 @@ export function wireKnowledge(deps: KnowledgeDeps): Knowledge {
 		settleLearning: learnings.settle,
 		settleNote: learnings.settleNote,
 		tellLearning: learnings.tell,
-		proposeFromRun: learnings.proposeFromRun,
-		knownLearnings: learnings.known,
-		learnsFromRuns: learnings.learnsFromRuns,
 		setLearnsFromRuns: learnings.setLearnsFromRuns,
 		followRuns: learnings.followRuns,
 		// The sources, the Map and the review.

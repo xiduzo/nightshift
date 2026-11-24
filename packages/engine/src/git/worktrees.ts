@@ -49,9 +49,6 @@ function changesShown(changes: readonly string[]): string {
 /** The clones that get per-worktree config now: runs that start at once turn it on once. */
 const turningOn = new Map<string, Promise<void>>();
 
-/** The git operations on clones and run worktrees. */
-export type Worktrees = ReturnType<typeof createWorktrees>;
-
 /** The git operations on clones and run worktrees, over the git port. */
 export function createWorktrees(git: Git) {
 	/**

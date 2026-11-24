@@ -18,9 +18,9 @@ import {
 	createRunLog,
 	type LoggedEvent,
 } from "../../../../log";
-import { appendEvent } from "../../../../log/run-log/append";
 import { transcriptPath } from "../../../../log/transcript/transcripts";
 import { ownDevice } from "../../../../testing/alone-directory";
+import { appendEvent } from "../../../../testing/append-event";
 import { localSpaceId } from "../../../../testing/test-support";
 import { archiveWalkHandover } from "./archive-walk-handover";
 import { inMemoryWalkHandover } from "./in-memory-walk-handover";

@@ -773,7 +773,6 @@ const ROUTES: Route[] = [
 	route("ollama.pull", { model: "bge-m3" }, "owner", "ollama.pull", ["bge-m3"]),
 	route("profiles.list", undefined, "owner", "configUse.profiles", [ASKER]),
 	route("profiles.save", agentProfile, "owner", "deviceConfig.saveProfile", [ASKING, { profile: like({ name: "fast" }) }]),
-	route("profiles.catalog", { spaceId: SPACE, ...project }, "session", "space.listDevices", ["p1"]),
 	route("profiles.remove", { id: "p-1" }, "owner", "deviceConfig.removeProfile", [ASKING, { id: "p-1" }]),
 	// Devices, Offers, the owner's sign-in.
 	route("offers.list", undefined, "owner", ["offers.list", "offers.spaces"], []),
@@ -2346,11 +2345,6 @@ describe("the error rule at the API seam", () => {
 			given: { notifications: { targets: { remove: async () => false } } },
 			message:
 				"This phone or browser is not in your list. Reload the page to see the list.",
-		},
-		{
-			path: "profiles.catalog",
-			input: { spaceId: "another-space", ...project },
-			message: "That Space does not exist.",
 		},
 		{
 			path: "invitations.get",

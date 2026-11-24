@@ -21,8 +21,8 @@ export type EventWrites = {
 };
 
 /**
- * Appends one event as `walkerId`'s next and returns it as committed, with
- * its seq and time. The Walker's count (`walker_seq`) is taken in the same
+ * Appends one event as `walkerId`'s next and returns its row as committed,
+ * with its seq, its time and its Space. The Walker's count (`walker_seq`) is taken in the same
  * statement, so two appends cannot get one number. The event's Space is
  * its run's, or for a fact of no run its project's (`payload.projectId`),
  * read in the same statement too. `writes` commit in one batch with the
@@ -30,16 +30,6 @@ export type EventWrites = {
  * The engine appends through its run log (`run-log.ts`), never here
  * directly.
  */
-export async function appendEvent<T extends EngineEventType>(
-	db: Database,
-	input: EventInput<T>,
-	walkerId: string,
-	writes: EventWrites = {},
-): Promise<LoggedEvent> {
-	return parseEventRow(await appendEventRow(db, input, walkerId, writes));
-}
-
-/** `appendEvent`, as the row it committed: with its Space and its Walker's count. */
 export async function appendEventRow<T extends EngineEventType>(
 	db: Database,
 	input: EventInput<T>,

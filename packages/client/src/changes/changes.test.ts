@@ -101,7 +101,6 @@ const READS = new Set([
 	"ollama.status",
 	"ollama.models",
 	"profiles.list",
-	"profiles.catalog",
 	"offers.list",
 	"devices.list",
 	"devices.others",

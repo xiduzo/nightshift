@@ -31,8 +31,6 @@ export type FlowOverview = {
 	starts: FlowStart[];
 	/** Its schedules, in the order of `starts`: the ones that start it, then the ones that wake it. */
 	schedules: ScheduleSummary[];
-	/** It starts on its own: a schedule or a webhook of it is on. */
-	startsOnItsOwn: boolean;
 	/** Its last runs, newest first, and how many of the ended ones finished. */
 	lastRuns: FlowHealthRow["lastRuns"];
 	ended: number;
@@ -81,7 +79,6 @@ export function flowOverviews(
 			flow,
 			starts,
 			schedules: [...own, ...wakers],
-			startsOnItsOwn: own.some((schedule) => schedule.enabled),
 			lastRuns,
 			ended: ended.length,
 			finished: ended.filter((run) => run.status === "finished").length,

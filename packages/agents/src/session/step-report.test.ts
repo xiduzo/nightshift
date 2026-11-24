@@ -15,8 +15,6 @@ import {
 } from "./step-report-parse";
 import {
 	stepReportSetup,
-	TEXT_REPORT_INSTRUCTION,
-	TOOL_REPORT_INSTRUCTION,
 	textReportInstruction,
 	toolReportInstruction,
 } from "./step-report-prompt";
@@ -25,6 +23,17 @@ import {
 	reportInputSchema,
 	reportStepTool,
 } from "./step-report-tool";
+
+/** What the prompt says when the session reports with the tool. */
+const TOOL_REPORT_INSTRUCTION =
+	'When you are done, call the `report_step` tool exactly once, as your last action. Use outcome "pass" when the task is done, "fail" when it is not, and "needs-input" when you need a person to decide or provide something. Put a one or two sentence summary of the result in `summary`.';
+
+/** What the prompt says when the session reports with text (plan mode). */
+const TEXT_REPORT_INSTRUCTION = [
+	"When you are done, end your final message with exactly one line in this format:",
+	'NIGHTSHIFT-REPORT: {"outcome": "pass", "summary": "One or two sentences about the result."}',
+	'Use outcome "pass" when the task is done, "fail" when it is not, and "needs-input" when you need a person to decide or provide something.',
+].join("\n");
 
 /** A harness's own name for the report tool, as Claude Code has one. */
 const REPORT_TOOL_ID = "mcp__tanstack__report_step";

@@ -12,10 +12,10 @@ import { createFlowDocuments } from "../../src/documents";
 import type { Engine } from "../../src/engine";
 import type { EngineEventType } from "../../src/log/events/events";
 import { createRunHistory } from "../../src/log/history/history";
-import { appendEvent } from "../../src/log/run-log/append";
 import { createRunLog } from "../../src/log/run-log/run-log";
 import { createRunBus } from "../../src/log/transcript/bus";
 import type { SpaceEngine } from "../../src/space-engine";
+import { appendEvent } from "../../src/testing/append-event";
 import {
 	createSandbox,
 	type Sandbox,

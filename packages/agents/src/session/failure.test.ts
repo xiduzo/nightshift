@@ -1,10 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-	failureKind,
-	isNetworkText,
-	isUsageLimitText,
-	parseLegacyResetAt,
-} from "./failure";
+import { failureKind, parseLegacyResetAt } from "./failure";
 
 describe("usage-limit text", () => {
 	test.each([
@@ -25,7 +20,7 @@ describe("usage-limit text", () => {
 			false,
 		],
 	])("%s", (text, expected) => {
-		expect(isUsageLimitText(text)).toBe(expected);
+		expect(failureKind(text) === "usage-limit").toBe(expected);
 	});
 
 	test("legacy reset accepts seconds and milliseconds", () => {
@@ -63,8 +58,6 @@ describe("network text", () => {
 		"You have exceeded a secondary rate limit. Please wait a few minutes before you try again.",
 	])("network: %s", (text) => {
 		expect(failureKind(text)).toBe("network");
-		expect(isNetworkText(text)).toBe(true);
-		expect(isUsageLimitText(text)).toBe(false);
 	});
 
 	test.each([

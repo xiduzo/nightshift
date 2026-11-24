@@ -9,10 +9,11 @@ import { asc, eq, inArray } from "drizzle-orm";
 import { NIGHT_SHIFT } from "../contract";
 import type { Engine, EngineInternals } from "../engine";
 import type { EnginePayloads } from "../log/events/events";
-import { appendEvent, parseEventRow } from "../log/run-log/append";
+import { parseEventRow } from "../log/run-log/append";
 import type { RunSummary } from "../read/views";
 import { START_HOLD_WORDS } from "../runs/walk/domain/start-holds";
 import type { SpaceEngine } from "../space-engine";
+import { appendEvent } from "../testing/append-event";
 import { seedFlows } from "../testing/seed-flows";
 import {
 	createSandbox,

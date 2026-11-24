@@ -78,7 +78,6 @@ describe("flowOverviews", () => {
 			"subflow",
 			"subflow",
 		]);
-		expect(overview?.startsOnItsOwn).toBe(true);
 	});
 
 	test("a flow with only paused schedules does not start on its own", () => {
@@ -87,7 +86,6 @@ describe("flowOverviews", () => {
 			[schedule({ enabled: false })],
 			[],
 		);
-		expect(overview?.startsOnItsOwn).toBe(false);
 		expect(overview?.starts).toHaveLength(1);
 	});
 
@@ -178,7 +176,6 @@ describe("flowOverviews", () => {
 		);
 		expect(listens?.starts).toEqual([{ kind: "signal", schedule: wake }]);
 		expect(listens?.schedules).toEqual([wake]);
-		expect(listens?.startsOnItsOwn).toBe(false);
 		expect(deaf?.schedules).toEqual([]);
 	});
 });

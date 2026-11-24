@@ -1,7 +1,7 @@
 import type { Database } from "@nightshift/db";
 import { notificationDelivery } from "@nightshift/db/schema";
 import { asDate, instant, instantOrNull } from "@nightshift/time";
-import { and, desc, eq, gte, inArray, lt, not, or } from "drizzle-orm";
+import { and, eq, inArray, lt, not, or } from "drizzle-orm";
 
 /**
  * The delivery log: what the notifier did with each event for each
@@ -227,26 +227,6 @@ export function createDeliveryLog(db: Database) {
 				.select()
 				.from(notificationDelivery)
 				.where(eq(notificationDelivery.status, "quiet"));
-			return rows.map(toDelivery);
-		},
-
-		/** The Person's entries of one kind made at `since` or later, newest first. */
-		async ofPersonSince(
-			personId: string,
-			kind: NoticeKind,
-			since: number,
-		): Promise<Delivery[]> {
-			const rows = await db
-				.select()
-				.from(notificationDelivery)
-				.where(
-					and(
-						eq(notificationDelivery.personId, personId),
-						eq(notificationDelivery.kind, kind),
-						gte(notificationDelivery.createdAt, asDate(since)),
-					),
-				)
-				.orderBy(desc(notificationDelivery.createdAt));
 			return rows.map(toDelivery);
 		},
 
