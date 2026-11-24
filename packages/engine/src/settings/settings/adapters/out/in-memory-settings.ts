@@ -1,7 +1,7 @@
 import { NIGHT_SHIFT } from "../../../../contract";
 import { saveSettings } from "../../application/save-settings";
 import type { SettingKey, SettingsPatch } from "../../domain/setting-defs";
-import { currentSettings } from "../../domain/setting-fields";
+import { currentSettings, settingsView } from "../../domain/setting-fields";
 import type { SettingsStore } from "../../wire";
 import { inMemorySavedSettings } from "./in-memory-saved-settings";
 
@@ -19,6 +19,7 @@ export function inMemorySettings(
 	const ground = { env: {}, embeddingModel: "embedder" };
 	const save = saveSettings({ saved, ground });
 	const bound = {
+		view: () => settingsView(saved.read(), ground),
 		current: () => currentSettings(saved.read(), ground),
 		save: (patch: SettingsPatch) => save(NIGHT_SHIFT, patch),
 	} satisfies Partial<SettingsStore>;

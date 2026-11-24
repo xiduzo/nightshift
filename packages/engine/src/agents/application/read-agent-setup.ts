@@ -1,13 +1,14 @@
 import type { Actor } from "../../contract";
+import { HARNESS_BIN, type SettingsStore } from "../../settings";
 import { type AgentSetupStatus, agentViewOf } from "../domain/agent-status";
 import type { AgentJobs } from "../domain/setup-jobs";
 import { AGENT_BLOCKED, setupBlock } from "../domain/setup-place";
 import { installCommand } from "../domain/setup-runs";
-import type { AgentCatalog, AgentConfig, Programs, SetupHere } from "./ports";
+import type { AgentCatalog, Programs, SetupHere } from "./ports";
 
 export type ReadAgentSetupPorts = {
 	catalog: AgentCatalog;
-	config: Pick<AgentConfig, "bin">;
+	settings: Pick<SettingsStore, "current">;
 	programs: Pick<Programs, "found">;
 	here: SetupHere;
 	jobs: AgentJobs;
@@ -27,9 +28,11 @@ export const readAgentSetup =
 					harness,
 					label,
 					setup,
-					path: ports.programs.found(ports.config.bin(harness)),
+					path: ports.programs.found(
+						String(ports.settings.current()[HARNESS_BIN[harness]]),
+					),
 					signInCommand: ports.catalog.signInCommand(
-						ports.config.bin(harness),
+						String(ports.settings.current()[HARNESS_BIN[harness]]),
 						setup,
 					),
 					job: ports.jobs.jobOf(harness),

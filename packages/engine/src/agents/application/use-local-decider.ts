@@ -1,24 +1,27 @@
 import type { DeciderName } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { now } from "@nightshift/time";
-
 import type { Actor } from "../../contract";
+import {
+	type CliToolStore,
+	type ConnectionStore,
+	type ProfileStore,
+	type SettingsStore,
+	saveProfile,
+} from "../../settings";
 import { saveNamedModelProfile, withModelAgents } from "../domain/decider-plan";
 import type { DeciderSetupStatus } from "../domain/decider-status";
 import { runLocalDecider } from "../domain/run-local-decider";
 import { type DeciderJob, refuseDeciderBusy } from "../domain/setup-jobs";
 import { DECIDER_BLOCKED, refuseBlocked } from "../domain/setup-place";
-import type {
-	DeciderConfig,
-	LocalOllama,
-	Programs,
-	SetupHere,
-	Wait,
-} from "./ports";
+import type { LocalOllama, Programs, SetupHere, Wait } from "./ports";
 import { readDeciderSetup } from "./read-decider-setup";
 
 export type UseLocalDeciderPorts = {
-	config: DeciderConfig;
+	settings: Pick<SettingsStore, "view" | "current" | "save">;
+	profiles: Pick<ProfileStore, "get" | "byName" | "list" | "save">;
+	connections: Pick<ConnectionStore, "get" | "secretSource" | "setSecret">;
+	cliTools: Pick<CliToolStore, "get">;
 	ollama: LocalOllama;
 	programs: Pick<Programs, "where">;
 	here: SetupHere;
@@ -66,8 +69,10 @@ async function runLocalDeciderJob(
 			model: ports.localModel.name,
 			startTimeoutMs: ports.here.startTimeoutMs ?? 60_000,
 			status: () => ports.ollama.status(ports.localModel.name),
-			ollamaOn: () => ports.config.current().ollama === "on",
-			turnOllamaOn: () => ports.config.save({ ollama: "on" }),
+			ollamaOn: () => ports.settings.current().ollama === "on",
+			turnOllamaOn: async () => {
+				await ports.settings.save({ ollama: "on" });
+			},
 			refresh: () => ports.ollama.refresh(),
 			pull: (model) => ports.ollama.pull(model),
 			pause: () => ports.wait.pause(),
@@ -76,14 +81,15 @@ async function runLocalDeciderJob(
 				saveNamedModelProfile(
 					base,
 					settings,
-					(name) => ports.config.profileByName(name),
-					(profile, id) => ports.config.saveProfile(profile, id),
+					(name) => ports.profiles.byName(name),
+					(profile, id) =>
+						saveProfile(ports, profile, id === undefined ? {} : { id }),
 				),
 			saveLocal: async (profile) => {
-				await ports.config.save({
+				await ports.settings.save({
 					decisionDecider: "ollama",
 					builtinAgents: withModelAgents(
-						ports.config.current().builtinAgents,
+						ports.settings.current().builtinAgents,
 						profile.name,
 						"ollama" satisfies DeciderName,
 					),

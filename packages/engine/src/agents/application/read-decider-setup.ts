@@ -1,13 +1,18 @@
 import type { Actor } from "../../contract";
-import { effectiveDecider } from "../../settings";
+import {
+	type ConnectionStore,
+	effectiveDecider,
+	type SettingsStore,
+} from "../../settings";
 import { ollamaInstallOf, TYPESAFE_KEY_PAGE } from "../domain/decider-plan";
 import type { DeciderSetupStatus } from "../domain/decider-status";
 import type { DeciderJob } from "../domain/setup-jobs";
 import { DECIDER_BLOCKED, setupBlock } from "../domain/setup-place";
-import type { DeciderConfig, LocalOllama, Programs, SetupHere } from "./ports";
+import type { LocalOllama, Programs, SetupHere } from "./ports";
 
 export type ReadDeciderSetupPorts = {
-	config: DeciderConfig;
+	settings: Pick<SettingsStore, "view">;
+	connections: Pick<ConnectionStore, "secretSource">;
 	ollama: Pick<LocalOllama, "status">;
 	programs: Pick<Programs, "where">;
 	here: SetupHere;
@@ -25,17 +30,15 @@ export const readDeciderSetup =
 	): Promise<DeciderSetupStatus> => {
 		const reason = setupBlock(request.here, ports.here);
 		const o = await ports.ollama.status(ports.localModel.name);
-		const view = ports.config.view();
-		const saved = ports.config.secretSource(ports.typesafeKey) !== "missing";
+		const view = ports.settings.view();
+		const saved =
+			ports.connections.secretSource(ports.typesafeKey) !== "missing";
 		return {
 			available: reason === null,
 			reason,
 			message: reason ? DECIDER_BLOCKED[reason] : null,
 			current: {
-				decider: effectiveDecider(
-					view as Parameters<typeof effectiveDecider>[0],
-					saved,
-				),
+				decider: effectiveDecider(view, saved),
 				chosen: view.fields.decisionDecider.source === "saved",
 			},
 			local: {

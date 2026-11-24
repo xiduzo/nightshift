@@ -1,7 +1,7 @@
 import { Refusal } from "@nightshift/refusal";
 import { now } from "@nightshift/time";
-
 import type { Actor } from "../../contract";
+import { saveProfile } from "../../settings";
 import {
 	ollamaInstallOf,
 	saveNamedModelProfile,
@@ -115,8 +115,10 @@ async function finishInstall(
 			model: ports.localModel.name,
 			startTimeoutMs: ports.here.startTimeoutMs ?? 60_000,
 			status: () => ports.ollama.status(ports.localModel.name),
-			ollamaOn: () => ports.config.current().ollama === "on",
-			turnOllamaOn: () => ports.config.save({ ollama: "on" }),
+			ollamaOn: () => ports.settings.current().ollama === "on",
+			turnOllamaOn: async () => {
+				await ports.settings.save({ ollama: "on" });
+			},
 			refresh: () => ports.ollama.refresh(),
 			pull: (model) => ports.ollama.pull(model),
 			pause: () => ports.wait.pause(),
@@ -125,14 +127,15 @@ async function finishInstall(
 				saveNamedModelProfile(
 					base,
 					settings,
-					(name) => ports.config.profileByName(name),
-					(profile, id) => ports.config.saveProfile(profile, id),
+					(name) => ports.profiles.byName(name),
+					(profile, id) =>
+						saveProfile(ports, profile, id === undefined ? {} : { id }),
 				),
 			saveLocal: async (profile) => {
-				await ports.config.save({
+				await ports.settings.save({
 					decisionDecider: "ollama",
 					builtinAgents: withModelAgents(
-						ports.config.current().builtinAgents,
+						ports.settings.current().builtinAgents,
 						profile.name,
 						"ollama",
 					),

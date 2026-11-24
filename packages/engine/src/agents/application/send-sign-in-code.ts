@@ -1,7 +1,7 @@
 import type { HarnessName } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
-
 import type { Actor } from "../../contract";
+import type { SettingsStore } from "../../settings";
 import { type AgentSetupView, MAX_CODE } from "../domain/agent-status";
 import type { AgentJobs } from "../domain/setup-jobs";
 import {
@@ -9,12 +9,12 @@ import {
 	codeNotWaitingProblem,
 	pasteCodeProblem,
 } from "../domain/setup-runs";
-import type { AgentCatalog, AgentConfig, Programs, SetupHere } from "./ports";
+import type { AgentCatalog, Programs, SetupHere } from "./ports";
 import { readAgentSetup } from "./read-agent-setup";
 
 export type SendSignInCodePorts = {
 	catalog: AgentCatalog;
-	config: Pick<AgentConfig, "bin">;
+	settings: Pick<SettingsStore, "current">;
 	programs: Pick<Programs, "found">;
 	here: SetupHere;
 	jobs: AgentJobs;

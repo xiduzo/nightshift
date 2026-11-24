@@ -1,16 +1,16 @@
 import type { HarnessName } from "@nightshift/flows";
 import { now } from "@nightshift/time";
-
 import type { Actor } from "../../contract";
+import type { SettingsStore } from "../../settings";
 import type { AgentSetupView } from "../domain/agent-status";
 import type { AgentJobs } from "../domain/setup-jobs";
 import { allowedSetup } from "../domain/setup-runs";
-import type { AgentCatalog, AgentConfig, Programs, SetupHere } from "./ports";
+import type { AgentCatalog, Programs, SetupHere } from "./ports";
 import { readAgentSetup } from "./read-agent-setup";
 
 export type CancelAgentSetupPorts = {
 	catalog: AgentCatalog;
-	config: Pick<AgentConfig, "bin">;
+	settings: Pick<SettingsStore, "current">;
 	programs: Pick<Programs, "found">;
 	here: SetupHere;
 	jobs: AgentJobs;

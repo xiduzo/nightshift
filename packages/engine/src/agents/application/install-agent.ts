@@ -1,8 +1,8 @@
 import type { HarnessName } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { now } from "@nightshift/time";
-
 import type { Actor } from "../../contract";
+import { HARNESS_BIN, type SettingsStore } from "../../settings";
 import type { AgentSetupView } from "../domain/agent-status";
 import { type AgentJobs, refuseAgentBusy } from "../domain/setup-jobs";
 import {
@@ -15,7 +15,6 @@ import {
 } from "../domain/setup-runs";
 import type {
 	AgentCatalog,
-	AgentConfig,
 	Programs,
 	SetupHere,
 	SetupProcesses,
@@ -24,7 +23,7 @@ import { readAgentSetup } from "./read-agent-setup";
 
 export type InstallAgentPorts = {
 	catalog: AgentCatalog;
-	config: Pick<AgentConfig, "bin">;
+	settings: Pick<SettingsStore, "current">;
 	programs: Pick<Programs, "found" | "where" | "putBinsOnPath" | "pathInHome">;
 	processes: Pick<SetupProcesses, "startInstall">;
 	here: SetupHere;
@@ -107,8 +106,9 @@ async function finishInstall(
 	ports.programs.putBinsOnPath();
 	const installed = ports.programs.pathInHome(setup.binDir, setup.program);
 	const path =
-		ports.programs.found(ports.config.bin(harness)) ??
-		ports.programs.found(installed);
+		ports.programs.found(
+			String(ports.settings.current()[HARNESS_BIN[harness]]),
+		) ?? ports.programs.found(installed);
 	job.end(
 		path
 			? { state: "installed", path, at: now() }

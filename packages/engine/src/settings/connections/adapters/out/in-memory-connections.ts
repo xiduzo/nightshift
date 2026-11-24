@@ -10,10 +10,9 @@ import { inMemorySavedConnections } from "./in-memory-saved-connections";
  * reads or saves a connection takes this one. Test code: production code
  * never imports this file.
  */
-export function inMemoryConnections(
-	names: readonly string[] = [],
-	secrets = inMemoryConnectionSecrets(),
-) {
+export function inMemoryConnections(names: readonly string[] = []) {
+	const values: Record<string, string> = {};
+	const secrets = inMemoryConnectionSecrets({ values });
 	const server = { url: "https://mcp.example.com" };
 	const saved = inMemorySavedConnections(
 		names.map((name) => [name, { description: null, server, updatedAt: 1 }]),
@@ -27,6 +26,10 @@ export function inMemoryConnections(
 		get: (name) => view().find((one) => one.name === name) ?? null,
 		save: writeConnection({ saved, secrets, now: () => 1 }),
 		remove: (name) => saved.remove(name),
+		secretSource: secrets.secretSource,
+		async setSecret(name: string, value: string) {
+			values[name] = value;
+		},
 	} satisfies Partial<ConnectionStore>;
 	return { ...bound, saved };
 }

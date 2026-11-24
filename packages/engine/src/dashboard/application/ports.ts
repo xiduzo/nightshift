@@ -7,7 +7,7 @@ import type { RunDetail, RunSummary } from "../../read";
  * The runs of a Space as the actor may see them, project by project.
  * Each call checks who may read, as the Space view does.
  *
- * @filledBy engine/runs
+ * @filledBy engine/wire
  */
 export type DashboardRuns = {
 	/** The runs of the Space, or of one project of it. */
@@ -25,7 +25,7 @@ export type DashboardRuns = {
 /**
  * The flows of a project, and the revisions of one flow.
  *
- * @filledBy engine/flows
+ * @filledBy engine/wire
  */
 export type DashboardFlows = {
 	list(
@@ -41,7 +41,7 @@ export type DashboardFlows = {
 /**
  * The projects of a Space, for the names of the dashboard over Spaces.
  *
- * @filledBy engine/projects
+ * @filledBy engine/wire
  */
 export type DashboardProjects = {
 	list(
@@ -53,7 +53,7 @@ export type DashboardProjects = {
 /**
  * What the answers of Night Shift's own agents in a Space cost, since a time.
  *
- * @filledBy engine/assistant
+ * @filledBy engine/wire
  */
 export type AnswerCosts = {
 	list(

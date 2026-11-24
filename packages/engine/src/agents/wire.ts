@@ -10,12 +10,7 @@ import { now } from "@nightshift/time";
 
 import { NIGHT_SHIFT } from "../contract";
 import type { OllamaService } from "../ollama";
-import {
-	agentProfileOn,
-	type ConfigStores,
-	HARNESS_BIN,
-	saveProfile,
-} from "../settings";
+import { type ConfigStores, HARNESS_BIN } from "../settings";
 import {
 	bunSetupProcesses,
 	type SetupSpawn,
@@ -28,8 +23,6 @@ import { installAgent } from "./application/install-agent";
 import { installOllama } from "./application/install-ollama";
 import type {
 	AgentCatalog,
-	AgentConfig,
-	DeciderConfig,
 	LocalOllama,
 	Programs,
 	SetupHere,
@@ -150,32 +143,6 @@ function catalog(): AgentCatalog {
 	};
 }
 
-function agentConfig(stores: AgentSetupDeps["stores"]): AgentConfig {
-	return {
-		bin: (harness) => String(stores.settings.current()[HARNESS_BIN[harness]]),
-		addProfile: (harness, program) => agentProfileOn(stores, harness, program),
-	};
-}
-
-function deciderConfig(stores: AgentSetupDeps["stores"]): DeciderConfig {
-	return {
-		view: () => stores.settings.view(),
-		current: () => stores.settings.current(),
-		save: async (patch) => {
-			await stores.settings.save(patch);
-		},
-		secretSource: (name) => stores.connections.secretSource(name),
-		setSecret: (name, value) => stores.connections.setSecret(name, value),
-		profileByName: (name) => stores.profiles.byName(name),
-		saveProfile: (profile, id) =>
-			saveProfile(
-				stores,
-				profile as Parameters<typeof saveProfile>[1],
-				id === undefined ? {} : { id },
-			),
-	};
-}
-
 function hereOf(deps: {
 	container: boolean;
 	platform?: NodeJS.Platform;
@@ -258,12 +225,11 @@ export function wireAgents(deps: AgentSetupWireDeps): {
 	const agentJobs = createAgentJobs();
 	const deciderJob = createDeciderJob();
 	const cat = catalog();
-	const config = agentConfig(deps.stores);
 	const checks: SignInChecks = { check: deps.check };
 	const actor = NIGHT_SHIFT;
 	const agentPorts = {
 		catalog: cat,
-		config,
+		...deps.stores,
 		programs,
 		processes,
 		checks,
@@ -301,7 +267,7 @@ export function wireAgents(deps: AgentSetupWireDeps): {
 		refresh: async () => {},
 	};
 	const deciderPorts = {
-		config: deciderConfig(deps.stores),
+		...deps.stores,
 		ollama,
 		programs,
 		processes,

@@ -48,20 +48,6 @@ export type Programs = {
 };
 
 /**
- * This computer's configuration the agent setup reads and writes.
- * @filledBy engine/settings
- */
-export type AgentConfig = {
-	/** The program a harness's setting names (`claudeBin`). */
-	bin(harness: HarnessName): string;
-	/** Adds the harness and an Agent Profile on it, or keeps the one it has. */
-	addProfile(
-		harness: HarnessName,
-		program: string,
-	): Promise<{ id: string; name: string }>;
-};
-
-/**
  * The harnesses the guided setup knows, as their vendors document them.
  * @filledBy engine/wire
  */
@@ -85,37 +71,6 @@ export type SignInChecks = {
 		signIn: "signed_in" | "signed_out" | "unknown";
 		account: string | null;
 	}>;
-};
-
-/**
- * This computer's configuration the decider setup reads and writes.
- * @filledBy engine/settings
- */
-export type DeciderConfig = {
-	view(): {
-		fields: { decisionDecider: { source: string } };
-		values: { decisionDecider: string };
-	};
-	current(): {
-		ollama: string;
-		builtinAgents: {
-			decider?: unknown;
-			"brief-writer"?: unknown;
-		};
-	};
-	save(patch: Record<string, unknown>): Promise<void>;
-	secretSource(name: string): string;
-	setSecret(name: string, value: string): Promise<void>;
-	profileByName(name: string): {
-		id: string;
-		name: string;
-		description?: string;
-		harness?: string;
-	} | null;
-	saveProfile(
-		profile: Record<string, unknown>,
-		id?: string,
-	): Promise<{ id: string; name: string }>;
 };
 
 /**

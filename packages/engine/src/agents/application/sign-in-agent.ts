@@ -1,8 +1,15 @@
 import type { HarnessName } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { now } from "@nightshift/time";
-
 import type { Actor } from "../../contract";
+import {
+	agentProfileOn,
+	type CliToolStore,
+	type ConnectionStore,
+	HARNESS_BIN,
+	type ProfileStore,
+	type SettingsStore,
+} from "../../settings";
 import type { AgentSetupView } from "../domain/agent-status";
 import { type AgentJobs, refuseAgentBusy } from "../domain/setup-jobs";
 import {
@@ -14,7 +21,6 @@ import {
 } from "../domain/setup-runs";
 import type {
 	AgentCatalog,
-	AgentConfig,
 	Programs,
 	SetupHere,
 	SetupProcesses,
@@ -24,7 +30,10 @@ import { readAgentSetup } from "./read-agent-setup";
 
 export type SignInAgentPorts = {
 	catalog: AgentCatalog;
-	config: AgentConfig;
+	settings: Pick<SettingsStore, "current" | "save">;
+	profiles: Pick<ProfileStore, "get" | "byName" | "list" | "save">;
+	connections: Pick<ConnectionStore, "get">;
+	cliTools: Pick<CliToolStore, "get">;
 	programs: Pick<Programs, "found">;
 	processes: Pick<SetupProcesses, "startSignIn">;
 	checks: SignInChecks;
@@ -48,7 +57,7 @@ export const signInAgent =
 		);
 		const label = ports.catalog.label(request.harness);
 		refuseAgentBusy(ports.jobs.busy(request.harness), label);
-		const bin = ports.config.bin(request.harness);
+		const bin = String(ports.settings.current()[HARNESS_BIN[request.harness]]);
 		const program = ports.programs.found(bin);
 		if (!program) {
 			throw new Refusal("conflict", agentNotInstalledProblem(label));
@@ -129,7 +138,7 @@ async function ready(
 	check: { account: string | null },
 	job: ReturnType<AgentJobs["begin"]>,
 ): Promise<void> {
-	const profile = await ports.config.addProfile(harness, bin);
+	const profile = await agentProfileOn(ports, harness, bin);
 	job.end({
 		state: "ready",
 		profileId: profile.id,

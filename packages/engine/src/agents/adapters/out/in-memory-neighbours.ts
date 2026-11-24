@@ -1,10 +1,12 @@
 import type { HarnessName } from "@nightshift/flows";
 import { now } from "@nightshift/time";
 
+import { inMemoryCliTools } from "../../../settings/cli-tools/adapters/out/in-memory-cli-tools";
+import { inMemoryConnections } from "../../../settings/connections/adapters/out/in-memory-connections";
+import { inMemoryProfiles } from "../../../settings/profiles/adapters/out/in-memory-profiles";
+import { inMemorySettings } from "../../../settings/settings/adapters/out/in-memory-settings";
 import type {
 	AgentCatalog,
-	AgentConfig,
-	DeciderConfig,
 	LocalOllama,
 	SetupHere,
 	SignInChecks,
@@ -56,30 +58,6 @@ export function inMemoryAgentCatalog(): AgentCatalog {
 	};
 }
 
-export function inMemoryAgentConfig(
-	bins: Partial<Record<HarnessName, string>> = {},
-) {
-	const profiles: { harness: HarnessName; id: string; name: string }[] = [];
-	let next = 1;
-	const twin = {
-		bin: (harness: HarnessName) =>
-			bins[harness] ?? harness.replace("-code", ""),
-		addProfile: async (harness: HarnessName, program: string) => {
-			const existing = profiles.find((p) => p.harness === harness);
-			if (existing) return { id: existing.id, name: existing.name };
-			const added = {
-				harness,
-				id: `p-${next++}`,
-				name: program.split("/").at(-1) ?? program,
-			};
-			profiles.push(added);
-			return { id: added.id, name: added.name };
-		},
-		profiles,
-	};
-	return twin satisfies AgentConfig;
-}
-
 export function inMemorySignInChecks(
 	...answers: Array<"signed_in" | "signed_out" | "unknown">
 ) {
@@ -99,78 +77,14 @@ export function inMemorySignInChecks(
 	return twin;
 }
 
-export function inMemoryDeciderConfig() {
-	const secrets = new Map<string, string>();
-	const profiles = new Map<
-		string,
-		{
-			id: string;
-			name: string;
-			description?: string;
-			harness?: string;
-			decider?: string;
-			model?: string;
-		}
-	>();
-	const values: {
-		ollama: string;
-		builtinAgents: { decider?: unknown; "brief-writer"?: unknown };
-		decisionDecider: string;
-		decisionDeciderSource: string;
-	} = {
-		ollama: "off",
-		builtinAgents: {},
-		decisionDecider: "ollama",
-		decisionDeciderSource: "default",
+/** This computer's configuration: its real edits over the in-memory stores. */
+function inMemoryStores() {
+	return {
+		settings: inMemorySettings(),
+		profiles: inMemoryProfiles(),
+		connections: inMemoryConnections(),
+		cliTools: inMemoryCliTools(),
 	};
-	let next = 1;
-	const twin = {
-		view: () => ({
-			fields: { decisionDecider: { source: values.decisionDeciderSource } },
-			values: { decisionDecider: values.decisionDecider },
-		}),
-		current: () => ({
-			ollama: values.ollama,
-			builtinAgents: values.builtinAgents,
-		}),
-		save: async (patch: Record<string, unknown>) => {
-			if (typeof patch.ollama === "string") values.ollama = patch.ollama;
-			if (typeof patch.decisionDecider === "string") {
-				values.decisionDecider = patch.decisionDecider;
-				values.decisionDeciderSource = "saved";
-			}
-			if (patch.builtinAgents && typeof patch.builtinAgents === "object") {
-				values.builtinAgents =
-					patch.builtinAgents as typeof values.builtinAgents;
-			}
-		},
-		secretSource: (name: string) =>
-			secrets.has(name) ? "keychain" : "missing",
-		setSecret: async (name: string, value: string) => {
-			secrets.set(name, value);
-		},
-		profileByName: (name: string) => {
-			const found = [...profiles.values()].find((p) => p.name === name);
-			return found ?? null;
-		},
-		saveProfile: async (profile: Record<string, unknown>, id?: string) => {
-			const view = {
-				id: id ?? `p-${next++}`,
-				name: String(profile.name),
-				description: profile.description
-					? String(profile.description)
-					: undefined,
-				harness: profile.harness ? String(profile.harness) : undefined,
-				decider: profile.decider ? String(profile.decider) : undefined,
-				model: profile.model ? String(profile.model) : undefined,
-			};
-			profiles.set(view.id, view);
-			return { id: view.id, name: view.name };
-		},
-		secrets,
-		profiles,
-	};
-	return twin satisfies DeciderConfig;
 }
 
 export function inMemoryLocalOllama(
@@ -256,7 +170,7 @@ export function inMemoryAgentSetupPorts(
 		programs: inMemoryPrograms({
 			programs: over.programs ?? { curl: "/usr/bin/curl" },
 		}),
-		config: inMemoryAgentConfig(),
+		...inMemoryStores(),
 		catalog: inMemoryAgentCatalog(),
 		checks: inMemorySignInChecks(...(over.checks ?? ["signed_out"])),
 		here: inMemorySetupHere(over.here),
@@ -277,7 +191,7 @@ export function inMemoryDeciderSetupPorts(
 	return {
 		processes,
 		programs: inMemoryPrograms({ programs: over.programs ?? {} }),
-		config: inMemoryDeciderConfig(),
+		...inMemoryStores(),
 		ollama: inMemoryLocalOllama(over.ollama),
 		here: inMemorySetupHere(over.here),
 		wait: inMemoryWait(),

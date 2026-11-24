@@ -1,4 +1,10 @@
-import { canMakeValue, type DeciderName } from "@nightshift/flows";
+import {
+	canMakeValue,
+	type DeciderName,
+	isAgentProfile,
+	type ModelProfile,
+	type Profile,
+} from "@nightshift/flows";
 
 /** How Ollama gets on this computer when it is not here. */
 export type OllamaInstall =
@@ -78,17 +84,12 @@ export async function saveNamedModelProfile<
 	T extends { id: string; name: string },
 >(
 	base: string,
-	settings: Record<string, unknown>,
-	byName: (name: string) => {
-		id: string;
-		name: string;
-		description?: string;
-		harness?: string;
-	} | null,
-	save: (profile: Record<string, unknown>, id?: string) => Promise<T>,
+	settings: Omit<ModelProfile, "name" | "description">,
+	byName: (name: string) => (Profile & { id: string }) | null,
+	save: (profile: ModelProfile, id?: string) => Promise<T>,
 ): Promise<T> {
 	const named = byName(base);
-	if (named && !named.harness) {
+	if (named && !isAgentProfile(named)) {
 		return save(
 			{
 				name: named.name,

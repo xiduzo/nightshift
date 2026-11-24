@@ -72,7 +72,7 @@ export type ScheduleLog = {
 
 /**
  * The runs a schedule starts, asks about and wakes.
- * @filledBy engine/runs
+ * @filledBy engine/wire
  */
 export type ScheduledRuns = {
 	/**
@@ -97,7 +97,7 @@ export type ScheduledRuns = {
 
 /**
  * The projects whose schedules count here.
- * @filledBy engine/projects
+ * @filledBy engine/wire
  */
 export type ScheduledProjects = {
 	/** The projects a person has not removed, also one without a Clone here. */

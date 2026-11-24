@@ -80,6 +80,24 @@ describe("removeKnowledgeSource", () => {
 		]);
 	});
 
+	test("keeps a folder another flow fills too", async () => {
+		const ports = await setup();
+		ports.space.flows.saved.set(
+			"drawn",
+			callFlow("kit:knowledge/web", { urls: "https://e.f", folder: "pages" }),
+		);
+		const removed = await removeKnowledgeSource(ports)({
+			actor: NIGHT_SHIFT,
+			spaceId: "space-1",
+			projectId: "p1",
+			name: "web",
+			files: true,
+			may: owner,
+		});
+		expect(removed).toEqual({ removedFiles: 0 });
+		expect(await listedIn(ports)).toHaveLength(4);
+	});
+
 	test("checks first: a source with a schedule refuses someone else, and nothing changes", async () => {
 		const ports = await setup();
 		const refusal = await refusalOf(

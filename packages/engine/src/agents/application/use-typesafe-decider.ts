@@ -1,7 +1,7 @@
 import { Refusal } from "@nightshift/refusal";
 import { now } from "@nightshift/time";
-
 import type { Actor } from "../../contract";
+import { saveProfile } from "../../settings";
 import {
 	MAX_KEY,
 	saveNamedModelProfile,
@@ -30,7 +30,7 @@ export const useTypesafeDecider =
 		refuseDeciderBusy(ports.job.busy());
 		const line = request.key?.trim() ?? "";
 		if (line === "") {
-			if (ports.config.secretSource(ports.typesafeKey) === "missing") {
+			if (ports.connections.secretSource(ports.typesafeKey) === "missing") {
 				throw new Refusal("invalid", "Paste the key TypeSafe gave you.");
 			}
 		} else {
@@ -38,7 +38,7 @@ export const useTypesafeDecider =
 				throw new Refusal("invalid", "Paste the key as TypeSafe shows it.");
 			}
 			try {
-				await ports.config.setSecret(ports.typesafeKey, line);
+				await ports.connections.setSecret(ports.typesafeKey, line);
 			} catch (error) {
 				console.error(
 					"[decider-setup] the TypeSafe key was not saved:",
@@ -54,13 +54,13 @@ export const useTypesafeDecider =
 		const profile = await saveNamedModelProfile(
 			TYPESAFE_PROFILE,
 			{ decider: "typesafe" },
-			(name) => ports.config.profileByName(name),
-			(next, id) => ports.config.saveProfile(next, id),
+			(name) => ports.profiles.byName(name),
+			(next, id) => saveProfile(ports, next, id === undefined ? {} : { id }),
 		);
-		await ports.config.save({
+		await ports.settings.save({
 			decisionDecider: "typesafe",
 			builtinAgents: withModelAgents(
-				ports.config.current().builtinAgents,
+				ports.settings.current().builtinAgents,
 				profile.name,
 				"typesafe",
 			),
