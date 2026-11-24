@@ -7,6 +7,8 @@
  *
  * It imports nothing, so every package can throw it, from `flows` up, and
  * the run rule (`@nightshift/engine/run-status`) can name it for the apps.
+ * Two Night Shifts of different versions say no to each other here too
+ * (`PROTOCOL_VERSION`, ADR 45).
  */
 
 export {
@@ -15,3 +17,11 @@ export {
 	type RefusalKind,
 	wordsFor,
 } from "./refusal";
+export {
+	appVersionWords,
+	deviceVersionWords,
+	hostVersionWords,
+	type OtherVersion,
+	otherVersion,
+	PROTOCOL_VERSION,
+} from "./version";

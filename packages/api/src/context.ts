@@ -51,6 +51,8 @@ export type Context = Services & {
 	 * A request with a key has no session: it is a Device, not a Person.
 	 */
 	deviceKey: DeviceKeyAccess | null;
+	/** The version a Device says with its call (ADR 45). Null: none. */
+	deviceVersion: number | null;
 	/** The Host requires two-factor sign-in for sessions from other computers. */
 	requireTwoFactor: boolean;
 	/** Sets a Person's email and password (`@nightshift/auth/login`). */

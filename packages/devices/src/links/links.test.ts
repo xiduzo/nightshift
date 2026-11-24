@@ -1,4 +1,5 @@
 import { afterEach, expect, mock, test } from "bun:test";
+import { hostVersionWords } from "@nightshift/refusal";
 import { ORPCError } from "@orpc/client";
 import type { HostClient } from "../contract";
 import type { HostLink, HostLinks } from "./host-links";
@@ -108,4 +109,58 @@ test("a Host that refuses the key: what follows goes on when one step of it fail
 	}
 	expect(marked).toEqual(["host-a"]);
 	expect(lines).toHaveBeenCalledTimes(1);
+});
+
+test("a Host of another version: the key, the access and the link stay, and the page says what to update", async () => {
+	console.warn = warnings;
+	const lost: string[] = [];
+	const links = createDeviceLinks({
+		links: {
+			list: async () => [link(["https://studio.invalid"])],
+			revoked: async () => lost.push("marked"),
+		} as unknown as HostLinks,
+		keys: {
+			kind: "file",
+			get: async () => "device-key",
+			set: async () => {},
+			delete: async () => {
+				lost.push("key");
+			},
+		},
+		revoked: async () => {
+			lost.push("left");
+		},
+		hostClient: () =>
+			({
+				link: {
+					hello: async () => {
+						throw new ORPCError("HOST_UNREACHABLE", {
+							status: 503,
+							data: { device: "older" },
+						});
+					},
+				},
+			}) as unknown as HostClient,
+		linkOptions: { heartbeatMs: 20, firstBackoffMs: 5, maxBackoffMs: 5 },
+	});
+	try {
+		await links.start();
+		while (links.get("host-a")?.state().status !== "outdated") {
+			await Bun.sleep(5);
+		}
+		// Many asks later, the same.
+		await Bun.sleep(50);
+		expect(await links.hosts()).toMatchObject([
+			{
+				hostId: "host-a",
+				homeHost: true,
+				status: "outdated",
+				update: hostVersionWords("newer"),
+			},
+		]);
+	} finally {
+		await links.close();
+	}
+	expect(lost).toEqual([]);
+	expect(warnings).toHaveBeenCalledTimes(1);
 });

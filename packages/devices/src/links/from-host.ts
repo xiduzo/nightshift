@@ -1,7 +1,16 @@
-import { HostUnreachableError, OlderHostError } from "@nightshift/engine";
+import {
+	HostUnreachableError,
+	OlderHostError,
+	OtherVersionError,
+} from "@nightshift/engine";
 import { Refusal, type RefusalKind } from "@nightshift/refusal";
 import { ORPCError } from "@orpc/client";
-import { type HostClient, hostContract, refusalDataSchema } from "../contract";
+import {
+	type HostClient,
+	hostContract,
+	hostVersionOf,
+	refusalDataSchema,
+} from "../contract";
 
 /**
  * How a Link translates every answer of a Host into this computer's
@@ -15,9 +24,11 @@ import { type HostClient, hostContract, refusalDataSchema } from "../contract";
  *   person to sign in here.
  * - NOT_FOUND, or any 404: the Host runs an older version of Night Shift
  *   and does not know the procedure. `OlderHostError`, with its one
- *   sentence. This is the one test of a Host's version: a refusal comes
- *   as BAD_REQUEST with its kind, never as NOT_FOUND.
- * - HOST_UNREACHABLE: `HostUnreachableError`, the same here.
+ *   sentence. A refusal comes as BAD_REQUEST with its kind, never as
+ *   NOT_FOUND.
+ * - HOST_UNREACHABLE: `HostUnreachableError`, the same here. With the
+ *   version beside it, `OtherVersionError`: the same, in the words of the
+ *   update it waits for (ADR 45).
  * - BAD_REQUEST, FORBIDDEN, CONFLICT: a `Refusal` with the Host's words. A
  *   BAD_REQUEST carries its kind (`refusalDataSchema`). Without one it is
  *   `invalid`: the Host could not read the call.
@@ -78,7 +89,8 @@ const KIND_OF_CODE: Record<string, RefusalKind> = {
 export function fromHost(error: unknown): unknown {
 	if (!(error instanceof ORPCError)) return error;
 	if (error.code === "HOST_UNREACHABLE") {
-		return new HostUnreachableError();
+		const host = hostVersionOf(error.data);
+		return host ? new OtherVersionError(host) : new HostUnreachableError();
 	}
 	if (error.code === "NOT_FOUND" || error.status === 404) {
 		return new OlderHostError({ cause: error });

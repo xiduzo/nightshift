@@ -1,5 +1,5 @@
 import type { DeviceKeyAccess } from "@nightshift/auth";
-import { Refusal } from "@nightshift/refusal";
+import { PROTOCOL_VERSION, Refusal } from "@nightshift/refusal";
 import type { HostHello } from "../../../contract";
 import {
 	isHomeDevice,
@@ -37,6 +37,7 @@ export const answerHello =
 				name: ports.self.name,
 				addresses: ports.settings.hostAddresses(),
 			},
+			version: PROTOCOL_VERSION,
 			deviceId: key.deviceId,
 			personId: key.personId,
 			spaces: spacesForHello(spaces, home),

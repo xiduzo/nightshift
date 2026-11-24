@@ -53,6 +53,7 @@ export {
 	HostUnreachableError,
 	OLDER_HOST,
 	OlderHostError,
+	OtherVersionError,
 	type Relay,
 } from "./relay";
 export type { RowBatch } from "./rows";

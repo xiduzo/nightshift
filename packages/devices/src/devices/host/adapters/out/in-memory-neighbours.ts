@@ -3,7 +3,7 @@ import type {
 	DeviceKeyPermission,
 	Role,
 } from "@nightshift/auth";
-import { Refusal } from "@nightshift/refusal";
+import { type OtherVersion, Refusal } from "@nightshift/refusal";
 import type { PairedDevice } from "../../../registry";
 import type {
 	CloneRows,
@@ -16,6 +16,7 @@ import type {
 	Registry,
 	SpaceRoles,
 } from "../../application/ports";
+import { createDeviceVersions } from "../../domain/host";
 import type { PairingAnswer, PairingCode } from "../../domain/pairing";
 import { createPendingPairings } from "../../domain/pending";
 import { NO_ACCESS, NO_PERMISSION } from "../../domain/words";
@@ -298,6 +299,9 @@ export function inMemoryKeyedCallCodes() {
 		forbidden(words: string): never {
 			throw new CodedError("FORBIDDEN", words);
 		},
+		otherVersion(device: OtherVersion): never {
+			throw new CodedError("HOST_UNREACHABLE", device);
+		},
 	};
 	return twin satisfies KeyedCallCodes;
 }
@@ -349,6 +353,7 @@ export function inMemoryHostPorts() {
 		spaces: inMemoryPersonSpaces(),
 		roles: inMemorySpaceRoles(),
 		codes: inMemoryKeyedCallCodes(),
+		versions: createDeviceVersions(),
 		settings: inMemoryHostSettings(),
 		relay: inMemoryDisconnect(),
 		clones: inMemoryCloneRows(),

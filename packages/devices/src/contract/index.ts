@@ -56,6 +56,13 @@ export {
 	type SyncCursors,
 } from "./sync";
 export {
+	deviceVersionOf,
+	documentToken,
+	hostVersionOf,
+	keyOfDocumentToken,
+	VERSION_HEADER,
+} from "./version";
+export {
 	secretRequestSchema,
 	UNREADABLE_REQUEST,
 	type WorkCall,

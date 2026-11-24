@@ -1,5 +1,5 @@
 import type { DeviceKeyAccess } from "@nightshift/auth";
-import { Refusal } from "@nightshift/refusal";
+import { PROTOCOL_VERSION, Refusal } from "@nightshift/refusal";
 import { createRouterClient, ORPCError } from "@orpc/server";
 import { type HostClient, type HostHello, hostContract } from "../contract";
 import {
@@ -76,6 +76,8 @@ export function inMemoryHost(deps: {
 	 * (`admitEvery`).
 	 */
 	admit?: Devices["admit"];
+	/** The version the Devices say, read on every call. Default: this one's. */
+	deviceVersion?(): number;
 	/** `link.hello` and `link.heartbeat`: the Host's answer for the key (`Host.hello`). */
 	hello(key: DeviceKeyAccess): Promise<HostHello>;
 	/** `link.leave`: the Host removes the Device's access (`Host.revoke`). Default: not served. */
@@ -114,6 +116,7 @@ export function inMemoryHost(deps: {
 		const router = createRouterClient(hostRouter, {
 			context: (): HostPeerContext => ({
 				deviceKey: read(),
+				deviceVersion: deps.deviceVersion?.() ?? PROTOCOL_VERSION,
 				exchange: deps.exchange,
 				devices: {
 					admit: deps.admit ?? admitEvery(),

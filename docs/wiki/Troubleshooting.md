@@ -104,6 +104,17 @@ An older Night Shift made it, and this one does not read it. Nothing is lost:
 
 Another install of the same computer is online. One computer is one Device, and only one Night Shift at a time can be that Device. Quit the other install, then pair again.
 
+### A computer or a Host says "Update needed"
+
+A computer and its Host need the same version of Night Shift. Until then they do not connect. Nothing is lost: the computer keeps its access, and its work waits.
+
+1. Read on the **Devices** page which side runs the older version.
+2. Update Night Shift there. When you update both, update the Host first.
+
+The computer connects within a minute after the update. An older computer shows only "Offline". The **Devices** page of the Host says that it needs the update.
+
+On your phone, "Update needed" means the app or the Host. Close the app and open it again to update the app.
+
 ### "Update Night Shift on both computers"
 
 One of your computers runs an older version of Night Shift. Update Night Shift on each of them, the Host first.

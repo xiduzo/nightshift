@@ -13,6 +13,7 @@
 export {
 	type ArchiveRef,
 	type Caller,
+	deviceVersionOf,
 	type FollowWant,
 	type HostClient,
 	type HostHello,

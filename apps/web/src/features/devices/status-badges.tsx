@@ -9,10 +9,12 @@ import type { SpaceComputer } from "./space-view";
 export const ONLINE =
 	"border-status-finished/40 bg-status-finished/10 text-status-finished";
 
-/** Online, Offline or Access removed. Nothing when this computer cannot tell. */
+/** Online, Offline, Update needed or Access removed. Nothing when this computer cannot tell. */
 export function ComputerStatus({ computer }: { computer: SpaceComputer }) {
 	if (computer.paired?.revokedAt != null)
 		return <Badge variant="outline">Access removed</Badge>;
+	if (computer.paired?.update)
+		return <Badge variant="outline">Update needed</Badge>;
 	if (computer.online === null) return null;
 	return computer.online ? (
 		<Badge variant="outline" className={ONLINE}>
@@ -29,6 +31,7 @@ export function ComputerStatus({ computer }: { computer: SpaceComputer }) {
 export function computerLine(computer: SpaceComputer, now: number): ReactNode {
 	if (computer.paired?.revokedAt != null)
 		return "It can no longer sync with this computer.";
+	if (computer.paired?.update) return computer.paired.update;
 	if (computer.thisDevice) return "Night Shift runs here now.";
 	if (computer.online) return "Connected now.";
 	if (computer.lastSeenAt)
@@ -55,6 +58,8 @@ export function HostStatus({ status }: { status: LinkedHost["status"] }) {
 			);
 		case "connecting":
 			return <Badge variant="outline">Connecting</Badge>;
+		case "outdated":
+			return <Badge variant="outline">Update needed</Badge>;
 		case "revoked":
 			return <Badge variant="outline">Access removed</Badge>;
 		default:

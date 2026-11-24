@@ -14,3 +14,4 @@ export {
 	isTwoFactorRequired,
 } from "./refusals";
 export type { ApiClient, ApiInputs, ApiOutputs, ApiQueryUtils } from "./types";
+export { versionMessage } from "./version";

@@ -4,7 +4,9 @@ import type {
 	Permissions,
 	Role,
 } from "@nightshift/auth";
+import { otherVersion } from "@nightshift/refusal";
 import type { Caller } from "../../../contract";
+import type { DeviceVersions } from "../domain/host";
 import { requireHost } from "../domain/host";
 import { NO_ACCESS, NO_PERMISSION, ROLE_WORDS } from "../domain/words";
 import type {
@@ -21,17 +23,21 @@ export type AdmitKeyedCallPorts = {
 	spaces: Pick<PersonSpaces, "of">;
 	roles: SpaceRoles;
 	codes: KeyedCallCodes;
+	versions: DeviceVersions;
 };
 
 export type AdmitKeyedCall = {
 	key: DeviceKeyAccess | null;
 	need: DeviceKeyPermission | undefined;
+	/** The version the call says. Null: none. */
+	version: number | null;
 };
 
 /**
  * Admits a keyed call once: the key, when there is one that holds
  * `need`, of a Device paired here with access, as its Person's own,
- * on a computer that is a Host now.
+ * on a computer that is a Host now. Then, and only then, the version: a
+ * Device of another one waits for an update (ADR 45).
  */
 export const admitKeyedCall =
 	(ports: AdmitKeyedCallPorts) =>
@@ -46,6 +52,9 @@ export const admitKeyedCall =
 		) {
 			ports.codes.unauthorized(NO_ACCESS);
 		}
+		const other = otherVersion(request.version);
+		ports.versions.said(key.deviceId, other);
+		if (other) ports.codes.otherVersion(other);
 		return callerOf(ports, key, {
 			name: paired.name,
 			homeHost: paired.homeHost,

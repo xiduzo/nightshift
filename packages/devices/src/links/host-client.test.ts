@@ -1,9 +1,15 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { gunzipSync } from "node:zlib";
+import { PROTOCOL_VERSION } from "@nightshift/refusal";
 import { hostClient } from "./host-client";
 
 /** What a Host got: each call's path, encoding and body as JSON text. */
-type Received = { path: string; encoding: string | null; body: string };
+type Received = {
+	path: string;
+	encoding: string | null;
+	version: string | null;
+	body: string;
+};
 
 let server: ReturnType<typeof Bun.serve> | null = null;
 
@@ -24,6 +30,7 @@ function host() {
 			received.push({
 				path: new URL(request.url).pathname,
 				encoding,
+				version: request.headers.get("x-nightshift-version"),
 				body: (encoding === "gzip"
 					? gunzipSync(raw)
 					: Buffer.from(raw)
@@ -47,5 +54,15 @@ describe("a Device's calls to its Host", () => {
 		expect(received.map((r) => r.encoding)).toEqual(["gzip", null]);
 		expect(received[0]?.path).toBe("/rpc/archive/put");
 		expect(JSON.parse(received[0]?.body ?? "{}").json.content).toBe(large);
+	});
+
+	test("say this Device's version, with a key and without one", async () => {
+		const { url, received } = host();
+		await hostClient(url, { key: "k" }).link.hello();
+		await hostClient(url).link.hello();
+		expect(received.map((r) => r.version)).toEqual([
+			String(PROTOCOL_VERSION),
+			String(PROTOCOL_VERSION),
+		]);
 	});
 });

@@ -1,4 +1,5 @@
 import { TRUSTED_BROWSER_DAYS } from "@nightshift/auth";
+import { PROTOCOL_VERSION } from "@nightshift/refusal";
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 
@@ -30,6 +31,7 @@ export const account = {
 				return {
 					signedIn: false,
 					person: null,
+					version: null,
 					thisComputer: context.fromThisComputer,
 					hasPassword: false,
 					twoFactor: {
@@ -43,6 +45,7 @@ export const account = {
 			return {
 				signedIn: true,
 				person: { name: session.user.name, email: session.user.email },
+				version: context.access.hostAccess.allowed ? PROTOCOL_VERSION : null,
 				thisComputer: context.fromThisComputer,
 				hasPassword: await context.hasLogin(session.user.id),
 				twoFactor: {

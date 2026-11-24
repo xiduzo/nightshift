@@ -1,3 +1,4 @@
+import { hostVersionWords } from "@nightshift/refusal";
 import type { HostClient, HostHello } from "../contract";
 import { DEV_STAYS_LOCAL, isLocalHost } from "./dev-link";
 import type { OpenDocumentChannel, SyncedDocument } from "./document-channel";
@@ -161,6 +162,10 @@ export function createDeviceLinks(deps: {
 					status: link.revokedAt ? "revoked" : (state?.status ?? "offline"),
 					since: state?.since ?? link.revokedAt ?? link.createdAt,
 					fingerprint: link.fingerprint,
+					update:
+						!link.revokedAt && state?.hostVersion
+							? hostVersionWords(state.hostVersion)
+							: null,
 				};
 			});
 		},

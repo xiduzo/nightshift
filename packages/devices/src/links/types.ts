@@ -3,7 +3,16 @@ import type { HostRole } from "./host-links";
 
 /** The Links of this computer to its Hosts, and how `nightshift join` goes. */
 
-export type LinkStatus = "connecting" | "online" | "offline" | "revoked";
+/**
+ * `outdated`: the Host has another version (ADR 45). The link keeps its key
+ * and tries again: an update ends it.
+ */
+export type LinkStatus =
+	| "connecting"
+	| "online"
+	| "offline"
+	| "outdated"
+	| "revoked";
 
 /** A Host this computer paired with. */
 export type LinkedHost = {
@@ -19,6 +28,8 @@ export type LinkedHost = {
 	/** Epoch ms of the last change of `status`. */
 	since: number;
 	fingerprint: string | null;
+	/** What the person does, while the link is `outdated`. */
+	update: string | null;
 };
 
 /** How `nightshift join` goes, step by step. */

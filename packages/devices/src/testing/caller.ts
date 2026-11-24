@@ -50,7 +50,7 @@ export function callerOf(
  * An admission for a Host in memory without a registry: every key is a
  * paired Device of its Person, with the facts given (one set, or one per
  * key), whatever permission the procedure names. No key is UNAUTHORIZED,
- * as on a Host. The Host's own rules run with its own `admit`
+ * as on a Host, and any version is taken. The Host's own rules run with its own `admit`
  * (`hostInMemory`).
  */
 export function admitEvery(

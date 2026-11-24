@@ -16,6 +16,7 @@ function paired(overrides: Partial<Paired> & { id: string }): Paired {
 		online: false,
 		pairedAt: 1,
 		revokedAt: null,
+		update: null,
 		...overrides,
 	};
 }

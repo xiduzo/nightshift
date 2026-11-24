@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { HOST_UNREACHABLE } from "@nightshift/engine";
 import { Refusal } from "@nightshift/refusal";
 import type { WorkRelay } from "../contract";
 import type { DeviceLinks, HostSpaces } from "../links";
@@ -47,7 +46,7 @@ export function createWorkRelay(deps: {
 				return;
 			}
 			if (to.at === "unreachable") {
-				yield { kind: "error", message: HOST_UNREACHABLE, offline: true };
+				yield { kind: "error", message: to.because.message, offline: true };
 				return;
 			}
 			// A Walker sends calls of runs only. A secret call goes from the

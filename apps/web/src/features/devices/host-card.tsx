@@ -52,7 +52,7 @@ export function HostCard({
 	onPhone: () => void;
 }) {
 	const linked = host.kind === "linked" ? host.host : null;
-	const offline = linked?.status === "offline";
+	const offline = linked?.status === "offline" || linked?.status === "outdated";
 	const name =
 		host.kind === "linked"
 			? host.host.name
@@ -123,24 +123,36 @@ export function HostCard({
 				{offline && linked ? (
 					<Alert variant="destructive">
 						<CircleAlertIcon />
-						<AlertTitle>This computer cannot reach {linked.name}</AlertTitle>
-						<AlertDescription>
-							Not connected since{" "}
-							<LocalTime at={linked.since}>
-								{formatRelative(linked.since, now)}
-							</LocalTime>
-							. Night Shift tries again, and syncs when it answers.
-						</AlertDescription>
-						<AlertAction>
-							<Button
-								variant="outline"
-								size="sm"
-								nativeButton={false}
-								render={<Link to="/settings" hash="this-computer" />}
-							>
-								Check the connection
-							</Button>
-						</AlertAction>
+						<AlertTitle>
+							{linked.update
+								? `This computer cannot connect to ${linked.name}`
+								: `This computer cannot reach ${linked.name}`}
+						</AlertTitle>
+						{linked.update ? (
+							<AlertDescription>
+								{linked.update} Then this computer connects and syncs again.
+							</AlertDescription>
+						) : (
+							<AlertDescription>
+								Not connected since{" "}
+								<LocalTime at={linked.since}>
+									{formatRelative(linked.since, now)}
+								</LocalTime>
+								. Night Shift tries again, and syncs when it answers.
+							</AlertDescription>
+						)}
+						{linked.update ? null : (
+							<AlertAction>
+								<Button
+									variant="outline"
+									size="sm"
+									nativeButton={false}
+									render={<Link to="/settings" hash="this-computer" />}
+								>
+									Check the connection
+								</Button>
+							</AlertAction>
+						)}
 					</Alert>
 				) : null}
 				<div className="flex flex-col gap-2">

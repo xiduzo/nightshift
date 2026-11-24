@@ -6,6 +6,7 @@
  * an older version answers a procedure it does not have yet.
  */
 
+import { hostVersionWords } from "@nightshift/refusal";
 import { ORPCError } from "@orpc/client";
 
 /** The oRPC code Night Shift refuses a call with when nobody is signed in. */
@@ -44,9 +45,8 @@ export function isHostUnreachable(error: unknown): boolean {
 	);
 }
 
-/** What a person reads when the Host does not have a procedure. The words of `OlderHostError` of the engine. */
-export const HOST_OUTDATED =
-	"This Host runs an older version of Night Shift. Update Night Shift there.";
+/** What a person reads when the Host does not have a procedure. */
+export const HOST_OUTDATED = hostVersionWords("older");
 
 /**
  * Whether the Host does not have the procedure at all: a Night Shift of

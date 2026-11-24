@@ -12,6 +12,7 @@ import {
 	createRunLog,
 	deviceRowsOn,
 } from "@nightshift/engine/testing";
+import { PROTOCOL_VERSION } from "@nightshift/refusal";
 import { eq } from "drizzle-orm";
 import { wireRegistry } from "../registry";
 import { type Host, wireHost } from "./wire";
@@ -203,7 +204,7 @@ describe("the Caller of a keyed call", () => {
 			body: { userId: bob.userId, role: "viewer", organizationId: spaceId },
 		});
 		const key = await paired(bob.userId, "home");
-		const caller = await host.admit(key, "sync");
+		const caller = await host.admit(key, "sync", PROTOCOL_VERSION);
 		expect(caller).toMatchObject({
 			...key,
 			device: { name: "home", homeHost: "https://studio.invalid" },
@@ -217,12 +218,18 @@ describe("the Caller of a keyed call", () => {
 				message: ROLE_REFUSAL.message,
 			},
 		);
-		const owner = await host.admit(await paired(ada.userId, "guest"), "sync");
+		const owner = await host.admit(
+			await paired(ada.userId, "guest"),
+			"sync",
+			PROTOCOL_VERSION,
+		);
 		await expect(
 			owner.may(spaceId, { run: ["start"] }),
 		).resolves.toBeUndefined();
 		await host.registry.revoke(key.deviceId);
-		await expect(host.admit(key, "sync")).rejects.toMatchObject({
+		await expect(
+			host.admit(key, "sync", PROTOCOL_VERSION),
+		).rejects.toMatchObject({
 			code: "UNAUTHORIZED",
 		});
 	});

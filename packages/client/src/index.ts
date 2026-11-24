@@ -25,6 +25,7 @@ export {
 	isMissingOnHost,
 	isSignInRequired,
 	isTwoFactorRequired,
+	versionMessage,
 } from "./api";
 export {
 	againstBefore,

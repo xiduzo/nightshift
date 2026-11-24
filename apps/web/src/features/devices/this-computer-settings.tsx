@@ -450,6 +450,10 @@ function Hosts({ hosts }: { hosts: ThisComputer["hosts"] }) {
 											The Host removed the access of this computer. Join it
 											again to sync.
 										</ItemDescription>
+									) : host.update ? (
+										<ItemDescription className="line-clamp-none">
+											{host.update}
+										</ItemDescription>
 									) : host.spaces.length === 0 ? (
 										<ItemDescription>
 											Keeps no Space of yours yet.

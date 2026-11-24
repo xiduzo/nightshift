@@ -69,6 +69,8 @@ function LinkedHostDetail({
 						"Connecting."
 					) : host.status === "revoked" ? (
 						"It removed the access of this computer."
+					) : host.update ? (
+						host.update
 					) : (
 						<>
 							Not connected since{" "}

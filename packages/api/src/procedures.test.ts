@@ -45,6 +45,7 @@ import { testInbox } from "@nightshift/engine/testing";
 import { singleAgentFlow } from "@nightshift/flows";
 import {
 	FAILURE_MESSAGE,
+	PROTOCOL_VERSION,
 	Refusal,
 	type RefusalKind,
 } from "@nightshift/refusal";
@@ -397,6 +398,7 @@ function recording(
 		access,
 		fromThisComputer: given.fromThisComputer ?? false,
 		deviceKey,
+		deviceVersion: null,
 		requireTwoFactor: false,
 		setLogin: recorder(["setLogin"], record) as Context["setLogin"],
 		hasLogin: recorder(["hasLogin"], record, {
@@ -1548,6 +1550,8 @@ describe("a Host that requires two-factor sign-in", () => {
 		).toEqual({
 			signedIn: true,
 			person: { name: "Ada", email: "ada@example.com" },
+			// Nothing about this Night Shift before the second factor.
+			version: null,
 			thisComputer: false,
 			hasPassword: true,
 			// How long a trusted browser skips the code: the rule of auth, not a copy.
@@ -1570,6 +1574,7 @@ describe("a Host that requires two-factor sign-in", () => {
 		expect(
 			await call(appRouter.account.status, undefined, { context: allowed }),
 		).toMatchObject({
+			version: PROTOCOL_VERSION,
 			twoFactor: { enabled: true, required: true, setUpNeeded: false },
 		});
 	});

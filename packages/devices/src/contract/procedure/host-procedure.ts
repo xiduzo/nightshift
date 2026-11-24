@@ -2,6 +2,7 @@ import type { DeviceKeyPermission } from "@nightshift/auth";
 import type { RefusalKind } from "@nightshift/refusal";
 import { oc } from "@orpc/contract";
 import { z } from "zod";
+import { versionRefusalSchema } from "../version";
 import { exact } from "./described";
 
 /**
@@ -42,14 +43,16 @@ export const refusalDataSchema = exact<{ kind: RefusalKind }>()(
  * (pair it again). FORBIDDEN: it may not do this. CONFLICT: not yet, try
  * again later. BAD_REQUEST: a refusal written for people, with its kind
  * (`refusalDataSchema`). HOST_UNREACHABLE: the Host of a Space this Host
- * does not keep cannot be reached now.
+ * does not keep cannot be reached now, or this Host has another version
+ * than the Device (`versionRefusalSchema`, ADR 45). A FORBIDDEN or an
+ * UNAUTHORIZED never means the version: it ends the link for good.
  */
 export const procedure = oc.$meta<HostProcedureMeta>({}).errors({
 	UNAUTHORIZED: { status: 401 },
 	FORBIDDEN: { status: 403 },
 	CONFLICT: { status: 409 },
 	BAD_REQUEST: { status: 400, data: refusalDataSchema.optional() },
-	HOST_UNREACHABLE: { status: 503 },
+	HOST_UNREACHABLE: { status: 503, data: versionRefusalSchema.optional() },
 });
 /** A paired Device's link and the exchange of run history. */
 export const sync = procedure.meta({ key: "sync" });

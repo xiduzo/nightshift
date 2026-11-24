@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { documentToken } from "../../../contract";
 import { inMemoryHostPorts } from "../adapters/out/in-memory-neighbours";
 import { readSyncKey } from "./read-sync-key";
 
@@ -22,12 +23,16 @@ describe("readSyncKey", () => {
 			pairedAt: 0,
 			revokedAt: null,
 		});
-		expect(await readSyncKey(p)("tok")).toEqual({
+		expect(await readSyncKey(p)(documentToken("tok"))).toEqual({
 			deviceId: "laptop",
 			personId: "ada",
 			home: true,
 		});
+		// A Device that says no version, or another one.
+		for (const token of ["tok", "tok@", "tok@x", "tok@0", "tok@999"]) {
+			expect(await readSyncKey(p)(token)).toBeNull();
+		}
 		p.settings.enabled = false;
-		expect(await readSyncKey(p)("tok")).toBeNull();
+		expect(await readSyncKey(p)(documentToken("tok"))).toBeNull();
 	});
 });

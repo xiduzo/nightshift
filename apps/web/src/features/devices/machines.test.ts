@@ -31,6 +31,7 @@ const host = (status: LinkedHost["status"] = "online"): LinkedHost => ({
 	status,
 	since: 7,
 	fingerprint: null,
+	update: null,
 	spaces: [{ id: "personal", name: "Personal", personal: true }],
 });
 

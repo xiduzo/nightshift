@@ -8,3 +8,4 @@ export { sendToAccess } from "./refusal";
 export { SignedInPage } from "./signed-in-page";
 export { TwoFactorPage } from "./two-factor-page";
 export { useAccessGuard } from "./use-access-guard";
+export { VersionNotice } from "./version-notice";

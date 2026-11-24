@@ -35,10 +35,12 @@ const linkedHostSchema = z.object({
 	addresses: z.array(z.string()),
 	/** The address that answers now. */
 	address: z.string().nullable(),
-	status: z.enum(["connecting", "online", "offline", "revoked"]),
+	status: z.enum(["connecting", "online", "offline", "outdated", "revoked"]),
 	/** Epoch ms of the last change of `status`. */
 	since: z.number(),
 	fingerprint: z.string().nullable(),
+	/** What the person does, while `outdated`: the Host has another version. */
+	update: z.string().nullable(),
 	/** The Spaces it keeps for this computer. */
 	spaces: z.array(
 		z.object({ id: z.string(), name: z.string(), personal: z.boolean() }),
@@ -59,6 +61,8 @@ const pairedDeviceSchema = z.object({
 	online: z.boolean(),
 	pairedAt: z.number(),
 	revokedAt: z.number().nullable(),
+	/** What the person does, when it has another version. */
+	update: z.string().nullable(),
 });
 
 /** What the Devices page shows, for one Person. */
@@ -244,6 +248,7 @@ export const accountStatusSchema = z.union([
 	z.object({
 		signedIn: z.boolean(),
 		person: z.null(),
+		version: z.null(),
 		thisComputer: z.boolean(),
 		hasPassword: z.boolean(),
 		twoFactor: twoFactorSchema,
@@ -251,6 +256,8 @@ export const accountStatusSchema = z.union([
 	z.object({
 		signedIn: z.boolean(),
 		person: z.object({ name: z.string(), email: z.string() }),
+		/** The version of this Night Shift, for an app of another one (ADR 45). Null: they may not use this Host yet. */
+		version: z.number().nullable(),
 		thisComputer: z.boolean(),
 		hasPassword: z.boolean(),
 		twoFactor: twoFactorSchema,

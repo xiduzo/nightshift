@@ -51,6 +51,7 @@ export {
 	NIGHT_SHIFT,
 	OLDER_HOST,
 	OlderHostError,
+	OtherVersionError,
 	permissionOf,
 	personOf,
 	runCommandSchema,

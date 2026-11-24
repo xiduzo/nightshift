@@ -9,6 +9,7 @@ import {
 } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import type { SettingsStore } from "@nightshift/engine/settings";
+import { deviceVersionWords } from "@nightshift/refusal";
 import { now as timeNow } from "@nightshift/time";
 import { ORPCError } from "@orpc/server";
 import type { DeviceRegistry } from "../registry";
@@ -24,6 +25,7 @@ import { redeemPairing } from "./application/redeem-pairing";
 import { reviewPairing } from "./application/review-pairing";
 import { revokeDevice } from "./application/revoke-device";
 import { startPairing } from "./application/start-pairing";
+import { createDeviceVersions } from "./domain/host";
 import { createPendingPairings, type PendingPairings } from "./domain/pending";
 
 /**
@@ -58,6 +60,13 @@ const keyedCallCodes: KeyedCallCodes = {
 	forbidden: (words) => {
 		throw new ORPCError("FORBIDDEN", { message: words });
 	},
+	otherVersion: (device) => {
+		throw new ORPCError("HOST_UNREACHABLE", {
+			status: 503,
+			message: deviceVersionWords(device),
+			data: { device },
+		});
+	},
 };
 
 /**
@@ -69,6 +78,7 @@ export type Host = ReturnType<typeof wireHost>;
 export function wireHost(deps: HostDeps) {
 	const pending = createPendingPairings(deps.pending);
 	const now = deps.now ?? timeNow;
+	const versions = createDeviceVersions();
 	const keys = wireDeviceKeys({
 		auth: deps.auth,
 		db: deps.db,
@@ -118,6 +128,7 @@ export function wireHost(deps: HostDeps) {
 		admit: (
 			key: DeviceKeyAccess | null,
 			need: DeviceKeyPermission | undefined,
+			version: number | null,
 		) =>
 			admitKeyedCall({
 				registry: deps.registry,
@@ -125,7 +136,10 @@ export function wireHost(deps: HostDeps) {
 				spaces,
 				roles,
 				codes: keyedCallCodes,
-			})({ key, need }),
+				versions,
+			})({ key, need, version }),
+		/** How the version of a Device's last call compares with this Host's. Null: the same, or it did not call. */
+		versionOf: (deviceId: string) => versions.of(deviceId),
 		keyOf: readBearerKey({ keys, bearerOf: bearerDeviceKey }),
 		syncKey: readSyncKey({
 			keys,

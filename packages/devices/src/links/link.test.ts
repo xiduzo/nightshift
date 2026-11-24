@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import type { SyncAccess } from "@nightshift/auth";
-import { HostUnreachableError, OlderHostError } from "@nightshift/engine";
+import {
+	HostUnreachableError,
+	OlderHostError,
+	OtherVersionError,
+} from "@nightshift/engine";
+import { PROTOCOL_VERSION } from "@nightshift/refusal";
 import { now } from "@nightshift/time";
 import { ORPCError } from "@orpc/client";
 import * as Y from "yjs";
@@ -35,6 +40,7 @@ const LINK: HostLink = {
 
 const hello = (addresses: string[]): HostHello => ({
 	host: { id: "host-a", name: "studio", addresses },
+	version: PROTOCOL_VERSION,
 	deviceId: "device-b",
 	personId: "person-a",
 	spaces: [],
@@ -84,6 +90,17 @@ describe("firstAnswering", () => {
 				throw new ORPCError("UNAUTHORIZED");
 			}),
 		).rejects.toBeInstanceOf(ORPCError);
+		expect(tried).toEqual(["a"]);
+	});
+
+	test("a Host of another version is an answer: it stops there", async () => {
+		const tried: string[] = [];
+		await expect(
+			firstAnswering(["a", "b"], async (address) => {
+				tried.push(address);
+				throw new OtherVersionError("older");
+			}),
+		).rejects.toBeInstanceOf(OtherVersionError);
 		expect(tried).toEqual(["a"]);
 	});
 
@@ -186,6 +203,163 @@ describe("httpsLink", () => {
 		expect(revoked).toBe(1);
 		expect(link.client()).toBeNull();
 		await link.close();
+	});
+
+	/** A Host that refuses the version of the Device, as its router does. */
+	const refusesVersion = (device: "older" | "newer") =>
+		new ORPCError("HOST_UNREACHABLE", { status: 503, data: { device } });
+
+	for (const [what, answer, host] of [
+		[
+			"a newer Host refuses this version",
+			() => Promise.reject(refusesVersion("older")),
+			"newer",
+		],
+		[
+			"an older Host refuses this version",
+			() => Promise.reject(refusesVersion("newer")),
+			"older",
+		],
+		[
+			"a Host from before the number answers without one",
+			async () => {
+				const { version: _none, ...old } = hello([]);
+				return old as HostHello;
+			},
+			"older",
+		],
+		[
+			"a Host takes the call and says a newer version",
+			async () => ({ ...hello([]), version: PROTOCOL_VERSION + 1 }),
+			"newer",
+		],
+	] as const) {
+		test(`${what}: the link waits for the update, keeps its access, and then goes on`, async () => {
+			let updated = false;
+			const fake = fakeHost({
+				"https://studio.local": (): Promise<HostHello> =>
+					updated ? Promise.resolve(hello([])) : answer(),
+			});
+			let revoked = 0;
+			let opened = 0;
+			let streamed = 0;
+			const learned: string[][] = [];
+			const states: LinkState["status"][] = [];
+			const link = httpsLink({
+				link: LINK,
+				key: "nsd_key",
+				// Not the Device the answer names: the version is read first.
+				clientFor: fake.clientFor,
+				heartbeatMs: 5,
+				firstBackoffMs: 5,
+				maxBackoffMs: 5,
+				onRevoked: () => revoked++,
+				onAddresses: (addresses) => learned.push(addresses),
+				onState: (state) => states.push(state.status),
+				documents: async () => {
+					opened++;
+					return [];
+				},
+				documentChannel: () => ({
+					sync: () => {},
+					inStep: () => false,
+					close: () => {},
+				}),
+			});
+			link.stream("test", async (_client, signal) => {
+				streamed++;
+				await new Promise<void>((resolve) =>
+					signal.addEventListener("abort", () => resolve(), { once: true }),
+				);
+			});
+			try {
+				await until(() => link.state().status === "outdated");
+				// It asks again, and the address that answered is the Host: no other one.
+				await until(() => fake.calls.length >= 3);
+				expect(new Set(fake.calls)).toEqual(new Set(["https://studio.local"]));
+				expect(link.state()).toMatchObject({
+					status: "outdated",
+					address: null,
+					hostVersion: host,
+				});
+				expect(link.client()).toBeNull();
+				const refused = await link.call(async () => null).catch((e) => e);
+				expect(refused).toBeInstanceOf(OtherVersionError);
+				expect(refused).toBeInstanceOf(HostUnreachableError);
+				expect([revoked, opened, streamed, learned]).toEqual([0, 0, 0, []]);
+
+				updated = true;
+				await until(() => link.state().status === "online");
+				await until(() => streamed === 1);
+				expect(opened).toBeGreaterThan(0);
+				expect(link.state().hostVersion).toBeUndefined();
+				expect(states).toEqual(["outdated", "online"]);
+				expect(revoked).toBe(0);
+			} finally {
+				await link.close();
+			}
+		});
+	}
+
+	test("a Host that was updated while the link was online: the first refused call makes the link ask, and it waits", async () => {
+		let refuse = false;
+		const answer = async () => {
+			if (refuse) throw refusesVersion("older");
+			return hello([]);
+		};
+		const link = httpsLink({
+			link: LINK,
+			key: "nsd_key",
+			clientFor: () =>
+				partialHostClient({
+					link: {
+						hello: answer,
+						heartbeat: answer,
+						phones: () => answer() as never,
+					},
+				}),
+			// Far longer than the test: only the refused call makes it ask.
+			heartbeatMs: 60_000,
+			maxBackoffMs: 60_000,
+		});
+		try {
+			await until(() => link.state().status === "online");
+			refuse = true;
+			const refused = await link
+				.call((client) => client.link.phones())
+				.catch((e) => e);
+			expect(refused).toBeInstanceOf(OtherVersionError);
+			await until(() => link.state().status === "outdated");
+		} finally {
+			await link.close();
+		}
+	});
+
+	test("a stream the Host refuses for the version makes the link ask too", async () => {
+		let refuse = false;
+		const answer = async () => {
+			if (refuse) throw refusesVersion("newer");
+			return hello([]);
+		};
+		const link = httpsLink({
+			link: LINK,
+			key: "nsd_key",
+			clientFor: () =>
+				partialHostClient({ link: { hello: answer, heartbeat: answer } }),
+			heartbeatMs: 60_000,
+			maxBackoffMs: 60_000,
+			streamBackoff: { firstMs: 60_000, maxMs: 60_000 },
+		});
+		try {
+			await until(() => link.state().status === "online");
+			refuse = true;
+			link.stream("test", async () => {
+				throw new OtherVersionError("older");
+			});
+			await until(() => link.state().status === "outdated");
+		} finally {
+			await link.close();
+		}
 	});
 
 	test("a key the Host knows as another Device's is not used: no calls, no streams, and the key stays", async () => {

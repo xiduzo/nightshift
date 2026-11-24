@@ -9,7 +9,7 @@ import {
 	HOST_UNREACHABLE as UNREACHABLE,
 } from "@nightshift/engine";
 import { createSandbox, waitFor } from "@nightshift/engine/testing";
-import { Refusal } from "@nightshift/refusal";
+import { type OtherVersion, Refusal } from "@nightshift/refusal";
 import { ORPCError } from "@orpc/client";
 import type { HostClient, WorkReply, WorkRequest } from "../contract";
 import type { DeviceLinks } from "../links";
@@ -139,6 +139,7 @@ type InStepFake = {
 function fakeLinks(
 	clients: Record<string, HostClient | null>,
 	inStep: InStepFake = { answer: async () => true, asked: [] },
+	hostVersion?: OtherVersion,
 ): Pick<DeviceLinks, "get"> {
 	return {
 		get(hostId) {
@@ -151,6 +152,7 @@ function fakeLinks(
 					status: client ? "online" : "offline",
 					address: client ? "fake" : null,
 					since: 0,
+					...(hostVersion ? { hostVersion } : {}),
 				}),
 				client: () => client,
 				// The relays read `client()` only.
@@ -180,7 +182,11 @@ const hostSpaces = {
 
 function relayWith(
 	host = fakeHost(),
-	options: { inStep?: InStepFake; flowSyncMs?: number } = {},
+	options: {
+		inStep?: InStepFake;
+		flowSyncMs?: number;
+		hostVersion?: OtherVersion;
+	} = {},
 ) {
 	const enqueued: unknown[] = [];
 	/** The actions this computer counts as waiting on a Host, once sent there. */
@@ -209,7 +215,11 @@ function relayWith(
 						: null,
 		}),
 		links: () =>
-			fakeLinks({ "host-1": host.client, "host-3": null }, options.inStep),
+			fakeLinks(
+				{ "host-1": host.client, "host-3": null },
+				options.inStep,
+				options.hostVersion,
+			),
 		flows: FLOWS,
 		...(options.flowSyncMs !== undefined
 			? { flowSyncMs: options.flowSyncMs }
@@ -309,11 +319,41 @@ describe("the Space route", () => {
 		expect(await routes.route("space-gone")).toEqual({
 			at: "unreachable",
 			hostId: "host-2",
+			because: new HostUnreachableError(),
 		});
 		expect(await routes.route("space-off")).toEqual({
 			at: "unreachable",
 			hostId: "host-3",
+			because: new HostUnreachableError(),
 		});
+	});
+
+	test("a Host of another version: every call waits, in the words of the update", async () => {
+		const { relay } = relayWith(fakeHost(), { hostVersion: "older" });
+		const refused = await relay.leases
+			?.take({
+				spaceId: "space-off",
+				name: "docker",
+				runId: "run-1",
+				runTitle: "Run",
+				walkerId: "laptop",
+				ttlMs: 1,
+			})
+			.then(
+				() => null,
+				(error: unknown) => error,
+			);
+		// What the run reads of it: a Host it cannot reach now, so it waits.
+		expect(refused).toBeInstanceOf(HostUnreachableError);
+		expect(refused).toMatchObject({ message: OLDER_HOST });
+		await expect(
+			relay.startRun({
+				spaceId: "space-off",
+				projectId: "project-1",
+				flowName: "watch",
+				startedBy: "person-1",
+			} as never),
+		).rejects.toThrow(OLDER_HOST);
 	});
 
 	test("reads the Link at each call", async () => {

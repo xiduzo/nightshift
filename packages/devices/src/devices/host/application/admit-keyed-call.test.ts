@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { DeviceKeyAccess } from "@nightshift/auth";
+import { PROTOCOL_VERSION } from "@nightshift/refusal";
 import { NOT_A_HOST } from "../../../contract";
 import type { PairedDevice } from "../../registry";
 import { inMemoryHostPorts } from "../adapters/out/in-memory-neighbours";
@@ -32,13 +33,21 @@ describe("admitKeyedCall", () => {
 		const p = inMemoryHostPorts();
 		p.registry.put(laptop());
 		await expect(
-			admitKeyedCall(p)({ key: null, need: "sync" }),
+			admitKeyedCall(p)({ key: null, need: "sync", version: PROTOCOL_VERSION }),
 		).rejects.toMatchObject({ code: "UNAUTHORIZED", message: NO_ACCESS });
 		await expect(
-			admitKeyedCall(p)({ key: keyOf(), need: "archive" }),
+			admitKeyedCall(p)({
+				key: keyOf(),
+				need: "archive",
+				version: PROTOCOL_VERSION,
+			}),
 		).rejects.toMatchObject({ code: "FORBIDDEN", message: NO_PERMISSION });
 		expect(
-			await admitKeyedCall(p)({ key: keyOf(), need: "sync" }),
+			await admitKeyedCall(p)({
+				key: keyOf(),
+				need: "sync",
+				version: PROTOCOL_VERSION,
+			}),
 		).toMatchObject({
 			deviceId: "laptop",
 			device: { name: "The laptop" },
@@ -49,25 +58,91 @@ describe("admitKeyedCall", () => {
 		const p = inMemoryHostPorts();
 		p.registry.put(laptop());
 		await expect(
-			admitKeyedCall(p)({ key: keyOf(), need: undefined }),
+			admitKeyedCall(p)({
+				key: keyOf(),
+				need: undefined,
+				version: PROTOCOL_VERSION,
+			}),
 		).rejects.toMatchObject({ code: "FORBIDDEN" });
 		p.settings.enabled = false;
 		await expect(
-			admitKeyedCall(p)({ key: keyOf(), need: "sync" }),
+			admitKeyedCall(p)({
+				key: keyOf(),
+				need: "sync",
+				version: PROTOCOL_VERSION,
+			}),
 		).rejects.toMatchObject({ kind: "unavailable", message: NOT_A_HOST });
 	});
 
 	test("a Device that is not paired here, revoked or another Person's is UNAUTHORIZED", async () => {
 		const p = inMemoryHostPorts();
 		await expect(
-			admitKeyedCall(p)({ key: keyOf(), need: "sync" }),
+			admitKeyedCall(p)({
+				key: keyOf(),
+				need: "sync",
+				version: PROTOCOL_VERSION,
+			}),
 		).rejects.toMatchObject({ code: "UNAUTHORIZED" });
 		for (const fields of [{ revokedAt: 5 }, { ownerId: "person-bob" }]) {
 			p.registry.put(laptop(fields));
 			await expect(
-				admitKeyedCall(p)({ key: keyOf(), need: "sync" }),
+				admitKeyedCall(p)({
+					key: keyOf(),
+					need: "sync",
+					version: PROTOCOL_VERSION,
+				}),
 			).rejects.toMatchObject({ code: "UNAUTHORIZED" });
 		}
+	});
+
+	test("a Device of another version waits: never UNAUTHORIZED or FORBIDDEN, and remembered for its owner", async () => {
+		const p = inMemoryHostPorts();
+		p.registry.put(laptop());
+		const admit = (version: number | null) =>
+			admitKeyedCall(p)({ key: keyOf(), need: "sync", version });
+		for (const [version, words] of [
+			[null, "older"],
+			[PROTOCOL_VERSION - 1, "older"],
+			[PROTOCOL_VERSION + 1, "newer"],
+		] as const) {
+			await expect(admit(version)).rejects.toMatchObject({
+				code: "HOST_UNREACHABLE",
+				message: words,
+			});
+			expect(p.versions.of("laptop")).toBe(words);
+		}
+		await admit(PROTOCOL_VERSION);
+		expect(p.versions.of("laptop")).toBeNull();
+	});
+
+	test("the version of a caller without access counts for nothing: who may act comes first", async () => {
+		const p = inMemoryHostPorts();
+		p.registry.put(laptop());
+		const admit = (request: {
+			key: DeviceKeyAccess | null;
+			need?: "sync" | "archive";
+		}) =>
+			admitKeyedCall(p)({
+				key: request.key,
+				need: request.need ?? "sync",
+				version: null,
+			});
+		await expect(admit({ key: null })).rejects.toMatchObject({
+			code: "UNAUTHORIZED",
+		});
+		await expect(
+			admit({ key: keyOf(), need: "archive" }),
+		).rejects.toMatchObject({ code: "FORBIDDEN" });
+		p.settings.enabled = false;
+		await expect(admit({ key: keyOf() })).rejects.toMatchObject({
+			message: NOT_A_HOST,
+		});
+		p.settings.enabled = true;
+		p.registry.put(laptop({ revokedAt: 5 }));
+		await expect(admit({ key: keyOf() })).rejects.toMatchObject({
+			code: "UNAUTHORIZED",
+		});
+		expect(p.versions.of("laptop")).toBeNull();
 	});
 
 	test("Caller.may refuses a viewer in the role words, or the procedure's", async () => {
@@ -77,6 +152,7 @@ describe("admitKeyedCall", () => {
 		const caller = await admitKeyedCall(p)({
 			key: keyOf({ personId: "viv" }),
 			need: "sync",
+			version: PROTOCOL_VERSION,
 		});
 		await expect(
 			caller.may("space-1", { run: ["start"] }),
@@ -98,7 +174,12 @@ describe("admitKeyedCall", () => {
 		const p = inMemoryHostPorts();
 		p.registry.put(laptop());
 		p.roles.roles.set("space-1", "owner");
-		const admit = () => admitKeyedCall(p)({ key: keyOf(), need: "sync" });
+		const admit = () =>
+			admitKeyedCall(p)({
+				key: keyOf(),
+				need: "sync",
+				version: PROTOCOL_VERSION,
+			});
 		const first = await admit();
 		expect(await first.roleIn("space-1")).toBe("owner");
 		p.roles.roles.set("space-1", "viewer");

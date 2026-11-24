@@ -9,3 +9,4 @@ export {
 	useSignedIn,
 } from "./host-provider";
 export { SignedInOnly } from "./signed-in-only";
+export { VersionNotice } from "./version-notice";

@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { deviceVersionWords } from "@nightshift/refusal";
 import { implement } from "@orpc/server";
 import { RPCHandler } from "@orpc/server/fetch";
 import { type HostClient, hostContract, type PhoneView } from "../../contract";
@@ -196,4 +197,22 @@ describe("the owner's other Devices", () => {
 			},
 		]);
 	});
+});
+
+test("the overview says which of the Person's computers needs an update", async () => {
+	const devices = createDevices({
+		host: {
+			registry: { list: async () => [{ id: "laptop" }, { id: "desktop" }] },
+			versionOf: (id: string) => (id === "laptop" ? "older" : null),
+		},
+		settings: { current: () => ({}) },
+	} as unknown as Parameters<typeof createDevices>[0]);
+	const { devices: listed } = await devices.overview({
+		personId: "person",
+		owner: false,
+	});
+	expect(listed.map(({ id, update }) => [id, update])).toEqual([
+		["laptop", deviceVersionWords("older")],
+		["desktop", null],
+	]);
 });

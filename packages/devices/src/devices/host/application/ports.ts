@@ -4,6 +4,7 @@ import type {
 	Permissions,
 	Role,
 } from "@nightshift/auth";
+import type { OtherVersion } from "@nightshift/refusal";
 import type { DeviceRegistry } from "../../registry";
 import type {
 	PairingAnswer,
@@ -90,12 +91,15 @@ export type SpaceRoles = {
 
 /**
  * The codes a Device reads for a keyed call that this Host does not take.
- * FORBIDDEN and UNAUTHORIZED only ever mean the key.
+ * FORBIDDEN and UNAUTHORIZED only ever mean the key. `otherVersion` is the
+ * code of a Host that cannot be reached now: the Device keeps its key, and
+ * what it has waits (ADR 45).
  * @filledBy devices/wire
  */
 export type KeyedCallCodes = {
 	unauthorized(words: string): never;
 	forbidden(words: string): never;
+	otherVersion(device: OtherVersion): never;
 };
 
 /**

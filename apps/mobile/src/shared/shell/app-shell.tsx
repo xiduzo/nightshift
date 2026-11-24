@@ -6,7 +6,7 @@ import { type ReactNode, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 
-import { HostProvider } from "@/features/access";
+import { HostProvider, VersionNotice } from "@/features/access";
 import { InFrontBanner, useNotificationTaps } from "@/features/notifications";
 import { createQueryClient } from "@/shared/api";
 import { applyKeptAppearance, useThemeColors } from "@/shared/theme";
@@ -35,6 +35,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 							<StatusBar style={scheme === "dark" ? "light" : "dark"} />
 							{children}
 							<InFrontBanner />
+							<VersionNotice />
 							<PortalHost />
 						</ThemeProvider>
 					</KeyboardProvider>

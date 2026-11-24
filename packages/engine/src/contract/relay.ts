@@ -1,4 +1,8 @@
-import { Refusal } from "@nightshift/refusal";
+import {
+	hostVersionWords,
+	type OtherVersion,
+	Refusal,
+} from "@nightshift/refusal";
 import type { RunCommandInput } from "./command";
 import type { LeaseHost } from "./leases";
 import type { StartRunInput } from "./start-run";
@@ -14,15 +18,26 @@ export const HOST_UNREACHABLE =
  * (`HOST_UNREACHABLE`), so a screen can say so.
  */
 export class HostUnreachableError extends Refusal {
-	constructor() {
-		super("unavailable", HOST_UNREACHABLE);
+	constructor(words: string = HOST_UNREACHABLE) {
+		super("unavailable", words);
 		this.name = "HostUnreachableError";
 	}
 }
 
+/**
+ * The Host that keeps the Space has another version of Night Shift (ADR
+ * 45): it cannot be reached until one of the two is updated. `host` is how
+ * its version compares with this computer's.
+ */
+export class OtherVersionError extends HostUnreachableError {
+	constructor(readonly host: OtherVersion) {
+		super(hostVersionWords(host));
+		this.name = "OtherVersionError";
+	}
+}
+
 /** What a person reads when a Host does not know a procedure. */
-export const OLDER_HOST =
-	"This Host runs an older version of Night Shift. Update Night Shift there.";
+export const OLDER_HOST = hostVersionWords("older");
 
 /**
  * The Host that keeps the Space runs an older version of Night Shift: it

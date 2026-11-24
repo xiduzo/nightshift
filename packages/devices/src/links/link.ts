@@ -1,4 +1,5 @@
-import { HostUnreachableError } from "@nightshift/engine";
+import { HostUnreachableError, OtherVersionError } from "@nightshift/engine";
+import { type OtherVersion, otherVersion } from "@nightshift/refusal";
 import { now as timeNow } from "@nightshift/time";
 import { ORPCError } from "@orpc/client";
 import type { HostClient, HostHello } from "../contract";
@@ -11,6 +12,7 @@ import {
 } from "./document-channel";
 import {
 	type CallOptions,
+	fromHost,
 	hostCall,
 	NotPairedError,
 	translated,
@@ -35,6 +37,9 @@ import type { LinkStatus } from "./types";
  *   that doubles up to `maxBackoffMs`.
  * - A Host that refuses the key (its owner removed this computer's
  *   access) ends the link for good: `revoked`.
+ * - A Host of another version makes the link wait for an update:
+ *   `outdated` (ADR 45). Nothing goes over it, the key and the rows stay,
+ *   and it asks again every `maxBackoffMs`.
  * - The documents it syncs are the caller's (`documents`), asked again
  *   with every answer of the Host: one the caller no longer gives stops
  *   syncing.
@@ -113,6 +118,8 @@ export type LinkState = {
 	address: string | null;
 	/** Epoch ms of the last change of `status`. */
 	since: number;
+	/** How the Host's version compares with this computer's, while the link is `outdated`. Else left out. */
+	hostVersion?: OtherVersion;
 };
 
 export type HttpsLinkOptions = {
@@ -165,7 +172,7 @@ export async function firstAnswering<T>(
 		try {
 			return { address, value: await call(address) };
 		} catch (error) {
-			if (isRefusal(error)) throw error;
+			if (isRefusal(error) || error instanceof OtherVersionError) throw error;
 			last = error;
 		}
 	}
@@ -178,6 +185,20 @@ export function isRefusal(error: unknown): boolean {
 		error instanceof ORPCError &&
 		(error.code === "UNAUTHORIZED" || error.code === "FORBIDDEN")
 	);
+}
+
+/** The Host answered a call so that the link asks it now: it no longer knows the key, or has another version. */
+function asksNow(error: unknown): boolean {
+	return error instanceof NotPairedError || error instanceof OtherVersionError;
+}
+
+/** Why a call on the Host of a link that is not online fails. */
+export function unreachable(
+	state: Pick<LinkState, "hostVersion"> | undefined,
+): HostUnreachableError {
+	return state?.hostVersion
+		? new OtherVersionError(state.hostVersion)
+		: new HostUnreachableError();
 }
 
 /** A stream of the link: what it runs, and how long it waits after a failure. */
@@ -208,7 +229,11 @@ export function httpsLink(options: HttpsLinkOptions): Link {
 			hostClient(address, { key, certificate: link.certificate }));
 
 	let addresses = [...link.addresses];
-	let state: LinkState = { status: "connecting", address: null, since: now() };
+	let state: LinkState = {
+		status: "connecting",
+		address: null,
+		since: now(),
+	};
 	/** The Host at the address that answers, as the link's own hello and heartbeat call it: the wire's codes. */
 	let wire: HostClient | null = null;
 	/** The same, in this computer's words: what the link hands out. */
@@ -229,9 +254,24 @@ export function httpsLink(options: HttpsLinkOptions): Link {
 	/** Someone asked to check the Host while no wait was on. */
 	let asked = false;
 
-	function setState(status: LinkStatus, address: string | null) {
-		if (state.status === status && state.address === address) return;
-		state = { status, address, since: now() };
+	function setState(
+		status: LinkStatus,
+		address: string | null,
+		hostVersion?: OtherVersion,
+	) {
+		if (
+			state.status === status &&
+			state.address === address &&
+			state.hostVersion === hostVersion
+		) {
+			return;
+		}
+		state = {
+			status,
+			address,
+			since: now(),
+			...(hostVersion ? { hostVersion } : {}),
+		};
 		options.onState?.(state);
 	}
 
@@ -304,9 +344,10 @@ export function httpsLink(options: HttpsLinkOptions): Link {
 			if (failure === null) {
 				if (well) continue;
 			} else {
-				// The Host no longer knows the key: ask it at once instead of at
-				// the next heartbeat. A call it does not allow is not this.
-				if (failure instanceof NotPairedError) check();
+				// The Host no longer knows the key, or has another version: ask it
+				// at once instead of at the next heartbeat. A call it does not
+				// allow is not this.
+				if (asksNow(failure)) check();
 				const said = String(failure);
 				if (stream.logged !== said) {
 					stream.logged = said;
@@ -338,14 +379,36 @@ export function httpsLink(options: HttpsLinkOptions): Link {
 		waiting.clear();
 	}
 
+	/**
+	 * The Host's answer to a hello or a heartbeat. Throws `OtherVersionError`
+	 * for a Host that refuses this computer's version, and for one whose
+	 * answer says another: the link uses nothing of it.
+	 */
+	async function said(
+		ask: (options: { signal: AbortSignal }) => Promise<HostHello>,
+	): Promise<HostHello> {
+		let hello: HostHello;
+		try {
+			hello = await ask({
+				signal: AbortSignal.any([
+					stop.signal,
+					AbortSignal.timeout(answerTimeoutMs),
+				]),
+			});
+		} catch (error) {
+			const read = fromHost(error);
+			throw read instanceof OtherVersionError ? read : error;
+		}
+		const host = otherVersion(hello.version);
+		if (host) throw new OtherVersionError(host);
+		return hello;
+	}
+
 	async function answer(address: string): Promise<HostHello> {
 		const client = clientFor(address);
-		const hello = await client.link.hello(undefined, {
-			signal: AbortSignal.any([
-				stop.signal,
-				AbortSignal.timeout(answerTimeoutMs),
-			]),
-		});
+		const hello = await said((options) =>
+			client.link.hello(undefined, options),
+		);
 		wire = client;
 		current = translated(client);
 		return hello;
@@ -378,12 +441,9 @@ export function httpsLink(options: HttpsLinkOptions): Link {
 				while (!stop.signal.aborted) {
 					await wait(heartbeatMs);
 					if (stop.signal.aborted) break;
-					const hello = await (wire as HostClient).link.heartbeat(undefined, {
-						signal: AbortSignal.any([
-							stop.signal,
-							AbortSignal.timeout(answerTimeoutMs),
-						]),
-					});
+					const hello = await said((options) =>
+						(wire as HostClient).link.heartbeat(undefined, options),
+					);
 					learn(hello, address);
 					await syncDocuments(address, hello);
 				}
@@ -397,6 +457,14 @@ export function httpsLink(options: HttpsLinkOptions): Link {
 					endWaits(`${link.name} no longer knows this computer.`);
 					options.onRevoked?.();
 					return;
+				}
+				if (error instanceof OtherVersionError) {
+					if (state.hostVersion !== error.host) {
+						console.warn(`Not connected to ${link.name}: ${error.message}`);
+					}
+					setState("outdated", null, error.host);
+					await wait(maxBackoffMs);
+					continue;
 				}
 				setState("offline", null);
 				await wait(waits.next());
@@ -429,12 +497,12 @@ export function httpsLink(options: HttpsLinkOptions): Link {
 		},
 		async call(use, options) {
 			const client = current;
-			if (!client) throw new HostUnreachableError();
+			if (!client) throw unreachable(state);
 			try {
 				return await hostCall(client, use, options);
 			} catch (error) {
-				// The Host no longer knows the key: ask it now.
-				if (error instanceof NotPairedError) check();
+				// The Host no longer knows the key, or has another version: ask it now.
+				if (asksNow(error)) check();
 				throw error;
 			}
 		},

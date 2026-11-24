@@ -21,6 +21,7 @@ import {
 	type Sandbox,
 	type TestEngineOptions,
 } from "@nightshift/engine/testing";
+import { PROTOCOL_VERSION } from "@nightshift/refusal";
 import { now } from "@nightshift/time";
 import type { Caller, HostClient, HostHello, WorkRelay } from "../contract";
 import { servedDocuments, wireHost } from "../devices/host";
@@ -89,6 +90,8 @@ export type HostReplicaOptions = Partial<
 > & {
 	/** How A's calls reach its paired Devices. Default: they reach none. */
 	hostWork?: WorkRelay;
+	/** The version the Devices say, read on every call. Default: this one's. */
+	deviceVersion?: () => number;
 };
 
 /**
@@ -169,6 +172,7 @@ export async function hostInMemory(
 	const token = (key: DeviceKeyAccess) => `nsd_memory-${key.deviceId}`;
 	const memory = inMemoryHost({
 		exchange: hostExchange,
+		...(options.deviceVersion ? { deviceVersion: options.deviceVersion } : {}),
 		admit: asHost.admit,
 		hello: asHost.hello,
 		revoke: asHost.revoke,
@@ -201,7 +205,7 @@ export async function hostInMemory(
 		hostId,
 		personId,
 		hello: asHost.hello,
-		caller: (key) => asHost.admit(key, "sync"),
+		caller: (key) => asHost.admit(key, "sync", PROTOCOL_VERSION),
 		token,
 		async join(deviceId, name) {
 			await host.devices.join({

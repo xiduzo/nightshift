@@ -1,6 +1,6 @@
 import { HostUnreachableError } from "@nightshift/engine";
 import type { HostClient } from "../contract";
-import type { CallOptions, DeviceLinks } from "../links";
+import { type CallOptions, type DeviceLinks, unreachable } from "../links";
 
 /**
  * Where a call for a Space goes now:
@@ -8,7 +8,8 @@ import type { CallOptions, DeviceLinks } from "../links";
  * - `host`: a Host keeps it, and its Link is online. `client` calls that
  *   Host with this Device's key. `ask` makes one call for a person.
  * - `unreachable`: a Host keeps it, and this computer has no online Link
- *   to it now (no Link, or the Link is offline).
+ *   to it now (no Link, or the Link is offline, or its Host has another
+ *   version). `because` says so.
  *
  * The Host's answers come in this computer's words: the Link's
  * (`Link.client`, `Link.call`).
@@ -25,7 +26,7 @@ export type SpaceRoute =
 				options?: CallOptions,
 			): Promise<T>;
 	  }
-	| { at: "unreachable"; hostId: string };
+	| { at: "unreachable"; hostId: string; because: HostUnreachableError };
 
 export type SpaceRoutes = {
 	/** Where a call for the Space goes now. It reads the Link at the moment of the call. */
@@ -58,7 +59,9 @@ export function createSpaceRoutes(deps: {
 		if (hostId === null) return { at: "here" };
 		const link = deps.links().get(hostId);
 		const client = link?.client();
-		if (!link || !client) return { at: "unreachable", hostId };
+		if (!link || !client) {
+			return { at: "unreachable", hostId, because: unreachable(link?.state()) };
+		}
 		return {
 			at: "host",
 			hostId,
@@ -71,7 +74,8 @@ export function createSpaceRoutes(deps: {
 		route,
 		async onHost(spaceId, use, options) {
 			const to = await route(spaceId);
-			if (to.at !== "host") throw new HostUnreachableError();
+			if (to.at === "unreachable") throw to.because;
+			if (to.at === "here") throw new HostUnreachableError();
 			return to.ask(use, options);
 		},
 	};

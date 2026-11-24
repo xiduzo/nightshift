@@ -4,6 +4,7 @@ import type {
 	DeviceCopy,
 	SettingsStore,
 } from "@nightshift/engine/settings";
+import { deviceVersionWords, type OtherVersion } from "@nightshift/refusal";
 import { now as timeNow } from "@nightshift/time";
 import type { HostClient, PhoneView } from "../../../../contract";
 import {
@@ -36,6 +37,7 @@ type HostOnPage = {
 	revoke: Devices["revoke"];
 	forget: Devices["forget"];
 	admit: Devices["admit"];
+	versionOf(deviceId: string): OtherVersion | null;
 	hello: Devices["hello"];
 };
 
@@ -124,7 +126,13 @@ export function createDevices(deps: {
 							),
 						}
 					: null,
-				devices: await host.registry.list(personId),
+				devices: (await host.registry.list(personId)).map((device) => {
+					const version = host.versionOf(device.id);
+					return {
+						...device,
+						update: version ? deviceVersionWords(version) : null,
+					};
+				}),
 			};
 		},
 		startPairing: (input) => host.startPairing(input),
@@ -134,7 +142,7 @@ export function createDevices(deps: {
 		deny: (headers, code) => host.deny(headers, code),
 		revoke: (personId, deviceId) => host.revoke(personId, deviceId),
 		forget: (personId, deviceId) => host.forget(personId, deviceId),
-		admit: (key, need) => host.admit(key, need),
+		admit: (key, need, version) => host.admit(key, need, version),
 		hello: (key) => host.hello(key),
 		personalSecrets: deps.personalSecrets,
 		projectSecrets: deps.projectSecrets,

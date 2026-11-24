@@ -23,6 +23,7 @@ async function errorOf(thrown: Error): Promise<ORPCError<string, unknown>> {
 			personId: "person-1",
 			permissions: { relay: ["serve"] },
 		},
+		deviceVersion: null,
 		exchange: {
 			reachable: async () => {
 				throw thrown;

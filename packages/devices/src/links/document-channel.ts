@@ -3,6 +3,7 @@ import {
 	HocuspocusProviderWebsocket,
 } from "@hocuspocus/provider";
 import type * as Y from "yjs";
+import { documentToken } from "../contract";
 import { pinnedWebSocket } from "../reach";
 
 /** A document a link syncs: the name the Host knows it by, and this Replica's copy. */
@@ -75,7 +76,7 @@ export const hocuspocusChannel: OpenDocumentChannel = (to) => {
 					websocketProvider: socketTo(),
 					name,
 					document: doc,
-					token: to.key,
+					token: documentToken(to.key),
 					onClose: to.closed,
 				});
 				provider.attach();

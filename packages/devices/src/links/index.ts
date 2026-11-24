@@ -21,7 +21,7 @@ export {
 	personOnHost,
 } from "./host-spaces";
 export { type JoinDeps, joinHost } from "./join";
-export type { Link } from "./link";
+export { type Link, unreachable } from "./link";
 export {
 	createDeviceLinks,
 	type DeviceLinks,

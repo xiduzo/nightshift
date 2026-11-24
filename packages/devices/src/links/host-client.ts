@@ -1,8 +1,9 @@
 import { promisify } from "node:util";
 import { gzip } from "node:zlib";
+import { PROTOCOL_VERSION } from "@nightshift/refusal";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
-import type { HostClient } from "../contract";
+import { type HostClient, VERSION_HEADER } from "../contract";
 import { pinnedFetch } from "../reach";
 
 /** A request body this large goes compressed. */
@@ -14,7 +15,7 @@ const gzipAsync = promisify(gzip);
  * The procedures of a Host at one address, as a Device calls them: the
  * Host's contract over HTTPS, `HostClient`'s production adapter. With its
  * Device key once it has one, trusting only the pinned certificate when
- * it pinned one. Each call goes on its own. A large body (a batch of rows,
+ * it pinned one. Each call says this Device's version, and goes on its own. A large body (a batch of rows,
  * a transcript) goes compressed.
  */
 export function hostClient(
@@ -24,7 +25,10 @@ export function hostClient(
 	const send = pinnedFetch(options.certificate ?? null);
 	const link = new RPCLink({
 		url: `${address.replace(/\/$/, "")}/rpc`,
-		headers: options.key ? { authorization: `Bearer ${options.key}` } : {},
+		headers: {
+			[VERSION_HEADER]: String(PROTOCOL_VERSION),
+			...(options.key ? { authorization: `Bearer ${options.key}` } : {}),
+		},
 		fetch: async (request, init) => send(await compressed(request), init),
 	});
 	return createORPCClient(link);

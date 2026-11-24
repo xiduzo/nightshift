@@ -22,6 +22,7 @@ import {
 } from "@nightshift/engine/testing";
 import type { Flow } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
+import { PROTOCOL_VERSION } from "@nightshift/refusal";
 import { eq } from "drizzle-orm";
 import * as Y from "yjs";
 import type { HostClient, WorkReply, WorkRequest } from "./contract";
@@ -358,6 +359,7 @@ describe("the devices runtime across a reload", () => {
 				permissions: { relay: ["serve"] },
 			},
 			"relay",
+			PROTOCOL_VERSION,
 		);
 		const taking = new AbortController();
 		const deliveries = second.hostExchange

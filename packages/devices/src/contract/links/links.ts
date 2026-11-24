@@ -22,6 +22,8 @@ const hostSchema = z.object({
 /** What a paired Device learns from its Host when its link answers. */
 export const hostHelloSchema = z.object({
 	host: hostSchema,
+	/** The Host's version (`PROTOCOL_VERSION`). */
+	version: z.number(),
 	deviceId: z.string(),
 	personId: z.string(),
 	/**

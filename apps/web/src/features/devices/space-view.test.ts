@@ -32,6 +32,7 @@ const linked = (spaces: string[]): LinkedHost => ({
 	status: "online",
 	since: 0,
 	fingerprint: null,
+	update: null,
 	spaces: spaces.map((id) => ({ id, name: id, personal: false })),
 });
 
@@ -48,6 +49,7 @@ const paired = (
 	online: true,
 	pairedAt: 1,
 	revokedAt: null,
+	update: null,
 	...extra,
 });
 

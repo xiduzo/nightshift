@@ -312,10 +312,11 @@
 											"!@nightshift/engine/run-status",
 											"!@nightshift/flows",
 											"!@nightshift/notifications/contract",
+											"!@nightshift/refusal",
 											"!@nightshift/time",
 											"!@nightshift/time/testing"
 										],
-										"message": "@nightshift/client imports only @nightshift/api/client (types), @nightshift/engine/run-status, the @nightshift/flows root, @nightshift/notifications/contract and @nightshift/time (see docs/steering/STRUCTURE.md, section 1)."
+										"message": "@nightshift/client imports only @nightshift/api/client (types), @nightshift/engine/run-status, the @nightshift/flows root, @nightshift/notifications/contract, @nightshift/refusal and @nightshift/time (see docs/steering/STRUCTURE.md, section 1)."
 									},
 									{
 										"group": [

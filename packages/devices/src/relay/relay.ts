@@ -87,7 +87,7 @@ export function createRelay(deps: {
 	return {
 		async command(command) {
 			const to = await route(command.spaceId);
-			if (to.at === "unreachable") throw new HostUnreachableError();
+			if (to.at === "unreachable") throw to.because;
 			if (to.at === "host") {
 				// The Host acts in the name of the key's Person, never a Person the call names.
 				await to.ask((client) => client.sync.command(command));
@@ -145,7 +145,7 @@ export function createRelay(deps: {
 
 		async archiveGet(ref) {
 			const to = await route(ref.spaceId);
-			if (to.at === "unreachable") throw new HostUnreachableError();
+			if (to.at === "unreachable") throw to.because;
 			if (to.at === "here") return null;
 			if (ref.kind !== "content") {
 				return to.ask((client) => client.archive.get({ ref }));
@@ -162,7 +162,7 @@ export function createRelay(deps: {
 
 		async archivePut(entry) {
 			const to = await route(entry.ref.spaceId);
-			if (to.at === "unreachable") throw new HostUnreachableError();
+			if (to.at === "unreachable") throw to.because;
 			if (to.at === "here") return false;
 			if (entry.ref.kind === "content") {
 				const { spaceId, sha256 } = entry.ref;
@@ -197,7 +197,8 @@ export function createRelay(deps: {
 			// The Host starts it in the name of the key's Person.
 			const { startedBy: _person, ...start } = input;
 			const to = await route(input.spaceId);
-			if (to.at !== "host") throw new HostUnreachableError();
+			if (to.at === "unreachable") throw to.because;
+			if (to.at === "here") throw new HostUnreachableError();
 			// A run of a saved flow starts from the Host's copy of it, so a flow
 			// saved here a moment ago must reach it first. A quick run carries its flow.
 			if ("flowName" in input) {
@@ -258,7 +259,7 @@ export function createRelay(deps: {
 
 		async devices(input) {
 			const to = await route(input.spaceId);
-			if (to.at === "unreachable") throw new HostUnreachableError();
+			if (to.at === "unreachable") throw to.because;
 			return to.at === "host"
 				? to.ask((client) => client.sync.devices(input))
 				: [];

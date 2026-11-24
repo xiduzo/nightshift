@@ -7,7 +7,7 @@ import { TooltipProvider } from "@nightshift/ui/components/tooltip";
 import { useRouterState } from "@tanstack/react-router";
 import { ThemeProvider } from "next-themes";
 import type { ReactNode } from "react";
-import { isOutsideApp, useAccessGuard } from "@/features/access";
+import { isOutsideApp, useAccessGuard, VersionNotice } from "@/features/access";
 import { NotificationStream } from "@/features/notifications";
 import { UsageNotice } from "@/features/settings";
 import { SpaceTabs } from "@/features/spaces";
@@ -52,6 +52,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 					<SpaceTabs />
 					<TabBadge />
 					<UsageNotice />
+					<VersionNotice />
 				</>
 			)}
 		</ThemeProvider>

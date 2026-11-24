@@ -9,6 +9,7 @@ import {
 	worktreeLocation,
 } from "@nightshift/engine";
 import { createSandbox, type Sandbox } from "@nightshift/engine/testing";
+import { PROTOCOL_VERSION } from "@nightshift/refusal";
 import { now } from "@nightshift/time";
 import type { WorkReply, WorkRequest } from "../contract";
 import type { DeviceOffer } from "../devices/offers";
@@ -176,6 +177,7 @@ function hubHost() {
 	});
 	const hello = {
 		host: { id: HOST, name: "studio", addresses: [] },
+		version: PROTOCOL_VERSION,
 		deviceId: DEVICE.id,
 		personId: ME,
 		spaces: [],
