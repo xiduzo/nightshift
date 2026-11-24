@@ -247,8 +247,7 @@ describe("leaving", () => {
 		world.hosts = [...world.hosts, guest as never];
 		world.revoke("guest");
 		await membership.beforeLinks();
-		// Only this install's own key: another one may share the store.
-		expect(deleted).toEqual([["guest", { ownOnly: true }]]);
+		expect(deleted).toEqual([["guest"]]);
 		expect(world.copies.kept).toEqual([]);
 
 		world.revoke();

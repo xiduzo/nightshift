@@ -53,16 +53,6 @@ function sharedKeychain(): DeviceKeyStore & { names(): string[] } {
 }
 
 describe("Device keys in a keychain two installs share", () => {
-	test("a delete of its own key only never takes the one from before", async () => {
-		const keychain = sharedKeychain();
-		await keychain.set("host", "nsd_of_another_install");
-		const keys = deviceKeysOf(keychain, "desktop");
-		await keys.set("host", "nsd_own");
-		await keys.delete("host", { ownOnly: true });
-		await keys.delete("host", { ownOnly: true });
-		expect(keychain.names()).toEqual(["host"]);
-	});
-
 	test("each Device keeps its own key for the same Host", async () => {
 		const keychain = sharedKeychain();
 		const desktop = deviceKeysOf(keychain, "desktop");
@@ -74,18 +64,15 @@ describe("Device keys in a keychain two installs share", () => {
 		expect(keychain.names().sort()).toEqual(["desktop/host", "dev/host"]);
 	});
 
-	test("a key from before, under the Host alone, is read until the Device has its own", async () => {
+	test("a Device reads and deletes only what is under its own name", async () => {
 		const keychain = sharedKeychain();
-		await keychain.set("host", "nsd_before");
+		await keychain.set("host", "nsd_other");
 		const keys = deviceKeysOf(keychain, "desktop");
-		expect(await keys.get("host")).toBe("nsd_before");
-		await keys.set("host", "nsd_new");
-		expect(await keys.get("host")).toBe("nsd_new");
-		// Its own goes first; the one from before stays for its owner.
-		await keys.delete("host");
-		expect(await keychain.get("host")).toBe("nsd_before");
-		await keys.delete("host");
 		expect(await keys.get("host")).toBeNull();
+		await keys.delete("host");
+		await keys.set("host", "nsd_own");
+		await keys.delete("host");
+		expect(keychain.names()).toEqual(["host"]);
 	});
 });
 

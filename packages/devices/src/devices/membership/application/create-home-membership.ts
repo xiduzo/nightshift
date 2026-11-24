@@ -119,14 +119,11 @@ export function createHomeMembership(deps: HomeMembershipDeps) {
 	 * Deletes the key of a Host without access. False: it stays. A Host that
 	 * gave access back has a new key, which stays too.
 	 */
-	async function dropKey(
-		hostId: string,
-		options?: { ownOnly: boolean },
-	): Promise<boolean> {
+	async function dropKey(hostId: string): Promise<boolean> {
 		const dropped = attempted("the key of a Host stays", async () => {
 			const link = await deps.hostLinks.get(hostId);
 			if (link?.revokedAt === null) return;
-			await deps.keys.delete(hostId, options);
+			await deps.keys.delete(hostId);
 		});
 		// A key store may wait for a person: nothing here waits with it.
 		let timer: ReturnType<typeof setTimeout> | undefined;
@@ -286,9 +283,7 @@ export function createHomeMembership(deps: HomeMembershipDeps) {
 			) {
 				await dropCopies();
 			}
-			await Promise.all(
-				left.map((link) => dropKey(link.hostId, { ownOnly: true })),
-			);
+			await Promise.all(left.map((link) => dropKey(link.hostId)));
 		},
 
 		keepFinishing(signal: AbortSignal, everyMs = 30_000): void {
