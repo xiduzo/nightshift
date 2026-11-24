@@ -434,7 +434,7 @@ async function makeDaemon(
 		usageFacts({
 			db,
 			settings,
-			listScreens: (personId) => notifications.targets.list(personId),
+			listScreens: (personId) => notifications.targets.kindsOf(personId),
 			devices: devices.devices,
 			ownerId: person.userId,
 		});

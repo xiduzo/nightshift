@@ -134,7 +134,7 @@ export async function wireNotifications(
 	// This computer's desktop is its owner's screen: registered at each
 	// start, so it keeps the computer's name.
 	if (desktopChannel) {
-		await notifications.targets.register(owner.userId, {
+		await notifications.targets.registerDesktop(owner.userId, {
 			kind: "desktop",
 			name: device.name,
 			platform: process.platform,

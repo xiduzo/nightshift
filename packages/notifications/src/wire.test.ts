@@ -5,6 +5,7 @@ import {
 	testSpaces,
 } from "@nightshift/auth/testing";
 
+import type { PersonActor } from "@nightshift/engine";
 import { now } from "@nightshift/time";
 import { createInAppChannel } from "./channels";
 import {
@@ -91,7 +92,7 @@ test("a new Gate goes to the Person's browser, and its answer sends no push that
 	const ada = await sandbox.signUp("Ada");
 	const spaceId = (await personalSpaceId(sandbox.db, ada.userId)) ?? "";
 	expect(spaceId).not.toBe("");
-	await notifications.targets.register(ada.userId, browser);
+	await notifications.targets.register(as(ada.userId), browser);
 	await notifications.start();
 
 	events.setOpen(spaceId, [{ runId: "run-1", stepId: "review" }]);
@@ -152,7 +153,7 @@ test("a new Gate goes to the Person's browser, and its answer sends no push that
 test("the learnings that wait reach open screens only: nothing goes to a phone or a browser", async () => {
 	const ada = await sandbox.signUp("Ada");
 	const spaceId = (await personalSpaceId(sandbox.db, ada.userId)) ?? "";
-	await notifications.targets.register(ada.userId, browser);
+	await notifications.targets.register(as(ada.userId), browser);
 	await notifications.start();
 	const got: { kind: string }[] = [];
 	const controller = new AbortController();
@@ -181,7 +182,7 @@ test("the learnings that wait reach open screens only: nothing goes to a phone o
 test("a synced document reaches open screens only, and this computer's document reaches its owner", async () => {
 	const ada = await sandbox.signUp("Ada");
 	const spaceId = (await personalSpaceId(sandbox.db, ada.userId)) ?? "";
-	await notifications.targets.register(ada.userId, browser);
+	await notifications.targets.register(as(ada.userId), browser);
 	await notifications.start();
 	const got: { kind: string; name?: string; spaceId?: string | null }[] = [];
 	const controller = new AbortController();
@@ -219,7 +220,7 @@ test("a synced document reaches open screens only, and this computer's document 
 test("a browser the push service lost is forgotten", async () => {
 	const ada = await sandbox.signUp("Ada");
 	const spaceId = (await personalSpaceId(sandbox.db, ada.userId)) ?? "";
-	await notifications.targets.register(ada.userId, browser);
+	await notifications.targets.register(as(ada.userId), browser);
 	sender.answer(browser.endpoint, 410);
 	await notifications.start();
 
@@ -237,7 +238,7 @@ test("a browser the push service lost is forgotten", async () => {
 	]);
 	await waitFor(() => sender.requests.length === 1);
 	await waitFor(
-		async () => (await notifications.targets.list(ada.userId)).length === 0,
+		async () => (await notifications.targets.list(as(ada.userId))).length === 0,
 	);
 });
 
@@ -248,23 +249,40 @@ test("removing a phone signs it out; removing a browser does not", async () => {
 	const browserSession = await sessionIdOf(ada.headers);
 
 	const addedPhone = await notifications.targets.register(
-		ada.userId,
+		as(ada.userId),
 		phone,
 		phoneSession,
 	);
 	const addedBrowser = await notifications.targets.register(
-		ada.userId,
+		as(ada.userId),
 		browser,
 		browserSession,
 	);
 
-	await notifications.targets.remove(ada.userId, addedBrowser.id);
+	await notifications.targets.remove(as(ada.userId), addedBrowser.id);
 	expect(await sessionIdOf(ada.headers)).toBe(browserSession);
 
-	await notifications.targets.remove(ada.userId, addedPhone.id);
+	await notifications.targets.remove(as(ada.userId), addedPhone.id);
 	expect(await sessionIdOf(phoneHeaders)).toBeNull();
 	expect(await sessionIdOf(ada.headers)).toBe(browserSession);
-	expect(await notifications.targets.list(ada.userId)).toEqual([]);
+	expect(await notifications.targets.list(as(ada.userId))).toEqual([]);
+});
+
+test("Night Shift registers this computer's desktop for its owner, and counts the kinds of screens they have", async () => {
+	const ada = await sandbox.signUp("Ada");
+	const bob = await sandbox.signUp("Bob");
+	await notifications.targets.registerDesktop(ada.userId, {
+		kind: "desktop",
+		name: "Mac",
+		endpoint: "device-1",
+	});
+	expect(await notifications.targets.kindsOf(ada.userId)).toEqual([
+		{ kind: "desktop" },
+	]);
+	expect(await notifications.targets.kindsOf(bob.userId)).toEqual([]);
+	expect(await notifications.targets.list(as(ada.userId))).toMatchObject([
+		{ kind: "desktop", name: "Mac" },
+	]);
 });
 
 test("nobody removes or signs out another Person's phone", async () => {
@@ -272,14 +290,21 @@ test("nobody removes or signs out another Person's phone", async () => {
 	const bob = await sandbox.signUp("Bob");
 	const adaSession = await sessionIdOf(ada.headers);
 	const added = await notifications.targets.register(
-		ada.userId,
+		as(ada.userId),
 		phone,
 		adaSession,
 	);
 
-	expect(await notifications.targets.remove(bob.userId, added.id)).toBeNull();
+	expect(
+		await notifications.targets.remove(as(bob.userId), added.id),
+	).toBeNull();
 	expect(await sessionIdOf(ada.headers)).toBe(adaSession);
 });
+
+/** A signed-in Person, as the API passes them. */
+function as(personId: string): PersonActor {
+	return { personId, door: "session" };
+}
 
 async function waitFor(
 	condition: () => boolean | Promise<boolean>,

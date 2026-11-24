@@ -158,11 +158,12 @@ export const devices = {
 		.route({ summary: "Lists your phones on the Host of the Space." })
 		.output(output(z.array(phoneSchema)))
 		.handler(async ({ context }) => {
-			const personId = context.session.user.id;
 			const hostId = context.spaceId
 				? await context.devices.hostOf(context.spaceId)
 				: null;
-			if (hostId === null) return phonesOf(context.notifications, personId);
+			if (hostId === null) {
+				return phonesOf(context.notifications, context.actor);
+			}
 			return ownsThisComputer(context) ? context.devices.phonesAt(hostId) : [];
 		}),
 	/** Signs out one of your phones on the Host of the session's Space. */
@@ -173,12 +174,11 @@ export const devices = {
 		.output(output(z.void()))
 		.input(z.object({ id: z.string().min(1) }))
 		.handler(async ({ context, input }) => {
-			const personId = context.session.user.id;
 			const hostId = context.spaceId
 				? await context.devices.hostOf(context.spaceId)
 				: null;
 			if (hostId === null) {
-				return removePhone(context.notifications, personId, input.id);
+				return removePhone(context.notifications, context.actor, input.id);
 			}
 			if (!ownsThisComputer(context)) {
 				throw new ORPCError("FORBIDDEN", {

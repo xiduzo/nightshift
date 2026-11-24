@@ -1,12 +1,13 @@
 import { describe, expect, test } from "bun:test";
-import type { Actor } from "@nightshift/engine";
+import type { PersonActor } from "@nightshift/engine";
 import { inMemoryTargetsPorts } from "../adapters/out/in-memory-neighbours";
 import { listScreens } from "./list-screens";
 import { listTargets } from "./list-targets";
 
 /** The use case listScreens, on in-memory adapters. */
 
-const ADA: Actor = { personId: "ada", door: "session" };
+const ADA: PersonActor = { personId: "ada", door: "session" };
+const BOB: PersonActor = { personId: "bob", door: "session" };
 
 describe("listScreens", () => {
 	test("the Person's screens as they see them, without the phones whose session ended", async () => {
@@ -33,20 +34,21 @@ describe("listScreens", () => {
 			sessionId: "gone",
 		});
 
-		expect(
-			await listScreens({ listTargets: listTargets(ports) })(ADA, {
-				personId: "ada",
-			}),
-		).toEqual([
-			{
-				id: "kept",
-				kind: "expo",
-				name: "Pixel",
-				platform: "android",
-				createdAt: 1_000,
-				lastSeenAt: 1_000,
-			},
-		]);
+		expect(await listScreens({ listTargets: listTargets(ports) })(ADA)).toEqual(
+			[
+				{
+					id: "kept",
+					kind: "expo",
+					name: "Pixel",
+					platform: "android",
+					createdAt: 1_000,
+					lastSeenAt: 1_000,
+				},
+			],
+		);
 		expect(ports.targetStore.all().map((t) => t.id)).toEqual(["kept"]);
+		expect(await listScreens({ listTargets: listTargets(ports) })(BOB)).toEqual(
+			[],
+		);
 	});
 });

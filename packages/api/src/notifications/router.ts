@@ -46,7 +46,7 @@ export const notifications = {
 			})
 			.output(output(settingsSchema))
 			.handler(({ context }) =>
-				context.notifications.settings.get(context.session.user.id),
+				context.notifications.settings.get(context.actor),
 			),
 		save: protectedProcedure
 			.route({
@@ -56,7 +56,7 @@ export const notifications = {
 			.output(output(settingsSchema))
 			.input(notificationSettingsPatchSchema)
 			.handler(({ context, input }) =>
-				context.notifications.settings.save(context.session.user.id, input),
+				context.notifications.settings.save(context.actor, input),
 			),
 	},
 	targets: {
@@ -67,7 +67,7 @@ export const notifications = {
 			})
 			.output(output(z.array(pushTargetSchema)))
 			.handler(({ context }) =>
-				context.notifications.targets.list(context.session.user.id),
+				context.notifications.targets.list(context.actor),
 			),
 		register: protectedProcedure
 			.route({
@@ -78,7 +78,7 @@ export const notifications = {
 			.input(registerScreenSchema)
 			.handler(({ context, input }) =>
 				context.notifications.targets.register(
-					context.session.user.id,
+					context.actor,
 					input,
 					context.session.session?.id ?? null,
 				),
@@ -92,7 +92,7 @@ export const notifications = {
 			.input(z.object({ id: z.string().min(1) }))
 			.handler(async ({ context, input }) => {
 				const removed = await context.notifications.targets.remove(
-					context.session.user.id,
+					context.actor,
 					input.id,
 				);
 				if (!removed) {

@@ -1,4 +1,4 @@
-import type { Actor } from "@nightshift/engine";
+import type { PersonActor } from "@nightshift/engine";
 import {
 	applyPatch,
 	defaultSettings,
@@ -14,24 +14,21 @@ export type SaveSettingsPorts = {
 	timeZone: string;
 };
 
-/** Whose settings, and the change: only the fields given change. */
-export type SaveSettings = {
-	personId: string;
-	patch: NotificationSettingsPatch;
-};
+/** The change: only the fields given change. */
+export type SaveSettings = { patch: NotificationSettingsPatch };
 
 /**
- * Saves a change of a Person's notification settings and returns them
- * all. A time or a time zone it cannot read throws, and nothing is saved.
- * Who asks: the Person, for their own. No role applies.
+ * Saves a change of the notification settings of the Person who asks, and
+ * returns them all. A time or a time zone it cannot read throws, and
+ * nothing is saved. No role applies, and nobody changes another's.
  */
 export const saveSettings =
 	(ports: SaveSettingsPorts) =>
 	async (
-		_actor: Actor,
+		actor: PersonActor,
 		request: SaveSettings,
 	): Promise<NotificationSettings> => {
-		const { personId } = request;
+		const { personId } = actor;
 		const patch = notificationSettingsPatchSchema.parse(request.patch);
 		const current =
 			(await ports.settingsStore.get(personId)) ??

@@ -2,6 +2,7 @@ import type { Database } from "@nightshift/db";
 import { localZone } from "@nightshift/time";
 import { drizzleSettingsStore } from "./adapters/out/drizzle-settings-store";
 import { adoptSwitches } from "./application/adopt-switches";
+import { findSettings } from "./application/find-settings";
 import { readSettings } from "./application/read-settings";
 import { saveSettings } from "./application/save-settings";
 import { seedSettings } from "./application/seed-settings";
@@ -20,9 +21,11 @@ export type SettingsDeps = {
 
 /** The use cases of settings, bound to their ports. */
 export type Settings = {
-	/** A Person's settings, or the defaults. */
+	/** A Person's settings, or the defaults, for Night Shift to decide whom to tell. */
+	find: ReturnType<typeof findSettings>;
+	/** The settings of the Person who asks, or the defaults. */
 	read: ReturnType<typeof readSettings>;
-	/** Saves a change of a Person's settings and returns them all. */
+	/** Saves a change of the settings of the Person who asks, and returns them all. */
 	save: ReturnType<typeof saveSettings>;
 	/** The one-time copy of the switches a computer kept, for a Person without settings. */
 	seed: ReturnType<typeof seedSettings>;
@@ -36,8 +39,10 @@ export function wireSettings(deps: SettingsDeps): Settings {
 		timeZone,
 		settingsStore: drizzleSettingsStore({ db: deps.db, timeZone }),
 	};
+	const find = findSettings(ports);
 	return {
-		read: readSettings(ports),
+		find,
+		read: readSettings({ findSettings: find }),
 		save: saveSettings(ports),
 		seed: seedSettings(ports),
 		adoptSwitches: adoptSwitches(ports),

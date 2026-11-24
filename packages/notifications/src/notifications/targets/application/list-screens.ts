@@ -1,4 +1,4 @@
-import type { Actor } from "@nightshift/engine";
+import type { PersonActor } from "@nightshift/engine";
 import { type PushTargetView, targetView } from "../domain/push-targets";
 import type { listTargets } from "./list-targets";
 
@@ -7,15 +7,12 @@ export type ListScreensPorts = {
 	listTargets: ReturnType<typeof listTargets>;
 };
 
-/** Whose screens. */
-export type ListScreens = { personId: string };
-
 /**
- * The browsers, phones and desktop apps that get the Person's
- * notifications, as the Person sees them: no endpoint, no keys. Who asks:
- * the Person, for their own. No role applies.
+ * The browsers, phones and desktop apps that get the notifications of the
+ * Person who asks, as they see them: no endpoint, no keys. No role
+ * applies, and nobody lists another's.
  */
 export const listScreens =
 	(ports: ListScreensPorts) =>
-	async (_actor: Actor, request: ListScreens): Promise<PushTargetView[]> =>
-		(await ports.listTargets({ personId: request.personId })).map(targetView);
+	async (actor: PersonActor): Promise<PushTargetView[]> =>
+		(await ports.listTargets({ personId: actor.personId })).map(targetView);

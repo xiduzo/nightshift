@@ -70,9 +70,10 @@ export type Notifications = {
 		options?: WatchOptions,
 	): AsyncGenerator<InAppItem>;
 	settings: {
-		get(personId: string): Promise<NotificationSettings>;
+		/** The settings of the Person who asks. */
+		get(actor: PersonActor): Promise<NotificationSettings>;
 		save(
-			personId: string,
+			actor: PersonActor,
 			patch: NotificationSettingsPatch,
 		): Promise<NotificationSettings>;
 		/** The one-time copy of the switches a computer kept, for a Person without settings. */
@@ -88,17 +89,26 @@ export type Notifications = {
 		): Promise<void>;
 	};
 	targets: {
-		list(personId: string): Promise<PushTargetView[]>;
+		/** The screens of the Person who asks. */
+		list(actor: PersonActor): Promise<PushTargetView[]>;
+		/** Registers a screen of the Person who asks. */
 		register(
-			personId: string,
+			actor: PersonActor,
 			input: RegisterTarget,
 			sessionId?: string | null,
 		): Promise<PushTargetView>;
+		/** Registers this computer's desktop app, as a screen of its owner. Night Shift asks. */
+		registerDesktop(
+			ownerId: string,
+			input: RegisterTarget,
+		): Promise<PushTargetView>;
+		/** The kinds of screens a Person has. Night Shift asks, to count its use. */
+		kindsOf(personId: string): Promise<{ kind: PushTargetView["kind"] }[]>;
 		/**
-		 * Removes one of the Person's screens. A phone is also signed out:
+		 * Removes a screen of the Person who asks. A phone is also signed out:
 		 * its session ends. Null when the Person has no target of that id.
 		 */
-		remove(personId: string, id: string): Promise<PushTargetView | null>;
+		remove(actor: PersonActor, id: string): Promise<PushTargetView | null>;
 	};
 	webPush: {
 		/** The public VAPID key a browser subscribes with. Null: this daemon sends no Web Push. */
@@ -155,14 +165,6 @@ export function createNotifications(
 		db,
 		...(options.timeZone ? { timeZone: options.timeZone } : {}),
 	});
-	/**
-	 * The Person a call of `settings` or `targets` is for: the API passes
-	 * the signed-in Person, the daemon this computer's owner.
-	 */
-	const person = (personId: string): PersonActor => ({
-		personId,
-		door: "session",
-	});
 	const targets = wireTargets({
 		db,
 		clock: now,
@@ -203,7 +205,7 @@ export function createNotifications(
 			},
 		},
 		settings: {
-			get: (personId) => settings.read(NIGHT_SHIFT, { personId }),
+			get: (personId) => settings.find({ personId }),
 		},
 		targets: {
 			of: (personId) => targets.listTargets({ personId }),
@@ -219,19 +221,21 @@ export function createNotifications(
 		watch: (personId, signal, watch) =>
 			options.inApp.watch(personId, signal, watch),
 		settings: {
-			get: (personId) => settings.read(person(personId), { personId }),
-			save: (personId, patch) =>
-				settings.save(person(personId), { personId, patch }),
+			get: (actor) => settings.read(actor),
+			save: (actor, patch) => settings.save(actor, { patch }),
 			seed: (personId, switches) => settings.seed({ personId, switches }),
 			adoptComputerSwitches: (personId, patch, switches) =>
 				settings.adoptSwitches({ personId, patch, switches }),
 		},
 		targets: {
-			list: (personId) => targets.list(person(personId), { personId }),
-			register: (personId, screen, sessionId = null) =>
-				targets.register(person(personId), { personId, screen, sessionId }),
-			remove: (personId, id) =>
-				targets.remove(person(personId), { personId, id }),
+			list: (actor) => targets.list(actor),
+			register: (actor, screen, sessionId = null) =>
+				targets.register(actor, { screen, sessionId }),
+			registerDesktop: (ownerId, screen) =>
+				targets.registerTarget({ personId: ownerId, screen, sessionId: null }),
+			kindsOf: async (personId) =>
+				(await targets.listTargets({ personId })).map(({ kind }) => ({ kind })),
+			remove: (actor, id) => targets.remove(actor, { id }),
 		},
 		webPush: {
 			publicKey: async () => (vapid ? (await vapid.get()).publicKey : null),

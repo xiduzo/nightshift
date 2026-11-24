@@ -1,21 +1,22 @@
 import { describe, expect, test } from "bun:test";
-import type { Actor } from "@nightshift/engine";
+import type { PersonActor } from "@nightshift/engine";
 import { inMemorySettingsPorts } from "../adapters/out/in-memory-neighbours";
 import type { NotificationSettingsPatch } from "../domain/notification-settings";
-import { readSettings } from "./read-settings";
+import { findSettings } from "./find-settings";
 import { saveSettings } from "./save-settings";
 
 /** The use case saveSettings, on in-memory adapters. */
 
-const ADA: Actor = { personId: "ada", door: "session" };
+const ADA: PersonActor = { personId: "ada", door: "session" };
+const BOB: PersonActor = { personId: "bob", door: "session" };
 
 function setUp() {
 	const ports = inMemorySettingsPorts();
 	return {
 		ports,
 		save: (patch: NotificationSettingsPatch) =>
-			saveSettings(ports)(ADA, { personId: "ada", patch }),
-		read: (personId: string) => readSettings(ports)(ADA, { personId }),
+			saveSettings(ports)(ADA, { patch }),
+		read: (personId: string) => findSettings(ports)({ personId }),
 	};
 }
 
@@ -34,6 +35,14 @@ describe("saveSettings", () => {
 		});
 		expect(await read("ada")).toEqual(saved);
 		expect((await save({ quietHours: null })).quietHours).toBe(null);
+	});
+
+	test("a Person changes only their own", async () => {
+		const { ports, save, read } = setUp();
+		await save({ holdMinutes: 5 });
+		await saveSettings(ports)(BOB, { patch: { holdMinutes: 20 } });
+		expect((await read("ada")).holdMinutes).toBe(5);
+		expect((await read("bob")).holdMinutes).toBe(20);
 	});
 
 	test("the urgencies that push: a round trip, once each, in order", async () => {

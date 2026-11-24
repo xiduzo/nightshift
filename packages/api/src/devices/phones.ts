@@ -1,4 +1,5 @@
 import type { HostPhones, PhoneView } from "@nightshift/devices";
+import type { PersonActor } from "@nightshift/engine";
 import type { Notifications } from "@nightshift/notifications";
 import { Refusal } from "@nightshift/refusal";
 
@@ -10,9 +11,9 @@ import { Refusal } from "@nightshift/refusal";
 
 export async function phonesOf(
 	notifications: Notifications,
-	personId: string,
+	actor: PersonActor,
 ): Promise<PhoneView[]> {
-	const targets = await notifications.targets.list(personId);
+	const targets = await notifications.targets.list(actor);
 	return targets
 		.filter((target) => target.kind === "expo")
 		.map(({ id, name, platform, createdAt, lastSeenAt }) => ({
@@ -32,23 +33,28 @@ export async function phonesOf(
  */
 export async function removePhone(
 	notifications: Notifications,
-	personId: string,
+	actor: PersonActor,
 	id: string,
 ): Promise<void> {
-	const phones = await phonesOf(notifications, personId);
+	const phones = await phonesOf(notifications, actor);
 	if (!phones.some((phone) => phone.id === id)) {
 		throw new Refusal(
 			"not-found",
 			"This phone is not in your list. Reload the page to see the list.",
 		);
 	}
-	await notifications.targets.remove(personId, id);
+	await notifications.targets.remove(actor, id);
 }
 
 /** A Person's phones here, as the Host's router reads them for a paired Device's link. */
 export function hostPhones(notifications: Notifications): HostPhones {
+	/** The Person of the Device's key. */
+	const asked = (personId: string): PersonActor => ({
+		personId,
+		door: "device-key",
+	});
 	return {
-		list: (personId) => phonesOf(notifications, personId),
-		remove: (personId, id) => removePhone(notifications, personId, id),
+		list: (personId) => phonesOf(notifications, asked(personId)),
+		remove: (personId, id) => removePhone(notifications, asked(personId), id),
 	};
 }

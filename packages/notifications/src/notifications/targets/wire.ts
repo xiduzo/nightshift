@@ -7,6 +7,7 @@ import { listScreens } from "./application/list-screens";
 import { listTargets } from "./application/list-targets";
 import type { Sessions } from "./application/ports";
 import { registerScreen } from "./application/register-screen";
+import { registerTarget } from "./application/register-target";
 import { removeScreen } from "./application/remove-screen";
 
 /**
@@ -23,11 +24,13 @@ export type TargetsDeps = {
 
 /** The use cases of targets, bound to their ports. */
 export type Targets = {
-	/** The Person's screens, as they see them. */
+	/** The screens of the Person who asks, as they see them. */
 	list: ReturnType<typeof listScreens>;
-	/** Registers a browser, a phone or this computer's desktop app. */
+	/** Registers a screen of a Person, for Night Shift: this computer's desktop app. */
+	registerTarget: ReturnType<typeof registerTarget>;
+	/** Registers a browser or a phone of the Person who asks. */
 	register: ReturnType<typeof registerScreen>;
-	/** Removes one of the Person's screens, and signs a phone out. */
+	/** Removes a screen of the Person who asks, and signs a phone out. */
 	remove: ReturnType<typeof removeScreen>;
 	/** The Person's push targets, to push to. */
 	listTargets: ReturnType<typeof listTargets>;
@@ -45,9 +48,11 @@ export function wireTargets(deps: TargetsDeps): Targets {
 		targetStore: drizzleTargetStore(deps.db),
 	};
 	const listed = listTargets(ports);
+	const registered = registerTarget(ports);
 	return {
 		list: listScreens({ listTargets: listed }),
-		register: registerScreen(ports),
+		registerTarget: registered,
+		register: registerScreen({ registerTarget: registered }),
 		remove: removeScreen(ports),
 		listTargets: listed,
 		findTargets: findTargets(ports),

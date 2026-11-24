@@ -123,13 +123,14 @@ async function errorOf(promise: Promise<unknown>): Promise<string> {
 
 /** A phone and a browser of the Person, as they register for notifications. */
 async function registerScreens(personId: string, name: string) {
-	const phone = await notifications.targets.register(personId, {
+	const actor = { personId, door: "session" } as const;
+	const phone = await notifications.targets.register(actor, {
 		kind: "expo",
 		name,
 		platform: "ios",
 		endpoint: `ExponentPushToken[${name}]`,
 	});
-	await notifications.targets.register(personId, {
+	await notifications.targets.register(actor, {
 		kind: "web",
 		name: "Firefox",
 		platform: "macos",
@@ -178,7 +179,12 @@ describe("phones in a Space this computer keeps", () => {
 			await call(appRouter.devices.phones, undefined, { context }),
 		).toEqual([]);
 		expect(
-			(await notifications.targets.list(bob.userId)).map((t) => t.id),
+			(
+				await notifications.targets.list({
+					personId: bob.userId,
+					door: "session",
+				})
+			).map((t) => t.id),
 		).toContain(bobPhone.id);
 	});
 });
