@@ -98,7 +98,10 @@ export function ProjectMenu({
 						</DropdownMenuItem>
 					) : null}
 					{withFolder && folder.available ? (
-						<DropdownMenuItem disabled={folder.busy} onClick={folder.choose}>
+						<DropdownMenuItem
+							disabled={!folder.allowed || folder.busy}
+							onClick={folder.choose}
+						>
 							<FolderOpenIcon aria-hidden="true" />
 							{project.repoPath === null ? "Choose folder…" : "Change folder…"}
 						</DropdownMenuItem>

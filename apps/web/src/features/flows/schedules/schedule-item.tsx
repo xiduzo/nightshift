@@ -64,6 +64,7 @@ export function ScheduleItem({
 	lastRuns,
 	needs,
 	now,
+	mayChange,
 	busy,
 	onToggle,
 	onEdit,
@@ -77,6 +78,8 @@ export function ScheduleItem({
 	/** The computers its run needs: the one it runs on first. */
 	needs: Machine[];
 	now: number;
+	/** Whether the role of the person lets them change it. */
+	mayChange: boolean;
 	busy: boolean;
 	onToggle: (enabled: boolean) => void;
 	onEdit: () => void;
@@ -144,6 +147,7 @@ export function ScheduleItem({
 					name={when}
 					webhook={schedule.webhook !== undefined}
 					enabled={schedule.enabled}
+					mayChange={mayChange}
 					busy={busy}
 					onToggle={onToggle}
 					onEdit={onEdit}
@@ -204,6 +208,7 @@ function ScheduleMenu({
 	name,
 	webhook,
 	enabled,
+	mayChange,
 	busy,
 	onToggle,
 	onEdit,
@@ -213,6 +218,7 @@ function ScheduleMenu({
 	name: string;
 	webhook: boolean;
 	enabled: boolean;
+	mayChange: boolean;
 	/** A save is under way: the schedule cannot change now. */
 	busy: boolean;
 	onToggle: (enabled: boolean) => void;
@@ -234,11 +240,14 @@ function ScheduleMenu({
 				<MoreHorizontalIcon />
 			</DropdownMenuTrigger>
 			<DropdownMenuContent align="end" className="w-60">
-				<DropdownMenuItem disabled={busy} onClick={() => onToggle(!enabled)}>
+				<DropdownMenuItem
+					disabled={!mayChange || busy}
+					onClick={() => onToggle(!enabled)}
+				>
 					{enabled ? <PauseIcon /> : <PlayIcon />}
 					{enabled ? "Pause schedule" : "Turn on schedule"}
 				</DropdownMenuItem>
-				<DropdownMenuItem onClick={onEdit}>
+				<DropdownMenuItem disabled={!mayChange} onClick={onEdit}>
 					<PencilIcon />
 					Edit schedule
 				</DropdownMenuItem>
@@ -249,7 +258,11 @@ function ScheduleMenu({
 					</DropdownMenuItem>
 				) : null}
 				<DropdownMenuSeparator />
-				<DropdownMenuItem variant="destructive" onClick={onDelete}>
+				<DropdownMenuItem
+					variant="destructive"
+					disabled={!mayChange}
+					onClick={onDelete}
+				>
 					<Trash2Icon />
 					Remove schedule
 				</DropdownMenuItem>

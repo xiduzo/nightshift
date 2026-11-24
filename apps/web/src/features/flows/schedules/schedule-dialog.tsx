@@ -14,6 +14,7 @@ export function ScheduleDialog({
 	schedule,
 	flow,
 	takenIds,
+	mayChange,
 	saving,
 	onSave,
 }: {
@@ -26,6 +27,8 @@ export function ScheduleDialog({
 	flow?: string;
 	/** The ids of the other schedules. */
 	takenIds: readonly string[];
+	/** Whether the role of the person lets them save it. */
+	mayChange: boolean;
 	saving: boolean;
 	onSave: (schedule: Schedule) => void;
 }) {
@@ -38,6 +41,7 @@ export function ScheduleDialog({
 						schedule={schedule}
 						flow={flow}
 						takenIds={takenIds}
+						mayChange={mayChange}
 						saving={saving}
 						onSave={onSave}
 					/>

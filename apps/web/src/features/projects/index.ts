@@ -7,3 +7,4 @@ export { ProjectMenu } from "./project-menu";
 export { ProjectPage } from "./project-page";
 export { notHere, useHasFolder } from "./projects";
 export { projectQueries } from "./queries";
+export { useMayChange } from "./use-may-change";

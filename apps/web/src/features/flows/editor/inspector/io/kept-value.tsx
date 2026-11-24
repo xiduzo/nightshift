@@ -4,6 +4,7 @@ import { Skeleton } from "@nightshift/ui/components/skeleton";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { RotateCcwIcon } from "lucide-react";
 import { toast } from "sonner";
+import { useMayChange } from "@/features/projects";
 import { flowMutations, flowQueries } from "../../../queries";
 
 /** Which flow's kept values the editor shows: the saved flow file. */
@@ -31,6 +32,7 @@ export function KeptValue({
 	name: string;
 	id: string;
 }) {
+	const mayChange = useMayChange();
 	const values = useQuery(flowQueries.kept(kept.projectId, kept.flowName));
 	const reset = useMutation(
 		flowMutations.resetKept({
@@ -60,7 +62,7 @@ export function KeptValue({
 			<Button
 				variant="ghost"
 				size="xs"
-				disabled={reset.isPending}
+				disabled={!mayChange || reset.isPending}
 				aria-label={`Reset the kept value of ${name}`}
 				onClick={() =>
 					reset.mutate({

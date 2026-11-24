@@ -102,7 +102,7 @@ export function CopyProjectHere({
 						<Button
 							size="sm"
 							variant={canCopy ? "ghost" : "outline"}
-							disabled={folder.busy}
+							disabled={!folder.allowed || folder.busy}
 							onClick={folder.choose}
 						>
 							{folder.busy ? <Spinner data-icon="inline-start" /> : null}

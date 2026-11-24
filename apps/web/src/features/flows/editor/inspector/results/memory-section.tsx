@@ -17,6 +17,7 @@ import { Skeleton } from "@nightshift/ui/components/skeleton";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { RotateCcwIcon } from "lucide-react";
 import { toast } from "sonner";
+import { useMayChange } from "@/features/projects";
 import { formatRelative } from "@/shared/format";
 import { flowMutations, flowQueries } from "../../../queries";
 import { InspectorSection, Note } from "../form";
@@ -45,6 +46,7 @@ export function MemorySection({
 	flowName: string;
 	node: SinceLastRunNode | CallNode;
 }) {
+	const mayChange = useMayChange();
 	const memory = useQuery(flowQueries.memory(projectId, flowName));
 	const forget = useMutation(
 		flowMutations.forgetMemory({
@@ -88,7 +90,7 @@ export function MemorySection({
 									<Button
 										variant="ghost"
 										size="xs"
-										disabled={forget.isPending}
+										disabled={!mayChange || forget.isPending}
 										aria-label={
 											entry.inside === undefined
 												? `Forget what it saw for ${entry.scope}`
@@ -117,7 +119,7 @@ export function MemorySection({
 					variant="outline"
 					size="sm"
 					className="self-start"
-					disabled={forget.isPending}
+					disabled={!mayChange || forget.isPending}
 					onClick={() =>
 						forget.mutate({ projectId, name: flowName, node: node.id })
 					}

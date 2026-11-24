@@ -41,6 +41,7 @@ import {
 	neededMachines,
 	useSpaceMachines,
 } from "@/features/devices";
+import { useMayChange } from "@/features/projects";
 import { runQueries } from "@/features/runs/flows-port";
 import type { ScheduleSummary } from "@/shared/api";
 import { useNow } from "@/shared/format";
@@ -69,6 +70,8 @@ const RECENT_RUNS = 200;
 
 /** The schedules of a project, as the Flows page shows and changes them. */
 export type ScheduleBoard = {
+	/** Whether the role of the person lets them change the schedules. */
+	mayChange: boolean;
 	/** Every schedule of the project. Empty while they load. */
 	schedules: ScheduleSummary[];
 	/** An item for each of `schedules`. `describe` says what one does, where the flow around it does not. */
@@ -92,6 +95,7 @@ export function useScheduleBoard(
 	showRuns: boolean,
 ): ScheduleBoard {
 	const now = useNow(30_000);
+	const mayChange = useMayChange();
 	const list = useQuery(scheduleQueries.listLive(projectId));
 	const [editing, setEditing] = useState<{
 		schedule: Schedule | null;
@@ -157,6 +161,7 @@ export function useScheduleBoard(
 				lastRuns={scheduleLastRuns(runs.data ?? [], schedule.id, LAST_RUNS)}
 				needs={needs(schedule)}
 				now={now}
+				mayChange={mayChange}
 				busy={save.isPending}
 				onToggle={(enabled) =>
 					saveAll(
@@ -184,6 +189,7 @@ export function useScheduleBoard(
 				takenIds={schedules
 					.map((s) => s.id)
 					.filter((id) => id !== editing?.schedule?.id)}
+				mayChange={mayChange}
 				saving={save.isPending}
 				onSave={(schedule) => upsert(schedule, editing?.schedule?.id ?? null)}
 			/>
@@ -219,7 +225,7 @@ export function useScheduleBoard(
 						<AlertDialogCancel>Cancel</AlertDialogCancel>
 						<AlertDialogAction
 							variant="destructive"
-							disabled={save.isPending}
+							disabled={!mayChange || save.isPending}
 							onClick={() => {
 								if (!toDelete) return;
 								saveAll(
@@ -238,6 +244,7 @@ export function useScheduleBoard(
 	);
 
 	return {
+		mayChange,
 		schedules,
 		items,
 		add: (flow) => setEditing({ schedule: null, flow }),
@@ -287,7 +294,10 @@ export function FlowSchedulesSheet({
 					)}
 				</div>
 				<SheetFooter className="border-t">
-					<Button onClick={() => board.add(flowName)}>
+					<Button
+						disabled={!board.mayChange}
+						onClick={() => board.add(flowName)}
+					>
 						<PlusIcon data-icon="inline-start" />
 						Add schedule
 					</Button>

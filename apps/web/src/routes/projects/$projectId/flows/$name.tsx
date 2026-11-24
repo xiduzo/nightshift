@@ -1,8 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 
 import { FlowPage, preloadFlowPage } from "@/features/flows";
-import { spaceQueries } from "@/features/spaces";
+import { useMayChange } from "@/features/projects";
 
 export const Route = createFileRoute("/projects/$projectId/flows/$name")({
 	// The canvas measures nodes in the browser; nothing to render on the server.
@@ -28,11 +27,7 @@ function FlowEditorRoute() {
 	const { projectId, name } = Route.useParams();
 	const { chat, revision } = Route.useSearch();
 	const navigate = Route.useNavigate();
-	const spaces = useQuery(spaceQueries.list());
-	const role = spaces.data?.spaces.find(
-		(space) => space.id === spaces.data?.active,
-	)?.role;
-	const canCopyKits = role !== undefined && role !== "viewer";
+	const mayChange = useMayChange();
 	return (
 		<FlowPage
 			projectId={projectId}
@@ -51,7 +46,7 @@ function FlowEditorRoute() {
 					replace: true,
 				})
 			}
-			canCopyKits={canCopyKits}
+			canCopyKits={mayChange}
 		/>
 	);
 }

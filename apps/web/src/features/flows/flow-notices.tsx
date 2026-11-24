@@ -7,6 +7,7 @@ import { Button } from "@nightshift/ui/components/button";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { InfoIcon } from "lucide-react";
 import { toast } from "sonner";
+import { useMayChange } from "@/features/projects";
 import { flowMutations, flowQueries } from "./queries";
 
 /**
@@ -16,6 +17,7 @@ import { flowMutations, flowQueries } from "./queries";
  * dismisses it.
  */
 export function FlowNotices({ projectId }: { projectId: string }) {
+	const mayChange = useMayChange();
 	const notices = useQuery({
 		...flowQueries.notices(projectId),
 		meta: { quietErrors: true },
@@ -37,7 +39,7 @@ export function FlowNotices({ projectId }: { projectId: string }) {
 						<Button
 							variant="outline"
 							size="sm"
-							disabled={dismiss.isPending}
+							disabled={!mayChange || dismiss.isPending}
 							onClick={() => dismiss.mutate({ projectId, id: notice.id })}
 						>
 							Dismiss

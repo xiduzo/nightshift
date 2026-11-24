@@ -99,6 +99,7 @@ export function ScheduleForm({
 	schedule,
 	flow: firstFlow,
 	takenIds,
+	mayChange,
 	saving,
 	onSave,
 }: {
@@ -106,6 +107,7 @@ export function ScheduleForm({
 	schedule: Schedule | null;
 	flow?: string;
 	takenIds: readonly string[];
+	mayChange: boolean;
 	saving: boolean;
 	onSave: (schedule: Schedule) => void;
 }) {
@@ -198,7 +200,7 @@ export function ScheduleForm({
 		);
 
 	const save = () => {
-		if (problem !== null || saving) return;
+		if (problem !== null || !mayChange || saving) return;
 		const ref = withFolder ? baseRef.trim() : "";
 		const shared = {
 			id: scheduleId,
@@ -585,7 +587,10 @@ export function ScheduleForm({
 				<DialogClose render={<Button variant="outline" type="button" />}>
 					Cancel
 				</DialogClose>
-				<Button type="submit" disabled={problem !== null || saving}>
+				<Button
+					type="submit"
+					disabled={problem !== null || !mayChange || saving}
+				>
 					{saving ? <Spinner data-icon="inline-start" /> : null}
 					{saving ? "Saving…" : schedule ? "Save" : "Add schedule"}
 				</Button>
