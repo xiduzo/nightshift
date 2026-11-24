@@ -11,13 +11,7 @@ import {
 	type ConfigStores,
 	reachesPrivateNetwork,
 } from "@nightshift/engine/settings";
-import {
-	type DaemonEnv,
-	type HotRegistry,
-	type HotSlots,
-	hot,
-	stopOlderKnowledge,
-} from "./runtime";
+import type { DaemonEnv, HotRegistry, HotSlots } from "./runtime";
 
 type KnowledgeDeps = Parameters<typeof wireKnowledge>[0];
 type FollowRunsDeps = Parameters<Knowledge["followRuns"]>[0];
@@ -84,7 +78,6 @@ export async function wireDaemonKnowledge(deps: {
 	 * opens the index file again, and what the one before knew of it comes
 	 * back from the file: unchanged sections are not embedded again.
 	 */
-	stopOlderKnowledge(hot);
 	const folderLocks = await slots.keep(
 		"nightshiftKnowledgeFolderLocks",
 		createKnowledgeFolderLocks,

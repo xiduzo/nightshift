@@ -463,16 +463,6 @@ describe("the relay across a bun --hot reload", () => {
 		expect(keptHere.doc.getMap("facts").get("platform")).toBe("linux");
 		expect(asked.sort()).toEqual(["device:kept-by-next", "fresh"]);
 	});
-
-	test("a relay of an older version, which cannot be bound again, is kept as it is", async () => {
-		const { rebind: _, ...older } = sync;
-		const kept = { nightshiftSync: older } as KeptSync;
-		const next = await keepSync(hotSlots(kept), {
-			document: () => null,
-			authorize: async () => false as const,
-		});
-		expect(next).toBe(older as Sync);
-	});
 });
 
 describe("a flow document a Device keeps a copy of", () => {

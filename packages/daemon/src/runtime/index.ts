@@ -15,8 +15,6 @@ export {
 	hot,
 	hotSlots,
 	oneStartAtATime,
-	stopOlderDocuments,
-	stopOlderKnowledge,
 } from "./hot";
 export {
 	checkHealth,

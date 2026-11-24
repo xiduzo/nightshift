@@ -55,11 +55,6 @@ export type HotRegistry = KeptDevices &
 		nightshiftLease?: HeldLease;
 		/** Every document this Replica syncs, by name. */
 		nightshiftDocuments?: SyncedDocuments;
-		/** A daemon of an older version kept these apart (`stopOlderDocuments`). */
-		nightshiftDocument?: OlderDocuments;
-		nightshiftSpaces?: OlderDocuments;
-		nightshiftFlows?: OlderDocuments;
-		nightshiftKnowledgeDocuments?: OlderDocuments;
 		nightshiftInApp?: InAppChannel;
 		nightshiftNotifications?: Notifications;
 		nightshiftKeepAwake?: KeepAwake;
@@ -74,14 +69,6 @@ export type HotRegistry = KeptDevices &
 		nightshiftKnowledge?: Knowledge;
 		/** Who may change each knowledge folder now. One set per process, as a folder has one writer. */
 		nightshiftKnowledgeFolderLocks?: KnowledgeFolderLocks;
-		/** A daemon of an older version kept these apart (`stopOlderKnowledge`). */
-		nightshiftKnowledgeSearch?: { close?(): void };
-		nightshiftKnowledgeTimers?: {
-			first: Timer;
-			retry: Timer;
-			firstCollect?: Timer;
-			collect?: Timer;
-		};
 		/** The Ollama Night Shift uses: the `ollama serve` it started stops with it. */
 		nightshiftOllama?: OllamaService;
 		nightshiftProjectCopies?: ProjectCopies;
@@ -119,61 +106,6 @@ export function oneStartAtATime<T>(
 }
 
 export const hot = globalThis as HotRegistry;
-
-/** Documents a daemon of an older version kept, one slot per kind. */
-type OlderDocuments = { close?(): Promise<void> };
-
-/**
- * A daemon of an older version kept the Device, Space, flow and
- * knowledge documents in a slot each. The first daemon with one slot for
- * every document closes them: each document keeps one writer in the
- * process. A connection the relay kept still holds the older documents:
- * restart the daemon after such a reload.
- */
-export async function stopOlderDocuments(registry: HotRegistry) {
-	const names = [
-		"nightshiftDocument",
-		"nightshiftSpaces",
-		"nightshiftFlows",
-		"nightshiftKnowledgeDocuments",
-	] as const;
-	for (const name of names) {
-		const older = registry[name];
-		registry[name] = undefined;
-		await older?.close?.().catch((error) => {
-			console.error(`${name} did not stop cleanly:`, error);
-		});
-	}
-}
-
-/**
- * A daemon of an older version kept the knowledge search in a slot, over
- * the closures of its first start, and the knowledge timers in another.
- * The first daemon with one `Knowledge` stops both: its own does what they
- * did, and two would prepare vectors and reconcile folders side by side.
- */
-export function stopOlderKnowledge(
-	registry: Pick<
-		HotRegistry,
-		"nightshiftKnowledgeSearch" | "nightshiftKnowledgeTimers"
-	>,
-): void {
-	const search = registry.nightshiftKnowledgeSearch;
-	registry.nightshiftKnowledgeSearch = undefined;
-	try {
-		search?.close?.();
-	} catch (error) {
-		console.error("nightshiftKnowledgeSearch did not stop cleanly:", error);
-	}
-	const timers = registry.nightshiftKnowledgeTimers;
-	registry.nightshiftKnowledgeTimers = undefined;
-	if (timers) {
-		clearTimeout(timers.first);
-		clearInterval(timers.retry);
-		if (timers.firstCollect) clearTimeout(timers.firstCollect);
-		if (timers.collect) clearInterval(timers.collect);
-	}
-}
 
 type Value<R, K extends keyof R> = NonNullable<R[K]>;
 

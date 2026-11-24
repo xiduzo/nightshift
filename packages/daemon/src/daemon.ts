@@ -37,7 +37,6 @@ import {
 	oneStartAtATime,
 	onProcessCrashed,
 	processDatabase,
-	stopOlderDocuments,
 	stopOnSignals,
 } from "./runtime";
 import { moveTelemetryHeaders, usageFacts } from "./telemetry";
@@ -193,7 +192,6 @@ async function makeDaemon(
 	const documents = await slots.keep(
 		"nightshiftDocuments",
 		async () => {
-			await stopOlderDocuments(hot);
 			return createSyncedDocuments({
 				db,
 				onStored: (document) => tellDocument(document.name),

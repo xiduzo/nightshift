@@ -17,14 +17,6 @@ export type KeptDevices = {
 	nightshiftDevices?: Handover;
 	/** The latest start, ended or failed: the next start waits for it (`startDevices`). */
 	nightshiftDevicesStart?: Promise<void>;
-	/**
-	 * A daemon from before the devices runtime kept these apart. The first
-	 * runtime stops them as a handover does, and keeps the work hub.
-	 */
-	nightshiftEngine?: { dispose(): Promise<void> };
-	nightshiftWork?: WorkHub;
-	nightshiftLinks?: { close(): Promise<void> };
-	nightshiftPresence?: Timer;
 };
 
 /**
@@ -46,10 +38,9 @@ export type Handover = {
 	/**
 	 * On a Host: the Devices online now, and the pairings in progress. A
 	 * Device's link outlives a reload, and so does a code it asked for.
-	 * Not read-only: a runtime of an older version kept neither.
 	 */
-	presence: DevicePresence;
-	pending: PendingPairings;
+	readonly presence: DevicePresence;
+	readonly pending: PendingPairings;
 	/** Per Host: the commands this computer applied, and the calls it serves as a placed Device. */
 	readonly hosts: Map<
 		string,
@@ -63,10 +54,7 @@ export type Handover = {
 
 /**
  * The handover of the runtime before this one, once it let go. Fresh on
- * the first start. A daemon from before the devices runtime kept its
- * parts in four slots: they stop the same way, and its work hub stays, so
- * a Device's stream outlives that reload too. That hub still wakes the
- * engine before it until the next restart.
+ * the first start.
  */
 export async function takeOver(kept: KeptDevices): Promise<Handover> {
 	const before = kept.nightshiftDevices;
@@ -75,24 +63,10 @@ export async function takeOver(kept: KeptDevices): Promise<Handover> {
 		// Nothing keeps the runtime before: a Device back meanwhile waits for its minute.
 		before.wake = () => {};
 		before.release = async () => {};
-		// A runtime of an older version kept less: what it lacks starts
-		// empty here, in the same handover (its work hub wakes through it).
-		const older: Partial<Pick<Handover, "presence" | "pending">> = before;
-		older.presence ??= new Map();
-		older.pending ??= new Map();
 		return before;
 	}
-	await kept.nightshiftLinks?.close();
-	if (kept.nightshiftPresence) clearInterval(kept.nightshiftPresence);
-	if (kept.nightshiftEngine) await letGo(kept.nightshiftEngine);
-	const hub = kept.nightshiftWork;
-	kept.nightshiftLinks = undefined;
-	kept.nightshiftPresence = undefined;
-	kept.nightshiftEngine = undefined;
-	kept.nightshiftWork = undefined;
 	const handover: Handover = {
-		hub:
-			hub ?? createWorkHub({ onBack: (deviceId) => handover.wake(deviceId) }),
+		hub: createWorkHub({ onBack: (deviceId) => handover.wake(deviceId) }),
 		offerUse: createOfferUse(),
 		presence: new Map(),
 		pending: new Map(),

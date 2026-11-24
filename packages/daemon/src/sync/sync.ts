@@ -82,9 +82,7 @@ export async function keepSync(
 		() => createSync(options),
 		(kept) => kept.close(),
 	);
-	// A relay of an older version cannot be bound again: it stays as it is
-	// until the next restart.
-	if (typeof sync.rebind === "function") sync.rebind(options);
+	sync.rebind(options);
 	return sync;
 }
 

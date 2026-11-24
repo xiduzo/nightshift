@@ -33,7 +33,6 @@ import { type PairedReplicas, pairedReplicas, withPeers } from "./testing";
 import { startDevices } from "./wire";
 import { documentsWithHost } from "./wire-links";
 import type { PeerEngine } from "./wire-peers-engine";
-import { createWorkHub } from "./work";
 
 /**
  * The devices runtime across a `bun --hot` reload: `startDevices` twice in
@@ -279,39 +278,6 @@ async function projectOnBoth() {
 }
 
 describe("the devices runtime across a reload", () => {
-	test("from a daemon before the runtime: its Links stop, then its engine lets go; its sweep stops and its work hub stays", async () => {
-		const stopped: string[] = [];
-		let swept = 0;
-		const hub = createWorkHub();
-		kept.nightshiftLinks = {
-			close: async () => {
-				stopped.push("links");
-			},
-		};
-		kept.nightshiftEngine = {
-			dispose: async () => {
-				stopped.push("engine");
-			},
-		};
-		kept.nightshiftPresence = setInterval(() => {
-			swept++;
-		}, 5);
-		kept.nightshiftWork = hub;
-
-		await startB();
-		const at = swept;
-		await Bun.sleep(50);
-		expect(swept).toBe(at);
-		expect(stopped).toEqual(["links", "engine"]);
-		expect(kept.nightshiftDevices?.hub).toBe(hub);
-		const slots: Record<string, unknown> = { ...kept };
-		expect(
-			Object.keys(slots)
-				.filter((name) => slots[name])
-				.sort(),
-		).toEqual(["nightshiftDevices", "nightshiftDevicesStart"]);
-	});
-
 	test("the Links and the presence sweep before it stop: one of each runs", async () => {
 		const first = await startB();
 		await streamsOn();
@@ -424,26 +390,6 @@ describe("the devices runtime across a reload", () => {
 			.map((e) => e.type)
 			.filter((type) => type === "DeviceOnline" || type === "DeviceOffline");
 		expect(presence).toEqual(["DeviceOnline"]);
-	});
-
-	test("from a runtime of an older version, which kept no presence: the Devices online are handed over from then on", async () => {
-		await startB({ host: true });
-		const older = kept.nightshiftDevices as unknown as Record<string, unknown>;
-		delete older.presence;
-		delete older.pending;
-		const second = await startB({ host: true });
-		const [owner] = await b.db.select().from(user);
-		await second.engine.devices.join({
-			id: "device-c",
-			name: "C",
-			platform: "test",
-			ownerId: owner?.id as string,
-			homeHost: null,
-		});
-		await second.engine.devices.seen("device-c");
-
-		const third = await startB({ host: true });
-		expect((await third.engine.devices.get("device-c"))?.online).toBe(true);
 	});
 
 	test("a pairing started before the reload keeps the joining Device's name and platform", async () => {
