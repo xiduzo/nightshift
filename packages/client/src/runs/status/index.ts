@@ -9,7 +9,6 @@ export {
 	runNow,
 	walkerName,
 } from "./run-now";
-export { finishedShare } from "./share";
 export {
 	groupStatuses,
 	hasEnded,

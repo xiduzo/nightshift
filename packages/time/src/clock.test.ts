@@ -7,7 +7,6 @@ import {
 	iso,
 	isTimeZone,
 	lastDays,
-	lastHours,
 	nextClockTime,
 	parseInstant,
 	utc,
@@ -112,19 +111,7 @@ describe("a day runs from midnight to midnight on the reader's clock", () => {
 	});
 });
 
-describe("hours start on the reader's clock", () => {
-	test("in a time zone half an hour off UTC, an hour starts at half past", () => {
-		const now = parseInstant("2026-05-01T10:50:12.345Z");
-		// Kolkata is UTC+5:30: 16:20 there, so this hour began at 10:30 UTC.
-		const hours = lastHours(3, now, "Asia/Kolkata");
-		expect(hours.map(iso)).toEqual([
-			"2026-05-01T08:30:00.000Z",
-			"2026-05-01T09:30:00.000Z",
-			"2026-05-01T10:30:00.000Z",
-		]);
-		expect((hours[1] ?? 0) - (hours[0] ?? 0)).toBe(HOUR_MS);
-	});
-
+describe("wall times on the reader's clock", () => {
 	test("the seconds follow the zone, including an old offset of seconds", () => {
 		// Paris in 1891 is 9 minutes and 21 seconds ahead of UTC.
 		const at = parseInstant("1891-06-01T00:00:40Z");

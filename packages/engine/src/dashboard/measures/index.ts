@@ -12,8 +12,7 @@ export {
 	MOVE_SETUP_CAUSES,
 } from "./domain/changes-types";
 export { isTimeZone, lastDays } from "./domain/clock";
-export { summarizeFlow } from "./domain/flow-health";
-export type { FlowHealthDetail, FlowSignal } from "./domain/flow-health-types";
+export type { FlowSignal } from "./domain/flow-health-types";
 export { NIGHT_RANGES, type NightRange } from "./domain/measure-types";
 export { MOVE_RUNS, nextMoves } from "./domain/moves";
 export { summarizeSpend } from "./domain/spend";

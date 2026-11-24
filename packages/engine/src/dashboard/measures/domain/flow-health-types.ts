@@ -1,22 +1,11 @@
 import type { RunResult, RunStatus } from "../../../run-status";
-import type {
-	KnownCost,
-	NightCounts,
-	NightRange,
-	Spread,
-	StatusCount,
-	TopRows,
-} from "./measure-types";
-import type { Ladder, NeededYouReason, Rung, RungBy } from "./runs";
+import type { Spread } from "./measure-types";
+import type { NeededYouReason } from "./runs";
 import type { CostSteadiness } from "./spend-types";
 
 /**
- * The health of a flow: its row on the dashboard, the watch over it, its
- * ladders, and the flow in detail behind the row.
+ * The health of a flow: its row on the dashboard and the watch over it.
  */
-
-/** Why runs needed you: one reason, and how many runs had it. */
-export type NeededReasonCount = { reason: NeededYouReason; runs: number };
 
 /**
  * A run's report (ADR 26) as a list shows it: the run, the End step that
@@ -57,8 +46,6 @@ export type FlowHealthRow = {
 	lastRuns: LastFlowRun[];
 	/** Runs in the last days, on its own and as a subflow. */
 	runs: number;
-	finished: number;
-	ended: number;
 	/** Percent of ended runs that finished. Null when none ended. */
 	rate: number | null;
 	/** What a finished run that asked an agent or model cost. Null when none did. */
@@ -74,19 +61,11 @@ export type FlowHealthRow = {
 	unknownCost: number;
 	/** Finished runs that asked no agent or model: not in `cost`. */
 	freeRuns: number;
-	/** Its runs' scores in the last days, the most scored first. Empty when none scored. */
-	scores: FlowScoreRow[];
-	/** What people answered to "Was this run useful?" in the last days. */
-	useful: FlowUseful;
-	/** How often its runs needed you in the last days, and why. */
-	neededYou: FlowNeededYou;
 	/**
 	 * The newest report of its own runs, of any day, like `lastRuns`. Absent:
 	 * no run of its own wrote one.
 	 */
 	report?: LatestReport;
-	/** Where the work of its own runs landed in the last days. */
-	ladders: FlowLadders;
 	/** Its level, how often it needed a person, and its signals. */
 	watch: FlowWatch;
 	/**
@@ -185,251 +164,4 @@ export type SpaceWatch = {
 	watched: number;
 	/** The flows with a signal, the severe first. */
 	flows: WatchedFlow[];
-};
-
-/**
- * One rung of a flow's ladder over some days: how often a climb landed on
- * it, and what a landing there cost on average, every try before it
- * included. Tiers of the same name merge, over all the flow's nodes. A
- * person, a deadline, a rule and `none` are one rung each: `tier` is null
- * on them. `tier` is null too on a node without a Cascade: `by` names it.
- */
-export type LadderRungRow = {
-	rung: Rung;
-	by: RungBy;
-	tier: string | null;
-	/** How many climbs landed on it. */
-	landed: number;
-	/** What its landings cost, divided by `landed`. */
-	costPerLanding: KnownCost;
-};
-
-/** Where the climbs of one ladder landed: the rungs in ladder order, the cheapest first. */
-export type LadderSummary = {
-	/** All its landings. */
-	landed: number;
-	rungs: LadderRungRow[];
-};
-
-/** The choice ladder also counts how sure its deciders were. */
-export type ChoiceLadderSummary = LadderSummary & {
-	/** Decisions a decider gave a probability on. */
-	picked: number;
-	/** Of them, the Decisions a decider was not sure enough on: below `minConfidence`. */
-	unsure: number;
-};
-
-/**
- * Where the work of a flow's own runs landed (Q31): the work ladder
- * (Agent, Subflow, Value by a model, Ask) and the choice ladder
- * (Decisions). A run as a subflow counts in the run that called it. Null
- * when nothing landed on that ladder.
- */
-export type FlowLadders = {
-	work: LadderSummary | null;
-	choice: ChoiceLadderSummary | null;
-};
-
-/** One node's ladder in a flow's detail. */
-export type NodeLadder = {
-	/** `<ladder>/<via>/<nodeId>`. */
-	key: string;
-	ladder: Ladder;
-	nodeId: string;
-	/** The Subflow nodes it ran in, outermost first, joined by `/`. Absent at the top level. */
-	via?: string;
-	landed: number;
-	/** What its landings cost, divided by `landed`. */
-	costPerLanding: KnownCost;
-	rungs: LadderRungRow[];
-	/** A Decision only: as on the choice ladder. */
-	picked?: number;
-	/** A Decision only: as on the choice ladder. */
-	unsure?: number;
-};
-
-/** A flow's ladders in its detail, with the nodes that landed most. */
-export type FlowRangeLadders = FlowLadders & {
-	/** The most landings first. */
-	nodes: TopRows<NodeLadder>;
-};
-
-/**
- * One day of a flow: its runs per status, and what the Metrics tab charts.
- * `night` is the start of the day.
- */
-export type FlowDay = NightCounts & {
-	/** What its runs that started this day spent, on its own and as a subflow. */
-	spent: KnownCost;
-	/** Its own runs that started this day, and how many of them needed you. */
-	needed: { runs: number; needed: number };
-	/**
-	 * Per metric name (a score of its own runs): what its runs that started
-	 * this day wrote, added up, and how many runs wrote it.
-	 */
-	metrics: Record<string, { sum: number; runs: number }>;
-};
-
-/**
- * How often a flow's runs needed you over some days, and why. Only its
- * own runs count: a run as a subflow counts in the run that called it.
- */
-export type FlowNeededYou = {
-	/** Its own runs in the days. */
-	runs: number;
-	/** Of them, the runs a person stepped in on. */
-	needed: number;
-	/** Why, the most runs first. */
-	reasons: NeededReasonCount[];
-};
-
-/**
- * What people answered to "Was this run useful?" about a flow's runs over
- * some days, and what a useful result cost. Only the flow's own runs
- * count: a run as a subflow has no answer of its own.
- */
-export type FlowUseful = {
-	/** Runs with an answer. */
-	answered: number;
-	/** Runs whose last answer is yes. */
-	useful: number;
-	/**
-	 * What all its runs in the days cost together, those that did not
-	 * finish included, divided by `useful`. Null when no run was useful.
-	 */
-	costPerUseful: KnownCost | null;
-};
-
-/**
- * One score name of a flow's runs over some days, a flow metric (Q32):
- * what its Command, Agent and Value steps wrote, and what became of its
- * pull requests (the optional scorer for code). A Gate's answer and the
- * useful answer are left out: they have their own numbers. Only the flow's
- * own runs count, not its runs as a subflow.
- */
-export type FlowScoreRow = {
-	name: string;
-	/** Runs that scored it at least once. */
-	runs: number;
-	/** How many values were written. */
-	count: number;
-	sum: number;
-	/** `sum` over `count`. */
-	mean: number;
-	/** The value written last, when, and in which run. */
-	latest: { value: number; at: number; runId: string };
-};
-
-/** One run of a flow: a run of its own, or a Subflow run inside another run. */
-export type FlowRun = {
-	/** The run it is part of. */
-	runId: string;
-	status: RunStatus;
-	startedAt: number;
-	/** Null while it has not ended. */
-	endedAt: number | null;
-	costUsd: number;
-	/** The title of the run that called it as a subflow. Null for a run of its own. */
-	calledBy: string | null;
-	/** Why a run of its own failed or ended. A subflow run has none of its own. */
-	reason: string | null;
-	/** Part of `costUsd` is estimated from tokens. */
-	costEstimated: boolean;
-	/** Steps that ended without a cost: their spend is not in `costUsd`. */
-	costMissing: number;
-	/** Agent sessions and model calls that ended. With none, it could not cost. */
-	costCalls: number;
-	/** Tokens it used. Null when it did not report any, as a subflow run does not. */
-	tokens: number | null;
-	/** How many warnings a run of its own has. A subflow run shows its warnings in the run that called it. */
-	warnings: number;
-};
-
-/** Why runs of a flow did not finish: one reason. */
-export type UnfinishedReason = {
-	/** The run's own reason. Null when it gave none: then its status says it. */
-	reason: string | null;
-	status: RunStatus;
-	/** The run that called it, when it ran as a subflow. */
-	calledBy: string | null;
-	runs: number;
-	/** When the latest of them started. */
-	lastAt: number;
-};
-
-/** One warning of a flow's runs, the runs that share it counted once. */
-export type FlowWarning = {
-	key: string;
-	nodeId: string | null;
-	message: string;
-	runs: number;
-	last: { runId: string; at: number };
-};
-
-/** One flow over the last `nights` days, today included. */
-export type FlowRange = {
-	nights: NightRange;
-	runs: number;
-	asSubflow: number;
-	ended: number;
-	finished: number;
-	unfinished: number;
-	/** What a finished run that asked an agent or model cost. */
-	cost: Spread | null;
-	/**
-	 * What a finished run in `cost` used, the same runs. Null when one of
-	 * them did not report its tokens.
-	 */
-	tokenUse: Spread | null;
-	/** How long a finished run took. */
-	length: Spread | null;
-	/** What every run in the days spent, the test runs too. */
-	spent: KnownCost;
-	/** Tokens of the runs in `spent`. A run that reported none counts as 0. */
-	spentTokens: number;
-	/**
-	 * The test runs in the days (`isTestRun`). Only `spent`, `spentTokens`
-	 * and the spend per day count them.
-	 */
-	tests: number;
-	spentUnfinished: KnownCost;
-	/** Tokens of the runs in `spentUnfinished`. */
-	unfinishedTokens: number;
-	/** The ended run that cost the most. */
-	dearest: { costUsd: number; startedAt: number; tokens: number | null } | null;
-	warnings: number;
-	statuses: StatusCount[];
-	/** Runs per day per status, what they spent, how often they needed you and their metrics, oldest first. */
-	perNight: FlowDay[];
-	/** Every ended run, oldest first: what it cost. */
-	endedRuns: {
-		runId: string;
-		startedAt: number;
-		/** The start of the day it started in. */
-		night: number;
-		costUsd: number;
-		/** Tokens it used. Null when it did not report any. */
-		tokens: number | null;
-		status: RunStatus;
-	}[];
-	/** The most common first. */
-	whyUnfinished: TopRows<UnfinishedReason>;
-	/** The most common first. */
-	warningRows: TopRows<FlowWarning>;
-	/** The most scored first. Empty when no run scored. */
-	scores: FlowScoreRow[];
-	/** What people answered to "Was this run useful?". */
-	useful: FlowUseful;
-	/** How often its runs needed you, and why. */
-	neededYou: FlowNeededYou;
-	/** Where the work of its own runs landed. */
-	ladders: FlowRangeLadders;
-	/** The newest first. */
-	latest: FlowRun[];
-};
-
-/** One flow of a project in detail, behind its Flow health row. */
-export type FlowHealthDetail = {
-	name: string;
-	ranges: FlowRange[];
 };

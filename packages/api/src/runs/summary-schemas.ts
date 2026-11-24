@@ -104,16 +104,10 @@ const answeredBySchema = z.enum(["person", "deadline"]).nullable();
 export const neededYouReasonSchema = z.enum(NEEDED_YOU_REASONS);
 
 /** The two ladders: the work ladder, and the choice ladder (Decisions). */
-export const ladderSchema = z.enum(["work", "choice"]);
+const ladderSchema = z.enum(["work", "choice"]);
 
 /** Who works or decides on a rung: a rule, a model, an agent, a called flow, a person. */
-export const rungBySchema = z.enum([
-	"rule",
-	"model",
-	"agent",
-	"flow",
-	"person",
-]);
+const rungBySchema = z.enum(["rule", "model", "agent", "flow", "person"]);
 
 /**
  * The start of a run's report: the End step that wrote it, at most 600

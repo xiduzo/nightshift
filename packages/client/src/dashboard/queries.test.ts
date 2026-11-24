@@ -24,15 +24,16 @@ describe("the dashboard query", () => {
 		expect(dashboard.summary({ everySpace: true }).refetchInterval).toBe(
 			300_000,
 		);
-		expect(dashboard.flow("p1", "night").refetchInterval).toBe(300_000);
+		expect(dashboard.changes("p1", "night", 7).refetchInterval).toBe(300_000);
 	});
 
 	test("keeps the keys of its procedures", () => {
-		expect(dashboard.flow("p1", "night").queryKey).toEqual(
-			orpc.dashboard.flow.queryKey({
+		expect(dashboard.changes("p1", "night", 7).queryKey).toEqual(
+			orpc.dashboard.changes.queryKey({
 				input: {
 					projectId: "p1",
 					flowName: "night",
+					nights: 7,
 					timeZone: readerTimeZone(),
 				},
 			}),

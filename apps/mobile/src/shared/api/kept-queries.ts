@@ -5,7 +5,6 @@
  */
 export const KEPT_PATHS = [
 	"dashboard.summary",
-	"dashboard.flow",
 	"gates.list",
 	"runs.list",
 	"projects.list",

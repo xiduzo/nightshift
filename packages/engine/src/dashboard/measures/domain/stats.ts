@@ -1,32 +1,9 @@
-import { isTestRun, type RunStatus } from "../../../run-status";
+import type { RunStatus } from "../../../run-status";
 import type { LatestReport } from "./flow-health-types";
-import {
-	type DashboardRun,
-	type KnownCost,
-	OVERVIEW_ROWS,
-	type Spread,
-	type StatusCount,
-	type TopRows,
-} from "./measure-types";
-import { isOpenStatus, type RunIn } from "./runs";
+import { OVERVIEW_ROWS, type Spread, type TopRows } from "./measure-types";
+import type { RunIn } from "./runs";
 
 /** The small rules every part of the dashboard shares. */
-
-/** Live statuses first, then how runs ended. */
-export const STATUS_ORDER: RunStatus[] = [
-	"running",
-	"waiting",
-	"sleeping",
-	"finished",
-	"failed",
-	"interrupted",
-	"stopped",
-];
-
-/** Whether a run is still open: at work, waiting at a Gate, or asleep. */
-export function isOpen(run: { status: RunStatus }): boolean {
-	return isOpenStatus(run.status);
-}
 
 /**
  * Whether a run has ended. A run still going has not, and what it spent so
@@ -41,53 +18,12 @@ export function hasEnded(run: { status: RunStatus }): boolean {
 	);
 }
 
-/** How many runs have each status, in a fixed order, without the empty ones. */
-export function countStatuses(
-	runs: readonly { status: RunStatus }[],
-): StatusCount[] {
-	return STATUS_ORDER.flatMap((status) => {
-		const count = runs.filter((run) => run.status === status).length;
-		return count > 0 ? [{ status, count }] : [];
-	});
-}
-
 /** Tokens a run reported. Null when it sent no metrics. */
 export function reportedTokens(run: {
 	metrics?: { tokens: { input: number; output: number } } | undefined;
 }): number | null {
 	if (!run.metrics) return null;
 	return run.metrics.tokens.input + run.metrics.tokens.output;
-}
-
-/** Tokens a run's agents used. 0 when it did not report any. */
-export function usedTokens(run: {
-	metrics?: { tokens: { input: number; output: number } } | undefined;
-}): number {
-	return reportedTokens(run) ?? 0;
-}
-
-/** The tokens a dashboard row shows. Null when none were used. */
-export function tokenCounts(run: {
-	metrics?: { tokens: { input: number; output: number } } | undefined;
-}): { input: number; output: number } | null {
-	const tokens = run.metrics?.tokens;
-	if (!tokens || tokens.input + tokens.output <= 0) return null;
-	return { input: tokens.input, output: tokens.output };
-}
-
-/** The costs of several runs or steps together. */
-export function sumKnownCost(
-	costs: readonly {
-		costUsd: number;
-		costEstimated: boolean;
-		costMissing: number;
-	}[],
-): KnownCost {
-	return {
-		costUsd: costs.reduce((sum, cost) => sum + cost.costUsd, 0),
-		costEstimated: costs.some((cost) => cost.costEstimated),
-		costMissing: costs.reduce((sum, cost) => sum + cost.costMissing, 0),
-	};
 }
 
 /** Linear interpolation between the closest ranks, like most spreadsheets. */
@@ -134,24 +70,5 @@ export function toLatestReport(run: RunIn): LatestReport | null {
 		result,
 		excerpt: report.excerpt,
 		more: report.more,
-	};
-}
-
-/** A run as a dashboard list shows it. */
-export function toDashboardRun(run: RunIn, group: string): DashboardRun {
-	return {
-		id: run.id,
-		title: run.title,
-		status: run.status,
-		createdAt: run.createdAt,
-		reason: run.reason,
-		wakeAt: run.wakeAt,
-		branch: run.branch,
-		costUsd: run.costUsd,
-		costEstimated: run.costEstimated,
-		costMissing: run.costMissing,
-		tokens: tokenCounts(run),
-		group,
-		...(isTestRun(run) ? { test: run.test } : {}),
 	};
 }

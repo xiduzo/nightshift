@@ -11,7 +11,6 @@ export {
 	CHANGE_VERDICTS,
 	COST_STEADINESS,
 	type FlowChanges,
-	type FlowHealthDetail,
 	isTimeZone,
 	MOVE_GUARDS,
 	MOVE_SETUP_CAUSES,

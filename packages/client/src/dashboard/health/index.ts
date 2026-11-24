@@ -10,7 +10,7 @@ export {
 	moveToneLabel,
 	verdictLabel,
 } from "./changes";
-export { type NodeLadder, nodeLadderLabel } from "./ladders";
+export { nodeLadderLabel } from "./ladders";
 export {
 	againstBefore,
 	type FlowLevel,

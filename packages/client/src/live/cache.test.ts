@@ -95,7 +95,7 @@ const KEYS = {
 	placements: runs.placements("p1").queryKey,
 	moveTargets: runs.moveTargets("r1").queryKey,
 	dashboard: createDashboardQueries(orpc).summary().queryKey,
-	flowHealth: createDashboardQueries(orpc).flow("p1", "fix").queryKey,
+	flowChanges: createDashboardQueries(orpc).changes("p1", "fix", 7).queryKey,
 	schedules: createScheduleQueries(orpc).list("p1").queryKey,
 	cron: createScheduleQueries(orpc).preview("0 3 * * *").queryKey,
 	projects: createProjectQueries(orpc).list().queryKey,
@@ -137,7 +137,7 @@ const RUN_1: Name[] = [
 	"files1",
 	"folder1",
 	"dashboard",
-	"flowHealth",
+	"flowChanges",
 	"schedules",
 	"projects",
 ];
@@ -462,7 +462,7 @@ describe("the live cache follows the Host", () => {
 		expect(stale()).toEqual(NOTHING);
 		timers.due(300);
 		expect(stale()).toEqual(
-			sorted(["projects", "branches", "dashboard", "flowHealth", "schedules"]),
+			sorted(["projects", "branches", "dashboard", "flowChanges", "schedules"]),
 		);
 	});
 
@@ -529,7 +529,7 @@ describe("the live cache follows the Host", () => {
 				"projects",
 				"branches",
 				"dashboard",
-				"flowHealth",
+				"flowChanges",
 				"schedules",
 				"members",
 				"spaceList",

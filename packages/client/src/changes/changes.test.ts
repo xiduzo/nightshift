@@ -78,7 +78,6 @@ const READS = new Set([
 	"notifications.targets.list",
 	"notifications.webPush.key",
 	"dashboard.summary",
-	"dashboard.flow",
 	"dashboard.changes",
 	"dashboard.spend",
 	"settings.get",

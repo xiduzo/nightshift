@@ -721,7 +721,6 @@ const ROUTES: Route[] = [
 	route("notifications.webPush.key", undefined, "session", "notifications.webPush.publicKey", []),
 	// The dashboard.
 	route("dashboard.summary", { everySpace: false }, "session", "engine.dashboard.readSpacesDashboard", [ASKING, like({ spaceIds: [SPACE], timeZone: "UTC" })]),
-	route("dashboard.flow", { ...project, flowName: "night", timeZone: "UTC" }, "session", "engine.dashboard.readFlowHealth", [ASKING, like({ spaceId: SPACE, projectId: "p1", flowName: "night", timeZone: "UTC" })]),
 	route("dashboard.changes", { ...project, flowName: "night", nights: 7, timeZone: "UTC" }, "session", "engine.dashboard.readFlowChanges", [ASKING, like({ spaceId: SPACE, projectId: "p1", name: "night", nights: 7, timeZone: "UTC" })]),
 	route("dashboard.spend", { timeZone: "UTC" }, "session", "engine.dashboard.readSpaceSpend", [ASKING, like({ spaceId: SPACE, timeZone: "UTC" })]),
 	// This computer's own configuration: its owner's.

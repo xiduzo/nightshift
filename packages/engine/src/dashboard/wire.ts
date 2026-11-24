@@ -5,7 +5,6 @@ import type {
 	DashboardRuns,
 } from "./application/ports";
 import { readFlowChanges } from "./application/read-flow-changes";
-import { readFlowHealth } from "./application/read-flow-health";
 import { readProjectDashboard } from "./application/read-project-dashboard";
 import { readSevereTurn } from "./application/read-severe-turn";
 import { readSpaceSpend } from "./application/read-space-spend";
@@ -26,7 +25,6 @@ export function wireDashboard(deps: DashboardDeps) {
 		readSpacesDashboard: readSpacesDashboard(deps),
 		readSpaceSpend: readSpaceSpend(deps),
 		readFlowChanges: readFlowChanges(deps),
-		readFlowHealth: readFlowHealth(deps),
 		readSevereTurn: readSevereTurn(deps),
 	};
 }

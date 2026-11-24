@@ -30,7 +30,7 @@ A run ends in one of three ways: **Done**, **Nothing to do**, or **Failed**.
 
 When a run fails or stops early, choose **Ask why**. An agent reads the run, and tells you what went wrong and what you can do. It changes nothing.
 
-When a run finishes, the run page asks whether the run was useful. Your phone asks too. Your answers show in [Flow health](#flow-health).
+When a run finishes, the run page asks whether the run was useful. Your phone asks too. The opened row of a flow in [Flow health](#flow-health) counts the useful runs.
 
 ### Your files stay as they are
 

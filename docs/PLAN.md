@@ -219,7 +219,7 @@ Server mode is built: the Host, its Spaces and its Offers ([docs/research/device
 
 - **A flow library to share.** It starts as the [`community/`](../community/) folder. A separate repository or a gallery in the app can come later.
 - **Dashboards that get you out of the loop.** Each flow gets a level: You decide, You check or On its own. Home guards the flows that nobody watches. A project's page suggests how each flow can need you less, tests the suggestion, and measures it after you confirm it. Spend shows the cost to the person who pays. [docs/research/dashboards-2026-11.md](research/dashboards-2026-11.md) lists the decisions.
-- **Cost and benefit insight.** A run shows what each step cost. Flow health shows where the work landed on each ladder and what each rung cost, the cost per useful result, and how often a flow needed you. A person cannot see yet:
+- **Cost and benefit insight.** A run shows what each step cost. Flow health shows how steady the cost and the time of a flow are, and how often it needed you. Spend shows the ways to save. A person cannot see yet:
   - what a subscription really costs, beyond the API price of the work
   - how close a running run is to its budget
   - how often the guards stop a flow

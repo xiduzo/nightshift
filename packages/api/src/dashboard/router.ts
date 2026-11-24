@@ -4,7 +4,6 @@ import { z } from "zod";
 import { output } from "../output";
 import { protectedProcedure } from "../procedures";
 import { flowChangesSchema } from "./changes-schemas";
-import { flowHealthDetailSchema } from "./flow-health-schemas";
 import { nightRangeSchema, timeZoneSchema } from "./measure-schemas";
 import { spaceSpendSchema } from "./spend-schemas";
 import { dashboardSummarySchema } from "./summary-schemas";
@@ -57,29 +56,6 @@ export const dashboard = {
 				...read,
 			});
 		}),
-	/** One flow of a project, behind its Flow health row. */
-	flow: protectedProcedure
-		.route({
-			summary:
-				"Computes the health of one flow of a project: its runs, where its work landed, its metrics, cost, problems and latest runs.",
-		})
-		.output(output(flowHealthDetailSchema))
-		.input(
-			z.object({
-				projectId: z.string(),
-				flowName: z.string().min(1),
-				timeZone: timeZoneSchema,
-			}),
-		)
-		.handler(({ context, input }) =>
-			context.engine.dashboard.readFlowHealth(context.actor, {
-				spaceId: context.spaceId,
-				projectId: input.projectId,
-				flowName: input.flowName,
-				now: now(),
-				timeZone: input.timeZone,
-			}),
-		),
 	/**
 	 * Before and after for one flow of a project over the last `nights`
 	 * days: the effect of its last change, the days against the days

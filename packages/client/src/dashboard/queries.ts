@@ -34,14 +34,6 @@ export function createDashboardQueries(orpc: ApiQueryUtils) {
 			refetchInterval: POLL_MS,
 			meta: { quietRefetchErrors: true },
 		}),
-		/** One flow of a project in detail. Polls every 5 minutes. */
-		flow: (projectId: string, flowName: string) => ({
-			...orpc.dashboard.flow.queryOptions({
-				input: { projectId, flowName, timeZone: readerTimeZone() },
-			}),
-			refetchInterval: POLL_MS,
-			meta: { quietRefetchErrors: true },
-		}),
 		/**
 		 * Before and after for one flow over the last `nights` days, and the
 		 * next changes to try. Polls every 5 minutes.

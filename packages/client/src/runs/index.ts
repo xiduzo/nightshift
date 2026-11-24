@@ -35,7 +35,6 @@ export {
 	rankFlowsByUse,
 } from "./start";
 export {
-	finishedShare,
 	flowUnreadWords,
 	groupStatuses,
 	hasEnded,

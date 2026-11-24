@@ -593,14 +593,14 @@ describe("replies of a real engine", () => {
 		told.abort();
 		await toldOf.return?.();
 
-		// The dashboard says when it computed its numbers: two replies differ.
-		await reply(appRouter.dashboard.summary, { timeZone: "Europe/Amsterdam" });
-		await reply(appRouter.dashboard.summary, { everySpace: true });
-		const projectDashboard = (await reply(appRouter.dashboard.summary, {
+		await read(appRouter.dashboard.summary, { timeZone: "Europe/Amsterdam" });
+		await read(appRouter.dashboard.summary, { everySpace: true });
+		const projectDashboard = (await read(appRouter.dashboard.summary, {
 			projectId,
-		})) as { cards: { lastDay: { runs: number } } };
-		expect(projectDashboard.cards.lastDay.runs).toBe(1);
-		await reply(appRouter.dashboard.flow, { projectId, flowName: "night" });
+		})) as { lastNight: { latest: { id: string }[] } };
+		expect(projectDashboard.lastNight.latest.map((run) => run.id)).toEqual([
+			started.id,
+		]);
 
 		// What an answer of Night Shift's own agents cost is its own line of
 		// the spend, read from what the engine kept.

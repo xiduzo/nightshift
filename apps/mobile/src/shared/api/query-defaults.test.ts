@@ -33,7 +33,7 @@ describe("how long a read stays fresh on the phone", () => {
 
 	test("the dashboard stays fresh for 5 minutes", () => {
 		expect(defaultsOf(["dashboard", "summary"]).staleTime).toBe(5 * MINUTE_MS);
-		expect(defaultsOf(["dashboard", "flow"]).staleTime).toBe(5 * MINUTE_MS);
+		expect(defaultsOf(["dashboard", "changes"]).staleTime).toBe(5 * MINUTE_MS);
 	});
 
 	test("projects, flows, Spaces and schedules stay fresh for 10 minutes", () => {

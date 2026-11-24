@@ -15,13 +15,10 @@ import type {
 	RUNGS,
 } from "../../read/ladder";
 import { NEEDED_YOU_REASONS as READ_REASONS } from "../../read/needed-you";
-import { isOpenStatus as readIsOpenStatus } from "../../read/run-views";
 import type { RunDetail, RunSummary } from "../../read/views";
 import { NIGHT_RANGES as READ_NIGHT_RANGES } from "../../read/views";
-import type { RunStatus } from "../../run-status";
 import { NIGHT_RANGES } from "./domain/measure-types";
 import {
-	isOpenStatus,
 	type Ladder,
 	NEEDED_YOU_REASONS,
 	type RevisionIn,
@@ -49,21 +46,6 @@ describe("the shapes the dashboard reads", () => {
 		expect(NIGHT_RANGES).toEqual(READ_NIGHT_RANGES);
 		expect(NEEDED_YOU_REASONS).toEqual(READ_REASONS);
 		expect(HELP_AGENTS).toEqual(ASSISTANT_HELP_AGENTS);
-	});
-
-	test("answer as their writers do", () => {
-		const statuses: RunStatus[] = [
-			"running",
-			"waiting",
-			"sleeping",
-			"finished",
-			"stopped",
-			"failed",
-			"interrupted",
-		];
-		for (const status of statuses) {
-			expect(isOpenStatus(status)).toBe(readIsOpenStatus(status));
-		}
 	});
 
 	test("are the same words, and a run of the read model is one", () => {

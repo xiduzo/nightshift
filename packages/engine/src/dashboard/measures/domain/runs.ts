@@ -26,11 +26,6 @@ export type NeededYou = {
 	question?: string;
 };
 
-/** Whether a run with this status is still open: at work, waiting at a Gate, or asleep. */
-export function isOpenStatus(status: RunStatus): boolean {
-	return status === "running" || status === "waiting" || status === "sleeping";
-}
-
 /** The two ladders, where a climb landed, and who landed it (`read/ladder.ts`). */
 export type Ladder = "work" | "choice";
 export type Rung = "rule" | "first" | "later" | "person" | "deadline" | "none";
@@ -74,8 +69,6 @@ export type RunIn = {
 	reason: string | null;
 	endReason: string | null;
 	result: RunResult | null;
-	wakeAt: number | null;
-	stopAt: number | null;
 	createdAt: number;
 	endedAt: number | null;
 	costUsd: number;

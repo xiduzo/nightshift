@@ -18,7 +18,6 @@ export {
 	iso,
 	isTimeZone,
 	lastDays,
-	lastHours,
 	localZone,
 	minuteOfDay,
 	nextClockTime,

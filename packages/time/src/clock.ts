@@ -13,7 +13,6 @@ import { TZDate, tz } from "@date-fns/tz";
 import { UTCDate } from "@date-fns/utc";
 import {
 	addDays,
-	addHours,
 	type ContextOptions,
 	getDate,
 	getDay,
@@ -22,7 +21,6 @@ import {
 	getMonth,
 	getYear,
 	startOfDay,
-	startOfHour,
 } from "date-fns";
 
 /** Milliseconds since 1970-01-01T00:00:00.000Z. The only instant Night Shift stores. */
@@ -217,19 +215,6 @@ export function lastDays(
 	const today = startOfDay(at, inZone);
 	return Array.from({ length: count }, (_, index) =>
 		startOfDay(addDays(today, -(count - 1 - index), inZone), inZone).getTime(),
-	);
-}
-
-/** The starts of the last `count` hours, oldest first, ending with this hour. */
-export function lastHours(
-	count: number,
-	at: Instant,
-	timeZone: string,
-): Instant[] {
-	const inZone = zone(timeZone);
-	const thisHour = startOfHour(at, inZone);
-	return Array.from({ length: count }, (_, index) =>
-		addHours(thisHour, -(count - 1 - index), inZone).getTime(),
 	);
 }
 

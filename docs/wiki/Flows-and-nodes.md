@@ -324,7 +324,7 @@ You do not have to write a shape. When a node has none, Night Shift takes it fro
 
 ### Scores
 
-A score is a number that a run gives, such as the leads it found. Flow health shows each score per run, so you see whether a change to the flow helps. See [Flow health](Runs-and-schedules.md#flow-health).
+A score is a number that a run gives, such as the leads it found. Night Shift keeps each score with its run. When you connect your monitoring, Night Shift sends each score there too.
 
 An Agent, a Command, or a Value scores the run with `scores` in its data: `{"scores": {"leads": 12, "replies": 3}}`.
 

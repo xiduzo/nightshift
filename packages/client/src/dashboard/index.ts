@@ -1,6 +1,6 @@
 /** The dashboard: its query, computed on the server, the reader's clock, and its view types. */
 
-export { daysOf } from "./console";
+export { daysOf } from "./days";
 export {
 	againstBefore,
 	changeSummary,
@@ -15,7 +15,6 @@ export {
 	moveText,
 	moveTone,
 	moveToneLabel,
-	type NodeLadder,
 	nodeLadderLabel,
 	signalFacts,
 	signalId,
@@ -41,7 +40,6 @@ export type {
 	FlowChanges,
 	FlowHealthRow,
 	FlowMove,
-	FlowRange,
 	FlowReport,
 	NightRange,
 	NightsRange,

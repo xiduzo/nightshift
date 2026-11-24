@@ -57,17 +57,6 @@ describe("a run screen starts from the lists in the cache", () => {
 		expect(cachedRunSummary(client, orpc, "a")?.status).toBe("finished");
 	});
 
-	test("the dashboard's open rows are not full runs and do not count", () => {
-		const client = new QueryClient();
-		seed(
-			client,
-			dashboard.summary().queryKey,
-			{ open: { rows: [{ id: "a", title: "Run a", status: "running" }] } },
-			1,
-		);
-		expect(cachedRunSummary(client, orpc, "a")).toBeUndefined();
-	});
-
 	test("the placeholder has the summary and no steps yet", () => {
 		const client = new QueryClient();
 		seed(client, runs.everyRun().queryKey, [run("a")], 1);
