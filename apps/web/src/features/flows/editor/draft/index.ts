@@ -6,7 +6,6 @@ export {
 	matchVariables,
 	missingConnectionMessage,
 	missingDeviceMessage,
-	oldDeviceMessage,
 	openTemplate,
 	optionNoun,
 	programWithoutLoginMessage,

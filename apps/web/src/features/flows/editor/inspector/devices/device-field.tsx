@@ -1,9 +1,4 @@
-import {
-	type DeviceRef,
-	deviceIdOf,
-	type FlowNode,
-	legacyDeviceName,
-} from "@nightshift/flows";
+import type { FlowNode } from "@nightshift/flows";
 import {
 	Select,
 	SelectContent,
@@ -13,7 +8,7 @@ import {
 	SelectValue,
 } from "@nightshift/ui/components/select";
 
-import { missingDeviceMessage, oldDeviceMessage } from "../../draft";
+import { missingDeviceMessage } from "../../draft";
 import { Field } from "../form";
 
 /**
@@ -90,40 +85,34 @@ export const SUBFLOW_DEVICE_COPY: DeviceFieldCopy = {
 	unknown: () => missingDeviceMessage({ type: "call" }),
 };
 
-/** The choice that stands for a device name from before ids. */
-const OLD_NAME = "__old_name__";
-
 /**
  * Where a step runs: one of your devices, or the device the run starts
  * on. The node keeps the device's id, and the list shows its name. The
  * list is what the Host says this node may name: yours, and other
  * people's that offer the node's profile to the Space. A device that is
  * not one of them stays, marked as an error, so a flow from a colleague
- * keeps its choice until you pick another. So does a name from before
- * ids that Night Shift could not bring to one device.
+ * keeps its choice until you pick another.
  */
 export function DeviceField({
 	id,
-	value,
+	value: chosen,
 	devices,
 	copy = STEP_COPY,
 	onChange,
 }: {
 	id: string;
-	value: DeviceRef | undefined;
+	value: string | undefined;
 	/** The devices this node may name (`runs.devices` with `forNode`); undefined while they load. */
 	devices: readonly DeviceChoice[] | undefined;
 	copy?: DeviceFieldCopy;
 	onChange: (device: string | undefined) => void;
 }) {
-	const chosen = deviceIdOf(value);
 	const listed = [
 		...new Map((devices ?? []).map((d) => [d.deviceId, d])).values(),
 	];
 	const shown = listed.filter(
 		(d) => !d.dev || d.thisDevice || d.deviceId === chosen,
 	);
-	const oldName = legacyDeviceName(value);
 	const unknown =
 		chosen !== undefined && !listed.some((d) => d.deviceId === chosen);
 	const label = (device: DeviceChoice) => {
@@ -134,9 +123,6 @@ export function DeviceField({
 	};
 	const items = [
 		{ value: RUN_DEVICE, label: copy.run },
-		...(oldName !== null
-			? [{ value: OLD_NAME, label: `${oldName} (choose again)` }]
-			: []),
 		...(unknown && chosen !== undefined
 			? [{ value: chosen, label: "A device that is not in this Space" }]
 			: []),
@@ -145,12 +131,7 @@ export function DeviceField({
 			label: label(device),
 		})),
 	];
-	const error =
-		oldName !== null
-			? oldDeviceMessage(oldName)
-			: unknown && devices !== undefined
-				? copy.unknown()
-				: null;
+	const error = unknown && devices !== undefined ? copy.unknown() : null;
 	return (
 		<Field
 			id={id}
@@ -162,9 +143,9 @@ export function DeviceField({
 		>
 			<Select
 				items={items}
-				value={oldName !== null ? OLD_NAME : (chosen ?? RUN_DEVICE)}
+				value={chosen ?? RUN_DEVICE}
 				onValueChange={(next) => {
-					if (next === null || next === OLD_NAME) return;
+					if (next === null) return;
 					onChange(next === RUN_DEVICE ? undefined : next);
 				}}
 			>

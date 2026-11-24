@@ -1,10 +1,4 @@
-import {
-	deviceIdOf,
-	type FlowNode,
-	isProfileRef,
-	type ProfileRef,
-	profileOf,
-} from "@nightshift/flows";
+import { type FlowNode, type ProfileRef, profileOf } from "@nightshift/flows";
 
 /**
  * Where a run's steps run, decided once when it starts
@@ -14,7 +8,7 @@ import {
 export type RunPlan = {
 	/** The run's Device: its worktree, and the steps of every node that names no Device. */
 	device: PlannedDevice;
-	/** The Devices the nodes name by their name (`device`), by that name. */
+	/** The Devices the nodes name (`device`), by their id. */
 	named: Record<string, PlannedDevice>;
 	/**
 	 * Every Device of the plan by its id: the run's, the named ones, and
@@ -64,11 +58,12 @@ export type RunFallbacks = {
 /** The key of a node in `RunFallbacks.nodes`: its id and the Device it names. */
 export function fallbackKey(node: FlowNode): string {
 	const ref = profileOf(node);
-	const device = isProfileRef(ref)
-		? `${ref.device}\u0000${ref.profile}`
-		: "device" in node
-			? String(deviceIdOf(node.device))
-			: "";
+	const device =
+		ref !== undefined
+			? `${ref.device}\u0000${ref.profile}`
+			: "device" in node
+				? String(node.device)
+				: "";
 	return `${node.id}\u0000${device}`;
 }
 

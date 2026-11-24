@@ -1,10 +1,9 @@
 /** The fields of an Agent node: its profile, harness, model, prompt and task. */
-import {
-	type AgentNode,
-	type AgentProfile,
-	type Flow,
-	isProfileRef,
-	type NodeOption,
+import type {
+	AgentNode,
+	AgentProfile,
+	Flow,
+	NodeOption,
 } from "@nightshift/flows";
 import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
@@ -365,7 +364,7 @@ export function AgentFields({
 					/>
 				</Field>
 
-				{node.cascade === undefined && isProfileRef(node.profile) ? (
+				{node.cascade === undefined && node.profile !== undefined ? (
 					<ProfileBackupsField
 						id={`${id}-backups`}
 						profile={node.profile}

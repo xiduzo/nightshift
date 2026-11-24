@@ -21,6 +21,7 @@ import {
 	isPersonTier,
 	personTierSchema,
 	personTierTexts,
+	TIER_ERROR,
 	tierBase,
 	tierLabel,
 } from "../cascade";
@@ -42,12 +43,12 @@ import {
 	type ModelAddress,
 	modelAddressPlain,
 	modelAddressSchema,
-	type NodeProfile,
 	nodeProfilePlain,
-	nodeProfileSchema,
+	type ProfileRef,
 	placed,
 	placedPlain,
 	profileFallbacksSchema,
+	profileRefSchema,
 } from "../profile";
 
 /** The Value node: it makes `data` that matches its output schema, by a rule, a model or a person. */
@@ -91,7 +92,7 @@ export type ValueBy = z.infer<typeof valueBySchema>;
 export interface ValueTier {
 	label?: string;
 	tries?: number;
-	profile?: NodeProfile;
+	profile?: ProfileRef;
 	decider?: DeciderName;
 	model?: string;
 	address?: ModelAddress;
@@ -100,7 +101,7 @@ export interface ValueTier {
 
 export const valueTierSchema: z.ZodType<ValueTier> = z.object({
 	...tierBase,
-	profile: nodeProfileSchema.optional(),
+	profile: profileRefSchema.optional(),
 	decider: deciderNameSchema.optional(),
 	model: z.string().min(1).optional(),
 	address: modelAddressSchema.optional(),
@@ -192,7 +193,7 @@ export const valueNodeSchema = z.object({
 	 * decider must make values. The node's own `decider` and `model` win
 	 * over it. A run resolves it when it starts.
 	 */
-	profile: nodeProfileSchema.optional(),
+	profile: profileRefSchema.optional(),
 	/**
 	 * The profiles that take this step when its own profile's Device cannot,
 	 * first one first (ADR 19). Unset: the step waits for its Device.
@@ -219,7 +220,7 @@ export const valueNodeSchema = z.object({
 	 * (ADR 10), filled in with the best answer of the models.
 	 */
 	cascade: z
-		.array(z.union([personTierSchema, valueTierSchema]))
+		.array(z.union([personTierSchema, valueTierSchema], { error: TIER_ERROR }))
 		.min(1)
 		.max(8)
 		.optional(),

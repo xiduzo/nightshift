@@ -35,8 +35,6 @@ function stringsOf(text: string | null): Record<string, string> {
  * (null before Placement: the Walker), `placements`, `device_names` and
  * `started_by`. A run from before the plan, or from a Device of a version
  * before it, has no names: the walk names its Devices as the nodes do.
- * A run planned before steps were placed by Device id also named each
- * profile's Device in `placements`: its nodes still read.
  */
 export function planOf(
 	row: Pick<
@@ -95,8 +93,8 @@ export function placedRun(row: RunRow): PlacedRun {
 }
 
 /**
- * The columns of a run's row that keep its plan. `placements` keeps its
- * shape (name to id), so a Replica of a version before the plan reads it.
+ * The columns of a run's row that keep its plan. `placements`
+ * holds the Devices the nodes name, each id to itself.
  * `device_names` keeps the name of every Device of the plan, by its id.
  */
 export function planColumns(

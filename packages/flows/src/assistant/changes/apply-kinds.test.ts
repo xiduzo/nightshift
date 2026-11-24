@@ -23,7 +23,7 @@ const flow: Flow = flowSchema.parse({
 			id: "review",
 			type: "agent",
 			position: { x: 0, y: 0 },
-			profile: "worker",
+			profile: { device: "mac", profile: "worker" },
 			prompt: "Review {{pr}}.",
 			check: "npm test",
 		},

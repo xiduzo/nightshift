@@ -1,7 +1,6 @@
 import {
 	type Flow,
 	type FlowNode,
-	isProfileRef,
 	type ProfileRef,
 	profileOf,
 	runsAs,
@@ -26,7 +25,7 @@ function addressOf(
 	if (node.type !== "decision" && node.type !== "value") return null;
 	if (node.by !== "model" || node.address === undefined) return null;
 	const ref = profileOf(node);
-	if (!isProfileRef(ref) || node.decider === undefined) return null;
+	if (ref === undefined || node.decider === undefined) return null;
 	return { check: { decider: node.decider, address: node.address }, ref };
 }
 

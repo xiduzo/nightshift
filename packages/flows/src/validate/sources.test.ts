@@ -263,17 +263,6 @@ describe("devicesOf", () => {
 		});
 	});
 
-	test("a name left from before ids names no Device", () => {
-		const old: Flow = {
-			...quick(),
-			nodes: quick().nodes.map((node) => ({
-				...node,
-				device: { name: "LE2316" },
-			})),
-		};
-		expect(devicesOf("quick", { quick: old })).toEqual({ ids: [] });
-	});
-
 	test("a flow that names no Device, or does not load, needs none", () => {
 		expect(devicesOf("quick", { quick: quick() })).toEqual({ ids: [] });
 		expect(devicesOf("broken", { broken: null })).toEqual({ ids: [] });

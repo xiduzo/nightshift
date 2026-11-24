@@ -28,6 +28,7 @@ import { createEngine } from "../../src/wire";
  * Only the current format is read (ADR 43): what a flow, a run, a revision
  * and a file of an older format do, everywhere they are met. Each gives
  * the one answer, nothing throws, and nothing is written over or deleted.
+ * So does a current one that names a device or a profile by its name.
  */
 
 const OLDER_RUN =
@@ -401,6 +402,101 @@ describe("a run of an older flow", () => {
 			"far-old",
 		]);
 	});
+});
+
+describe("a current flow that names a device or a profile by its name", () => {
+	const byName = [
+		{
+			id: "device",
+			issue:
+				"nodes.0.device: A device is named by its id. Choose the device again.",
+			nodes: [{ ...current.nodes[0], device: { name: "LE2316" } }],
+		},
+		{
+			id: "profile",
+			issue:
+				"nodes.0.profile: A profile is named by its device and its id. Pick the profile again.",
+			nodes: [
+				{
+					id: "say",
+					type: "agent",
+					position: { x: 0, y: 0 },
+					prompt: "Say.",
+					profile: "worker",
+				},
+			],
+		},
+	] as const;
+
+	test.each([...byName])(
+		"a run by $id shows, and cannot go on",
+		async ({ id, nodes }) => {
+			await putRun(id, { ...current, nodes });
+			await putStep(id, `${id}-1`, "say", "command");
+			await push(id, "RunEnded", { status: "failed", reason: "x" });
+			const detail = await space.getRun(id);
+			expect(detail.flowUnread).toBe("invalid");
+			expect(detail.steps.map((s) => s.nodeId)).toEqual(["say"]);
+			expect((await space.listRuns()).map((r) => r.id)).toEqual([id]);
+			const resume = await refusalOf(space.act(id, { kind: "resume" }));
+			expect(resume.message).toBe(
+				"Night Shift cannot read the flow of this run. Start the flow again.",
+			);
+		},
+	);
+
+	test.each([...byName])(
+		"an open run by $id ends at a start, never on another device",
+		async ({ id, nodes }) => {
+			await putRun(id, { ...current, nodes });
+			await putStep(id, `${id}-1`, "say", "command");
+			const warn = spyOn(console, "warn").mockImplementation(() => {});
+			try {
+				const again = start({ scheduler: false }).space(
+					sandbox.spaceId,
+					NIGHT_SHIFT,
+				);
+				await waitFor(
+					async () => (await again.getRun(id)).status !== "running" || null,
+				);
+				const detail = await again.getRun(id);
+				expect(detail.status).toBe("interrupted");
+				expect(detail.steps).toHaveLength(1);
+			} finally {
+				warn.mockRestore();
+			}
+		},
+	);
+
+	test.each([...byName])(
+		"a stored flow by $id is listed with what to choose, and does not start",
+		async ({ nodes, issue }) => {
+			await space.flows.save(projectId, "build", current);
+			const documents = createFlowDocuments({ db: sandbox.db });
+			const document = await documents.open(projectId);
+			for (const value of document.current.doc.getMap("flows").values()) {
+				const flow = value as Y.Map<unknown>;
+				await document.current.change(() =>
+					(flow.get("nodes") as Y.Map<unknown>).set("say", nodes[0]),
+				);
+			}
+			await documents.flush();
+			engine = start();
+			space = engine.space(sandbox.spaceId, NIGHT_SHIFT);
+			expect((await space.flows.list(projectId)).map((f) => f.name)).toEqual([
+				"build",
+			]);
+			expect(await space.flows.get(projectId, "build")).toMatchObject({
+				flow: null,
+				issues: [{ severity: "error", message: issue }],
+			});
+			const refused = await refusalOf(
+				space.startRun({ projectId, flowName: "build" }),
+			);
+			expect(refused.message).toContain(issue);
+			expect(await space.listRuns()).toEqual([]);
+		},
+	);
 });
 
 describe("a flow of an older format", () => {

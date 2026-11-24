@@ -7,7 +7,6 @@
 import {
 	type DecisionNode,
 	decisionDecider,
-	isProfileRef,
 	type ModelProfile,
 	type ValueNode,
 	valueDecider,
@@ -243,7 +242,7 @@ export function ModelSettings<N extends DecisionNode | ValueNode>({
 					}
 				/>
 			</Field>
-			{node.cascade === undefined && isProfileRef(node.profile) ? (
+			{node.cascade === undefined && node.profile !== undefined ? (
 				<ProfileBackupsField
 					id={`${id}-backups`}
 					profile={node.profile}

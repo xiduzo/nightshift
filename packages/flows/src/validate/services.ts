@@ -1,10 +1,5 @@
 import { type Flow, type FlowNode, profileOf, touchesDevice } from "../flow";
-import {
-	deviceIdOf,
-	isProfileRef,
-	type ServiceNode,
-	serviceSection,
-} from "../nodes";
+import { type ServiceNode, serviceSection } from "../nodes";
 import { nodesWithin, sectionPath } from "../sections";
 import type { Report } from "./issues";
 
@@ -44,8 +39,8 @@ type Place =
 
 function placeOf(node: FlowNode): Place {
 	const profile = profileOf(node);
-	if (isProfileRef(profile)) return { kind: "profile", device: profile.device };
-	const device = "device" in node ? deviceIdOf(node.device) : undefined;
+	if (profile !== undefined) return { kind: "profile", device: profile.device };
+	const device = "device" in node ? node.device : undefined;
 	if (device !== undefined) return { kind: "device", device };
 	return { kind: "run" };
 }

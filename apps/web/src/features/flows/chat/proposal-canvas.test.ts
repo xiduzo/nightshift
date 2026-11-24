@@ -10,7 +10,7 @@ const draft: Flow = flowSchema.parse({
 			id: "build",
 			type: "agent",
 			position: { x: 0, y: 0 },
-			profile: "worker",
+			profile: { device: "mac", profile: "worker" },
 			prompt: "Build it.",
 		},
 		{

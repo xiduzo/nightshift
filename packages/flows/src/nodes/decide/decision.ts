@@ -10,6 +10,7 @@ import {
 	personTierSchema,
 	personTierTexts,
 	probabilityProblem,
+	TIER_ERROR,
 	tierBase,
 	tierLabel,
 } from "../cascade";
@@ -35,12 +36,12 @@ import {
 	type ModelAddress,
 	modelAddressPlain,
 	modelAddressSchema,
-	type NodeProfile,
 	nodeProfilePlain,
-	nodeProfileSchema,
+	type ProfileRef,
 	placed,
 	placedPlain,
 	profileFallbacksSchema,
+	profileRefSchema,
 } from "../profile";
 
 /**
@@ -62,7 +63,7 @@ export type DecidedBy = z.infer<typeof decidedBySchema>;
 export interface DecisionTier {
 	label?: string;
 	tries?: number;
-	profile?: NodeProfile;
+	profile?: ProfileRef;
 	decider?: DeciderName;
 	model?: string;
 	address?: ModelAddress;
@@ -71,7 +72,7 @@ export interface DecisionTier {
 
 export const decisionTierSchema: z.ZodType<DecisionTier> = z.object({
 	...tierBase,
-	profile: nodeProfileSchema.optional(),
+	profile: profileRefSchema.optional(),
 	decider: deciderNameSchema.optional(),
 	model: z.string().min(1).optional(),
 	address: modelAddressSchema.optional(),
@@ -111,7 +112,7 @@ export const decisionNodeSchema = z.object({
 	 * node's own `decider` and `model` win over it. A run resolves it when
 	 * it starts.
 	 */
-	profile: nodeProfileSchema.optional(),
+	profile: profileRefSchema.optional(),
 	/**
 	 * The profiles that take this step when its own profile's Device cannot,
 	 * first one first (ADR 19). Unset: the step waits for its Device.
@@ -161,7 +162,9 @@ export const decisionNodeSchema = z.object({
 	 * person tier, the step ends `fail` when the last tier does not hold.
 	 */
 	cascade: z
-		.array(z.union([personTierSchema, decisionTierSchema]))
+		.array(
+			z.union([personTierSchema, decisionTierSchema], { error: TIER_ERROR }),
+		)
 		.min(1)
 		.max(8)
 		.optional(),

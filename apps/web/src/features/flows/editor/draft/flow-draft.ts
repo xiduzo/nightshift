@@ -69,11 +69,6 @@ export function missingDeviceMessage(node: Pick<FlowNode, "type">): string {
 	return `This ${what} is no longer in this Space, or you cannot use it. Choose another ${what}.`;
 }
 
-/** What the editor says about a device name from before ids that Night Shift could not bring to one device. */
-export function oldDeviceMessage(name: string): string {
-	return `Night Shift cannot tell which device "${name}" is. Choose the device again.`;
-}
-
 /** What the editor says about a command that calls a program without the login of its CLI tool. */
 export function programWithoutLoginMessage(
 	program: string,

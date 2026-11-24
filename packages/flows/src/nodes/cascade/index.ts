@@ -17,6 +17,7 @@ export {
 	personTierTexts,
 	probabilityProblem,
 	RETRY_CHOICES,
+	TIER_ERROR,
 	tierBase,
 	tierLabel,
 } from "./cascade";

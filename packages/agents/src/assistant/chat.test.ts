@@ -57,7 +57,10 @@ const withTests: Flow = flowSchema.parse({
 /** A flow that names a profile this computer does not have. */
 const broken = {
 	...withTests,
-	nodes: [{ ...draft.nodes[0], profile: "ghost" }, withTests.nodes[1]],
+	nodes: [
+		{ ...draft.nodes[0], profile: { device: "mac", profile: "ghost" } },
+		withTests.nodes[1],
+	],
 };
 
 function port(over: Partial<AuthoringPort> = {}): AuthoringPort & {
@@ -189,7 +192,7 @@ describe("authoringTools", () => {
 			"error:",
 		);
 		expect(await call(tools, "check_flow", { flow: broken })).toContain(
-			'error: Agent node "build" names the profile "ghost", but Night Shift cannot tell which computer\'s profile it is.',
+			'error: There is no profile "ghost" on the device "mac".',
 		);
 		const elsewhere = {
 			...withTests,

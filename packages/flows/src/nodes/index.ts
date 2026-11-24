@@ -197,17 +197,12 @@ export {
 export {
 	addressRoot,
 	type DeciderName,
-	type DeviceRef,
 	deciderAddress,
 	deciderMeasuresProbability,
 	deciderNameSchema,
-	deviceIdOf,
 	deviceIdSchema,
-	isProfileRef,
-	legacyDeviceName,
 	type ModelAddress,
 	modelAddressSchema,
-	type NodeProfile,
 	type ProfileRef,
 	sameProfileRef,
 } from "./profile";

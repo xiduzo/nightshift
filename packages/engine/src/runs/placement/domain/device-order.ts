@@ -1,10 +1,8 @@
 import {
-	deviceIdOf,
 	type Flow,
 	type FlowNode,
 	fallbacksOf,
 	hasCascade,
-	isProfileRef,
 	type ProfileRef,
 	type ProfileSettings,
 	profileOf,
@@ -103,8 +101,8 @@ const unique = (ids: readonly (string | null | undefined)[]): string[] => [
 /** Whether a node says itself where it runs, and where. */
 function pinOf(node: FlowNode): string | undefined {
 	const ref = profileOf(node);
-	if (isProfileRef(ref)) return ref.device;
-	return "device" in node ? deviceIdOf(node.device) : undefined;
+	if (ref !== undefined) return ref.device;
+	return "device" in node ? node.device : undefined;
 }
 
 /** The fields a profile fills in, as a step on a fallback Device needs them. */
@@ -132,7 +130,7 @@ function unplacedOf(flows: readonly Flow[]): FlowNode[] {
 		flow.nodes.filter(
 			(node) =>
 				!hasCascade(node) &&
-				!isProfileRef(profileOf(node)) &&
+				profileOf(node) === undefined &&
 				pinOf(node) === undefined,
 		),
 	);
@@ -289,7 +287,7 @@ export async function chooseDevices<D, C>(
 	/** Where a node may run, first one first. A profile means its Device (ADR 19). */
 	function candidatesOf(node: FlowNode, pin: string): Candidate[] {
 		const ref = profileOf(node);
-		if (!isProfileRef(ref)) {
+		if (ref === undefined) {
 			return unique(
 				!byPerson ? [pin, ...configured] : [pick, pin, ...configured, starter],
 			).map((id) => ({
@@ -319,7 +317,7 @@ export async function chooseDevices<D, C>(
 		pair: ProfileRef,
 	): Promise<string | null> {
 		const own = profileOf(node);
-		if (isProfileRef(own) && sameProfileRef(pair, own)) return null;
+		if (own !== undefined && sameProfileRef(pair, own)) return null;
 		if (at.offered) {
 			return at.offered.offers.some((offer) => offer.profile === pair.profile)
 				? null

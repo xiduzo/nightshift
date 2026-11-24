@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { NodeCheck } from "../base";
 import { secretNameSchema } from "../names";
-import type { NodeProfile } from "./device";
+import type { ProfileRef } from "./device";
 
 /**
  * Who decides a Decision or a Value by a model: the deciders, the address
@@ -142,7 +142,7 @@ export function checkModelAddress(
 		id: string;
 		by: string;
 		decider?: DeciderName;
-		profile?: NodeProfile;
+		profile?: ProfileRef;
 		address?: ModelAddress;
 	},
 	title: "Decision" | "Value",

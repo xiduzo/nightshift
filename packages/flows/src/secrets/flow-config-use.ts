@@ -1,6 +1,6 @@
 import { everyProfileOf, runsAs } from "../agents";
 import type { Flow } from "../flow";
-import { isProfileRef, type ProfileRef, sameProfileRef } from "../nodes";
+import { type ProfileRef, sameProfileRef } from "../nodes";
 import { type CalledFlowsOptions, walkCalledFlows } from "./called-flows";
 
 /**
@@ -20,8 +20,7 @@ export type FlowConfigUse = {
 /**
  * The connections, CLI tools and profiles a flow names, each once: those
  * of its own nodes (each tier of a cascade adds its own), and those of
- * every flow and kit it calls (`walkCalledFlows`). A profile name left
- * from format 6 names no profile.
+ * every flow and kit it calls (`walkCalledFlows`).
  *
  * `flows`: the project's flow files, for the flows it calls. `name`: the
  * flow's own file name, so that a call back to it adds nothing.
@@ -41,7 +40,6 @@ export function flowConfigUse(
 			for (const name of agent.clis ?? []) clis.add(name);
 		}
 		for (const profile of everyProfileOf(node)) {
-			if (!isProfileRef(profile)) continue;
 			if (!profiles.some((known) => sameProfileRef(known, profile))) {
 				profiles.push(profile);
 			}

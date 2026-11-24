@@ -282,7 +282,12 @@ describe("replies of a real engine", () => {
 			nodes: [
 				...night.nodes.map((node) =>
 					node.type === "agent"
-						? { ...node, profile: "fast", clis: ["jq"], connections: ["gh"] }
+						? {
+								...node,
+								profile: { device: "mac", profile: "fast" },
+								clis: ["jq"],
+								connections: ["gh"],
+							}
 						: node,
 				),
 				{

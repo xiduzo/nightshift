@@ -22,7 +22,7 @@ const request: SuggestionRequest = {
 				id: "a",
 				type: "agent",
 				position: { x: 0, y: 0 },
-				profile: "w",
+				profile: { device: "mac", profile: "w" },
 				prompt: "",
 			},
 		],

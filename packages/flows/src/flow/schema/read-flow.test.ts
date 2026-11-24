@@ -92,6 +92,52 @@ describe("readFlow", () => {
 		});
 	});
 
+	test("a device or a profile by its name does not read, and says what to choose again", () => {
+		const of = (node: object) =>
+			readFlow({
+				...json(),
+				nodes: [{ id: "a", position: { x: 0, y: 0 }, ...node }],
+			});
+		const why = (node: object) => {
+			const read = of(node);
+			if (read.flow !== null) throw new Error("Expected no flow.");
+			return [read.why, read.issues];
+		};
+		const device = "A device is named by its id. Choose the device again.";
+		const profile =
+			"A profile is named by its device and its id. Pick the profile again.";
+		const tier =
+			"Night Shift cannot read this tier. Check its fields, and pick its profile again.";
+		const named = { device: { name: "LE2316" } };
+		for (const node of [
+			{ type: "command", command: "true" },
+			{ type: "call", flow: "b" },
+			{ type: "tool", connection: "c", tool: "t" },
+		]) {
+			expect(why({ ...node, ...named })).toEqual([
+				"invalid",
+				[{ path: "nodes.0.device", message: device }],
+			]);
+		}
+		const agent = { type: "agent", prompt: "x" };
+		expect(why({ ...agent, profile: "worker" })).toEqual([
+			"invalid",
+			[{ path: "nodes.0.profile", message: profile }],
+		]);
+		const model = {
+			type: "decision",
+			by: "model",
+			prompt: "x",
+			options: [{ name: "a" }, { name: "b" }],
+		};
+		for (const node of [agent, model]) {
+			expect(why({ ...node, cascade: [{ profile: "worker" }] })).toEqual([
+				"invalid",
+				[{ path: "nodes.0.cascade.0", message: tier }],
+			]);
+		}
+	});
+
 	test("it changes nothing of what it reads", () => {
 		for (const value of [json(), json(1), json(FLOW_VERSION + 1)]) {
 			const before = JSON.stringify(value);

@@ -6,13 +6,7 @@ import {
 	nodeProfiles,
 	readFlow,
 } from "../flow";
-import {
-	calledFlowNames,
-	deviceIdOf,
-	flowNameSchema,
-	isProfileRef,
-	waitSignalOf,
-} from "../nodes";
+import { calledFlowNames, flowNameSchema, waitSignalOf } from "../nodes";
 import { parseFlow } from "./flow";
 import type {
 	FlowDevices,
@@ -132,9 +126,9 @@ export function devicesOf(name: string, flows: ProjectFlowMap): FlowDevices {
 		seen.add(flowName);
 		for (const id of flows[flowName]?.devices ?? []) ids.add(id);
 		for (const node of flows[flowName]?.nodes ?? []) {
-			const profiles = nodeProfiles(node).filter(isProfileRef);
+			const profiles = nodeProfiles(node);
 			for (const profile of profiles) ids.add(profile.device);
-			const device = "device" in node ? deviceIdOf(node.device) : undefined;
+			const device = "device" in node ? node.device : undefined;
 			if (profiles.length === 0 && device !== undefined) ids.add(device);
 			if (node.type === "call") calledFlowNames(node).forEach(walk);
 		}

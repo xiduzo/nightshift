@@ -2,12 +2,7 @@
 
 import { everyProfileOf, runsAs } from "../../agents";
 import { type Flow, type FlowNode, flowSchema, profileOf } from "../../flow";
-import {
-	type AgentNode,
-	deviceIdOf,
-	isProfileRef,
-	type ProfileRef,
-} from "../../nodes";
+import type { AgentNode, ProfileRef } from "../../nodes";
 import {
 	type FlowIssue,
 	type ProjectFlowMap,
@@ -154,8 +149,7 @@ export function checkDraft(
 
 	if (devices) {
 		for (const node of flow.nodes) {
-			// A name left from format 6: `validateFlow` asks to pick it again.
-			for (const profile of everyProfileOf(node).filter(isProfileRef)) {
+			for (const profile of everyProfileOf(node)) {
 				if (profileIn(devices, profile) !== undefined) continue;
 				issues.push({
 					severity: "error",
@@ -185,7 +179,7 @@ export function checkDraft(
 			issues.push({ severity: "error", message: messages.missingFlowDevice() });
 		}
 		for (const node of flow.nodes) {
-			const id = "device" in node ? deviceIdOf(node.device) : undefined;
+			const id = "device" in node ? node.device : undefined;
 			if (id === undefined || known(id)) continue;
 			issues.push({
 				severity: "error",
@@ -272,7 +266,7 @@ function commandlessMode(
 		if (run.type !== "agent") continue;
 		const profile = profileOf(run);
 		const known =
-			devices && profile !== undefined && isProfileRef(profile)
+			devices && profile !== undefined
 				? profileIn(devices, profile)
 				: undefined;
 		const mode =

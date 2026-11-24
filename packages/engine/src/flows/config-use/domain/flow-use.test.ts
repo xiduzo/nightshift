@@ -37,8 +37,6 @@ describe("flowUse", () => {
 					type: "agent",
 					profile: { device: "le2316", profile: "fast" },
 				},
-				// A name left from format 6 names no profile yet.
-				{ id: "old", type: "agent", profile: "fast" },
 				{ id: "file", type: "tool", connection: "linear" },
 				{ id: "login", type: "command", secrets: ["API_USER", "API_PW"] },
 				{ id: "again", type: "command", secrets: ["API_USER"] },

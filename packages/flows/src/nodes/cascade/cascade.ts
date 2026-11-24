@@ -13,9 +13,8 @@ import {
 	type DeciderName,
 	deciderAddress,
 	deciderMeasuresProbability,
-	isProfileRef,
 	type ModelAddress,
-	type NodeProfile,
+	type ProfileRef,
 } from "../profile";
 
 /**
@@ -71,6 +70,10 @@ export const tierBase = {
  * The brief fields work as on a Gate (`gate-brief.ts`); only a Decision's
  * person tier takes `recommend`.
  */
+/** What a check says of a tier that is neither a person's nor a whole one of a model. */
+export const TIER_ERROR =
+	"Night Shift cannot read this tier. Check its fields, and pick its profile again.";
+
 /** The last tier of a cascade as a person. Named, so the declared types stay small. */
 export interface PersonTier {
 	person: true;
@@ -212,16 +215,15 @@ function checkTierDeadline(
 /** A model tier of a Decision or a Value, as its checks read it. */
 export type ModelTierFields = {
 	label?: string;
-	profile?: NodeProfile;
+	profile?: ProfileRef;
 	decider?: DeciderName;
 	model?: string;
 	address?: ModelAddress;
 };
 
 /**
- * The checks of a model tier: a profile left from format 6 must be picked
- * again, an address belongs to a Model Profile (ADR 5), and a decider
- * that needs an address needs a profile.
+ * The checks of a model tier: an address belongs to a Model Profile
+ * (ADR 5), and a decider that needs an address needs a profile.
  */
 export function checkModelTier(
 	nodeId: string,
@@ -233,11 +235,6 @@ export function checkModelTier(
 	if (tier.address !== undefined) {
 		check.error(
 			`The tier "${label}" of ${title} node "${nodeId}" sets an address. Put the address on a Model Profile, and pick that profile.`,
-		);
-	}
-	if (tier.profile !== undefined && !isProfileRef(tier.profile)) {
-		check.error(
-			`The tier "${label}" of ${title} node "${nodeId}" names the profile "${tier.profile}", but Night Shift cannot tell which computer's profile it is. Pick the profile again.`,
 		);
 	}
 	if (

@@ -14,7 +14,6 @@ import {
 	type FolderNeed,
 	type PlaceDevice,
 } from "../flows";
-import { deviceIdOf, isProfileRef } from "../nodes";
 import type { FlowIssue } from "../validate";
 
 /**
@@ -98,10 +97,10 @@ function withDevicesOf(
 		named.set(deviceId, profiles);
 	};
 	for (const node of draft.nodes) {
-		for (const ref of everyProfileOf(node).filter(isProfileRef)) {
+		for (const ref of everyProfileOf(node)) {
 			name(ref.device, ref.profile);
 		}
-		const id = "device" in node ? deviceIdOf(node.device) : undefined;
+		const id = "device" in node ? node.device : undefined;
 		if (id !== undefined) name(id);
 	}
 	for (const id of draft.devices ?? []) name(id);

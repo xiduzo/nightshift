@@ -19,9 +19,7 @@ import {
 	deciderNameSchema,
 	effortSchema,
 	isPersonTier,
-	isProfileRef,
 	modelAddressSchema,
-	type NodeProfile,
 	nameSchema,
 	type ProfileRef,
 	permissionModeSchema,
@@ -143,12 +141,12 @@ export function profileSecrets(profile: ProfileSettings): string[] {
  * that does not read its profile has none.
  */
 export function fallbacksOf(node: FlowNode): readonly ProfileRef[] {
-	if (!isProfileRef(profileOf(node))) return [];
+	if (profileOf(node) === undefined) return [];
 	return "fallbacks" in node ? (node.fallbacks ?? []) : [];
 }
 
 /** Every profile a flow depends on through a node: its own and its backups. */
-export function everyProfileOf(node: FlowNode): NodeProfile[] {
+export function everyProfileOf(node: FlowNode): ProfileRef[] {
 	return [...nodeProfiles(node), ...fallbacksOf(node)];
 }
 
@@ -186,19 +184,9 @@ export function cascadeProblem(node: FlowNode): string | null {
  */
 export function placesItself(node: FlowNode): boolean {
 	return (
-		isProfileRef(profileOf(node)) ||
+		profileOf(node) !== undefined ||
 		("device" in node && node.device !== undefined)
 	);
-}
-
-/**
- * A node's profile as words, when nothing better is known: a name left
- * from format 6 as it is, a `ProfileRef` by its profile's id. The empty
- * string for none.
- */
-export function profileLabel(profile: NodeProfile | undefined): string {
-	if (profile === undefined) return "";
-	return isProfileRef(profile) ? profile.profile : profile;
 }
 
 /** An Agent node with everything it runs with, after its profile is resolved. */
@@ -262,10 +250,10 @@ export function resolveModelNode<N extends DecisionNode | ValueNode>(
 export function resolveNodeProfile(
 	node: FlowNode,
 	profile: ProfileSettings,
-	/** The profile's name, for the problem. Default: what the node names. */
+	/** The profile's name, for the problem. Default: its id. */
 	label?: string,
 ): { node: FlowNode } | { problem: string } {
-	const name = label ?? profileLabel(profileOf(node));
+	const name = label ?? profileOf(node)?.profile ?? "";
 	if (node.type === "agent") {
 		if (isAgentProfile(profile))
 			return { node: resolveAgentNode(node, profile) };

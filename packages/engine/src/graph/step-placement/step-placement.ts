@@ -1,10 +1,4 @@
-import {
-	deviceIdOf,
-	type FlowNode,
-	isProfileRef,
-	legacyDeviceName,
-	profileOf,
-} from "@nightshift/flows";
+import { type FlowNode, profileOf } from "@nightshift/flows";
 import type { StepRun } from "../../contract";
 import type { Device } from "../../device";
 import {
@@ -31,8 +25,7 @@ import { capabilitiesFor, unfit } from "../fit";
  * worktree is here (`placedHere`).
  *
  * - A node's profile names its Device (ADR 3, ADR 19), else the node's
- *   `device`, else the run's Device. A run planned before ids keeps the
- *   Devices its nodes named by name.
+ *   `device`, else the run's Device.
  * - Every Device it returns works for the run: each session, command,
  *   tool call and decider call names the run, so the Device reads that
  *   run's Project secrets for it (ADR 13).
@@ -58,10 +51,9 @@ export type PlacementDeps = {
 	takenOverSecrets(at: { host: boolean }): string;
 };
 
-/** What a node writes as its Device, as the plan keys it: the Device's id, or, for a run planned before ids, the name that plan kept (`named`). */
+/** The Device a node names, by its id, as the plan keys it. */
 function nodeDevice(node: FlowNode): string | undefined {
-	if (!("device" in node)) return undefined;
-	return deviceIdOf(node.device) ?? legacyDeviceName(node.device) ?? undefined;
+	return "device" in node ? node.device : undefined;
 }
 
 /** Where a step of `node` can go when its Device cannot take it, as the plan says: a node that names a Device goes by its own list, even an empty one. */
@@ -72,7 +64,7 @@ function fallbackList(
 	const { fallbacks } = plan;
 	if (!fallbacks) return [];
 	const placesItself =
-		isProfileRef(profileOf(node)) || nodeDevice(node) !== undefined;
+		profileOf(node) !== undefined || nodeDevice(node) !== undefined;
 	return placesItself
 		? (fallbacks.nodes[fallbackKey(node)] ?? [])
 		: fallbacks.run;
@@ -134,7 +126,7 @@ export function createPlacement(deps: PlacementDeps) {
 			return onFallback(to ?? { id: movedTo, name: null }, run, row);
 		}
 		const ref = profileOf(node);
-		if (isProfileRef(ref)) {
+		if (ref !== undefined) {
 			return forRun(deviceOf(ref.device, run), stepRun(row));
 		}
 		const { plan } = run;
@@ -143,11 +135,7 @@ export function createPlacement(deps: PlacementDeps) {
 			(key !== undefined
 				? (plan.named[key] ?? plan.devices[key])
 				: undefined) ?? plan.device;
-		const oldName = "device" in node ? legacyDeviceName(node.device) : null;
-		return forRun(
-			deviceOf(at.id, run, at.name ?? oldName ?? undefined),
-			stepRun(row),
-		);
+		return forRun(deviceOf(at.id, run, at.name ?? undefined), stepRun(row));
 	}
 
 	function deviceById(id: string, row: RunRow): Device {

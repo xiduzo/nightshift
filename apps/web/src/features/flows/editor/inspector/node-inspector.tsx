@@ -7,7 +7,6 @@ import {
 	type CallEach,
 	type Flow,
 	type FlowNode,
-	isProfileRef,
 	type NodeOption,
 	nodeIdSchema,
 } from "@nightshift/flows";
@@ -94,10 +93,9 @@ export function NodeInspector({
 	// The devices this node may name, as the Host says. A node with a
 	// profile runs on the profile's device and names none of its own.
 	const named = "profile" in node ? node.profile : undefined;
-	const profile = typeof named === "string" ? named : undefined;
-	const onDevice = runsOnDevice(node) && !isProfileRef(named);
+	const onDevice = runsOnDevice(node) && named === undefined;
 	const nodeDevices = useQuery({
-		...runQueries.devices(projectId, profile !== undefined ? { profile } : {}),
+		...runQueries.devices(projectId, {}),
 		enabled: onDevice,
 		meta: { quietErrors: true },
 	});

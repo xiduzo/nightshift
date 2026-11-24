@@ -1,7 +1,6 @@
 import {
 	type AgentNode,
 	type FlowNode,
-	isProfileRef,
 	nameSchema,
 	type permissionModeSchema,
 	touchesDevice,
@@ -322,9 +321,10 @@ export function offerRefusal(
 	for (const node of nodes) {
 		if (node.type !== "agent") continue;
 		const profile = node.profile;
-		const offer = isProfileRef(profile)
-			? offers.find((o) => o.profile === profile.profile)
-			: undefined;
+		const offer =
+			profile !== undefined
+				? offers.find((o) => o.profile === profile.profile)
+				: undefined;
 		if (profile === undefined || !offer) {
 			return profile === undefined
 				? `The Agent node "${node.id}" names no profile. ${offersNothingOr(deviceName, offers)}`

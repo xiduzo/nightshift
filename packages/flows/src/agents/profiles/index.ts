@@ -24,7 +24,6 @@ export {
 	type Profile,
 	type ProfileSettings,
 	placesItself,
-	profileLabel,
 	profileSchema,
 	profileSecrets,
 	profileSettingsSchema,

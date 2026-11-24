@@ -45,8 +45,8 @@ export const commandExitSchema = z.object({
 });
 export type CommandExit = z.infer<typeof commandExitSchema>;
 
-/** The exits of a Command node that does not list its own: today's pass and fail. */
-export const LEGACY_COMMAND_EXITS: CommandExit[] = [
+/** The exits of a Command node that does not list its own: pass and fail, by its exit code. */
+export const PASS_FAIL_EXITS: CommandExit[] = [
 	{ name: "pass", code: 0 },
 	{ name: "fail" },
 ];
@@ -172,7 +172,7 @@ export type CommandNode = z.infer<typeof commandNodeSchema>;
 
 /** A Command node's exits: its own, else pass on 0 and fail on any other code. */
 export function commandExits(node: Pick<CommandNode, "exits">): CommandExit[] {
-	return node.exits ?? LEGACY_COMMAND_EXITS;
+	return node.exits ?? PASS_FAIL_EXITS;
 }
 
 /**

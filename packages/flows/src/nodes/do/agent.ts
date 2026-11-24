@@ -12,6 +12,7 @@ import {
 	personTierSchema,
 	personTierTexts,
 	RETRY_CHOICES,
+	TIER_ERROR,
 	tierBase,
 	tierLabel,
 } from "../cascade";
@@ -36,12 +37,12 @@ import {
 import { nameSchema } from "../names";
 import {
 	checkNodeProfile,
-	type NodeProfile,
 	nodeProfilePlain,
-	nodeProfileSchema,
+	type ProfileRef,
 	placed,
 	placedPlain,
 	profileFallbacksSchema,
+	profileRefSchema,
 } from "../profile";
 
 /**
@@ -59,7 +60,7 @@ import {
 export interface AgentTier {
 	label?: string;
 	tries?: number;
-	profile?: NodeProfile;
+	profile?: ProfileRef;
 	harness?: AgentHarnessName;
 	model?: string;
 	effort?: z.infer<typeof effortSchema>;
@@ -71,7 +72,7 @@ export interface AgentTier {
 
 export const agentTierSchema: z.ZodType<AgentTier> = z.object({
 	...tierBase,
-	profile: nodeProfileSchema.optional(),
+	profile: profileRefSchema.optional(),
 	harness: agentHarnessSchema.optional(),
 	model: z.string().min(1).optional(),
 	effort: effortSchema.optional(),
@@ -98,7 +99,7 @@ export const agentNodeSchema = z.object({
 	 * when it starts, and a flow that names a profile its Device does not
 	 * have refuses to start.
 	 */
-	profile: nodeProfileSchema.optional(),
+	profile: profileRefSchema.optional(),
 	/**
 	 * The profiles that take this step when its own profile's Device cannot,
 	 * first one first (ADR 19). Unset: the step waits for its Device.
@@ -189,7 +190,7 @@ export const agentNodeSchema = z.object({
 	 * `harness` and `model`; its other fields apply to every tier.
 	 */
 	cascade: z
-		.array(z.union([personTierSchema, agentTierSchema]))
+		.array(z.union([personTierSchema, agentTierSchema], { error: TIER_ERROR }))
 		.min(1)
 		.max(8)
 		.optional(),

@@ -1,8 +1,3 @@
-import {
-	type DeviceRef,
-	deviceIdOf,
-	legacyDeviceName,
-} from "@nightshift/flows";
 import { createContext, useContext } from "react";
 
 /**
@@ -13,12 +8,8 @@ export const DeviceNamesContext = createContext<ReadonlyMap<string, string>>(
 	new Map(),
 );
 
-/** What the canvas calls the device a node names: its name, a name from before ids, or "another computer". */
-export function useDeviceLabel(device: DeviceRef): string {
+/** What the canvas calls the device a node names: its name, or "another computer". */
+export function useDeviceLabel(device: string): string {
 	const names = useContext(DeviceNamesContext);
-	const id = deviceIdOf(device);
-	return (
-		(id === undefined ? legacyDeviceName(device) : names.get(id)) ??
-		"another computer"
-	);
+	return names.get(device) ?? "another computer";
 }

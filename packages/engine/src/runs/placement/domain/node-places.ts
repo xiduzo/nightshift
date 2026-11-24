@@ -1,11 +1,8 @@
 import {
 	cascadeProblem,
-	deviceIdOf,
 	type Flow,
 	type FlowNode,
 	hasCascade,
-	isProfileRef,
-	legacyDeviceName,
 	type ProfileRef,
 	type ProfileSettings,
 	profileOf,
@@ -26,17 +23,7 @@ import { checkAddresses } from "./start-addresses";
 
 /** The Device a node names by its id, if its kind runs on one. */
 export function namedDevice(node: FlowNode): string | undefined {
-	return "device" in node ? deviceIdOf(node.device) : undefined;
-}
-
-/** A name from before ids that a node names as its Device, or null. */
-function oldDeviceName(node: FlowNode): string | null {
-	return "device" in node ? legacyDeviceName(node.device) : null;
-}
-
-/** An old profile's id is its name: the label when nothing better is known. */
-function idAsName(ref: ProfileRef): string | null {
-	return /^[a-z][a-z0-9_]{0,39}$/.test(ref.profile) ? ref.profile : null;
+	return "device" in node ? node.device : undefined;
 }
 
 /**
@@ -65,15 +52,7 @@ export async function placeNodes<D>(
 	const byId = new Map<string, PlacedOn<D>>();
 	const unknown = new Map<string, string[]>();
 	for (const node of nodes) {
-		if (isProfileRef(profileOf(node))) continue;
-		const oldName = oldDeviceName(node);
-		if (oldName !== null) {
-			// The flow check refuses it first: a run never starts on a guess.
-			throw new Refusal(
-				"invalid",
-				`Node "${node.id}" names the device "${oldName}", but Night Shift cannot tell which device that is. Choose the device again.`,
-			);
-		}
+		if (profileOf(node) !== undefined) continue;
 		const id = namedDevice(node);
 		if (id === undefined || named.has(id)) continue;
 		const missing = unknown.get(id);
@@ -108,7 +87,7 @@ export async function placeNodes<D>(
 	const owners = new Map<string, PlacedOn<D> | null>();
 	for (const node of nodes) {
 		const ref = profileOf(node);
-		if (!isProfileRef(ref) || owners.has(ref.device)) continue;
+		if (ref === undefined || owners.has(ref.device)) continue;
 		owners.set(
 			ref.device,
 			ref.device === runDevice.id
@@ -121,7 +100,7 @@ export async function placeNodes<D>(
 	const wanted = new Map<PlacedOn<D>, Set<string>>();
 	for (const node of nodes) {
 		const ref = profileOf(node);
-		if (!isProfileRef(ref)) continue;
+		if (ref === undefined) continue;
 		const at = owners.get(ref.device);
 		// Another Person's Device resolves its offered profiles itself.
 		if (!at || at.offered) continue;
@@ -177,11 +156,11 @@ export async function placeNodes<D>(
 	const labels = new Map<string, string | null>();
 	for (const node of nodes) {
 		const ref = profileOf(node);
-		if (!isProfileRef(ref)) continue;
+		if (ref === undefined) continue;
 		const key = `${ref.device}\u0000${ref.profile}`;
 		if (labels.has(key)) continue;
 		const known = (await lastKnown(ref.device))?.get(ref.profile)?.name;
-		labels.set(key, known ?? idAsName(ref));
+		labels.set(key, known ?? null);
 	}
 	const labelOf = (ref: ProfileRef) =>
 		labels.get(`${ref.device}\u0000${ref.profile}`) ?? null;
@@ -207,7 +186,7 @@ export async function placeNodes<D>(
 	const misfits: string[] = [];
 	const placeOne = (node: FlowNode): FlowNode => {
 		const ref = profileOf(node);
-		if (!isProfileRef(ref)) return node;
+		if (ref === undefined) return node;
 		const at = owners.get(ref.device);
 		if (!at) {
 			const name = gone.get(ref.device) ?? null;

@@ -58,11 +58,14 @@ describe("singleAgentFlow", () => {
 	test("runs an Agent Profile, with only the overrides given", () => {
 		const node = singleAgentFlow({
 			prompt: "x",
-			profile: "worker",
+			profile: { device: "mac", profile: "worker" },
 			model: "opus",
 			permissionMode: "acceptEdits",
 		}).nodes[0];
-		expect(node).toMatchObject({ profile: "worker", model: "opus" });
+		expect(node).toMatchObject({
+			profile: { device: "mac", profile: "worker" },
+			model: "opus",
+		});
 		expect(node).not.toHaveProperty("harness");
 	});
 

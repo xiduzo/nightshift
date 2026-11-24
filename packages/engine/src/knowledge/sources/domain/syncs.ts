@@ -1,9 +1,7 @@
 import {
-	deviceIdOf,
 	type Flow,
 	type KnowledgeSource,
 	knowledgeKitsOf,
-	legacyDeviceName,
 	REVIEW_LEARNINGS_KIT,
 	type Schedule,
 	scheduleSchema,
@@ -186,7 +184,7 @@ function deviceOf(parsed: Flow | null) {
  */
 export function namesOthers(flows: FlowMap, here: string): boolean {
 	return Object.values(flows).some((flow) => {
-		const id = deviceIdOf(flow ? deviceOf(flow) : undefined);
+		const id = flow ? deviceOf(flow) : undefined;
 		return id !== undefined && id !== here;
 	});
 }
@@ -225,21 +223,17 @@ export function fillingFlowsOf<Run extends SourceRun>(input: {
 					at: last.endedAt ?? last.createdAt,
 				}
 			: null;
-		const device = deviceOf(parsed);
-		const deviceId = deviceIdOf(device);
+		const deviceId = deviceOf(parsed);
 		return [
 			{
 				flow,
 				kits: fills,
 				source: parsed ? sourceOf(parsed) : null,
 				computer:
-					device === undefined
+					deviceId === undefined
 						? null
 						: {
-								name:
-									(deviceId === undefined
-										? legacyDeviceName(device)
-										: names.get(deviceId)) ?? ANOTHER_COMPUTER,
+								name: names.get(deviceId) ?? ANOTHER_COMPUTER,
 								here: deviceId === here,
 							},
 				schedule: schedule?.cron

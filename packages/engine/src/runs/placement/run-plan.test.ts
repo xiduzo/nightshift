@@ -313,7 +313,7 @@ describe("the node walk of a run's plan", () => {
 			...devices(["everywhere"]),
 			lastKnown: async (id) =>
 				id === "hetzner-1"
-					? new Map([["p-77", { name: "deliverer", settings: PROFILE }]])
+					? new Map([["everywhere", { name: "deliverer", settings: PROFILE }]])
 					: null,
 		};
 		await expect(
@@ -329,7 +329,7 @@ describe("the node walk of a run's plan", () => {
 				"the-person",
 			),
 		).rejects.toThrow(
-			"The flow uses everywhere on hetzner-1 (deliver), but hetzner-1 has no such profile. Pick another profile. The flow uses a profile on hetzner-1 (ship) that hetzner-1 no longer has. Pick another profile.",
+			"The flow uses deliverer on hetzner-1 (deliver), but hetzner-1 has no such profile. Pick another profile. The flow uses a profile on hetzner-1 (ship) that hetzner-1 no longer has. Pick another profile.",
 		);
 	});
 
@@ -439,7 +439,7 @@ describe("the node walk of a run's plan", () => {
 				"the-person",
 			),
 		).rejects.toThrow(
-			"away is offline, and Night Shift does not know its profile other (work). Start the run when away is online, or pick another profile.",
+			"away is offline, and Night Shift does not know its profile (work). Start the run when away is online, or pick another profile.",
 		);
 	});
 
@@ -463,18 +463,6 @@ describe("the node walk of a run's plan", () => {
 			["twin-a", ["one"]],
 			["twin-b", ["two"]],
 		]);
-	});
-
-	test("a Device name from before ids refuses the run: Night Shift never guesses", async () => {
-		const old = {
-			...command("a"),
-			device: { name: "LE2316" },
-		} as FlowNode;
-		await expect(
-			planNodes({ projectId: "p", flow: flow([old]) }, devices(), "the-person"),
-		).rejects.toThrow(
-			'Node "a" names the device "LE2316", but Night Shift cannot tell which device that is. Choose the device again.',
-		);
 	});
 
 	test("refuses a Device nobody can reach when no other can take the run, and a run's Device without the project", async () => {

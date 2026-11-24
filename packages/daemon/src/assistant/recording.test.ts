@@ -87,7 +87,7 @@ const signal = new AbortController().signal;
 const flow = singleAgentFlow({
 	prompt: "Do the work.",
 	permissionMode: "default",
-	profile: "sonnet",
+	profile: { device: "mac", profile: "sonnet" },
 });
 const suggestion: SuggestionRequest = {
 	projectId: "p1",

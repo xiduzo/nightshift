@@ -5,12 +5,7 @@
  * person's other Devices', and what other people offer to the Space. The
  * settings of a profile are known for this computer's profiles only.
  */
-import {
-	isProfileRef,
-	type NodeProfile,
-	type Profile,
-	type ProfileRef,
-} from "@nightshift/flows";
+import type { Profile, ProfileRef } from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
 import {
 	NativeSelect,
@@ -47,16 +42,12 @@ export function profileOnDevice(choice: {
 
 const keyOf = (ref: ProfileRef) => `${ref.device}\u001f${ref.profile}`;
 
-/** An old profile's id is its name: what a node shows when its profile is gone. */
-const idAsName = (ref: ProfileRef) =>
-	/^[a-z][a-z0-9_]{0,39}$/.test(ref.profile) ? ref.profile : null;
-
 /** The profiles of one kind a node can name, the one it names, and what is wrong with it. */
 function useProfileChoices<P extends Profile & { id: string }>(
 	projectId: string,
 	kind: "agent" | "model",
 	own: readonly P[] | undefined,
-	value: NodeProfile | undefined,
+	value: ProfileRef | undefined,
 ) {
 	const devices = useQuery({ ...runQueries.devices(projectId), ...quiet });
 	const choices: ProfileChoice<P>[] = (devices.data ?? []).flatMap((device) =>
@@ -76,22 +67,19 @@ function useProfileChoices<P extends Profile & { id: string }>(
 				};
 			}),
 	);
-	const ref = isProfileRef(value) ? value : undefined;
 	const chosen =
-		ref === undefined
+		value === undefined
 			? undefined
-			: choices.find((choice) => keyOf(choice.ref) === keyOf(ref));
-	const device = devices.data?.find((d) => d.deviceId === ref?.device);
+			: choices.find((choice) => keyOf(choice.ref) === keyOf(value));
+	const device = devices.data?.find((d) => d.deviceId === value?.device);
 	// A Device whose profiles this computer cannot tell: its node is not marked.
 	const untold = device !== undefined && device.profiles === undefined;
 	return {
 		choices,
 		chosen,
-		/** A name left from format 6: the person picks the profile again. */
-		stale: typeof value === "string" ? value : undefined,
 		/** The node names a profile its Device does not have, or a Device the Space does not. */
 		unknown:
-			ref !== undefined && devices.data !== undefined && !chosen && !untold,
+			value !== undefined && devices.data !== undefined && !chosen && !untold,
 		/** The Device the node's profile names, by its name, when the list has it. */
 		deviceName: device?.name,
 	};
@@ -100,7 +88,7 @@ function useProfileChoices<P extends Profile & { id: string }>(
 /** The Agent Profiles an Agent node can name, and the one it names. */
 export function useAgentProfiles(
 	projectId: string,
-	value: NodeProfile | undefined,
+	value: ProfileRef | undefined,
 ) {
 	const own = useQuery({ ...profileQueries.agents(), ...quiet });
 	return useProfileChoices(projectId, "agent", own.data, value);
@@ -109,24 +97,17 @@ export function useAgentProfiles(
 /** The Model Profiles a Decision or a Value by a model can name, and the one it names. */
 export function useModelProfiles(
 	projectId: string,
-	value: NodeProfile | undefined,
+	value: ProfileRef | undefined,
 ) {
 	const own = useQuery({ ...profileQueries.models(), ...quiet });
 	return useProfileChoices(projectId, "model", own.data, value);
 }
 
-/**
- * Why the node's profile does not run, or null: a name left from format 6,
- * or a profile its Device does not have.
- */
+/** Why the node's profile does not run, or null: its Device does not have it. */
 export function profileProblem(found: {
-	stale: string | undefined;
 	unknown: boolean;
 	deviceName: string | undefined;
 }): string | null {
-	if (found.stale !== undefined) {
-		return `Pick the profile again. This node names "${found.stale}", but not the computer it is on.`;
-	}
 	if (!found.unknown) return null;
 	return found.deviceName
 		? `${found.deviceName} no longer has this profile. The flow cannot run until you pick another profile.`
@@ -144,7 +125,7 @@ export function ProfileSelect<P extends Profile>({
 	onPick,
 }: {
 	id: string;
-	value: NodeProfile | undefined;
+	value: ProfileRef | undefined;
 	choices: ProfileChoice<P>[];
 	/** The node's profile does not run: `profileProblem` says why. */
 	invalid: boolean;
@@ -162,12 +143,7 @@ export function ProfileSelect<P extends Profile>({
 		group.push(choice);
 		groups.set(choice.ref.device, group);
 	}
-	const current =
-		value === undefined
-			? ""
-			: isProfileRef(value)
-				? keyOf(value)
-				: `stale\u001f${value}`;
+	const current = value === undefined ? "" : keyOf(value);
 	const listed = choices.some((choice) => keyOf(choice.ref) === current);
 	return (
 		<NativeSelect
@@ -205,11 +181,9 @@ export function ProfileSelect<P extends Profile>({
 					</NativeSelectOptGroup>
 				);
 			})}
-			{value !== undefined && current !== "" && !listed ? (
+			{value !== undefined && !listed ? (
 				<NativeSelectOption value={current}>
-					{isProfileRef(value)
-						? `${idAsName(value) ?? "A profile"} (not found)`
-						: `${value} (pick again)`}
+					A profile (not found)
 				</NativeSelectOption>
 			) : null}
 		</NativeSelect>

@@ -23,7 +23,6 @@ import {
 	modelAddressProblem,
 	modelProfileSettingsSchema,
 	type ProfileSettings,
-	profileLabel,
 	profileSecrets,
 	profileSettingsSchema,
 	resolveAgentNode,
@@ -140,13 +139,6 @@ describe("validateFlow and profiles", () => {
 	test("a node with a profile needs no harness or model of its own", () => {
 		const issues = validateFlow(flowOf(node()));
 		expect(issues.filter((i) => i.severity === "error")).toEqual([]);
-	});
-
-	test("a profile name left from format 6 runs nowhere: pick the profile again", () => {
-		const issues = validateFlow(flowOf(node({ profile: "builder" })));
-		expect(issues.map((i) => i.message)).toContain(
-			`Agent node "work" names the profile "builder", but Night Shift cannot tell which computer's profile it is. Pick the profile again.`,
-		);
 	});
 
 	test("a node with a profile names no device: the profile's device runs it", () => {
@@ -426,7 +418,7 @@ describe("the profiles of a cascade (ADR 6)", () => {
 			const [named] = nodeProfiles(tier.node);
 			const result = resolveNodeProfile(
 				tier.node,
-				profileFor(profileLabel(named)),
+				profileFor(named?.profile ?? ""),
 			);
 			if ("problem" in result) throw new Error(result.problem);
 			resolved = withTierNode(resolved, tier.index, result.node);

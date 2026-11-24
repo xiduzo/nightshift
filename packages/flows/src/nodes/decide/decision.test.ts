@@ -63,7 +63,7 @@ describe("decider", () => {
 			by: "model",
 			decider: "openai",
 			model: "m",
-			profile: "triage",
+			profile: { device: "mac", profile: "triage" },
 		});
 		for (const by of ["person", "rule"] as const) {
 			const next = withDecidedBy(node, by);
@@ -74,7 +74,7 @@ describe("decider", () => {
 			withValueBy(
 				{
 					...withValueBy(valueNode("v", { x: 0, y: 0 }), "model"),
-					profile: "triage",
+					profile: { device: "mac", profile: "triage" },
 				},
 				"rule",
 			),

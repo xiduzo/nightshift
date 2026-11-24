@@ -175,7 +175,7 @@ describe("nightshift mcp tools", () => {
 		};
 		const result = await call("save_flow", { name: "broken", flow: broken });
 		expect(result.text).toStartWith("Refused: the flow has errors.");
-		expect(result.text).toContain("nobody");
+		expect(result.text).toContain("Pick the profile again.");
 		expect(port.saved.p1?.broken).toBeUndefined();
 		const notAFlow = await call("save_flow", { name: "x", flow: { a: 1 } });
 		expect(notAFlow.text).toStartWith("Refused");

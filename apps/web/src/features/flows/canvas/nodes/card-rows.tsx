@@ -1,4 +1,4 @@
-import type { DeviceRef, EndStatus } from "@nightshift/flows";
+import type { EndStatus } from "@nightshift/flows";
 import { cn } from "@nightshift/ui/lib/utils";
 import { MonitorIcon } from "lucide-react";
 import { useDeviceLabel } from "./device-names-context";
@@ -44,7 +44,7 @@ export function EndRow({
 }
 
 /** The computer a Subflow's steps run on, by its name. */
-export function SubflowDevice({ device }: { device: DeviceRef }) {
+export function SubflowDevice({ device }: { device: string }) {
 	const name = useDeviceLabel(device);
 	return (
 		<span

@@ -2,7 +2,6 @@ import {
 	everyProfileOf,
 	flowConfigUse,
 	flowSecrets,
-	isProfileRef,
 	type ProjectFlowMap,
 	type Schedule,
 	webhookSecretName,
@@ -118,7 +117,7 @@ export function flowUse(projects: readonly ProjectFlowFacts[]): FlowUse {
 			const byProfile = new Map<string, string[]>();
 			for (const node of flow.nodes) {
 				// A cascade names a profile per tier.
-				for (const profile of everyProfileOf(node).filter(isProfileRef)) {
+				for (const profile of everyProfileOf(node)) {
 					const key = profileUseKey(profile.device, profile.profile);
 					const ids = byProfile.get(key) ?? [];
 					if (!ids.includes(node.id)) byProfile.set(key, [...ids, node.id]);

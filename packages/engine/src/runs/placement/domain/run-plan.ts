@@ -2,7 +2,6 @@ import {
 	calledFlowNames,
 	type Flow,
 	type FlowNode,
-	isProfileRef,
 	profileOf,
 	runsAs,
 } from "@nightshift/flows";
@@ -109,11 +108,12 @@ export async function planRun<D, C>(
 		for (const node of body.nodes.flatMap(runsAs)) {
 			const ref = profileOf(node);
 			const id = namedDevice(node);
-			const at = isProfileRef(ref)
-				? (byId.get(ref.device) ?? run)
-				: id !== undefined
-					? (named.get(id) ?? run)
-					: around;
+			const at =
+				ref !== undefined
+					? (byId.get(ref.device) ?? run)
+					: id !== undefined
+						? (named.get(id) ?? run)
+						: around;
 			groups.set(at, (groups.get(at) ?? new Set()).add(node));
 			if (node.type !== "call") continue;
 			const inner = calledByName.get(node.flow);

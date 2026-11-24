@@ -91,18 +91,6 @@ describe("flowConfigUse: the flow's own nodes", () => {
 			],
 		});
 	});
-
-	test("a profile name left from format 6 names no profile", () => {
-		const flow = flowOf([
-			agent("old", {
-				harness: undefined,
-				model: undefined,
-				permissionMode: undefined,
-				profile: "fast",
-			}),
-		]);
-		expect(flowConfigUse(flow).profiles).toEqual([]);
-	});
 });
 
 describe("flowConfigUse: the flows and kits it calls", () => {

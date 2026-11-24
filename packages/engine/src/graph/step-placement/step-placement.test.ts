@@ -142,29 +142,13 @@ describe("the Device of a step, from the plan alone", () => {
 		expect(placement.deviceById(H, row()).name).toBe("hetzner-1");
 	});
 
-	test("a run from before ids: its node names its Device by the name the plan keeps (ADR 14)", () => {
+	test("a Device the plan has no name for: by the node's id, and a run without a Device on its Walker", () => {
 		const placement = placementOver([]);
-		const older = row({ placements: JSON.stringify({ "hetzner-1": H }) });
-		// Its flow snapshot reads as the current format: the name is to choose again.
-		const at = placement.deviceFor(
-			command("y", { device: { name: "hetzner-1" } }),
-			older,
+		const unnamed = row({ deviceNames: null });
+		expect(placement.deviceFor(command("y", { device: H }), unnamed).id).toBe(
+			H,
 		);
-		expect([at.id, at.name]).toEqual([H, "hetzner-1"]);
-	});
-
-	test("a run from before the plan kept names: by the node's name, and before Placement on its Walker", () => {
-		const placement = placementOver([]);
-		const older = row({
-			placements: JSON.stringify({ "hetzner-1": H }),
-			deviceNames: null,
-		});
-		const named = placement.deviceFor(
-			command("y", { device: { name: "hetzner-1" } }),
-			older,
-		);
-		expect([named.id, named.name]).toEqual([H, "hetzner-1"]);
-		expect(placement.deviceFor(command("x"), older).id).toBe(B);
+		expect(placement.deviceFor(command("x"), unnamed).id).toBe(B);
 		expect(
 			placement.deviceFor(
 				command("x"),
@@ -198,16 +182,6 @@ describe("the Device of a step, from the plan alone", () => {
 		expect([first.id, first.name]).toEqual(["twin-a", "twin"]);
 		expect([second.id, second.name]).toEqual(["twin-b", "twin"]);
 		expect(placement.deviceFor(agentOn(A), twins).id).toBe(A);
-	});
-
-	test("a run planned before steps were placed by id still reads: its copy names the profile's Device by name too", () => {
-		const placement = placementOver([]);
-		const older = row({ placements: JSON.stringify({ "hetzner-1": H }) });
-		const at = placement.deviceFor(
-			agentOn(H, "builder", { device: { name: "hetzner-1" } }),
-			older,
-		);
-		expect([at.id, at.name]).toEqual([H, "hetzner-1"]);
 	});
 
 	test("whether the run's worktree is here: the run's Device is this computer, or its Walker", () => {

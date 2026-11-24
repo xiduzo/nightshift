@@ -9,7 +9,6 @@ import {
 	type AgentNode,
 	type JsonValue,
 	knowledgeFolderPath,
-	profileLabel,
 	renderTemplate,
 	resolvedAgent,
 } from "@nightshift/flows";
@@ -189,8 +188,7 @@ export async function runSession(
 				: {
 						...common,
 						offered: {
-							// By id. A run copied from format 6 still holds the name.
-							profile: profileLabel(node.profile),
+							profile: node.profile?.profile ?? "",
 							...(node.permissionMode
 								? { permissionMode: node.permissionMode }
 								: {}),

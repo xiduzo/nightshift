@@ -14,17 +14,12 @@ export {
 } from "./decider";
 export {
 	checkNodeProfile,
-	type DeviceRef,
-	deviceIdOf,
 	deviceIdSchema,
-	isProfileRef,
-	legacyDeviceName,
-	type NodeProfile,
 	nodeProfilePlain,
-	nodeProfileSchema,
 	type ProfileRef,
 	placed,
 	placedPlain,
 	profileFallbacksSchema,
+	profileRefSchema,
 	sameProfileRef,
 } from "./device";

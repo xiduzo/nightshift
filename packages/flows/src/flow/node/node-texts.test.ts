@@ -105,7 +105,6 @@ function declared(type: FlowNodeType): string[] {
 const SHARED_PLAIN = new Set([
 	"label",
 	"device",
-	"device.name",
 	"profile.device",
 	"profile.profile",
 	"fallbacks[].device",

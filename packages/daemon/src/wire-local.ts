@@ -96,8 +96,7 @@ export function wireLocalDevice(
 		// here, next to the run history (ADR 22).
 		runFolders: createRunFolders(dataDir),
 		// The flows another Device's older Walker asks this one for: the
-		// engine's (made later, before anyone can ask), a flow of format 6
-		// as the Device that saved it named its profiles.
+		// engine's (made later, before anyone can ask).
 		flows: deps.flows,
 		// The files agents keep for the person, next to the run history.
 		artifacts: createArtifactStore(dataDir),

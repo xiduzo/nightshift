@@ -1,10 +1,5 @@
 import type { Actor, OwnDevice } from "@nightshift/engine";
-import {
-	deviceIdOf,
-	type FlowNode,
-	type FlowSources,
-	type Schedule,
-} from "@nightshift/flows";
+import type { FlowNode, FlowSources, Schedule } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { type DeviceOffer, offerRefusal, spaceOffers } from "../domain/offers";
 
@@ -84,9 +79,7 @@ export const checkScheduleOffers =
 					// unless they name another Device.
 					.filter(
 						(n) =>
-							!("device" in n) ||
-							!n.device ||
-							deviceIdOf(n.device) === theirs.deviceId,
+							!("device" in n) || !n.device || n.device === theirs.deviceId,
 					);
 			} catch {
 				// A flow that does not load is the schedule's own issue.

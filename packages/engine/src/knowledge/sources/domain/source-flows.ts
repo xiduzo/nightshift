@@ -1,5 +1,4 @@
 import {
-	type DeviceRef,
 	FLOW_VERSION,
 	type Flow,
 	flowNameSchema,
@@ -93,7 +92,7 @@ function checkedInputs(source: KnowledgeSource): Record<string, string> {
 function sourceFlow(
 	kit: KnowledgeSourceKit,
 	inputs: Record<string, string>,
-	device: DeviceRef | undefined,
+	device: string | undefined,
 ) {
 	const kind = knowledgeSourceKind(kit);
 	return flowSchema.parse({
@@ -185,7 +184,7 @@ function free(base: string, taken: ReadonlySet<string>): string {
  * A source that reads a folder of one computer (`local`) names that
  * computer on its Subflow (`device`), so its steps run there whoever
  * starts the run, the Host included: the computer it already names, else
- * `here.device` (where the person adds it). Each by the computer's id. A name from before ids stays, for the person to choose again.
+ * `here.device` (where the person adds it). Each by the computer's id.
  */
 export function savedSource(input: {
 	source: KnowledgeSource;
@@ -196,7 +195,7 @@ export function savedSource(input: {
 	const { source, name, flows } = input;
 	const inputs = checkedInputs(source);
 	let current: KnowledgeSource | null = null;
-	let placed: DeviceRef | undefined;
+	let placed: string | undefined;
 	if (name !== undefined) {
 		const flow = flows[name];
 		current = flow ? sourceOf(flow) : null;
