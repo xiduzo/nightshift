@@ -1,5 +1,10 @@
 import { loginReferences } from "../../device";
 import type { SecretList } from "../../secrets";
+import type {
+	CliToolStore,
+	ConnectionStore,
+	ProfileStore,
+} from "../../settings";
 import {
 	type CliToolInUse,
 	listCliToolUse,
@@ -17,12 +22,7 @@ import {
 	listSharedSecretUse,
 	type SharedSecretInUse,
 } from "./application/list-shared-secret-use";
-import type {
-	ConfiguredCliTools,
-	ConfiguredConnections,
-	ConfiguredProfiles,
-	ToolSignIns,
-} from "./application/ports";
+import type { ToolSignIns } from "./application/ports";
 import type { SpaceFlowReader } from "./domain/flow-use";
 import type { Asker, SecretOwner } from "./domain/secret-users";
 
@@ -34,9 +34,12 @@ export type ConfigUseDeps = {
 	deviceId: string;
 	/** A Space as `at` sees it: its projects, their flows and schedules. */
 	space(at: Asker): SpaceFlowReader;
-	connections: ConfiguredConnections;
-	cliTools: ConfiguredCliTools;
-	profiles: ConfiguredProfiles;
+	connections: Pick<
+		ConnectionStore,
+		"list" | "secrets" | "projectSecrets" | "spaceSecrets"
+	>;
+	cliTools: Pick<CliToolStore, "list">;
+	profiles: Pick<ProfileStore, "list">;
 	toolLaunchers: ToolSignIns;
 };
 

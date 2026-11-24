@@ -1,4 +1,3 @@
-import type { Schedule } from "@nightshift/flows";
 import type { RowBatch } from "../../contract";
 import type {
 	MovedRuns,
@@ -82,23 +81,6 @@ export type MoveHolds = {
  */
 export type ThisWalker = {
 	walkerId(): Promise<string>;
-};
-
-/**
- * The schedules of the moved Projects.
- * @filledBy engine/flows
- */
-export type MovedSchedules = {
-	/** The project's schedules. Refuses (`not-found`) a removed project. */
-	schedules(
-		projectId: string,
-		options: { validate: false },
-	): Promise<{ schedules: Schedule[] }>;
-	/** Saves the project's schedules. */
-	saveSchedules(
-		projectId: string,
-		schedules: readonly Schedule[],
-	): Promise<unknown>;
 };
 
 /**

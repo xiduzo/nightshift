@@ -1,10 +1,9 @@
 import type { ProjectFlowMap } from "@nightshift/flows";
 import type { ProjectSecretName, SecretView } from "../../../../secrets";
-import type { CliTool, Connection, ProfileView } from "../../../../settings";
+import type { Connection, ConnectionStore } from "../../../../settings";
+import { inMemoryCliTools } from "../../../../settings/cli-tools/adapters/out/in-memory-cli-tools";
+import { inMemoryProfiles } from "../../../../settings/profiles/adapters/out/in-memory-profiles";
 import type {
-	ConfiguredCliTools,
-	ConfiguredConnections,
-	ConfiguredProfiles,
 	SpaceViews,
 	ThisDevice,
 	ToolLogins,
@@ -68,7 +67,10 @@ export function inMemorySpaceViews(): InMemorySpaceViews {
  * names saved here. `shared` gives the names of each project's secrets
  * and of the Space's (`space`): an error is what reading them throws.
  */
-export type InMemoryConfiguredConnections = ConfiguredConnections & {
+export type InMemoryConfiguredConnections = Pick<
+	ConnectionStore,
+	"list" | "secrets" | "projectSecrets" | "spaceSecrets"
+> & {
 	connections: Connection[];
 	saved: string[];
 	personal: "available" | "unavailable";
@@ -112,30 +114,6 @@ export function inMemoryConfiguredConnections(): InMemoryConfiguredConnections {
 	return store;
 }
 
-export type InMemoryConfiguredCliTools = ConfiguredCliTools & {
-	tools: CliTool[];
-};
-
-export function inMemoryConfiguredCliTools(): InMemoryConfiguredCliTools {
-	const store: InMemoryConfiguredCliTools = {
-		tools: [],
-		list: () => store.tools,
-	};
-	return store;
-}
-
-export type InMemoryConfiguredProfiles = ConfiguredProfiles & {
-	profiles: ProfileView[];
-};
-
-export function inMemoryConfiguredProfiles(): InMemoryConfiguredProfiles {
-	const store: InMemoryConfiguredProfiles = {
-		profiles: [],
-		list: () => store.profiles,
-	};
-	return store;
-}
-
 /** When each tool last signed in, by `<tool>` or `<tool>/<project>`. */
 export type InMemoryToolSignIns = ToolSignIns & {
 	at: Record<string, number>;
@@ -175,8 +153,8 @@ export function inMemoryConfigUsePorts() {
 		device: inMemoryThisDevice("d1"),
 		spaces: inMemorySpaceViews(),
 		connections: inMemoryConfiguredConnections(),
-		cliTools: inMemoryConfiguredCliTools(),
-		profiles: inMemoryConfiguredProfiles(),
+		cliTools: inMemoryCliTools(),
+		profiles: inMemoryProfiles(),
 		toolLaunchers: inMemoryToolSignIns(),
 		logins: inMemoryToolLogins(),
 	};

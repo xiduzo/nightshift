@@ -1,11 +1,11 @@
 import type { FlowMigration } from "@nightshift/flows";
+import type { ProfileStore } from "../../../settings";
 import {
 	flowMigration,
 	type MigrationScope,
 	spaceDevices,
 } from "../domain/device-names";
 import type {
-	DeviceProfiles,
 	KnownDevices,
 	SpaceDevices,
 	StoredDevices,
@@ -16,7 +16,7 @@ export type ReadFlowMigrationPorts = {
 	device: ThisDevice;
 	stored: StoredDevices;
 	/** Without them, the profiles of this Device's stored document. */
-	profiles?: DeviceProfiles | undefined;
+	profiles?: Pick<ProfileStore, "list"> | undefined;
 	/** Without them, only the documents. */
 	directory?: KnownDevices | undefined;
 	/** Without them, every Device counts. */

@@ -29,14 +29,6 @@ export type StoredDevices = {
 };
 
 /**
- * This Device's profiles, fresher than its stored document.
- * @filledBy engine/settings
- */
-export type DeviceProfiles = {
-	list(): readonly NamedProfile[];
-};
-
-/**
  * The Device rows of this Replica: their names and owners (on a Host,
  * every paired Device), and the owner of this computer.
  * @filledBy devices

@@ -1,5 +1,10 @@
 import type { SecretList, SecretView } from "../../../secrets";
-import type { Connection } from "../../../settings";
+import type {
+	CliToolStore,
+	Connection,
+	ConnectionStore,
+	ProfileStore,
+} from "../../../settings";
 import { type FlowRef, flowUse, readSpaceFlows } from "../domain/flow-use";
 import {
 	type Asker,
@@ -8,21 +13,17 @@ import {
 	secretUsers,
 	sharedNames,
 } from "../domain/secret-users";
-import type {
-	ConfiguredCliTools,
-	ConfiguredConnections,
-	ConfiguredProfiles,
-	SpaceViews,
-	ThisDevice,
-	ToolLogins,
-} from "./ports";
+import type { SpaceViews, ThisDevice, ToolLogins } from "./ports";
 
 export type ListConnectionUsePorts = {
 	device: ThisDevice;
 	spaces: SpaceViews;
-	connections: ConfiguredConnections;
-	cliTools: ConfiguredCliTools;
-	profiles: ConfiguredProfiles;
+	connections: Pick<
+		ConnectionStore,
+		"list" | "secrets" | "projectSecrets" | "spaceSecrets"
+	>;
+	cliTools: Pick<CliToolStore, "list">;
+	profiles: Pick<ProfileStore, "list">;
 	logins: ToolLogins;
 };
 

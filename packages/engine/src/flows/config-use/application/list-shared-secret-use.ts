@@ -1,26 +1,27 @@
 import { Refusal } from "@nightshift/refusal";
 import type { ProjectSecretName } from "../../../secrets";
+import type {
+	CliToolStore,
+	ConnectionStore,
+	ProfileStore,
+} from "../../../settings";
 import { type FlowRef, flowUse, readSpaceFlows } from "../domain/flow-use";
 import {
 	type Asker,
 	type SecretOwner,
 	secretUsers,
 } from "../domain/secret-users";
-import type {
-	ConfiguredCliTools,
-	ConfiguredConnections,
-	ConfiguredProfiles,
-	SpaceViews,
-	ThisDevice,
-	ToolLogins,
-} from "./ports";
+import type { SpaceViews, ThisDevice, ToolLogins } from "./ports";
 
 export type ListSharedSecretUsePorts = {
 	device: ThisDevice;
 	spaces: SpaceViews;
-	connections: ConfiguredConnections;
-	cliTools: ConfiguredCliTools;
-	profiles: ConfiguredProfiles;
+	connections: Pick<
+		ConnectionStore,
+		"list" | "secrets" | "projectSecrets" | "spaceSecrets"
+	>;
+	cliTools: Pick<CliToolStore, "list">;
+	profiles: Pick<ProfileStore, "list">;
 	logins: ToolLogins;
 };
 

@@ -141,7 +141,7 @@ describe("moveProjects", () => {
 
 	test("schedules change before the batch, and the caller's rows see how many", async () => {
 		const ports = seeded();
-		ports.movedSchedules.lists.set("app", [
+		await ports.movedSchedules.saveSchedules("app", [
 			schedule("nightly", true),
 			schedule("weekly", false),
 		]);
@@ -162,7 +162,8 @@ describe("moveProjects", () => {
 		});
 		expect(moved.schedules).toBe(1);
 		expect(counted).toBe(1);
-		expect(ports.movedSchedules.lists.get("app")).toEqual([
+		const { schedules } = await ports.movedSchedules.schedules("app");
+		expect(schedules).toEqual([
 			schedule("nightly", false),
 			schedule("weekly", false),
 		]);

@@ -5,10 +5,8 @@ import { readFlowMigration } from "./read-flow-migration";
 describe("readFlowMigration", () => {
 	test("finds a profile of this Device by its name, also one renamed after ids came", async () => {
 		const ports = inMemoryMigrationsPorts();
-		ports.profiles.profiles = [
-			{ id: "builder", name: "maker" },
-			{ id: "fresh", name: "builder" },
-		];
+		await ports.profiles.save({ name: "maker", decider: "ollama" }, "builder");
+		await ports.profiles.save({ name: "builder", decider: "ollama" }, "fresh");
 		const migration = await readFlowMigration(ports)({ deviceId: "laptop" });
 		expect(migration.deviceId).toBe("laptop");
 		expect(migration.profileIdByName("laptop", "builder")).toBe("fresh");

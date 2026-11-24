@@ -1,27 +1,25 @@
-import type { CliTool } from "../../../settings";
+import type {
+	CliTool,
+	CliToolStore,
+	ConnectionStore,
+	ProfileStore,
+} from "../../../settings";
 import { type FlowRef, flowUse, readSpaceFlows } from "../domain/flow-use";
 import {
 	type Asker,
 	profilesNaming,
 	sharedNames,
 } from "../domain/secret-users";
-import type {
-	ConfiguredCliTools,
-	ConfiguredConnections,
-	ConfiguredProfiles,
-	SpaceViews,
-	ToolLogins,
-	ToolSignIns,
-} from "./ports";
+import type { SpaceViews, ToolLogins, ToolSignIns } from "./ports";
 
 export type ListCliToolUsePorts = {
 	spaces: SpaceViews;
 	connections: Pick<
-		ConfiguredConnections,
+		ConnectionStore,
 		"secrets" | "projectSecrets" | "spaceSecrets"
 	>;
-	cliTools: ConfiguredCliTools;
-	profiles: ConfiguredProfiles;
+	cliTools: Pick<CliToolStore, "list">;
+	profiles: Pick<ProfileStore, "list">;
 	toolLaunchers: ToolSignIns;
 	logins: ToolLogins;
 };

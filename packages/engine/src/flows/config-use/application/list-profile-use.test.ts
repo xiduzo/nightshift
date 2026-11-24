@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test";
 import type { Flow } from "@nightshift/flows";
-import type { ProfileView } from "../../../settings";
 import { inMemoryConfigUsePorts } from "../adapters/out/in-memory-neighbours";
 import { listProfileUse } from "./list-profile-use";
 
@@ -14,19 +13,20 @@ const agent = (id: string, device: string, profile: string) => ({
 	clis: [],
 	profile: { device, profile },
 });
-const profile = (id: string) =>
-	({
-		id,
-		name: id,
-		harness: "claude-code",
-		connections: [],
-		clis: [],
-	}) as never as ProfileView;
+const profile = (name: string) => ({
+	name,
+	harness: "claude-code" as const,
+	model: "sonnet",
+	permissionMode: "auto" as const,
+	connections: [],
+	clis: [],
+});
 
 describe("listProfileUse", () => {
 	test("lists the nodes that name each profile of this Device, in the Space of the Person who asks", async () => {
 		const ports = inMemoryConfigUsePorts();
-		ports.profiles.profiles = [profile("fast"), profile("slow")];
+		await ports.profiles.save(profile("fast"), "fast");
+		await ports.profiles.save(profile("slow"), "slow");
 		ports.spaces.projects = [
 			{
 				id: "p1",

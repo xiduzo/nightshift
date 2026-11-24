@@ -1,9 +1,8 @@
-import type { Schedule } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { inMemoryAccess } from "../../../access/adapters/out/in-memory-access";
 import type { RowBatch } from "../../../contract";
+import { inMemoryFlows } from "../../../flows/store/adapters/out/in-memory-flows";
 import type {
-	MovedSchedules,
 	MoveHolds,
 	MoveLog,
 	MoveRows,
@@ -51,23 +50,20 @@ export function inMemoryThisWalker(
 	};
 }
 
-/** The schedules of each Project. A Project without a list is removed (`not-found`). */
-export function inMemoryMovedSchedules(steps: string[]) {
-	const lists = new Map<string, Schedule[]>();
-	const port: MovedSchedules = {
-		async schedules(projectId) {
-			steps.push(`schedules ${projectId}`);
-			const list = lists.get(projectId);
-			if (!list) throw new Refusal("not-found", "That project does not exist.");
-			return { schedules: list };
+/** The flows of the Projects, with each read and save of a schedule as a step. */
+function movedSchedules(steps: string[], spaces: Record<string, string>) {
+	const flows = inMemoryFlows(spaces);
+	return {
+		...flows,
+		schedules(...args: Parameters<typeof flows.schedules>) {
+			steps.push(`schedules ${args[0]}`);
+			return flows.schedules(...args);
 		},
-		async saveSchedules(projectId, schedules) {
-			steps.push(`save schedules ${projectId}`);
-			lists.set(projectId, [...schedules]);
-			return [];
+		saveSchedules(...args: Parameters<typeof flows.saveSchedules>) {
+			steps.push(`save schedules ${args[0]}`);
+			return flows.saveSchedules(...args);
 		},
 	};
-	return { ...port, lists };
 }
 
 /** The rows of a package above the engine: a batch of one marker per call. */
@@ -196,7 +192,7 @@ export function inMemorySpaceMovePorts() {
 				return store.commit(batches);
 			},
 		},
-		movedSchedules: inMemoryMovedSchedules(steps),
+		movedSchedules: movedSchedules(steps, { app: "from" }),
 		spaceEntries: {
 			...spaceEntries,
 			async move(move: Parameters<typeof spaceEntries.move>[0]) {

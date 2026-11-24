@@ -1,5 +1,5 @@
+import { inMemoryProfiles } from "../../../../settings/profiles/adapters/out/in-memory-profiles";
 import type {
-	DeviceProfiles,
 	KnownDevices,
 	SpaceDevices,
 	StoredDevices,
@@ -32,18 +32,6 @@ export function inMemoryStoredDevices(): InMemoryStoredDevices {
 		list: async () => stored.devices,
 	};
 	return stored;
-}
-
-export type InMemoryDeviceProfiles = DeviceProfiles & {
-	profiles: NamedProfile[];
-};
-
-export function inMemoryDeviceProfiles(): InMemoryDeviceProfiles {
-	const own: InMemoryDeviceProfiles = {
-		profiles: [],
-		list: () => own.profiles,
-	};
-	return own;
 }
 
 export type InMemoryKnownDevices = KnownDevices & {
@@ -94,7 +82,7 @@ export function inMemoryMigrationsPorts() {
 	return {
 		device: inMemoryThisDevice("laptop", "MacBook"),
 		stored: inMemoryStoredDevices(),
-		profiles: inMemoryDeviceProfiles(),
+		profiles: inMemoryProfiles(),
 		directory: inMemoryKnownDevices(),
 		spaces: inMemorySpaceDevices(),
 	};

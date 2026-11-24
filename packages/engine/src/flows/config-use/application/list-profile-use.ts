@@ -1,4 +1,4 @@
-import type { ProfileView } from "../../../settings";
+import type { ProfileStore, ProfileView } from "../../../settings";
 import {
 	type FlowRef,
 	flowUse,
@@ -6,12 +6,12 @@ import {
 	readSpaceFlows,
 } from "../domain/flow-use";
 import type { Asker } from "../domain/secret-users";
-import type { ConfiguredProfiles, SpaceViews, ThisDevice } from "./ports";
+import type { SpaceViews, ThisDevice } from "./ports";
 
 export type ListProfileUsePorts = {
 	device: ThisDevice;
 	spaces: SpaceViews;
-	profiles: ConfiguredProfiles;
+	profiles: Pick<ProfileStore, "list">;
 };
 
 /** A profile of this computer, with the nodes that name it. */

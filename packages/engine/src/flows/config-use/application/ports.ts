@@ -1,10 +1,5 @@
 import type { ToolLaunchers } from "../../../device";
-import type {
-	CliTool,
-	CliToolStore,
-	ConnectionStore,
-	ProfileStore,
-} from "../../../settings";
+import type { CliTool } from "../../../settings";
 import type { SpaceFlowReader } from "../domain/flow-use";
 import type { Asker } from "../domain/secret-users";
 
@@ -26,28 +21,6 @@ export type ThisDevice = { readonly id: string };
  * @filledBy daemon
  */
 export type SpaceViews = { open(at: Asker): SpaceFlowReader };
-
-/**
- * This computer's connections, and the secrets of this computer, of its
- * Person, of a project and of the Space.
- * @filledBy engine/settings
- */
-export type ConfiguredConnections = Pick<
-	ConnectionStore,
-	"list" | "secrets" | "projectSecrets" | "spaceSecrets"
->;
-
-/**
- * This computer's CLI tools.
- * @filledBy engine/settings
- */
-export type ConfiguredCliTools = Pick<CliToolStore, "list">;
-
-/**
- * This computer's profiles.
- * @filledBy engine/settings
- */
-export type ConfiguredProfiles = Pick<ProfileStore, "list">;
 
 /**
  * When a CLI tool's login last signed in, on this computer or for a

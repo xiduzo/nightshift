@@ -1,6 +1,6 @@
 import type { FlowMigration } from "@nightshift/flows";
+import type { ProfileStore } from "../../settings";
 import type {
-	DeviceProfiles,
 	KnownDevices,
 	SpaceDevices,
 	StoredDevices,
@@ -28,7 +28,7 @@ export type FlowMigrations = {
 export function wireMigrations(deps: {
 	device: ThisDevice;
 	stored: StoredDevices;
-	profiles?: DeviceProfiles | undefined;
+	profiles?: Pick<ProfileStore, "list"> | undefined;
 	directory?: KnownDevices | undefined;
 	spaces?: SpaceDevices | undefined;
 }): FlowMigrations {

@@ -1,13 +1,13 @@
 import type { Database } from "@nightshift/db";
 import type { Access } from "../access";
 import type { SpaceDocuments } from "../documents";
+import type { ProjectFlows } from "../flows";
 import { drizzleMoveStore } from "./adapters/out/drizzle-move-store";
 import { yjsSpaceEntries } from "./adapters/out/yjs-space-entries";
 import { forgetSpace } from "./application/forget-space";
 import { moveProject } from "./application/move-project";
 import { moveProjects } from "./application/move-projects";
 import type {
-	MovedSchedules,
 	MoveHolds,
 	MoveLog,
 	MoveRows,
@@ -30,7 +30,7 @@ export type SpaceMoveDeps = {
 	documents: Pick<SpaceDocuments, "open" | "remove">;
 	holds: MoveHolds;
 	walker: ThisWalker;
-	movedSchedules: MovedSchedules;
+	movedSchedules: Pick<ProjectFlows, "schedules" | "saveSchedules">;
 	/** The rows of the packages above the engine, in this order. */
 	moveRows: readonly MoveRows[];
 	reread: Reread;

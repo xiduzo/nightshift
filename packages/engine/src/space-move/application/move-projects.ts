@@ -1,13 +1,13 @@
 import type { Schedule } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import type { RowBatch } from "../../contract";
+import type { ProjectFlows } from "../../flows";
 import {
 	groupBySpace,
 	type MovedProjects,
 	type ProjectsMove,
 } from "../domain/move";
 import type {
-	MovedSchedules,
 	MoveHolds,
 	MoveRows,
 	MoveStore,
@@ -21,7 +21,7 @@ export type MoveProjectsPorts = {
 	holds: MoveHolds;
 	walker: ThisWalker;
 	moveStore: Pick<MoveStore, "runIds" | "projectRows" | "batchOf" | "commit">;
-	movedSchedules: MovedSchedules;
+	movedSchedules: Pick<ProjectFlows, "schedules" | "saveSchedules">;
 	spaceEntries: Pick<SpaceEntries, "move">;
 	/** The rows of the packages above the engine, in this order. */
 	moveRows: readonly MoveRows[];
@@ -31,7 +31,7 @@ export type MoveProjectsPorts = {
 
 /** Changes the schedules of the Projects. Returns how many changed. */
 async function editSchedules(
-	schedules: MovedSchedules,
+	schedules: Pick<ProjectFlows, "schedules" | "saveSchedules">,
 	projectIds: readonly string[],
 	edit: (schedule: Schedule) => Schedule,
 ): Promise<number> {
