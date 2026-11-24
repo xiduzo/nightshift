@@ -401,7 +401,7 @@ A Command node reads secrets too. `"secrets": ["API_USER", "API_PASSWORD"]` give
 - the run's `step`, `agent_session` and `event` rows
 - a `transcript` table (`step_id`, `line_no`, `seq`, `json`) with the lines of each step's transcript file. `missing_transcripts` lists a missing file.
 
-Settings, connections and secrets stay out. The values of saved secrets, and of the variables the connections reference, become `•••` in transcripts, event payloads, prompts, the flow and the title. Other text is copied as is, so check a transcript before you share it. `openRunBundle` in `packages/engine` reads a bundle back: the same events give the same status, steps, outputs and cost.
+Settings, connections and secrets stay out. The values of saved secrets, and of the variables the connections reference, become `•••` in transcripts, event payloads, prompts, the flow and the title. Other text is copied as is, so check a transcript before you share it. The events of a bundle give the same status, steps, outputs and cost.
 
 ## 7. Open items
 
@@ -424,7 +424,7 @@ Settings, connections and secrets stay out. The values of saved secrets, and of 
 - Secrets use the macOS keychain through `Bun.secrets`. A packaged desktop build signs a different binary. Check that it can read items saved by the `bun` daemon.
 - The lease fences on the heartbeat only. A daemon that lost the lease can still write for up to one heartbeat (10 s) before it exits. The stale check compares the heartbeat with this machine's clock. Two machines on one remote database need clocks that agree within the stale window.
 - Runs are never deleted, and nothing removes old transcripts. A run bundle could be the archive before a run is deleted. Retention is not decided.
-- A run bundle leaves out command logs (`logs/<runId>/<stepId>.log`). The command step's transcript holds its output. The UI cannot open a bundle yet. Only `openRunBundle` reads one.
+- A run bundle leaves out command logs (`logs/<runId>/<stepId>.log`). The command step's transcript holds its output. The UI cannot open a bundle.
 - A run bundle masks secret values only if they are saved or a connection references them. A value from the environment that a node's own `mcpServers` reads goes in as is.
 - Automatic resume after a restart is tested with fake harnesses and a fake clock only. A Decision step runs again from the start on resume.
 - A guard can change in the few seconds before the daemon resumes a run (the scheduler switched off, the stop time came). Then the run stays `interrupted` with the plain end reason. Only the daemon's log says why.

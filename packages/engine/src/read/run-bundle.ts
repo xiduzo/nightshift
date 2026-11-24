@@ -17,46 +17,26 @@ import {
 	sqliteTable,
 	text,
 } from "drizzle-orm/sqlite-core";
-import {
-	type LoggedEvent,
-	parseEventRow,
-	runFiles,
-	type TranscriptEntry,
-} from "../log";
-import { readFormat1, readFormat2, readRows } from "./bundle-rows";
+import { runFiles, type TranscriptEntry } from "../log";
 
 /**
  * A run bundle is one run in its own small SQLite file: the run, its
  * project and the project's Clones (its folders), its steps, sessions and events, and the lines of
  * its transcripts. The tables keep the names and columns of the daemon's
- * database, so the queries and derivations that read the live log read a
- * bundle too. Nothing from settings, connections or secrets goes in.
+ * database, so a query of the live log reads a bundle too. Nothing from settings, connections or secrets goes in.
  *
  * Call steps belong to the run that calls them (their
  * scope names the calling step), so the run's own rows hold all of it.
  */
 
-/**
- * The format this Night Shift writes. 10: whether the project has a
- * folder (ADR 22). 9: the run's fallback Devices.
- * 8: the run's Flow revisions.
- * 7: the names of the run's Devices.
- * 6: the Devices the run's nodes name.
- * 5: the Device the run's steps run on. 4: the Person who started the run.
- * 3: the Space on every row. 2: the project by its remote, with its
- * Clones; the Walker on runs, steps and events. Format 1 to 3 bundles
- * still open: see `openRunBundle`.
- */
-export const RUN_BUNDLE_FORMAT_VERSION = 10;
-
-/** The formats `openRunBundle` reads. */
-const READABLE_FORMATS = [1, 2, 3, 4, 5, 6, 7, 8, 9, RUN_BUNDLE_FORMAT_VERSION];
+/** The format of the file. */
+const RUN_BUNDLE_FORMAT_VERSION = 10;
 
 /** What stands in for a secret value that a bundle leaves out. */
 const MASK = "•••";
 
 /** One line of a step's transcript file, as written. */
-const transcript = sqliteTable(
+export const transcript = sqliteTable(
 	"transcript",
 	{
 		stepId: text("step_id").notNull(),
@@ -70,7 +50,7 @@ const transcript = sqliteTable(
 );
 
 /** Facts about the bundle itself. `value` is JSON-encoded. */
-const bundle = sqliteTable("bundle", {
+export const bundle = sqliteTable("bundle", {
 	key: text("key").primaryKey(),
 	value: text("value").notNull(),
 });
@@ -89,18 +69,6 @@ const DDL = [
 	`CREATE TABLE \`event\` (\`seq\` integer PRIMARY KEY, \`space_id\` text NOT NULL, \`run_id\` text, \`step_id\` text, \`session_id\` text, \`type\` text NOT NULL, \`payload\` text DEFAULT '{}' NOT NULL, ${createdAt}, \`walker_id\` text NOT NULL, \`walker_seq\` integer NOT NULL)`,
 	"CREATE TABLE `transcript` (`step_id` text NOT NULL, `line_no` integer NOT NULL, `seq` integer NOT NULL, `json` text NOT NULL, PRIMARY KEY (`step_id`, `line_no`))",
 ];
-
-export type RunBundleMeta = {
-	formatVersion: number;
-	exportedAt: number;
-	runId: string;
-	/** The last database migration of the daemon that wrote the bundle. */
-	schema: string | null;
-	/** Steps whose transcript file was not on disk. */
-	missingTranscripts: string[];
-	/** How many texts had a secret value taken out. */
-	redacted: number;
-};
 
 export type RunBundleSummary = {
 	path: string;
@@ -229,84 +197,6 @@ export async function exportRun(options: {
 		};
 	} finally {
 		out.$client.close();
-	}
-}
-
-export type RunBundle = {
-	meta: RunBundleMeta;
-	project: typeof project.$inferSelect | null;
-	/** The project's folders, one per Device. */
-	clones: (typeof clone.$inferSelect)[];
-	run: typeof run.$inferSelect;
-	steps: (typeof step.$inferSelect)[];
-	sessions: (typeof agentSession.$inferSelect)[];
-	/** The run's events, oldest first, ready for `foldRun`. */
-	events: LoggedEvent[];
-	/** Transcript entries ordered by seq: one step's, or the whole run's. */
-	transcript(stepId?: string): Promise<TranscriptEntry[]>;
-	close(): void;
-};
-
-/** Opens a run bundle to read. It never writes to the file. */
-export async function openRunBundle(path: string): Promise<RunBundle> {
-	if (!existsSync(path)) throw new Error(`${path} does not exist.`);
-	const db = createDb({ DATABASE_URL: `file:${path}` }, { singleFile: true });
-	try {
-		const tables = await db.all<{ name: string }>(
-			sql`select name from sqlite_master where type = 'table' and name = 'bundle'`,
-		);
-		if (tables.length === 0) {
-			throw new Error(`${path} is not a Night Shift run bundle.`);
-		}
-		const meta = new Map(
-			(await db.select().from(bundle)).map((row) => [
-				row.key,
-				JSON.parse(row.value) as unknown,
-			]),
-		);
-		const formatVersion = Number(meta.get("format_version"));
-		if (!READABLE_FORMATS.includes(formatVersion)) {
-			throw new Error(
-				`${path} is a run bundle of format ${formatVersion}. This Night Shift reads format ${READABLE_FORMATS.join(" and ")}.`,
-			);
-		}
-		const runId = String(meta.get("run_id"));
-		const rows =
-			formatVersion === 1
-				? await readFormat1(db, runId)
-				: formatVersion === 2
-					? await readFormat2(db, runId)
-					: await readRows(db, runId, formatVersion);
-		const { run: runRow, project: projectRow, clones, steps, sessions } = rows;
-		if (!runRow) throw new Error(`${path} has no run ${runId}.`);
-		return {
-			meta: {
-				formatVersion,
-				exportedAt: Number(meta.get("exported_at")),
-				runId,
-				schema: (meta.get("schema") as string | null) ?? null,
-				missingTranscripts: (meta.get("missing_transcripts") as string[]) ?? [],
-				redacted: Number(meta.get("redacted") ?? 0),
-			},
-			project: projectRow ?? null,
-			clones,
-			run: runRow,
-			steps,
-			sessions,
-			events: rows.events.map(parseEventRow),
-			async transcript(stepId) {
-				const query = db.select({ json: transcript.json }).from(transcript);
-				const rows = await (stepId
-					? query.where(eq(transcript.stepId, stepId))
-					: query
-				).orderBy(asc(transcript.seq));
-				return rows.map((row) => JSON.parse(row.json) as TranscriptEntry);
-			},
-			close: () => db.$client.close(),
-		};
-	} catch (error) {
-		db.$client.close();
-		throw error;
 	}
 }
 

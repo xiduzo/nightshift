@@ -16,7 +16,6 @@ export { createRunLog, type RunLog } from "../log/run-log/run-log";
 export { placedRun } from "../log/run-row/run-row";
 export { createRunBus, type RunBus } from "../log/transcript/bus";
 export type { LandedChange } from "../read/landed-facts";
-export { openRunBundle } from "../read/run-bundle";
 
 export { answerCostsOn } from "./answer-costs";
 export {
@@ -31,6 +30,7 @@ export { deviceRowsOn, placesOn } from "./device-rows";
 export { testInbox } from "./gates";
 export { joinSpace } from "./join-space";
 export { testKnowledge } from "./knowledge";
+export { openRunBundle } from "./run-bundle";
 export { runEvents } from "./run-events";
 export { seedFlows } from "./seed-flows";
 export {
