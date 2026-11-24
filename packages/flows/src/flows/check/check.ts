@@ -1,5 +1,6 @@
 /** Checks a draft in its place: the schema, the connections, profiles, Devices and CLI programs it names, what needs the project's folder, and `validateFlow`. */
 
+import { messageOf } from "@nightshift/refusal";
 import { everyProfileOf, runsAs } from "../../agents";
 import { type Flow, type FlowNode, flowSchema, profileOf } from "../../flow";
 import type { AgentNode, ProfileRef } from "../../nodes";
@@ -208,7 +209,7 @@ export function checkDraft(
 		if (folder === false)
 			issues.push(...folderIssues(flow, messages, flows, name));
 	} catch (error) {
-		validatorError = error instanceof Error ? error.message : String(error);
+		validatorError = messageOf(error);
 	}
 	return { issues, validatorError };
 }

@@ -1,4 +1,5 @@
 import { lookup } from "node:dns/promises";
+import { messageOf } from "@nightshift/refusal";
 import ipaddr from "ipaddr.js";
 
 /**
@@ -113,7 +114,7 @@ export async function checkHost(
 		} catch (error) {
 			return {
 				kind: "unresolved",
-				message: error instanceof Error ? error.message : String(error),
+				message: messageOf(error),
 			};
 		}
 		if (addresses.length === 0) {

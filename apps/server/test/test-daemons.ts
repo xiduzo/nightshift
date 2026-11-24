@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import type { AppRouterClient } from "@nightshift/api";
 import type { SpaceEngine, SpaceFlows } from "@nightshift/engine";
+import { messageOf } from "@nightshift/refusal";
 import { now } from "@nightshift/time";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
@@ -228,7 +229,7 @@ async function untilAnswers(
 			if (response.ok) return null;
 			last = `GET / answered ${response.status}`;
 		} catch (error) {
-			last = `GET / failed: ${error instanceof Error ? error.message : String(error)}`;
+			last = `GET / failed: ${messageOf(error)}`;
 		}
 		if (child.exitCode !== null || child.signalCode !== null) {
 			return `it stopped (${endOf(child)}) after it said it listens. ${last}.`;

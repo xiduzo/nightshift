@@ -7,6 +7,7 @@
  * Claude Code sees them, for `--allowedTools`, and reads a subagent's
  * messages, which the AG-UI translation drops too.
  */
+import { isRecord } from "@nightshift/flows";
 import type { BRIDGED_MCP_SERVER_NAME as ADAPTER_BRIDGE_NAME } from "@tanstack/ai-claude-code";
 import type { AgentEvent, AgentUsage } from "../../port";
 import {
@@ -15,7 +16,6 @@ import {
 	asString,
 	failureKind,
 	type HarnessProfile,
-	isRecord,
 	parseLegacyResetAt,
 	REPORT_TOOL_NAME,
 	type SdkSignals,

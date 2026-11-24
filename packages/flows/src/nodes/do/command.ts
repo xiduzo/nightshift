@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isRecord } from "../../json";
 import {
 	jsonSchemaSchema,
 	type NodeCheck,
@@ -202,10 +203,10 @@ export function dataExitFor(
 	node: Pick<CommandNode, "exits">,
 	data: unknown,
 ): CommandExit | undefined {
-	if (typeof data !== "object" || data === null || Array.isArray(data)) {
+	if (!isRecord(data)) {
 		return undefined;
 	}
-	const outcome = (data as Record<string, unknown>).outcome;
+	const { outcome } = data;
 	if (typeof outcome !== "string") return undefined;
 	return commandExits(node).find((exit) => exit.name === outcome);
 }

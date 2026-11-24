@@ -14,10 +14,7 @@ import {
 	type ShownNotification as Shown,
 	staleGates,
 } from "@nightshift/client";
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
-}
+import { isRecord } from "@nightshift/flows";
 
 /**
  * The `data` of a push that reached the background task. iOS gives the

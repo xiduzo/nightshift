@@ -1,12 +1,8 @@
-import { FLOW_VERSION } from "@nightshift/flows";
+import { FLOW_VERSION, isRecord } from "@nightshift/flows";
 import type { QueryClient } from "@tanstack/react-query";
 
 import type { ApiQueryUtils } from "../api";
 import type { RunDetail, RunSummary } from "./types";
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 function isRun(value: unknown, runId: string): value is RunSummary {
 	return isRecord(value) && value.id === runId && "projectId" in value;

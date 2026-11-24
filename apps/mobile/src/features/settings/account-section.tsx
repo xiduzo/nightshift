@@ -1,3 +1,4 @@
+import { messageOf } from "@nightshift/client";
 import { CircleUserRound } from "lucide-react-native";
 import { useState } from "react";
 import { Alert as NativeAlert } from "react-native";
@@ -36,10 +37,7 @@ export function AccountSection() {
 			await signOut();
 			goToConnect();
 		} catch (error) {
-			NativeAlert.alert(
-				"You are still signed in",
-				error instanceof Error ? error.message : String(error),
-			);
+			NativeAlert.alert("You are still signed in", messageOf(error));
 		} finally {
 			setBusy(false);
 		}

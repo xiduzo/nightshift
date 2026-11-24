@@ -5,8 +5,9 @@
  * `metadata.tanstack`, so each read checks both.
  */
 
+import { isRecord } from "@nightshift/flows";
 import type { AgentUsage } from "../port";
-import { asNumber, asString, isRecord } from "./raw-value";
+import { asNumber, asString } from "./raw-value";
 
 /** The AG-UI chunk shape this module reads. Every field is checked at runtime. */
 export type AgUiChunk = { type: string; [key: string]: unknown };

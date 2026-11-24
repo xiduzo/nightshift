@@ -1,3 +1,4 @@
+import { messageOf } from "@nightshift/refusal";
 import { parseHTML } from "linkedom";
 import {
 	LOCAL_ONLY_BYTES,
@@ -10,7 +11,6 @@ import {
 	absoluteLink,
 	fingerprintOf,
 	type Looked,
-	messageOf,
 	nameOfAddress,
 	READER_USER_AGENT,
 	type ReadMark,

@@ -25,6 +25,7 @@ export {
 	isMissingOnHost,
 	isSignInRequired,
 	isTwoFactorRequired,
+	messageOf,
 	versionMessage,
 } from "./api";
 export {

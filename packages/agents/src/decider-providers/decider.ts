@@ -10,6 +10,7 @@
 
 import { randomUUID } from "node:crypto";
 import { canMakeValue } from "@nightshift/flows";
+import { messageOf } from "@nightshift/refusal";
 import { chat, choice, decide, type TokenUsage } from "@tanstack/ai";
 import type {
 	AgentErrorKind,
@@ -171,7 +172,7 @@ function failure(
 	model: string,
 	error: unknown,
 ): { errorKind: AgentErrorKind; message: string } {
-	const message = error instanceof Error ? error.message : String(error);
+	const message = messageOf(error);
 	const explained = spec.explain?.(message, model);
 	if (explained) return { errorKind: "harness", message: explained };
 	return { errorKind: failureKind(message) ?? "harness", message };

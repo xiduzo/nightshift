@@ -7,6 +7,7 @@ import {
 } from "@nightshift/agents/tools";
 import type { McpServerConfig } from "@nightshift/agents/types";
 import type { JsonValue } from "@nightshift/flows";
+import { messageOf } from "@nightshift/refusal";
 
 import type { ToolCallInput, ToolResult } from "./types";
 
@@ -152,8 +153,4 @@ function coerce(text: string, types: readonly string[]): JsonValue {
 		}
 	}
 	return text;
-}
-
-function messageOf(error: unknown): string {
-	return error instanceof Error ? error.message : String(error);
 }

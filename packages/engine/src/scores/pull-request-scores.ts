@@ -1,6 +1,7 @@
 import type { Database } from "@nightshift/db";
 import { event, run } from "@nightshift/db/schema";
 import type { JsonValue, WebhookEvent } from "@nightshift/flows";
+import { isRecord } from "@nightshift/flows";
 import { and, eq, sql } from "drizzle-orm";
 import type { RunLog, RunState, ScoreName } from "../log";
 import { runFacts } from "../read";
@@ -41,11 +42,6 @@ export type PullRequestNews =
 
 /** How long after its merge a revert counts. */
 export const REVERT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
-
-const isRecord = (
-	value: JsonValue | undefined,
-): value is Record<string, JsonValue> =>
-	typeof value === "object" && value !== null && !Array.isArray(value);
 
 const text = (value: JsonValue | undefined): string | null =>
 	typeof value === "string" && value.trim() !== "" ? value.trim() : null;

@@ -1,4 +1,5 @@
 import type { JsonValue } from "@nightshift/flows";
+import { isRecord } from "@nightshift/flows";
 import { XMLBuilder, XMLParser, XMLValidator } from "fast-xml-parser";
 import { ConvertProblem } from "./problem";
 
@@ -37,10 +38,7 @@ export function readXml(text: string): JsonValue {
 }
 
 export function writeXml(value: JsonValue): string {
-	const roots =
-		typeof value === "object" && value !== null && !Array.isArray(value)
-			? Object.keys(value)
-			: [];
+	const roots = isRecord(value) ? Object.keys(value) : [];
 	if (roots.length !== 1) {
 		throw new ConvertProblem(
 			'XML needs one root element: a record with one key, such as {"note": {"to": "Ann", "@lang": "en"}}.',

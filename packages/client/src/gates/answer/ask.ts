@@ -4,6 +4,7 @@ import {
 	type AskForm,
 	askFields,
 	formDataProblem,
+	isRecord,
 	isSimpleForm,
 	type JsonValue,
 } from "@nightshift/flows";
@@ -46,9 +47,6 @@ export function askOptions(form: AskForm, field: AskField): AskOption[] {
 	if (form.choices?.field === field.name) return form.choices.items;
 	return field.options.map((name) => ({ name, label: name }));
 }
-
-const isRecord = (value: unknown): value is Record<string, JsonValue> =>
-	typeof value === "object" && value !== null && !Array.isArray(value);
 
 /** What a field starts with: the pre-filled data when it fits, else empty (a switch off). */
 function startValue(field: AskField, given: JsonValue | undefined): AskValue {

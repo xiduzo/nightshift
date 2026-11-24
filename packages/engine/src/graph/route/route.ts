@@ -10,6 +10,7 @@ import {
 	type JsonValue,
 	nextEdge,
 } from "@nightshift/flows";
+import { messageOf } from "@nightshift/refusal";
 import type { Device } from "../../device";
 import {
 	leavingHolds,
@@ -20,12 +21,7 @@ import {
 	type StepOutputs,
 } from "../../log";
 import { arrive, openRound, outrun, placeOf } from "../branches";
-import {
-	messageOf,
-	type NodeAction,
-	type StepContext,
-	type StopService,
-} from "../context";
+import type { NodeAction, StepContext, StopService } from "../context";
 import { commitVisit, type DoneStep } from "../position";
 import type { PendingParked, RunStateUpdate, RunStateValues } from "../state";
 import { interruptNode } from "./interrupt";

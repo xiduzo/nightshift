@@ -282,10 +282,6 @@ export type ServiceBroughtUp =
 /** A service to stop, and the Device it runs on (null: that Device cannot be reached now). */
 export type StopService = { service: ServiceHold; device: Device | null };
 
-export function messageOf(error: unknown): string {
-	return error instanceof Error ? error.message : String(error);
-}
-
 /**
  * The words a person sees for an error that ends a step: a refusal keeps
  * its own. Any other error is a failure: plain words (`wordsFor`), and the

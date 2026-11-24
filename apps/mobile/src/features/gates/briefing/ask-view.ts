@@ -1,5 +1,6 @@
 import { type OpenGate, webPathOf } from "@nightshift/client";
 import type { AskAttachment, AskForm, JsonValue } from "@nightshift/flows";
+import { isRecord } from "@nightshift/flows";
 
 /**
  * What the phone shows of an Ask (ADR 10). Pure: `ask-screen.tsx` draws
@@ -30,9 +31,6 @@ export function askImageUrl(
 	if (!(mediaType ?? "").startsWith("image/")) return null;
 	return `${address}/api/runs/${encodeURIComponent(runId)}/artifacts/${encodeURIComponent(artifactId)}`;
 }
-
-const isRecord = (value: unknown): value is Record<string, JsonValue> =>
-	typeof value === "object" && value !== null && !Array.isArray(value);
 
 /**
  * The answer in a few words, for the card after the send: the labels of

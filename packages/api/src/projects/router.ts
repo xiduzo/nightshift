@@ -2,6 +2,7 @@ import { isAbsolute, join, relative } from "node:path";
 import { ROLE_REFUSAL, RoleRefusal } from "@nightshift/auth";
 import type { ProjectRuns } from "@nightshift/engine";
 import { SpaceNotFound } from "@nightshift/engine";
+import { messageOf } from "@nightshift/refusal";
 import { now } from "@nightshift/time";
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";
@@ -117,7 +118,7 @@ export const projects = {
 					starters = imported.imported.length;
 				} catch (error) {
 					console.warn(
-						`Could not import the starters into ${project.name}: ${error instanceof Error ? error.message : String(error)}`,
+						`Could not import the starters into ${project.name}: ${messageOf(error)}`,
 					);
 				}
 			}

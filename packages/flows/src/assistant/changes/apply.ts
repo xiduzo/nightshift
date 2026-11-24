@@ -20,6 +20,7 @@ import {
 	withOutputSchema,
 	withWrites,
 } from "../../flows";
+import { isRecord } from "../../json";
 import type { VariableWrite } from "../../nodes";
 import { typedOutput } from "../../shapes";
 import type {
@@ -307,9 +308,7 @@ export type OutputFieldChange = {
 type Schema = Record<string, unknown>;
 
 function objectOf(value: unknown): Schema | undefined {
-	return value && typeof value === "object" && !Array.isArray(value)
-		? (value as Schema)
-		: undefined;
+	return isRecord(value) ? value : undefined;
 }
 
 function propertiesOf(schema: Schema | undefined): [string, Schema][] {

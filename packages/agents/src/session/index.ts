@@ -13,7 +13,7 @@ export {
 export { ARTIFACT_TOOL_NAME } from "./artifact-tool";
 export { failureKind, parseLegacyResetAt } from "./failure";
 export type { HarnessProfile, SdkSignals } from "./harness-profile";
-export { asNumber, asString, isRecord, toEpochMs } from "./raw-value";
+export { asNumber, asString, toEpochMs } from "./raw-value";
 export { readOnlyInput } from "./read-only";
 export { REPORT_TOOL_NAME } from "./step-report";
 export { TODO_LIST } from "./translate";

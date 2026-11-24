@@ -1,10 +1,10 @@
 import { homedir } from "node:os";
-
 import type {
 	CallToolResult,
 	Client,
 	RequestOptions,
 } from "@modelcontextprotocol/client";
+import { isRecord } from "@nightshift/flows";
 import type { McpServerConfig } from "../port";
 
 /**
@@ -172,10 +172,7 @@ export function toolCallOf(result: AnyToolResult): McpToolCall {
 	const structured = result.structuredContent;
 	return {
 		text: toolResultText(result),
-		structuredContent:
-			structured && typeof structured === "object" && !Array.isArray(structured)
-				? (structured as Record<string, unknown>)
-				: null,
+		structuredContent: isRecord(structured) ? structured : null,
 		isError: result.isError === true,
 	};
 }

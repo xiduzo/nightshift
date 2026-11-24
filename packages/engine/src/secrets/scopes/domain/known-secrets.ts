@@ -1,3 +1,4 @@
+import { messageOf } from "@nightshift/refusal";
 import { notReadLine } from "./secret-words";
 
 /**
@@ -55,7 +56,7 @@ export function createKnownSecrets(
 			return names;
 		},
 		warnOnce(what, error, scope = "Personal") {
-			const reason = `${scope} ${what}: ${error instanceof Error ? error.message : String(error)}`;
+			const reason = `${scope} ${what}: ${messageOf(error)}`;
 			if (reason === lastWarning) return;
 			lastWarning = reason;
 			warn(notReadLine(what, scope), error);

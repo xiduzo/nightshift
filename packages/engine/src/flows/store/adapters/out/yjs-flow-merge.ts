@@ -1,11 +1,10 @@
-import { suffixedName } from "@nightshift/flows";
+import { isRecord, suffixedName } from "@nightshift/flows";
 import * as Y from "yjs";
 import type { FlowDocument } from "../../../../documents";
 import { same } from "../../domain/flow-json";
 import {
 	apartNames,
 	type FlowMergePlan,
-	isRecord,
 	mergedSchedule,
 	sameFlow,
 	withCalls,

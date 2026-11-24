@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isRecord } from "../../json";
 import { type NodeCheck, nodeBase } from "../base";
 import {
 	type BuiltInOutcome,
@@ -166,10 +167,7 @@ export function commandWaitOutcome(
 	data: unknown,
 ): { kind: "outcome"; outcome: string } | { kind: "again"; picked?: string } {
 	if (exitCode !== 0) return { kind: "again" };
-	const picked =
-		typeof data === "object" && data !== null && !Array.isArray(data)
-			? (data as Record<string, unknown>).outcome
-			: undefined;
+	const picked = isRecord(data) ? data.outcome : undefined;
 	if (typeof picked !== "string") return { kind: "outcome", outcome: "done" };
 	if (isOwnWaitOutcome(node, picked)) {
 		return { kind: "outcome", outcome: picked };

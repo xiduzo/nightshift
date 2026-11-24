@@ -237,6 +237,7 @@ export {
 	withValueBy,
 	withWrites,
 } from "./flows";
+export { isRecord } from "./json";
 export {
 	ACCEPTED_LEARNINGS_DIR,
 	DEFAULT_PAGE_READER,

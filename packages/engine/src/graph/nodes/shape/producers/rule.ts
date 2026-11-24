@@ -4,7 +4,8 @@ import {
 	type ValueNode,
 } from "@nightshift/flows";
 import { schemaProblem } from "@nightshift/flows/json-schema";
-import { messageOf, type StepContext } from "../../../context";
+import { messageOf } from "@nightshift/refusal";
+import type { StepContext } from "../../../context";
 import { RESUME_RULES, runStep } from "../../../step";
 
 import {

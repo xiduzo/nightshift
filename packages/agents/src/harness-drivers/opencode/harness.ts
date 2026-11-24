@@ -40,6 +40,7 @@
  *   killed only if it is still alive 10 s later (see `withSpawnRewrite`).
  */
 
+import { isRecord } from "@nightshift/flows";
 import { parseInstant, now as timeNow } from "@nightshift/time";
 import type {
 	AgentEvent,
@@ -123,10 +124,6 @@ export function opencodeSessionConfig(
 		),
 		...(names.length > 0 ? { mcp: opencodeMcpConfig(servers) } : {}),
 	});
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function num(value: unknown): number {

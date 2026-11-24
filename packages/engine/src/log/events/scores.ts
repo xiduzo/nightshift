@@ -1,4 +1,5 @@
 import type { JsonValue } from "@nightshift/flows";
+import { isRecord } from "@nightshift/flows";
 
 import type { EnginePayloads } from "./events";
 import type { ScoreName } from "./run";
@@ -97,12 +98,12 @@ export function flowScores(data: JsonValue | undefined): {
 	scores: FlowScore[];
 	refused: string[];
 } {
-	if (data === null || typeof data !== "object" || Array.isArray(data)) {
+	if (!isRecord(data)) {
 		return { scores: [], refused: [] };
 	}
 	const raw = data.scores;
 	if (raw === undefined) return { scores: [], refused: [] };
-	if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
+	if (!isRecord(raw)) {
 		return {
 			scores: [],
 			refused: [

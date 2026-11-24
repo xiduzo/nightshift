@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isRecord } from "../../json";
 import type { JsonValue } from "../base";
 
 /**
@@ -133,9 +134,6 @@ export const choiceItemSchema = z.object({
 export type ChoiceItem = z.infer<typeof choiceItemSchema>;
 
 type Schema = { [key: string]: unknown };
-
-const isRecord = (value: unknown): value is Schema =>
-	typeof value === "object" && value !== null && !Array.isArray(value);
 
 /** The `properties` of an object schema, or none. */
 function propertiesOf(schema: Schema): [string, Schema][] {

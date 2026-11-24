@@ -3,12 +3,9 @@
  * session's executable and config, and the port that the server chose.
  */
 
+import { isRecord } from "@nightshift/flows";
 import type { SandboxHandle, SandboxProvider } from "@tanstack/ai-sandbox";
 import { shellQuoteAlways } from "../../port";
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 /** Merge plain objects; `over` wins, arrays and other values replace. */
 export function mergeConfig(
@@ -19,7 +16,7 @@ export function mergeConfig(
 	for (const [key, value] of Object.entries(over)) {
 		const current = out[key];
 		out[key] =
-			isPlainObject(current) && isPlainObject(value)
+			isRecord(current) && isRecord(value)
 				? mergeConfig(current, value)
 				: value;
 	}
@@ -46,7 +43,7 @@ export function rewriteServe(
 	let adapterConfig: Record<string, unknown> = {};
 	try {
 		const parsed: unknown = JSON.parse(env?.OPENCODE_CONFIG_CONTENT ?? "{}");
-		if (isPlainObject(parsed)) adapterConfig = parsed;
+		if (isRecord(parsed)) adapterConfig = parsed;
 	} catch {
 		// Not JSON: the session config alone.
 	}

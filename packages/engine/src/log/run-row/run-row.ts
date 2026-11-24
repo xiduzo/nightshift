@@ -1,5 +1,6 @@
 import type { Database } from "@nightshift/db";
 import { event, run, step } from "@nightshift/db/schema";
+import { isRecord } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import type { PlannedDevice, RunFallbacks, RunPlan } from "../../contract";
@@ -17,7 +18,7 @@ function stringsOf(text: string | null): Record<string, string> {
 	if (!text) return {};
 	try {
 		const parsed: unknown = JSON.parse(text);
-		if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+		if (!isRecord(parsed)) {
 			return {};
 		}
 		return Object.fromEntries(

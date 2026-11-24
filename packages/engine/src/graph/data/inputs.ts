@@ -5,7 +5,7 @@ import {
 	renderValue,
 	type TemplateContext,
 } from "@nightshift/flows";
-import { Refusal } from "@nightshift/refusal";
+import { messageOf, Refusal } from "@nightshift/refusal";
 
 import type { InputValues } from "../../log";
 
@@ -49,7 +49,7 @@ function parseJsonText(
 	try {
 		return { ok: true, value: JSON.parse(text) as JsonValue };
 	} catch (error) {
-		const reason = error instanceof Error ? error.message : String(error);
+		const reason = messageOf(error);
 		return { ok: false, error: `${what} is not valid JSON: ${reason}` };
 	}
 }

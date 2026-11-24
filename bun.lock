@@ -29,6 +29,7 @@
       "name": "desktop",
       "dependencies": {
         "@nightshift/daemon": "workspace:*",
+        "@nightshift/refusal": "workspace:*",
         "@nightshift/time": "workspace:*",
         "fix-path": "^5.0.0",
       },
@@ -144,6 +145,7 @@
         "@nightshift/db": "workspace:*",
         "@nightshift/engine": "workspace:*",
         "@nightshift/flows": "workspace:*",
+        "@nightshift/refusal": "workspace:*",
         "@nightshift/time": "workspace:*",
         "@orpc/client": "catalog:",
         "better-auth": "catalog:",

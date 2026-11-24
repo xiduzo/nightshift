@@ -1,4 +1,9 @@
-import { type InputTexts, localZone, missingInputs } from "@nightshift/client";
+import {
+	type InputTexts,
+	localZone,
+	messageOf,
+	missingInputs,
+} from "@nightshift/client";
 import {
 	cronToTimeAndDays,
 	KNOWLEDGE_SOURCE_KINDS,
@@ -236,9 +241,7 @@ function SourceForm({
 					: "Source added. Night Shift syncs it now.",
 			);
 		} catch (error) {
-			toast.error(
-				`Saved, but the sync did not start: ${error instanceof Error ? error.message : String(error)}`,
-			);
+			toast.error(`Saved, but the sync did not start: ${messageOf(error)}`);
 		}
 	};
 	const save = useMutation(

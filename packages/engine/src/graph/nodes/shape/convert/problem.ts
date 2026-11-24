@@ -1,4 +1,5 @@
 import type { JsonValue } from "@nightshift/flows";
+import { isRecord } from "@nightshift/flows";
 
 /**
  * Why a value does not convert, in words for the person who reads the
@@ -14,9 +15,10 @@ export function recordsOf(
 	value: JsonValue,
 	format: string,
 ): Record<string, JsonValue>[] {
-	const isRecord = (entry: JsonValue): entry is Record<string, JsonValue> =>
-		typeof entry === "object" && entry !== null && !Array.isArray(entry);
-	if (!Array.isArray(value) || !value.every(isRecord)) {
+	if (
+		!Array.isArray(value) ||
+		!value.every((entry): entry is Record<string, JsonValue> => isRecord(entry))
+	) {
 		throw new ConvertProblem(
 			`${format} needs a list of records, such as [{"name": "Ann", "city": "Oslo"}].`,
 		);

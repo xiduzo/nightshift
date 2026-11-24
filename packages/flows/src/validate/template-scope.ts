@@ -5,6 +5,7 @@ import {
 	nodeOutputFields,
 	runsEach,
 } from "../flow";
+import { isRecord } from "../json";
 import { isKitName, kitFlow } from "../kits";
 import { commandHasData } from "../nodes";
 import { inputShape, outputFieldShape, variableShape } from "../shapes";
@@ -215,10 +216,7 @@ export function schemaFields(schema: unknown, base: string): TemplateField[] {
 	return Object.entries(properties as Record<string, unknown>)
 		.filter(([name]) => /^[A-Za-z0-9_-]+$/.test(name))
 		.map(([name, field]) => {
-			const shape =
-				field && typeof field === "object" && !Array.isArray(field)
-					? (field as Record<string, unknown>)
-					: undefined;
+			const shape = isRecord(field) ? field : undefined;
 			const type = shape?.type;
 			return {
 				name,

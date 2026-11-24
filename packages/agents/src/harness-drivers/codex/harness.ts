@@ -15,6 +15,7 @@
  * Unverified: the `codex` CLI was not installed when this was written. It is
  * tested against a fake `codex` that speaks the JSONL the adapter expects.
  */
+import { isRecord } from "@nightshift/flows";
 import type {
 	AgentEvent,
 	AgentHarness,
@@ -136,10 +137,6 @@ export function codexEffort(effort: Effort): string {
 }
 
 const KNOWN_MODELS: ReadonlySet<string> = new Set(CODEX_ADAPTER.models);
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 /**
  * The id and list of a Codex to-do list event (`item.started`,

@@ -20,6 +20,7 @@
  *   allowed, or every MCP tool is out of reach.
  * - It takes the model over ACP, as a session config option.
  */
+import { isRecord } from "@nightshift/flows";
 import type { BRIDGED_MCP_SERVER_NAME as ADAPTER_BRIDGE_NAME } from "@tanstack/ai-acp";
 import { firstLine, probe, resolveBin } from "../../doctor";
 import type { AcpAgent } from "../acp";
@@ -63,10 +64,6 @@ export function opencodeRules(
 				}));
 	});
 	return [...rules, { action: "execute", resource: "*", effect: "allow" }];
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 /**

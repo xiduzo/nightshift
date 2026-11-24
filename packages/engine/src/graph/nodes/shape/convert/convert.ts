@@ -6,6 +6,7 @@ import {
 	renderValue,
 	type TemplateContext,
 } from "@nightshift/flows";
+import { messageOf } from "@nightshift/refusal";
 import type { StepOutputs } from "../../../../log";
 import {
 	type NodeAction,
@@ -137,7 +138,7 @@ function inputOf(
 	} catch (error) {
 		return {
 			text: value,
-			problem: `The value is not valid JSON: ${error instanceof Error ? error.message : String(error)}.`,
+			problem: `The value is not valid JSON: ${messageOf(error)}.`,
 		};
 	}
 }

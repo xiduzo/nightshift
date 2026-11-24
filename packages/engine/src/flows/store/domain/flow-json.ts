@@ -1,4 +1,4 @@
-import { FLOW_VERSION } from "@nightshift/flows";
+import { FLOW_VERSION, isRecord } from "@nightshift/flows";
 import { z } from "zod";
 
 /** The same JSON, whatever the order of the keys. */
@@ -9,7 +9,7 @@ export function same(a: unknown, b: unknown): boolean {
 /** The JSON of a value with the keys of each object sorted. */
 export function stableJson(value: unknown): string {
 	return JSON.stringify(value, (_key, inner: unknown) =>
-		inner !== null && typeof inner === "object" && !Array.isArray(inner)
+		isRecord(inner)
 			? Object.fromEntries(
 					Object.entries(inner).sort(([a], [b]) => (a < b ? -1 : 1)),
 				)

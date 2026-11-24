@@ -5,6 +5,7 @@ import {
 	renderValue,
 	type TemplateContext,
 } from "@nightshift/flows";
+import { messageOf } from "@nightshift/refusal";
 import type { DerivedItem, ItemFacts, StepOutputs } from "../../log";
 
 /**
@@ -50,9 +51,7 @@ export function parseCommandJson(stdout: string, what: string): JsonValue {
 	try {
 		return JSON.parse(stdout) as JsonValue;
 	} catch (error) {
-		throw new Error(
-			`${what} did not print JSON: ${error instanceof Error ? error.message : String(error)}`,
-		);
+		throw new Error(`${what} did not print JSON: ${messageOf(error)}`);
 	}
 }
 

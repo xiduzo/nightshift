@@ -1,3 +1,5 @@
+import { messageOf } from "@nightshift/refusal";
+
 /**
  * The runs that moved to this computer, taken over until they arrived.
  *
@@ -52,7 +54,7 @@ export function createTakeOvers(deps: {
 					failed.delete(runId);
 				},
 				(error) => {
-					const said = error instanceof Error ? error.message : String(error);
+					const said = messageOf(error);
 					const before = failed.get(runId);
 					if (before?.said !== said) {
 						console.error(

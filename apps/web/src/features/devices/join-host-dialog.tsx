@@ -1,4 +1,4 @@
-import { useChanged } from "@nightshift/client";
+import { messageOf, useChanged } from "@nightshift/client";
 import {
 	Alert,
 	AlertDescription,
@@ -207,7 +207,7 @@ function JoinHostSteps({
 			if (stop.signal.aborted) return;
 			setStep({
 				kind: "form",
-				error: error instanceof Error ? error.message : String(error),
+				error: messageOf(error),
 			});
 		}
 	}

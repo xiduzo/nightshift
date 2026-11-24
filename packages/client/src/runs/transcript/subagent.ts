@@ -1,3 +1,5 @@
+import { isRecord } from "@nightshift/flows";
+
 /**
  * A subagent in an agent's transcript: a call of Claude Code's Agent tool
  * (Task in older versions) starts one. Its own events carry the call's id
@@ -29,15 +31,12 @@ export function subagentTask(
 	input: unknown,
 ): SubagentTask | null {
 	if (!SUBAGENT_TOOLS.has(name.toLowerCase())) return null;
-	if (typeof input !== "object" || input === null || Array.isArray(input)) {
-		return null;
-	}
-	const record = input as Record<string, unknown>;
+	if (!isRecord(input)) return null;
 	const task: SubagentTask = {
-		agent: field(record, "subagent_type"),
-		description: field(record, "description"),
-		prompt: field(record, "prompt"),
-		model: field(record, "model"),
+		agent: field(input, "subagent_type"),
+		description: field(input, "description"),
+		prompt: field(input, "prompt"),
+		model: field(input, "model"),
 	};
 	// Another tool of that name: it takes no task.
 	return (task.agent ?? task.prompt ?? task.description) ? task : null;

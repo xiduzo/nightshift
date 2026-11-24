@@ -1,4 +1,5 @@
 import { PortTakenError } from "@nightshift/daemon";
+import { messageOf } from "@nightshift/refusal";
 import { moonPhase } from "@nightshift/time";
 import Electrobun, {
 	ApplicationMenu,
@@ -153,7 +154,7 @@ try {
 		detail:
 			error instanceof PortTakenError
 				? `Another program uses port ${error.port}. Close that program, then open ${APP_NAME} again.`
-				: String(error instanceof Error ? error.message : error),
+				: messageOf(error),
 		buttons: ["Quit"],
 	});
 	Utils.quit(1);

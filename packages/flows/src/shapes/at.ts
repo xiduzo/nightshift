@@ -1,3 +1,5 @@
+import { isRecord } from "../json";
+
 /**
  * What a JSON Schema says is below a path: a template's keys below a JSON
  * field (`{{plan.data.tasks.0.title}}`) read into the shape of that field.
@@ -74,8 +76,4 @@ function typeOf(schema: Schema): string | undefined {
 	if (schema.type === undefined && "properties" in schema) return "object";
 	if (schema.type === undefined && "items" in schema) return "array";
 	return undefined;
-}
-
-function isRecord(value: unknown): value is Schema {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
 }

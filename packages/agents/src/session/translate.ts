@@ -62,6 +62,7 @@
  * that harness's profile.
  */
 
+import { isRecord } from "@nightshift/flows";
 import type {
 	AgentErrorKind,
 	AgentEvent,
@@ -84,7 +85,7 @@ import {
 	thrownWords,
 } from "./failure";
 import type { HarnessProfile, SdkSignals } from "./harness-profile";
-import { asString, isRecord } from "./raw-value";
+import { asString } from "./raw-value";
 import { isReportTool, reportRules, type StepReport } from "./step-report";
 import {
 	isRefusedReport,

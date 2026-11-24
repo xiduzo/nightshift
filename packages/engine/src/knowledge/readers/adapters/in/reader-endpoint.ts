@@ -3,6 +3,7 @@ import {
 	type LoopbackState,
 	newLoopbackState,
 } from "@nightshift/agents/loopback";
+import { messageOf } from "@nightshift/refusal";
 
 /**
  * The step's page reader on this computer (ADR 39): one loopback listener
@@ -59,10 +60,7 @@ export const openReaderRoute = createLoopback<ReaderRoute>({
 			const { searchParams } = new URL(request.url);
 			return await route.handle(action, searchParams, request.signal);
 		} catch (error) {
-			return plain(
-				`The page reader stopped: ${error instanceof Error ? error.message : String(error)}`,
-				500,
-			);
+			return plain(`The page reader stopped: ${messageOf(error)}`, 500);
 		}
 	},
 });

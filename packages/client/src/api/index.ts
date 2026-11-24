@@ -1,5 +1,6 @@
 /** The typed client of a Night Shift, its TanStack Query helpers and query client, the API types and how a call is refused. */
 
+export { messageOf } from "@nightshift/refusal";
 export {
 	type ApiTransport,
 	createApiClient,

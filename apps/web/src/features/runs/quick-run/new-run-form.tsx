@@ -1,4 +1,4 @@
-import { useRunActed } from "@nightshift/client";
+import { messageOf, useRunActed } from "@nightshift/client";
 import {
 	HARNESS_CATALOG,
 	QUICK_RUN_HARNESS,
@@ -114,9 +114,7 @@ export function QuickRunDialog({
 					(profile === undefined ? DEFAULT_PERMISSION : undefined),
 			});
 		} catch (error) {
-			setFlowError(
-				`Could not build the run: ${error instanceof Error ? error.message : String(error)}`,
-			);
+			setFlowError(`Could not build the run: ${messageOf(error)}`);
 			return;
 		}
 		setFlowError(null);

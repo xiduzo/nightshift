@@ -1,3 +1,4 @@
+import { isRecord } from "../json";
 import type { JsonValue } from "../nodes";
 
 /**
@@ -189,12 +190,6 @@ export function normalizeList(
 	return { ok: true, items };
 }
 
-type JsonObject = { [key: string]: JsonValue };
-
-function isObject(value: JsonValue | undefined): value is JsonObject {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
 /** A non-empty string, or a finite number as text. */
 function key(value: JsonValue | undefined): string | null {
 	if (typeof value === "string") return value === "" ? null : value;
@@ -203,7 +198,7 @@ function key(value: JsonValue | undefined): string | null {
 }
 
 function toItem(element: JsonValue, index: number): ListItem {
-	if (!isObject(element)) {
+	if (!isRecord(element)) {
 		return {
 			id: String(index),
 			title: shortText(element),
@@ -238,7 +233,7 @@ function dependencies(value: JsonValue | undefined): ListItem["dependsOn"] {
 	if (!Array.isArray(value)) return [];
 	const out: ListItem["dependsOn"] = [];
 	for (const entry of value) {
-		if (isObject(entry)) {
+		if (isRecord(entry)) {
 			const id = key(entry.id);
 			if (id !== null)
 				out.push({

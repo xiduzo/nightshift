@@ -5,6 +5,7 @@
  * (`data[].id`), or Jev's shape (`models[].name`) for OpenJev.
  */
 
+import { messageOf } from "@nightshift/refusal";
 import type { AnyTextAdapter } from "@tanstack/ai";
 
 /** How long a listing waits for the server before it gives up. */
@@ -61,7 +62,7 @@ export async function addressModels(at: AddressAccess): Promise<string[]> {
 			signal: AbortSignal.timeout(LISTING_TIMEOUT_MS),
 		});
 	} catch (error) {
-		const message = error instanceof Error ? error.message : String(error);
+		const message = messageOf(error);
 		const silent =
 			NOT_ANSWERING.test(message) ||
 			(error instanceof Error && error.name === "TimeoutError");

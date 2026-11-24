@@ -1,3 +1,4 @@
+import { messageOf } from "@nightshift/refusal";
 import { defaultDeciderModel } from "../decider/domain/catalogue";
 import { harnessFacts } from "../harness-drivers/facts";
 import type {
@@ -198,7 +199,7 @@ export function fakeHarness(script: FakeScriptSource = {}): FakeHarness {
 				const out = await execute(args);
 				return typeof out === "string" ? out : JSON.stringify(out);
 			} catch (error) {
-				return `Error: ${error instanceof Error ? error.message : String(error)}`;
+				return `Error: ${messageOf(error)}`;
 			}
 		};
 

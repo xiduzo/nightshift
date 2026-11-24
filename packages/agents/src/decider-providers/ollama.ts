@@ -11,6 +11,7 @@
  * passes it in as an `OllamaAddress`. Without one, Ollama's own default.
  */
 
+import { messageOf } from "@nightshift/refusal";
 import type { AnyTextAdapter } from "@tanstack/ai";
 import { createOllamaChat, OllamaTextModels } from "@tanstack/ai-ollama";
 import { Ollama } from "ollama";
@@ -90,7 +91,7 @@ export async function ollamaModels(
 		const { models } = await client.list();
 		return models.map((m) => m.name);
 	} catch (error) {
-		const message = error instanceof Error ? error.message : String(error);
+		const message = messageOf(error);
 		throw new Error(
 			NOT_RUNNING.test(message) || /timed? ?out|abort/i.test(message)
 				? `Ollama does not answer ${placeOf(at)}. Start Ollama to see the models you pulled.`

@@ -1,4 +1,6 @@
+import { messageOf } from "@nightshift/refusal";
 import { Ajv2020, type ValidateFunction } from "ajv/dist/2020.js";
+import { isRecord } from "./json";
 import { FILE_FORMAT, RESERVED_DATA_KEYS } from "./shapes";
 
 /**
@@ -30,7 +32,7 @@ export function schemaProblem(schema: Record<string, unknown>): string | null {
 		compile(schema);
 		return null;
 	} catch (error) {
-		return `The output schema of this node is not a valid JSON Schema: ${error instanceof Error ? error.message : String(error)}`;
+		return `The output schema of this node is not a valid JSON Schema: ${messageOf(error)}`;
 	}
 }
 
@@ -47,7 +49,7 @@ export function dataProblem(
 	try {
 		validate = compile(schema);
 	} catch (error) {
-		return error instanceof Error ? error.message : String(error);
+		return messageOf(error);
 	}
 	if (validate(data)) return null;
 	return ajv.errorsText(validate.errors, { dataVar: "data", separator: "; " });
@@ -70,7 +72,7 @@ function withoutReservedKeys(
 	schema: Record<string, unknown>,
 	data: unknown,
 ): unknown {
-	if (typeof data !== "object" || data === null || Array.isArray(data)) {
+	if (!isRecord(data)) {
 		return data;
 	}
 	const named =

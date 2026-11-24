@@ -3,7 +3,6 @@ import {
 	absoluteLink,
 	fingerprintOf,
 	linksOfMarkdown,
-	messageOf,
 	nameOfAddress,
 	READER_USER_AGENT,
 	readOrUnchanged,
@@ -52,11 +51,9 @@ describe("a read of a page", () => {
 		expect(nameOfAddress("not a link")).toBe("not a link");
 	});
 
-	test("a request names the product, never the person; an error reads as its message", () => {
+	test("a request names the product, never the person", () => {
 		expect(READER_USER_AGENT).toBe(
 			"NightShift-knowledge/1 (+https://github.com/xiduzo/nightshift)",
 		);
-		expect(messageOf(new Error("refused"))).toBe("refused");
-		expect(messageOf(404)).toBe("404");
 	});
 });

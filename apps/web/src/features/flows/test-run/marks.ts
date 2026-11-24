@@ -5,7 +5,12 @@
  * (`testRequest`). Pure: the hook passes the storage in.
  */
 import type { PinRef } from "@nightshift/client";
-import { type Flow, standInOutcomes, standsIn } from "@nightshift/flows";
+import {
+	type Flow,
+	isRecord,
+	standInOutcomes,
+	standsIn,
+} from "@nightshift/flows";
 
 /** What a person marked on the nodes of one flow for its next test run. */
 export type TestMarks = {
@@ -181,10 +186,6 @@ export function testRequest(marks: TestMarks):
 		...(pinned > 0 ? { pinned: { ...marks.pinned } } : {}),
 		...(skipped > 0 ? { skipped: { ...marks.skipped } } : {}),
 	};
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function isId(value: unknown): value is string {

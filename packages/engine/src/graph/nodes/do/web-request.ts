@@ -9,6 +9,7 @@ import {
 	type WebRequestMethod,
 	type WebRequestNode,
 } from "@nightshift/flows";
+import { messageOf } from "@nightshift/refusal";
 import { parseInstant } from "@nightshift/time";
 
 import type {
@@ -175,9 +176,7 @@ export function jsonBody(value: string, tctx: TemplateContext): RequestPart[] {
 		if (/^\{\{[^}]*\}\}$/.test(text)) {
 			return [{ text: JSON.stringify(renderValue(text, tctx)) }];
 		}
-		throw new Error(
-			`The JSON body is not valid: ${error instanceof Error ? error.message : String(error)}`,
-		);
+		throw new Error(`The JSON body is not valid: ${messageOf(error)}`);
 	}
 	const parts: RequestPart[] = [];
 	const push = (part: RequestPart) => {
@@ -293,11 +292,7 @@ async function sendWebRequest(
 	try {
 		input = webRequestOf(node, step.tctx, signal);
 	} catch (error) {
-		return end(
-			"error",
-			empty,
-			error instanceof Error ? error.message : String(error),
-		);
+		return end("error", empty, messageOf(error));
 	}
 	step.record(null, {
 		type: "web-request",

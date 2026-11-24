@@ -1,6 +1,6 @@
+import { isRecord } from "@nightshift/flows";
 import {
 	type AgentToolCall,
-	isRecord,
 	jsonResult,
 	stringField,
 	toolName,

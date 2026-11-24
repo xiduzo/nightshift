@@ -8,6 +8,7 @@ import {
 	renderTemplate,
 	type TemplateContext,
 } from "@nightshift/flows";
+import { messageOf } from "@nightshift/refusal";
 
 import type {
 	GateChoice,
@@ -16,7 +17,7 @@ import type {
 	StepOutputs,
 } from "../../../../log";
 import { type Climb, climbOutputs } from "../../../cascade";
-import { messageOf, type NodeAction, type StepContext } from "../../../context";
+import type { NodeAction, StepContext } from "../../../context";
 import type { DoneStep } from "../../../position";
 
 import {

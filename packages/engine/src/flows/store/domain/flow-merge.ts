@@ -1,4 +1,4 @@
-import { type FlowSource, suffixedName } from "@nightshift/flows";
+import { type FlowSource, isRecord, suffixedName } from "@nightshift/flows";
 import { same } from "./flow-json";
 
 /**
@@ -128,6 +128,3 @@ export function withPerson(
 }
 
 /** A plain object: not null, not an array. */
-export function isRecord(value: unknown): value is Record<string, unknown> {
-	return value !== null && typeof value === "object" && !Array.isArray(value);
-}

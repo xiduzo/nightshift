@@ -3,6 +3,7 @@ import {
 	type HowOften,
 	linksIn,
 	localZone,
+	messageOf,
 	type NoteToCheck,
 	readSource,
 	type ToldSource,
@@ -80,14 +81,14 @@ export function KnowledgeOverviewPage() {
 			});
 			name = saved.name;
 		} catch (error) {
-			return `This did not save: ${error instanceof Error ? error.message : String(error)}`;
+			return `This did not save: ${messageOf(error)}`;
 		}
 		if (!can.startRuns) return null;
 		try {
 			await sync.mutateAsync({ projectId, name });
 			return null;
 		} catch (error) {
-			return `Saved, but the first read did not start: ${error instanceof Error ? error.message : String(error)}`;
+			return `Saved, but the first read did not start: ${messageOf(error)}`;
 		}
 	};
 

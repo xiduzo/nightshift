@@ -1,6 +1,7 @@
 import { closeSync, mkdirSync, openSync, writeSync } from "node:fs";
 import { dirname } from "node:path";
 import type { JsonValue } from "@nightshift/flows";
+import { messageOf } from "@nightshift/refusal";
 
 import { type Device, runCommand, tailOf } from "../device";
 import type {
@@ -417,8 +418,4 @@ function pause(ms: number, signal: AbortSignal): Promise<void> {
 		}
 		signal.addEventListener("abort", done, { once: true });
 	});
-}
-
-function messageOf(error: unknown): string {
-	return error instanceof Error ? error.message : String(error);
 }

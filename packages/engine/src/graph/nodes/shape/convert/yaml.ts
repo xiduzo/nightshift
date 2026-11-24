@@ -1,5 +1,6 @@
 import type { JsonValue } from "@nightshift/flows";
-import { messageOf } from "../../../context";
+import { messageOf } from "@nightshift/refusal";
+
 import { ConvertProblem } from "./problem";
 
 /**

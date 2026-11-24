@@ -1,3 +1,4 @@
+import { isRecord } from "../json";
 import type { TemplateField, TemplateScope } from "../validate";
 
 /**
@@ -250,9 +251,7 @@ function fieldShape(item: Schema, field: string): Schema {
 /** The item shape of a list shape: `{}` when it does not say. */
 function itemShape(list: Schema): Schema {
 	const items = list.items;
-	return items !== null && typeof items === "object" && !Array.isArray(items)
-		? (items as Schema)
-		: {};
+	return isRecord(items) ? items : {};
 }
 
 /** The item shape when `schema` is a list, else null. */

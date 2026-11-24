@@ -5,11 +5,11 @@ import {
 	personTierIndex,
 	runsEach,
 } from "@nightshift/flows";
+import { messageOf } from "@nightshift/refusal";
 import type { InputValues, StepOutputs } from "../../../log";
 import type { Climb } from "../../cascade";
 import {
 	endedAtReason,
-	messageOf,
 	type NodeAction,
 	type NodeKind,
 	PLAIN_KIND,

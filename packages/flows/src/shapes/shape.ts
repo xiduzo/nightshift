@@ -1,3 +1,5 @@
+import { isRecord } from "../json";
+
 /**
  * A small, zod-like model of the JSON Schemas the editor can show as a
  * shape: text, numbers, yes or no, a choice of strings, a file, lists and
@@ -106,10 +108,6 @@ export function toJsonSchema(shape: SchemaShape): Schema {
 	}
 	if (shape.description !== undefined) schema.description = shape.description;
 	return schema;
-}
-
-function isRecord(value: unknown): value is Schema {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function onlyKeys(schema: Schema, allowed: readonly string[]): boolean {

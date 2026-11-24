@@ -1,4 +1,5 @@
 import type { JsonValue, WebRequestMethod } from "@nightshift/flows";
+import { messageOf } from "@nightshift/refusal";
 import { type AddressRules, checkHost } from "../web-access";
 import type { WebRequestResult, WebResponse } from "./types";
 
@@ -55,10 +56,6 @@ function serverOf(url: URL, show: boolean): string {
 /** A message that starts with the server's name or with "the server". */
 function capital(text: string): string {
 	return text.charAt(0).toUpperCase() + text.slice(1);
-}
-
-function messageOf(error: unknown): string {
-	return error instanceof Error ? error.message : String(error);
 }
 
 /** Sends the request. Every outcome is a result: nothing throws. */

@@ -1,9 +1,10 @@
 import type { FlowNode } from "@nightshift/flows";
+import { messageOf } from "@nightshift/refusal";
 import { now } from "@nightshift/time";
 import type { Device } from "../../device";
 import { type DerivedStep, readTranscriptFile } from "../../log";
 import { deriveSteps } from "../../read";
-import { messageOf, type StepContext } from "../context";
+import type { StepContext } from "../context";
 import type { OpenStep } from "./step-handle";
 
 /**

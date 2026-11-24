@@ -1,5 +1,7 @@
+import { messageOf } from "@nightshift/client";
 import {
 	fromJsonSchema,
+	isRecord,
 	type SchemaShape,
 	SHAPE_KINDS,
 	schemaFields,
@@ -69,15 +71,15 @@ function parse(
 		value = JSON.parse(text);
 	} catch (error) {
 		return {
-			error: `This is not valid JSON: ${error instanceof Error ? error.message : String(error)}`,
+			error: `This is not valid JSON: ${messageOf(error)}`,
 		};
 	}
-	if (!value || typeof value !== "object" || Array.isArray(value)) {
+	if (!isRecord(value)) {
 		return {
 			error: 'Start with { and end with }, for example {"type": "array"}.',
 		};
 	}
-	return { schema: value as Schema };
+	return { schema: value };
 }
 
 /** The shape the fields view can show for `schema`, or null. */

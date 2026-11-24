@@ -14,6 +14,7 @@ export const PACKAGE_FLOWS: Record<string, Place> = {
 	// and the flows that ship (`kits`, `starters`). The capability `flows`
 	// is what a Project does with its flows.
 	flow: M,
+	json: M,
 	kits: M,
 	lists: M,
 	nodes: M,

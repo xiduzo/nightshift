@@ -1,3 +1,4 @@
+import { messageOf } from "@nightshift/refusal";
 import {
 	type Mutation,
 	useMutation,
@@ -206,7 +207,7 @@ export function useCheckNotes(
 			} catch (error) {
 				onFailed?.({
 					title: "The note was not kept",
-					message: error instanceof Error ? error.message : String(error),
+					message: messageOf(error),
 					note: replaces ?? null,
 				});
 				return false;

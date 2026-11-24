@@ -6,7 +6,6 @@ export {
 	harnessLabel,
 	isWaitKind,
 	keptFlowOf,
-	messageOf,
 	type OutputType,
 	pastStopTime,
 	type ServiceBringUp,

@@ -1,3 +1,5 @@
+import { isRecord } from "@nightshift/flows";
+
 /**
  * One tool call of an agent, as a transcript keeps it: the tool's name, its
  * input once the harness has it, the tool's answer, and whether it failed.
@@ -15,10 +17,6 @@ export type AgentToolCall = {
 export function toolName(name: string): string {
 	const mcp = /^mcp__.+?__(.+)$/.exec(name);
 	return (mcp?.[1] ?? name).toLowerCase();
-}
-
-export function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 /** The first of `keys` that holds a string. */

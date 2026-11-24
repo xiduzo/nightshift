@@ -3,6 +3,7 @@
 // groups the dialog shows, and the confirm step. `planSubflowFromSection`
 // in @nightshift/flows plans; this file has no React.
 
+import { messageOf } from "@nightshift/client";
 import {
 	type Flow,
 	type FlowSection,
@@ -217,7 +218,7 @@ export async function makeSubflow(
 	} catch (error) {
 		return {
 			ok: false,
-			message: error instanceof Error ? error.message : String(error),
+			message: messageOf(error),
 		};
 	}
 	return { ok: true, name, caller: plan.caller, callNode: plan.callNode };

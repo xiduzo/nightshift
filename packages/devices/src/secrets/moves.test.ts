@@ -6,7 +6,7 @@ import {
 	createSandbox,
 	type Sandbox,
 } from "@nightshift/engine/testing";
-import { Refusal } from "@nightshift/refusal";
+import { messageOf, Refusal } from "@nightshift/refusal";
 import {
 	type HostClient,
 	type WorkReply,
@@ -244,7 +244,7 @@ async function refusalOf(promise: Promise<unknown>): Promise<string> {
 	try {
 		await promise;
 	} catch (error) {
-		return error instanceof Error ? error.message : String(error);
+		return messageOf(error);
 	}
 	throw new Error("It was not refused.");
 }

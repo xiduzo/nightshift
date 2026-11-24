@@ -1,5 +1,6 @@
 // Saving the draft, and the export of the saved flow.
 
+import { messageOf } from "@nightshift/client";
 import type { Flow, FlowIssue } from "@nightshift/flows";
 import type { QueryClient } from "@tanstack/react-query";
 import { useMutation } from "@tanstack/react-query";
@@ -54,9 +55,7 @@ export function useFlowSave({
 				);
 			}
 		} catch (error) {
-			toast.error(
-				`Could not export: ${error instanceof Error ? error.message : String(error)}`,
-			);
+			toast.error(`Could not export: ${messageOf(error)}`);
 		}
 	};
 

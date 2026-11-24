@@ -1,3 +1,4 @@
+import { messageOf } from "@nightshift/refusal";
 import { isTimeZone } from "@nightshift/time";
 import { latestCronTime, nextCronTimes } from "@nightshift/time/cron";
 import { Cron } from "croner";
@@ -211,7 +212,7 @@ export function cronError(cron: string): string | null {
 		cronOf(cron);
 		return null;
 	} catch (error) {
-		const message = error instanceof Error ? error.message : String(error);
+		const message = messageOf(error);
 		return message.replace(/^CronPattern: /, "");
 	}
 }

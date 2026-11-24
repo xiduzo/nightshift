@@ -1,3 +1,4 @@
+import { messageOf } from "@nightshift/client";
 import { router, Stack } from "expo-router";
 import { CircleAlert, ScanQrCode } from "lucide-react-native";
 import { useEffect, useRef, useState } from "react";
@@ -70,7 +71,7 @@ export function ConnectScreen() {
 			}
 			setConnected(true);
 		} catch (failed) {
-			setError(failed instanceof Error ? failed.message : String(failed));
+			setError(messageOf(failed));
 		} finally {
 			setBusy(false);
 		}

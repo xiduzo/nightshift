@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
+import { messageOf } from "@nightshift/refusal";
 
 import type { ArtifactStore } from "../artifacts";
 
@@ -49,7 +50,7 @@ export function openKeptFiles(
 					await store.save({ ...step, cwd: path, path: file, title: file });
 				} catch (error) {
 					problems.push(
-						`Night Shift could not keep ${file}: ${error instanceof Error ? error.message : String(error)}`,
+						`Night Shift could not keep ${file}: ${messageOf(error)}`,
 					);
 				}
 			}

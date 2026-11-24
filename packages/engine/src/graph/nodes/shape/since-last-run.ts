@@ -11,10 +11,10 @@ import {
 	type TemplateContext,
 	watchesValue,
 } from "@nightshift/flows";
+import { messageOf } from "@nightshift/refusal";
 import type { MemoryAt, Remembered, StepMemory } from "../../../memory";
 import {
 	endedAtReason,
-	messageOf,
 	type NodeAction,
 	type NodeKind,
 	PLAIN_KIND,

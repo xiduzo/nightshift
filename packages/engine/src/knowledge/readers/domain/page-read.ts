@@ -129,11 +129,6 @@ export function absoluteLink(href: string, base?: string): string | null {
 	}
 }
 
-/** The message of an error, for a reason a person reads. */
-export function messageOf(error: unknown): string {
-	return error instanceof Error ? error.message : String(error);
-}
-
 /** The last part of an address's path, for a title when the page gives none. */
 export function nameOfAddress(address: string): string {
 	try {

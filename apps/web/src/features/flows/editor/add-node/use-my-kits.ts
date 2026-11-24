@@ -1,3 +1,4 @@
+import { messageOf } from "@nightshift/client";
 import {
 	type Flow,
 	type ProjectFlowMap,
@@ -106,7 +107,7 @@ export function useMyKits({
 			return saved.name;
 		} catch (error) {
 			toast.error(
-				`Could not copy ${flow} from ${from.project}: ${error instanceof Error ? error.message : String(error)}`,
+				`Could not copy ${flow} from ${from.project}: ${messageOf(error)}`,
 			);
 			return null;
 		}

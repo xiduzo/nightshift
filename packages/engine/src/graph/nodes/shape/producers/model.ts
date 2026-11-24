@@ -9,6 +9,7 @@ import {
 	valueDecider,
 } from "@nightshift/flows";
 import { schemaProblem } from "@nightshift/flows/json-schema";
+import { messageOf } from "@nightshift/refusal";
 import { type Climb, trailData } from "../../../cascade";
 import { isWaitKind, type StepContext, stepFailure } from "../../../context";
 import {
@@ -87,7 +88,7 @@ async function accepted(
 			why = `The value does not pass the accept rule of the tier: ${rule}`;
 		}
 	} catch (error) {
-		why = `The accept rule of the tier failed: ${error instanceof Error ? error.message : String(error)}`;
+		why = `The accept rule of the tier failed: ${messageOf(error)}`;
 	}
 	if (why === null) return made;
 	step.record(null, { type: "value", data: null, problem: why });

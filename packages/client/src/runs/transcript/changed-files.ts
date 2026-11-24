@@ -1,8 +1,8 @@
+import { isRecord } from "@nightshift/flows";
 import type { WorktreeChangesEvent } from "../types";
 import { projectPath } from "./project-path";
 import {
 	type AgentToolCall,
-	isRecord,
 	jsonResult,
 	stringField,
 	toolName,

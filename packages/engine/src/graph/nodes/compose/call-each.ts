@@ -9,6 +9,7 @@ import {
 	type TemplateContext,
 	unfinishedBlockers,
 } from "@nightshift/flows";
+import { messageOf } from "@nightshift/refusal";
 import { itemBranchName } from "../../../contract";
 import { runCommand } from "../../../device";
 import type {
@@ -23,7 +24,6 @@ import type {
 } from "../../../log";
 import { itemStates } from "../../../read";
 import {
-	messageOf,
 	type NodeAction,
 	STOP_AFTER_STEP_REASON,
 	STOP_TIME_REASON,

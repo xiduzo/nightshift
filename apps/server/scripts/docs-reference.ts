@@ -60,6 +60,7 @@ import {
 	tierNode,
 	valueDecider,
 } from "@nightshift/flows";
+import { messageOf } from "@nightshift/refusal";
 
 const ROOT = join(import.meta.dir, "../../..");
 const CLI = join(ROOT, "apps/server/src/cli.ts");
@@ -285,10 +286,6 @@ const BREACHES: readonly { pattern: RegExp; message: string }[] = [
 	},
 ];
 
-function errorText(error: unknown): string {
-	return error instanceof Error ? error.message : String(error);
-}
-
 /**
  * One flow of `community/` from the text of its `flow.json`. It loads as an
  * import loads a file (JSON, then `readFlow`) and must pass the check a
@@ -307,7 +304,7 @@ export function loadCommunityFlow(
 	try {
 		json = JSON.parse(text);
 	} catch (error) {
-		problems.push(`It is not valid JSON: ${errorText(error)}`);
+		problems.push(`It is not valid JSON: ${messageOf(error)}`);
 		return { name, flow: null, problems };
 	}
 	const read = readFlow(json);
@@ -461,7 +458,7 @@ export function fill(
 				try {
 					body = render(file);
 				} catch (error) {
-					problems.push({ block, message: errorText(error) });
+					problems.push({ block, message: messageOf(error) });
 					return whole;
 				}
 				return `<!-- ${block}${note} -->\n${body}\n<!-- /${block} -->`;

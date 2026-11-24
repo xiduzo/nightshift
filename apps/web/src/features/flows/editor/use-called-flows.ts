@@ -1,5 +1,6 @@
 // The flows the Subflow nodes call: open one, or make one and point the node at it.
 
+import { messageOf } from "@nightshift/client";
 import type { Flow } from "@nightshift/flows";
 import {
 	isSavable,
@@ -74,7 +75,7 @@ export function useCalledFlows({
 			});
 		} catch (error) {
 			toast.error(
-				`Could not ${copy ? `copy ${copy.kit}` : `create ${calledName}`}: ${error instanceof Error ? error.message : String(error)}`,
+				`Could not ${copy ? `copy ${copy.kit}` : `create ${calledName}`}: ${messageOf(error)}`,
 			);
 			return;
 		}

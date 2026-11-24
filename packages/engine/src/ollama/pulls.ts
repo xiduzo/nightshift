@@ -1,3 +1,4 @@
+import { messageOf } from "@nightshift/refusal";
 import type { Ollama } from "ollama";
 
 /**
@@ -73,7 +74,7 @@ export function createOllamaPulls(options: {
 			log(`[ollama] ${model} is downloaded.`);
 			onDone?.(model);
 		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
+			const message = messageOf(error);
 			const quiet = stopped || cancelled.has(model);
 			pull.error = quiet ? null : message;
 			if (!quiet) log(`[ollama] ${model} did not download: ${message}`);

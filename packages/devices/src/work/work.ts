@@ -1,3 +1,4 @@
+import { messageOf } from "@nightshift/refusal";
 import { now as timeNow } from "@nightshift/time";
 import {
 	secretRequestSchema,
@@ -193,7 +194,7 @@ export function createWorkServer(deps: {
 		} catch (error) {
 			out.push({
 				kind: "error",
-				message: error instanceof Error ? error.message : String(error),
+				message: messageOf(error),
 			});
 		} finally {
 			calls.delete(id);

@@ -1,3 +1,4 @@
+import { messageOf } from "@nightshift/client";
 import Constants from "expo-constants";
 import { Smartphone } from "lucide-react-native";
 import { Alert as NativeAlert } from "react-native";
@@ -30,10 +31,7 @@ export function ThisPhoneSection() {
 			await forget();
 			goToConnect();
 		} catch (error) {
-			NativeAlert.alert(
-				"This phone was not removed",
-				error instanceof Error ? error.message : String(error),
-			);
+			NativeAlert.alert("This phone was not removed", messageOf(error));
 		}
 	}
 

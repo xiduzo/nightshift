@@ -1,3 +1,4 @@
+import { messageOf } from "@nightshift/refusal";
 import { now } from "@nightshift/time";
 import type { McpServerConfig } from "../port";
 import { type McpToolInfo, toolInfo, withMcpClient } from "./mcp";
@@ -47,7 +48,7 @@ export async function testMcpServer(
 			ok: false,
 			server: null,
 			tools: [],
-			error: redact(error instanceof Error ? error.message : String(error)),
+			error: redact(messageOf(error)),
 			ms: now() - started,
 		};
 	}

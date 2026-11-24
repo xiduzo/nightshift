@@ -1,4 +1,5 @@
 import type { Schedule } from "@nightshift/flows";
+import { isRecord } from "@nightshift/flows";
 
 /**
  * The schedules that a leave of a Host paused on this computer only. The
@@ -59,7 +60,7 @@ export function pausedForm(schedule: Schedule): Schedule {
 /** A value as text: the same for the same fields in another order. */
 function canonical(value: unknown): string {
 	return JSON.stringify(value, (_key, field) =>
-		field !== null && typeof field === "object" && !Array.isArray(field)
+		isRecord(field)
 			? Object.fromEntries(
 					Object.entries(field).sort(([a], [b]) => (a < b ? -1 : 1)),
 				)

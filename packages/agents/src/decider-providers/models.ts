@@ -5,6 +5,7 @@
  */
 
 import { deciderAddress, type ModelAddress } from "@nightshift/flows";
+import { messageOf } from "@nightshift/refusal";
 import type { DeciderName } from "../port";
 import { reachAddress, type TanstackDeciderOptions } from "./access";
 import { type AddressAccess, AddressError } from "./address";
@@ -55,7 +56,7 @@ export async function deciderModels(
 	try {
 		return result([...new Set(await list())], null);
 	} catch (error) {
-		return result([], error instanceof Error ? error.message : String(error));
+		return result([], messageOf(error));
 	}
 }
 
@@ -78,7 +79,7 @@ export async function deciderModelsAt(
 /** How a listing failure reads at run start: whether the server answered at all. */
 function listingReason(error: unknown): "silent" | "refused" | "other" {
 	if (error instanceof AddressError) return error.reason;
-	const message = error instanceof Error ? error.message : String(error);
+	const message = messageOf(error);
 	if (/does not answer/i.test(message)) return "silent";
 	if (/\b(401|403)\b|unauthori[sz]ed|forbidden/i.test(message))
 		return "refused";

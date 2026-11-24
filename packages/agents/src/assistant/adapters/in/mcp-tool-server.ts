@@ -7,6 +7,7 @@
  *
  * The MCP SDK loads on first use: the package root must not load it.
  */
+
 import type {
 	CallToolResult,
 	Resource,
@@ -14,6 +15,7 @@ import type {
 	ToolAnnotations,
 	Transport,
 } from "@modelcontextprotocol/server";
+import { messageOf } from "@nightshift/refusal";
 import type { BridgedTool } from "../../../port";
 
 type ToolServerInfo = {
@@ -64,11 +66,7 @@ async function toolServer(
 		server.setRequestHandler("resources/read", async (request) => {
 			const { uri } = request.params;
 			const read = await resources.read(uri).catch((error: unknown) => {
-				throw new ProtocolError(
-					RESOURCE_NOT_FOUND,
-					error instanceof Error ? error.message : String(error),
-					{ uri },
-				);
+				throw new ProtocolError(RESOURCE_NOT_FOUND, messageOf(error), { uri });
 			});
 			if (!read) {
 				throw new ProtocolError(RESOURCE_NOT_FOUND, "Resource not found", {
@@ -110,9 +108,7 @@ async function toolServer(
 					],
 				};
 			} catch (error) {
-				return errorResult(
-					error instanceof Error ? error.message : String(error),
-				);
+				return errorResult(messageOf(error));
 			}
 		},
 	);

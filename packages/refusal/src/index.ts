@@ -11,6 +11,7 @@
  * (`PROTOCOL_VERSION`, ADR 45).
  */
 
+export { messageOf } from "./message";
 export {
 	FAILURE_MESSAGE,
 	Refusal,

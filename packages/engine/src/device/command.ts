@@ -11,6 +11,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { messageOf } from "@nightshift/refusal";
 
 import { ARTIFACTS_ENV } from "./kept-files";
 import type { Device, ExecEvent, ExecInput } from "./types";
@@ -264,8 +265,4 @@ function openOutputFile(): OutputFile {
 			return taken;
 		},
 	};
-}
-
-function messageOf(error: unknown): string {
-	return error instanceof Error ? error.message : String(error);
 }
