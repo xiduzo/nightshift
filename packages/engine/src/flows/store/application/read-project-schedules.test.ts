@@ -18,9 +18,7 @@ describe("readProjectSchedules", () => {
 		expect(read.schedules).toEqual([nightly]);
 		// The flow "build" does not exist: the schedule has a problem.
 		expect(read.issues.length).toBeGreaterThan(0);
-		expect(ports.store.reads).toEqual([
-			{ projectId: "project", deviceId: "laptop", spaceId: "space" },
-		]);
+		expect(ports.store.reads).toEqual(["project"]);
 	});
 
 	test("without validate, it reads no flow and finds no problem", async () => {

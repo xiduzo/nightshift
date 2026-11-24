@@ -8,7 +8,9 @@ import {
 import * as Y from "yjs";
 import type { FlowDocument } from "../../../../documents";
 import {
+	type FlowFormat,
 	type FlowRevision,
+	formatOf,
 	readableRevision,
 	same,
 	stableJson,
@@ -89,8 +91,11 @@ export type FlowEntry = {
 	name: string;
 	stored: string;
 	createdAt: number;
-	/** A newer Night Shift saved it: this one does not read or change it. */
-	newer: boolean;
+	/**
+	 * An `older` flow is listed with its JSON, and nothing changes it. A
+	 * `newer` one is not listed either.
+	 */
+	format: FlowFormat;
 	map: Y.Map<unknown>;
 };
 
@@ -120,9 +125,9 @@ export function scanFlows(document: FlowDocument): {
 		if (typeof stored !== "string" || !flowNameSchema.safeParse(stored).success)
 			continue;
 		if (typeof version !== "number" || typeof createdAt !== "number") continue;
-		const newer = version > FLOW_VERSION;
-		if (!newer && !readable(map)) continue;
-		all.push({ flowId, stored, createdAt, newer, map });
+		const format = formatOf(version);
+		if (format !== "newer" && !readable(map)) continue;
+		all.push({ flowId, stored, createdAt, format, map });
 	}
 	all.sort((a, b) =>
 		a.createdAt !== b.createdAt
@@ -138,7 +143,9 @@ export function scanFlows(document: FlowDocument): {
 	}
 	const seen: { entry: Omit<FlowEntry, "name">; json: string }[] = [];
 	const entries = all.filter((entry) => {
-		if (entry.newer || (counts.get(entry.stored) ?? 0) < 2) return true;
+		if (entry.format === "newer" || (counts.get(entry.stored) ?? 0) < 2) {
+			return true;
+		}
 		const json = stableJson(flowJson(entry.map));
 		const original = seen.find(
 			(other) => other.entry.stored === entry.stored && other.json === json,
@@ -179,16 +186,16 @@ function readable(map: Y.Map<unknown>): boolean {
 }
 
 /**
- * Every flow of the document that this Night Shift reads, by name: what a
- * Clone's flow files were. Each with its Flow revision, when the flow is
- * the last one saved.
+ * Every flow of the document by name, as it is stored, with its Flow
+ * revision when the flow is the last one saved. Not one that a newer Night
+ * Shift saved.
  */
 export function flowSources(document: FlowDocument): FlowSources {
 	const sources: FlowSources = {};
 	for (const entry of flowEntries(document).sort((a, b) =>
 		a.name < b.name ? -1 : 1,
 	)) {
-		if (entry.newer) continue;
+		if (entry.format === "newer") continue;
 		const json = flowJson(entry.map);
 		const last = flowRevisions(document, entry.flowId).at(-1);
 		// A merge that no revision records yet is no revision.
@@ -237,7 +244,7 @@ function orderedItems(
 	return items;
 }
 
-/** The newest revision of a flow that this Night Shift reads, or none. Older ones stay for the history. */
+/** The newest revision of a flow that this Night Shift lists, or none. Older ones stay for the history. */
 export function lastRevision(
 	document: FlowDocument,
 	flowId: string,
@@ -250,7 +257,7 @@ export function lastRevision(
 	return undefined;
 }
 
-/** The revisions of a flow that this Night Shift reads, oldest first. One from a newer Night Shift is left out. */
+/** The revisions of a flow that this Night Shift lists, oldest first. One from a newer Night Shift is left out. */
 export function flowRevisions(
 	document: FlowDocument,
 	flowId: string,
@@ -289,9 +296,11 @@ export function newFlowMap(
 	return map;
 }
 
-/** Writes the flow into its Y.Map: only the fields, nodes, edges and Sections that differ. */
+/**
+ * Writes the flow into its Y.Map: only the fields, nodes, edges and
+ * Sections that differ. The map is of the current format already.
+ */
 export function applyFlow(map: Y.Map<unknown>, flow: Flow): void {
-	if (map.get("version") !== FLOW_VERSION) map.set("version", FLOW_VERSION);
 	const scalars = map.get("scalars") as Y.Map<unknown>;
 	const wanted = new Map(
 		Object.entries(flow).filter(

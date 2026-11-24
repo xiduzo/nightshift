@@ -9,7 +9,7 @@ const quick = (prompt: string): Flow =>
 	);
 
 describe("readProjectFlows", () => {
-	test("reads the flows as this Device, in the Project's Space", async () => {
+	test("reads the flows of the Project", async () => {
 		const ports = inMemoryStorePorts();
 		await ports.store.save("project", {
 			name: "build",
@@ -21,9 +21,7 @@ describe("readProjectFlows", () => {
 		});
 		const flows = await readProjectFlows(ports)({ projectId: "project" });
 		expect(Object.keys(flows)).toEqual(["build"]);
-		expect(ports.store.reads).toEqual([
-			{ projectId: "project", deviceId: "laptop", spaceId: "space" },
-		]);
+		expect(ports.store.reads).toEqual(["project"]);
 	});
 
 	test("refuses a Project this Replica does not have, and reads nothing", async () => {

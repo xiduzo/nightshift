@@ -24,12 +24,12 @@ import {
 	type PendingCommand,
 	type ProjectRuns,
 	parseCalledFlows,
-	parseRunFlow,
 	type RunDetail,
 	type RunWalker,
 	runDeviceId,
 	type runFacts,
 	type StepDetail,
+	shownRunFlow,
 	stepMetrics,
 	toSummary,
 } from "../../../../read";
@@ -244,7 +244,7 @@ export function toRunDetail(
 	const summary = toSummary(row, facts, names, walker, device);
 	return {
 		...summary,
-		flow: parseRunFlow(row),
+		...shownRunFlow(row),
 		calledFlows: parseCalledFlows(row),
 		flowRevision: row.flowRevision,
 		steps: deriveSteps(run).map((step) => toStepSummary(step, deviceOf)),

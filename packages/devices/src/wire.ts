@@ -103,7 +103,6 @@ async function startNow(deps: DevicesDeps): Promise<DevicesRuntime> {
 			profileFor: (ref) => deps.profiles.settingsFor(ref),
 			spaceDocuments: deps.spaces,
 			flowDocuments: deps.flows,
-			profiles: deps.profiles,
 			scheduler: deps.scheduler,
 			github: systemGitHubCli(),
 			...(deps.usage ? { usage: deps.usage } : {}),

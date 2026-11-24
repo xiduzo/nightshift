@@ -45,18 +45,17 @@ import {
 	type Flow,
 	type FlowNode,
 	flowConfigUse,
-	flowSchema,
 	flowSecrets,
 	HARNESS_CATALOG,
 	isCustomHarness,
 	isKitName,
 	isKnowledgeKit,
 	kitList,
-	migrateFlow,
 	NODE_FAMILY_LABEL,
 	NODE_TYPE_LABEL,
 	type ProjectFlowMap,
 	proposalIssues,
+	readFlow,
 	starterList,
 	tierNode,
 	valueDecider,
@@ -290,15 +289,9 @@ function errorText(error: unknown): string {
 	return error instanceof Error ? error.message : String(error);
 }
 
-/** A flow file's JSON at the current format, or null when it does not parse. */
-function currentFlow(json: unknown): Flow | null {
-	const parsed = flowSchema.safeParse(migrateFlow(json));
-	return parsed.success ? parsed.data : null;
-}
-
 /**
  * One flow of `community/` from the text of its `flow.json`. It loads as an
- * import loads a file (JSON, then `migrateFlow`) and must pass the check a
+ * import loads a file (JSON, then `readFlow`) and must pass the check a
  * save makes (`proposalIssues`, which `check_flow` calls). `flows` are the
  * flows it may call, by name.
  */
@@ -317,22 +310,21 @@ export function loadCommunityFlow(
 		problems.push(`It is not valid JSON: ${errorText(error)}`);
 		return { name, flow: null, problems };
 	}
-	const migrated = migrateFlow(json);
-	const version = (migrated as { version?: unknown } | null)?.version;
-	if (typeof version === "number" && version > FLOW_VERSION) {
+	const read = readFlow(json);
+	if (read.flow === null && read.why !== "invalid") {
 		problems.push(
-			`Its format is ${version}, and Night Shift reads up to format ${FLOW_VERSION}.`,
+			`Night Shift reads format ${FLOW_VERSION}. ${read.issues.map(({ message }) => message).join(" ")}`,
 		);
 		return { name, flow: null, problems };
 	}
 	// A community flow has no project: its place holds only the flows it may
 	// call. No Devices or connections to check against, so the base is never
 	// read: the flow stands in for it, as `check_flow` does for a new flow.
-	const errors = proposalIssues(migrated as Flow, migrated, { flows, name })
+	const errors = proposalIssues(json as Flow, json, { flows, name })
 		.filter((issue) => issue.severity === "error")
 		.map((issue) => issue.message);
 	problems.push(...errors);
-	const flow = errors.length === 0 ? currentFlow(json) : null;
+	const flow = errors.length === 0 ? read.flow : null;
 	return { name, flow, problems };
 }
 
@@ -359,10 +351,10 @@ export function communityFlows(dir: string = COMMUNITY): CommunityFlow[] {
 	}));
 	const callable: Record<string, Flow | null> = {};
 	for (const starter of starterList())
-		callable[starter.name] = currentFlow(starter.source);
+		callable[starter.name] = readFlow(starter.source).flow;
 	for (const { name, text } of files) {
 		try {
-			callable[name] = currentFlow(JSON.parse(text));
+			callable[name] = readFlow(JSON.parse(text)).flow;
 		} catch {
 			callable[name] = null;
 		}

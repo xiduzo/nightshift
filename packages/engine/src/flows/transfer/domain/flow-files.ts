@@ -1,12 +1,9 @@
 import {
 	canonicalFlowJson,
-	FLOW_VERSION,
 	type Flow,
 	type FlowIssue,
-	type FlowMigration,
 	type FlowSources,
-	flowSchema,
-	migrateFlow,
+	readFlow,
 	suffixedName,
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
@@ -46,8 +43,8 @@ export function nameTaken(name: string, taken: ReadonlySet<string>): Refusal {
 	);
 }
 
-/** The flow a JSON file holds, brought to the current format, or a refusal that says what is wrong. */
-export function importedFlow(json: string, migration?: FlowMigration): Flow {
+/** The flow a JSON file holds, or a refusal that says what is wrong. */
+export function importedFlow(json: string): Flow {
 	let parsed: unknown;
 	try {
 		parsed = JSON.parse(json);
@@ -57,31 +54,31 @@ export function importedFlow(json: string, migration?: FlowMigration): Flow {
 			"This file is not a flow. Choose a flow file that Night Shift exported.",
 		);
 	}
-	return migratedFlow(parsed, migration);
+	return flowOfFile(parsed);
 }
 
-/** A flow file's contents, brought to the current format, or a refusal that says what is wrong. */
-export function migratedFlow(parsed: unknown, migration?: FlowMigration): Flow {
-	const migrated = migrateFlow(parsed, migration);
-	const version =
-		migrated !== null && typeof migrated === "object" && "version" in migrated
-			? migrated.version
-			: undefined;
-	if (typeof version === "number" && version > FLOW_VERSION) {
-		throw new Refusal(
-			"invalid",
-			"A newer version of Night Shift made this flow. Update Night Shift to import it.",
-		);
+/** A flow file's contents as a flow, or a refusal that says what is wrong. */
+export function flowOfFile(contents: unknown): Flow {
+	const read = readFlow(contents);
+	if (read.flow !== null) return read.flow;
+	switch (read.why) {
+		case "older":
+			throw new Refusal(
+				"invalid",
+				"An older version of Night Shift made this file. Night Shift cannot import it.",
+			);
+		case "newer":
+			throw new Refusal(
+				"invalid",
+				"A newer version of Night Shift made this flow. Update Night Shift to import it.",
+			);
+		case "invalid": {
+			const issue = read.issues[0];
+			const where = issue?.path ? ` at ${issue.path}` : "";
+			throw new Refusal(
+				"invalid",
+				`This file is not a valid flow${where}: ${issue?.message ?? "check its format"}. Choose a flow file that Night Shift exported.`,
+			);
+		}
 	}
-	const flow = flowSchema.safeParse(migrated);
-	if (!flow.success) {
-		const issue = flow.error.issues[0];
-		const where =
-			issue && issue.path.length > 0 ? ` at ${issue.path.join(".")}` : "";
-		throw new Refusal(
-			"invalid",
-			`This file is not a valid flow${where}: ${issue?.message ?? "check its format"}. Choose a flow file that Night Shift exported.`,
-		);
-	}
-	return flow.data;
 }

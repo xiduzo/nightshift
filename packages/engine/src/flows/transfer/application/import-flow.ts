@@ -8,7 +8,7 @@ import type { Access } from "../../../access";
 import { type Actor, personOf } from "../../../contract";
 import type { ProjectFlows } from "../../store";
 import { importedFlow, namesOf, type SavedFlow } from "../domain/flow-files";
-import type { FlowUsage, ImportMigrations, SpaceProjects } from "./ports";
+import type { FlowUsage, SpaceProjects } from "./ports";
 
 const SAVES_FLOWS: Permissions = { flow: ["save"] };
 
@@ -16,15 +16,13 @@ export type ImportFlowPorts = {
 	access: Pick<Access, "openSpace">;
 	projects: SpaceProjects;
 	flows: Pick<ProjectFlows, "flows" | "save">;
-	/** Without them, a node keeps its profile's name and its Device's name, to pick again. */
-	importMigrations?: ImportMigrations | undefined;
 	usage?: FlowUsage | undefined;
 };
 
 /**
  * Saves the flow of a JSON file as a new flow of a project of the Space,
- * a revision of kind `import` by the actor. An older format is brought up
- * to date first. A name the project has already gets a suffix (`-2`).
+ * a revision of kind `import` by the actor. A file of an older format is
+ * refused. A name the project has already gets a suffix (`-2`).
  * `agents` puts the person's own profiles in place of the agents the flow
  * names.
  */
@@ -48,13 +46,7 @@ export const importFlow =
 		});
 		await ports.projects.inSpace(projectId, spaceId);
 		const flow = withAgentProfiles(
-			importedFlow(
-				request.json,
-				await ports.importMigrations?.forScope({
-					spaceId,
-					personId: personId ?? null,
-				}),
-			),
+			importedFlow(request.json),
 			request.agents ?? [],
 		);
 		const free = suffixedName(

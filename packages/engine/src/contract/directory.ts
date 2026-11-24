@@ -22,8 +22,7 @@ export type DeviceDirectory = {
 	names(ids: readonly string[]): Promise<Map<string, string>>;
 	/**
 	 * Every Device row this Replica has whose access is not removed, with
-	 * its owner: on a Host, its paired Devices and itself. What brings an
-	 * old Device name to the Device's id (`FlowMigrations`).
+	 * its owner: on a Host, its paired Devices and itself.
 	 */
 	known(): Promise<KnownDevice[]>;
 	/** Whether a Host keeps the Space, not this Replica. */

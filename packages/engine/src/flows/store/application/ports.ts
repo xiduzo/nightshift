@@ -14,22 +14,16 @@ import type { FlowNotice } from "../domain/notices";
  */
 export type FlowStore = {
 	/**
-	 * Every flow of the project that this Night Shift reads, by name, with
-	 * its Flow revision when it is the last one saved. A flow of an older
-	 * format reads as the Device that saved it named its profiles and
-	 * Devices (`deviceId`: this Device, for a flow that no revision names),
-	 * in the Project's Space (`spaceId`).
+	 * Every flow of the project by name, as it is stored, with its Flow
+	 * revision when it is the last one saved. Not one that a newer Night
+	 * Shift saved.
 	 */
-	read(
-		projectId: string,
-		at: { deviceId: string; spaceId: string | undefined },
-	): Promise<FlowSources>;
+	read(projectId: string): Promise<FlowSources>;
 	/**
 	 * Saves a flow, a draft with errors too: a new flow when no flow has the
 	 * name. A save that changes nothing since the last revision adds none.
-	 * Refuses (`conflict`) a flow that a newer Night Shift saved. Returns
-	 * every flow as it is stored after the save, with no older format
-	 * brought up.
+	 * Refuses (`conflict`) to write over a flow of another format. Returns
+	 * every flow as it is stored after the save.
 	 */
 	save(projectId: string, save: FlowSave): Promise<FlowSources>;
 	/** Removes the flow of that name. Its revisions stay. Refuses (`not-found`) a flow that does not exist. */
@@ -66,14 +60,9 @@ export type FlowStore = {
 	): Promise<boolean>;
 	/**
 	 * The revisions of the flow of that name, oldest first. Empty for a
-	 * flow that does not exist. One of an older format reads as the Device
-	 * that saved it named its profiles and Devices, in `spaceId`.
+	 * flow that does not exist.
 	 */
-	revisions(
-		projectId: string,
-		name: string,
-		spaceId: string | undefined,
-	): Promise<FlowRevision[]>;
+	revisions(projectId: string, name: string): Promise<FlowRevision[]>;
 	/** The schedules this Night Shift reads, in their order, and how many others it holds. */
 	schedules(
 		projectId: string,
@@ -87,17 +76,6 @@ export type FlowStore = {
 	notices(projectId: string): Promise<FlowNotice[]>;
 	/** Removes a notice. One that is gone already is no error. */
 	dismissNotice(projectId: string, noticeId: string): Promise<void>;
-	/** Every Project this Replica knows, by id: each has a flow document. */
-	projectIds(): Promise<string[]>;
-	/**
-	 * Brings the flows and the schedules of an older format of the project
-	 * to the current one, once: a flow with a revision of kind `upgrade` by
-	 * Night Shift on `deviceId`.
-	 */
-	upgrade(
-		projectId: string,
-		upgrade: { deviceId: string; spaceId: string; at: number },
-	): Promise<void>;
 	/** What a merge of the flows of `source` into those of `destination` renames. Changes nothing. */
 	planMerge(
 		source: string,

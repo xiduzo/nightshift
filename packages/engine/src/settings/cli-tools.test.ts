@@ -3,7 +3,6 @@ import { inMemoryComputer } from "../access/computer/adapters/out/in-memory-comp
 import { createSandbox, type Sandbox } from "../testing/test-support";
 import { wireCliTools as createCliToolStore } from "./cli-tools";
 import { cliToolsInstruction } from "./cli-tools/domain/cli-tool-guides";
-import { wireProfiles as createProfileStore } from "./profiles";
 
 let sandbox: Sandbox;
 beforeEach(async () => {
@@ -120,31 +119,6 @@ describe("createCliToolStore", () => {
 				input: "${ACLI_WORK_TOKEN}",
 			},
 		});
-	});
-});
-
-describe("profiles saved with the GitHub tool set", () => {
-	test("read as profiles with the CLI tool gh", async () => {
-		const document = await sandbox.openDocument();
-		await document.change(() => {
-			document.profiles.set("builder", {
-				description: null,
-				settings: {
-					harness: "claude-code",
-					model: "sonnet",
-					permissionMode: "auto",
-					tools: ["github"],
-					connections: [],
-				},
-				updatedAt: 1,
-			});
-		});
-		const profiles = createProfileStore({
-			computerAccess: inMemoryComputer(),
-			document,
-		});
-		await profiles.load();
-		expect(profiles.settingsFor("builder")).toMatchObject({ clis: ["gh"] });
 	});
 });
 

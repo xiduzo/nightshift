@@ -2,9 +2,11 @@
 
 export {
 	costFields,
+	olderRun,
 	parseCalledFlows,
 	parseRunFlow,
 	runDeviceId,
 	runFacts,
+	shownRunFlow,
 	toSummary,
 } from "./run-summary";

@@ -42,7 +42,6 @@ let crashNext = false;
 function flowsOn(over: FlowDocuments): MergingFlows {
 	const { merges, ...stored } = createProjectFlows({
 		documents: {
-			openAll: () => over.openAll(),
 			open: async (projectId) => {
 				const document = await over.open(projectId);
 				return projectId !== HOSTED ? document : crashing(document);

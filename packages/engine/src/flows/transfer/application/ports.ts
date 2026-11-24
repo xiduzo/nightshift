@@ -1,4 +1,3 @@
-import type { FlowMigration } from "@nightshift/flows";
 import type { UsageMoment } from "../../../usage";
 
 /**
@@ -22,19 +21,6 @@ export type SpaceProjects = {
 	 * that is not in the Space: the same answer as one that does not exist.
 	 */
 	inSpace(projectId: string, spaceId: string): Promise<void>;
-};
-
-/**
- * What brings an imported file of an older format to the current format:
- * its nodes name the profiles of this Device, the one that imports it,
- * and the Devices of the Space by id, the Person's own first.
- * @filledBy engine/wire
- */
-export type ImportMigrations = {
-	forScope(scope: {
-		spaceId: string;
-		personId: string | null;
-	}): Promise<FlowMigration>;
 };
 
 /**

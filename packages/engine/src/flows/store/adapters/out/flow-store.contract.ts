@@ -16,6 +16,8 @@ export type FlowStoreSetup = {
 	store: FlowStore;
 	/** Two Projects this Replica knows. */
 	projects: [string, string];
+	/** Makes the stored flow of that name one of the format before this one. */
+	putOlder(projectId: string, name: string): Promise<void>;
 	close(): Promise<void>;
 };
 
@@ -32,8 +34,6 @@ const saving = (name: string, flow: Flow, at: number): FlowSave => ({
 	deviceId: "laptop",
 	at,
 });
-
-const here = { deviceId: "laptop", spaceId: "space" };
 
 const nightly = (flow: string, id = "nightly"): Schedule =>
 	scheduleSchema.parse({ id, flow, cron: "0 3 * * *" });
@@ -63,30 +63,30 @@ export function flowStoreContract(
 					json: { version: FLOW_VERSION, nodes: flow.nodes },
 				});
 				await store.save(project, saving("build", flow, 2));
-				const revisions = await store.revisions(project, "build", "space");
+				const revisions = await store.revisions(project, "build");
 				expect(revisions.map((r) => [r.kind, r.personId, r.at])).toEqual([
 					["save", "ada", 1],
 				]);
-				const read = await store.read(project, here);
+				const read = await store.read(project);
 				expect(read.build).toEqual({
 					json: stored.build && "json" in stored.build ? stored.build.json : {},
 					revision: revisions[0]?.id ?? "",
 				});
-				expect(await store.read(other, here)).toEqual({});
+				expect(await store.read(other)).toEqual({});
 			}));
 
 		test("a removed flow is gone, its revisions stay, and a flow that does not exist is refused", () =>
 			withStore(async ({ store, projects: [project] }) => {
 				await store.save(project, saving("build", quick("Write"), 1));
 				await store.remove(project, "build");
-				expect(await store.read(project, here)).toEqual({});
+				expect(await store.read(project)).toEqual({});
 				const refusal = await store.remove(project, "build").catch((e) => e);
 				expect(refusal).toBeInstanceOf(Refusal);
 				expect((refusal as Refusal).kind).toBe("not-found");
 				expect((refusal as Error).message).toBe(
 					'The flow "build" does not exist.',
 				);
-				expect(await store.revisions(project, "gone", "space")).toEqual([]);
+				expect(await store.revisions(project, "gone")).toEqual([]);
 			}));
 
 		test("a run's shapes stay on a node without a schema, once", () =>
@@ -108,12 +108,12 @@ export function flowStoreContract(
 				expect(await store.keepShapes(project, { ...keep, name: "gone" })).toBe(
 					false,
 				);
-				const read = await store.read(project, here);
+				const read = await store.read(project);
 				const json = read.build && "json" in read.build ? read.build.json : {};
 				expect(
 					(json as { nodes: { output?: unknown }[] }).nodes[0],
 				).toMatchObject({ output: shape, outputInferred: true });
-				const revisions = await store.revisions(project, "build", "space");
+				const revisions = await store.revisions(project, "build");
 				expect(revisions.map((r) => [r.kind, r.personId, r.deviceId])).toEqual([
 					["save", "ada", "laptop"],
 					["infer", null, "desktop"],
@@ -135,7 +135,7 @@ export function flowStoreContract(
 				};
 				expect(await store.keepOutputTypes(project, keep)).toBe(true);
 				expect(await store.keepOutputTypes(project, keep)).toBe(false);
-				const read = await store.read(project, here);
+				const read = await store.read(project);
 				const json = read.build && "json" in read.build ? read.build.json : {};
 				expect((json as { outputs: unknown[] }).outputs).toEqual([
 					{
@@ -168,9 +168,45 @@ export function flowStoreContract(
 				expect(await store.notices(project)).toEqual([]);
 			}));
 
-		test("every Project with a document is listed", () =>
-			withStore(async ({ store, projects }) => {
-				expect((await store.projectIds()).sort()).toEqual([...projects].sort());
+		test("a flow of an older format is listed as it is stored, and nothing writes over it", () =>
+			withStore(async ({ store, projects: [project], putOlder }) => {
+				const flow = quick("Write");
+				await store.save(project, saving("build", flow, 1));
+				await putOlder(project, "build");
+				const stored = await store.read(project);
+				expect(stored.build).toMatchObject({
+					json: { version: FLOW_VERSION - 1, nodes: flow.nodes },
+				});
+				const node = flow.nodes[0];
+				if (!node) throw new Error("Expected a node.");
+				const at = { name: "build", deviceId: "laptop", at: 2 };
+				expect(
+					await store.keepShapes(project, {
+						...at,
+						node: { id: node.id, type: node.type },
+						shapes: { data: { type: "object" } },
+					}),
+				).toBe(false);
+				expect(
+					await store.keepOutputTypes(project, {
+						...at,
+						types: [{ name: "summary", value: "x", type: "text" }],
+					}),
+				).toBe(false);
+				const refused = await store
+					.save(project, saving("build", quick("Over"), 3))
+					.catch((error) => error);
+				expect(refused).toBeInstanceOf(Refusal);
+				expect(refused).toMatchObject({
+					kind: "conflict",
+					message:
+						'An older version of Night Shift made the flow "build". You cannot change it here. Delete it, or use another name.',
+				});
+				expect(await store.read(project)).toEqual(stored);
+				expect(await store.revisions(project, "build")).toHaveLength(1);
+				// A person may still delete it.
+				await store.remove(project, "build");
+				expect(await store.read(project)).toEqual({});
 			}));
 
 		test("a merge gives a clashing flow a free name, takes the schedules, and runs again safely", () =>
@@ -183,22 +219,20 @@ export function flowStoreContract(
 				const plan = { flows: { build: "build-2" }, schedules: {} };
 				expect(await store.planMerge(source, destination, {})).toEqual(plan);
 				expect(await store.merge(source, destination, { at: 3 })).toEqual(plan);
-				const read = await store.read(destination, here);
+				const read = await store.read(destination);
 				expect(Object.keys(read).sort()).toEqual(["build", "build-2", "same"]);
 				expect((await store.schedules(destination)).schedules).toEqual([
 					nightly("build-2"),
 				]);
-				expect(
-					(await store.revisions(destination, "build-2", "space")).length,
-				).toBe(1);
+				expect((await store.revisions(destination, "build-2")).length).toBe(1);
 				// Again: nothing more.
 				await store.merge(source, destination, { at: 4 });
-				expect(Object.keys(await store.read(destination, here)).sort()).toEqual(
-					["build", "build-2", "same"],
-				);
-				expect(
-					(await store.revisions(destination, "build-2", "space")).length,
-				).toBe(1);
+				expect(Object.keys(await store.read(destination)).sort()).toEqual([
+					"build",
+					"build-2",
+					"same",
+				]);
+				expect((await store.revisions(destination, "build-2")).length).toBe(1);
 			}));
 	});
 }

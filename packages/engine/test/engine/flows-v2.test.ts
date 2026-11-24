@@ -16,11 +16,10 @@ import type {
 	Flow,
 	FlowEdge,
 } from "@nightshift/flows";
-import { FLOW_VERSION, parseFlow } from "@nightshift/flows";
+import { FLOW_VERSION } from "@nightshift/flows";
 import type { FlowInput } from "@nightshift/flows/testing";
 import { NIGHT_SHIFT } from "../../src/contract";
 import { saverFor } from "../../src/graph/checkpoints/checkpointer";
-import { appendEvent } from "../../src/log/run-log/append";
 import { createRunLog, type RunLog } from "../../src/log/run-log/run-log";
 import type { RunDetail, StepSummary } from "../../src/read/views";
 import type { SpaceEngine } from "../../src/space-engine";
@@ -41,7 +40,7 @@ import { createEngine } from "../../src/wire";
 /**
  * Flow format 2: inputs and outputs, templates with paths, the Call
  * node (once, and over any list), Agent outcomes and output schemas, and
- * runs of format 1 and the example flows.
+ * the example flows.
  */
 
 let sandbox: Sandbox;
@@ -788,79 +787,6 @@ describe("Call with each, over any list", () => {
 		});
 	});
 
-	test("a files source of an older flow lists the files that match its glob, sorted", async () => {
-		for (const name of ["src/b.ts", "src/a.ts", "src/c.md", "top.ts"]) {
-			await mkdir(join(sandbox.repoPath, "src"), { recursive: true });
-			await writeFile(join(sandbox.repoPath, name), `${name}\n`);
-		}
-		await mustGit(sandbox.repoPath, ["add", "-A"]);
-		await mustGit(sandbox.repoPath, [
-			"-c",
-			"user.name=t",
-			"-c",
-			"user.email=t@nightshift.invalid",
-			"-c",
-			"commit.gpgsign=false",
-			"commit",
-			"-q",
-			"-m",
-			"files",
-		]);
-		saveFlow(
-			"lint",
-			flowOf([command("look", `head -c 8 "{{item.path}}"`)], [], {
-				inputs: [{ name: "item", type: "json", required: true }],
-			}),
-		);
-		const engine = makeEngine(fakeHarness());
-		const id = await projectId(engine);
-		// Version 5: the source becomes a command on `git ls-files`.
-		const parsed = parseFlow({
-			...flowOf(
-				[callEach("files", "lint", { kind: "json", value: "[]" })],
-				[],
-				{
-					inputs: [{ name: "pattern", type: "text", default: "src/*.ts" }],
-				},
-			),
-			version: 5,
-			nodes: [
-				{
-					id: "files",
-					type: "call",
-					position: { x: 0, y: 0 },
-					flow: "lint",
-					each: { source: { kind: "files", glob: "{{pattern}}" } },
-				},
-			],
-		});
-		const flow = parsed.flow as Flow;
-		expect(flow.nodes[0]).toMatchObject({
-			each: { source: { kind: "command" } },
-		});
-		const run = await engine.startRun({ projectId: id, flow });
-		const detail = await waitForEnd(engine, run.id);
-		expect(detail.status).toBe("finished");
-		const files = await openStep(engine, detail, "files");
-		expect(files.items.map((i) => [i.id, i.title, i.value])).toEqual([
-			[
-				"src/a.ts",
-				"src/a.ts",
-				{ id: "src/a.ts", title: "src/a.ts", path: "src/a.ts" },
-			],
-			[
-				"src/b.ts",
-				"src/b.ts",
-				{ id: "src/b.ts", title: "src/b.ts", path: "src/b.ts" },
-			],
-		]);
-		expect(
-			detail.steps
-				.filter((s) => s.nodeId === "look")
-				.map((s) => s.outputs.log_tail),
-		).toEqual(["src/a.ts", "src/b.ts"]);
-	});
-
 	test("a command source of plain strings, and of objects with `dependsOn` and a parent", async () => {
 		saveFlow(
 			"echo",
@@ -1112,186 +1038,7 @@ describe("Agent outcomes and output schemas", () => {
 	});
 });
 
-describe("flow format 1", () => {
-	test("a run with events of an older shape still lists and opens", async () => {
-		const engine = makeEngine(fakeHarness());
-		const projectIdV1 = await projectId(engine);
-		const top = {
-			version: 1,
-			params: [{ name: "epic", required: true }],
-			start: "loop",
-			nodes: [
-				{
-					id: "loop",
-					type: "foreach",
-					position: { x: 0, y: 0 },
-					source: {
-						kind: "command",
-						command: `printf '%s' '[{"id":"12","title":"first"}]'`,
-					},
-					flow: "build",
-					branchPerItem: false,
-					haltOn: ["halt"],
-				},
-				{
-					id: "after",
-					type: "command",
-					position: { x: 0, y: 0 },
-					command: 'echo "epic {{params.epic}}: {{loop.summary}}"',
-				},
-			],
-			edges: [{ id: "e1", from: "loop", outcome: "done", to: "after" }],
-		};
-		const body = {
-			version: 1,
-			input: "item",
-			start: "work",
-			nodes: [
-				{
-					id: "work",
-					type: "command",
-					position: { x: 0, y: 0 },
-					command:
-						'echo "{{item.title}} #{{item.number}} of #{{item.parent_number}} on {{item.branch}}"',
-				},
-			],
-			edges: [],
-		};
-		const runId = "00000000-v1-run";
-		const { run, step } = await import("@nightshift/db/schema");
-		await sandbox.db.insert(run).values({
-			id: runId,
-			spaceId: sandbox.spaceId,
-			projectId: projectIdV1,
-			flowName: "night",
-			flow: JSON.stringify(top),
-			bodyFlows: JSON.stringify({ build: body }),
-			title: "night · epic 7",
-			worktreePath: sandbox.repoPath,
-			branch: "main",
-			baseRef: "main",
-			walkerId: sandbox.deviceId,
-		});
-		const push = (
-			type: string,
-			payload: unknown,
-			stepId: string | null = null,
-		) =>
-			appendEvent(
-				sandbox.db,
-				{
-					type: type as "RunEnded",
-					runId,
-					stepId,
-					payload: payload as never,
-				},
-				sandbox.deviceId,
-			);
-		const stepRow = (id: string, nodeId: string, nodeType: string) =>
-			sandbox.db.insert(step).values({
-				id,
-				spaceId: sandbox.spaceId,
-				runId,
-				nodeId,
-				nodeType,
-				visit: 1,
-				transcriptPath: join(sandbox.dataDir, `${id}.ndjson`),
-			});
-		await push("RunStarted", {
-			projectId: projectIdV1,
-			flowName: "night",
-			title: "night · epic 7",
-			start: "loop",
-			params: { epic: "7" },
-		});
-		await stepRow("loop-1", "loop", "foreach");
-		await push(
-			"StepStarted",
-			{
-				nodeId: "loop",
-				nodeType: "foreach",
-				visit: 1,
-				transcriptPath: join(sandbox.dataDir, "loop-1.ndjson"),
-				logPath: null,
-			},
-			"loop-1",
-		);
-		await push("ItemsRead", { count: 1, open: 1 }, "loop-1");
-		await push(
-			"ItemStarted",
-			{
-				item: {
-					id: "12",
-					number: 12,
-					title: "first",
-					body: "the body",
-					url: null,
-					parentNumber: 7,
-					parentTitle: "The Epic",
-				},
-				index: 1,
-				branch: null,
-				baseBranch: null,
-			},
-			"loop-1",
-		);
-		await stepRow("work-1", "work", "command");
-		await push(
-			"StepStarted",
-			{
-				nodeId: "work",
-				nodeType: "command",
-				visit: 1,
-				transcriptPath: join(sandbox.dataDir, "work-1.ndjson"),
-				logPath: null,
-				scope: { forEachStepId: "loop-1", itemId: "12" },
-			},
-			"work-1",
-		);
-		await push(
-			"StepEnded",
-			{
-				outcome: "stopped",
-				outputs: { outcome: "stopped", visit: 1 },
-				error: null,
-			},
-			"work-1",
-		);
-		await push(
-			"StepEnded",
-			{
-				outcome: "stopped",
-				outputs: { outcome: "stopped", visit: 1 },
-				error: null,
-			},
-			"loop-1",
-		);
-		await push("RunEnded", { status: "stopped", reason: null });
-
-		const listed = await engine.listRuns();
-		expect(listed.find((r) => r.id === runId)).toMatchObject({
-			status: "stopped",
-			inputs: { epic: "7" },
-		});
-		const loaded = await engine.getRun(runId);
-		expect(loaded.flow.version).toBe(FLOW_VERSION);
-		expect(loaded.flow.inputs).toEqual([
-			expect.objectContaining({ name: "epic", type: "text", required: true }),
-		]);
-		expect(loaded.calledFlows.build?.inputs).toEqual([
-			expect.objectContaining({ name: "item", type: "json", required: true }),
-		]);
-		const loop = stepOf(loaded, "loop");
-		expect(loop.nodeType).toBe("call");
-		expect((await openStep(engine, loaded, "loop")).items[0]).toMatchObject({
-			id: "12",
-			title: "first",
-			value: null,
-		});
-		// Its scope names no parent step, so it shows at the top level.
-		expect(stepOf(loaded, "work").scope).toBeNull();
-	});
-
+describe("the example flows", () => {
 	test("the rpgdotexe example flows start and walk to the first agent", async () => {
 		const examples = join(
 			import.meta.dir,

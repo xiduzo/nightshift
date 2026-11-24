@@ -5,12 +5,11 @@ import {
 	validateSchedules,
 } from "@nightshift/flows";
 import { unreadableSchedules } from "../domain/flow-save";
-import type { FlowStore, ProjectSpaces, ThisDevice } from "./ports";
+import type { FlowStore, ProjectSpaces } from "./ports";
 
 export type ReadProjectSchedulesPorts = {
 	store: Pick<FlowStore, "schedules" | "read">;
 	projects: ProjectSpaces;
-	device: ThisDevice;
 };
 
 /** The schedules of a project as read. */
@@ -25,8 +24,7 @@ export type ProjectSchedules = {
 
 /**
  * The project's schedules. `validate` (default true) checks each against
- * the project's flows as a read gives them: one of an older format in the
- * current format, so a schedule checks the flow that runs.
+ * the project's flows as a read gives them.
  */
 export const readProjectSchedules =
 	(ports: ReadProjectSchedulesPorts) =>
@@ -35,12 +33,11 @@ export const readProjectSchedules =
 		validate?: boolean;
 	}): Promise<ProjectSchedules> => {
 		const { projectId } = request;
-		const spaceId = await ports.projects.spaceOf(projectId);
+		await ports.projects.spaceOf(projectId);
 		const { schedules, unreadable } = await ports.store.schedules(projectId);
 		const issues = unreadableSchedules(unreadable);
 		if (request.validate !== false) {
-			const deviceId = await ports.device.id();
-			const sources = await ports.store.read(projectId, { deviceId, spaceId });
+			const sources = await ports.store.read(projectId);
 			issues.push(...validateSchedules(schedules, scheduleFlowInfos(sources)));
 		}
 		return { path: "schedules", schedules, issues };

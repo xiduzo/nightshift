@@ -5,8 +5,9 @@ import {
 	FLOW_VERSION,
 	type Flow,
 	flowSchema,
+	listFlowSources,
+	loadFlowSource,
 	parsedFlows,
-	parseFlow,
 	scheduleSchema,
 	singleAgentFlow,
 } from "@nightshift/flows";
@@ -19,14 +20,14 @@ import {
 	type FlowDocuments,
 } from "../documents";
 import { createSandbox, type Sandbox } from "../testing/test-support";
-import type { FlowMigrations } from "./migrations";
 import { wireStore as createProjectFlows, type ProjectFlows } from "./store";
 import {
 	flowIdOf,
 	flowRevisions,
 	flowSources,
 } from "./store/adapters/out/yjs-flow-encoding";
-import { saveFlow, upgradeFlows } from "./store/adapters/out/yjs-flow-saves";
+import { saveFlow } from "./store/adapters/out/yjs-flow-saves";
+import { upgradeSchedules } from "./store/adapters/out/yjs-schedules";
 
 /** A flow with two Agent nodes, `a` then `b`. */
 const twoNodes = (): Flow => {
@@ -454,191 +455,130 @@ describe("the flow document", () => {
 	});
 });
 
-describe("flows of format 6 in the document (ADR 3)", () => {
+describe("a flow of an older format (ADR 43)", () => {
 	const clock = { at: 1_000 };
 	let laptop: Replica;
-	let desktop: Replica;
-
-	/** The laptop has "builder" (id "p-laptop"), the desktop its own "builder". */
-	const migrations: FlowMigrations = {
-		async forDevice(deviceId) {
-			return {
-				deviceId,
-				deviceIdByName: (name) => (name === "LE2316" ? "le-2316" : null),
-				profileIdByName: (device, name) =>
-					name !== "builder"
-						? null
-						: device === "laptop"
-							? "p-laptop"
-							: device === "desktop"
-								? "p-desktop"
-								: null,
-			};
-		},
-	};
-
-	/** The flow `build` as a Night Shift of format 6 saved it on `deviceId`. */
-	async function storeFormat6(device: Replica, deviceId: string) {
-		const flow = twoNodes();
-		const old: Flow = {
-			...flow,
-			nodes: flow.nodes.map((node) => {
-				if (node.type !== "agent") return node;
-				const { harness: _h, model: _m, permissionMode: _p, ...rest } = node;
-				return node.id === "b"
-					? { ...rest, profile: "builder", device: "LE2316" }
-					: { ...rest, profile: "builder" };
-			}),
-		};
-		const document = await device.document();
-		await saveFlow(document, {
-			name: "build",
-			flow: old,
-			kind: "import",
-			personId: null,
-			deviceId,
-			at: 1,
-		});
-		const flowId = flowIdOf(document, "build") ?? "";
-		await document.current.change(() => {
-			(flowMap(document).get(flowId) as Y.Map<unknown>).set("version", 6);
-		});
-		await document.history.change(() => {
-			const revisions = document.history.doc.getArray<{ flow: unknown }>(
-				flowId,
-			);
-			const [last] = revisions.toArray();
-			revisions.delete(0, 1);
-			revisions.push([
-				{ ...last, flow: { ...(last?.flow as object), version: 6 } },
-			]);
-		});
-		return flowId;
-	}
-
-	const profiles = (flow: Flow | null | undefined) =>
-		flow?.nodes.map((node) => ("profile" in node ? node.profile : null));
 
 	beforeEach(async () => {
 		clock.at = 1_000;
 		laptop = await replica(clock);
-		desktop = await replica(clock);
 	});
 
 	afterEach(async () => {
 		await laptop.dispose();
-		await desktop.dispose();
 	});
 
-	test("a read names the profiles of the Device that saved the flow, and the Device a node named", async () => {
-		await storeFormat6(desktop, "laptop");
-		const flows = createProjectFlows({
-			documents: desktop.documents,
-			project: async () => ({ spaceId: desktop.sandbox.spaceId }),
-			deviceId: "desktop",
-			migrations,
+	/** The flow `build` as a Night Shift of format 6 stored it, with its revision. */
+	async function storeFormat6() {
+		await laptop.flows.save(of, "build", twoNodes());
+		const document = await laptop.document();
+		const flowId = flowIdOf(document, "build") ?? "";
+		await document.current.change(() => {
+			const flow = flowMap(document).get(flowId) as Y.Map<unknown>;
+			flow.set("version", 6);
+			const nodes = flow.get("nodes") as Y.Map<unknown>;
+			nodes.set("a", { ...(nodes.get("a") as object), tools: ["github"] });
 		});
-		const read = parsedFlows(await flows.flows(of));
-		expect(profiles(read.build)).toEqual([
-			{ device: "laptop", profile: "p-laptop" },
-			"builder",
+		await document.history.change(() => {
+			const revisions = document.history.doc.getArray<object>(flowId);
+			const [last] = revisions.toArray();
+			revisions.delete(0, 1);
+			revisions.push([
+				{ ...last, kind: "upgrade", flow: { ...twoNodes(), version: 6 } },
+			]);
+		});
+		return document;
+	}
+
+	/** Both documents as bytes: any write at all changes them. */
+	const bytes = (document: FlowDocument) =>
+		[document.current.doc, document.history.doc].map((doc) =>
+			Buffer.from(Y.encodeStateAsUpdate(doc)).toString("base64"),
+		);
+
+	test("it is listed with one issue and no flow, as it is stored", async () => {
+		await storeFormat6();
+		const sources = await laptop.flows.flows(of);
+		expect(sources.build).toMatchObject({
+			json: { version: 6, nodes: [{ tools: ["github"] }, {}] },
+		});
+		expect(loadFlowSource(sources, "build")).toMatchObject({
+			flow: null,
+			issues: [
+				{
+					severity: "error",
+					message: "An older version of Night Shift made this flow.",
+				},
+			],
+		});
+		expect(listFlowSources(sources)).toMatchObject([
+			{ name: "build", nodeCount: null, errorCount: 1 },
 		]);
-		// LE2316 has no "builder": the node keeps the name, to pick again, and names LE2316 by id.
-		expect(read.build?.nodes[1]).toMatchObject({ device: "le-2316" });
-		const [revision] = await flows.revisions(of, "build");
-		expect(revision?.flow).toMatchObject({
-			version: FLOW_VERSION,
-			nodes: [{ profile: { device: "laptop", profile: "p-laptop" } }, {}],
-		});
 	});
 
-	test("a schedule checks its flow as a read gives it, not as an older format stored it", async () => {
-		await storeFormat6(desktop, "laptop");
-		const flows = createProjectFlows({
-			documents: desktop.documents,
-			project: async () => ({ spaceId: desktop.sandbox.spaceId }),
-			deviceId: "desktop",
-			migrations,
-		});
+	test("no read and no write changes the document", async () => {
+		const document = await storeFormat6();
+		const before = bytes(document);
+		await laptop.flows.flows(of);
+		expect(await laptop.flows.revisions(of, "build")).toMatchObject([
+			{ kind: "upgrade", flow: { version: 6 } },
+		]);
+		await laptop.flows.schedules(of);
+		await laptop.flows.notices(of);
+		for (const kind of ["save", "restore", "import"] as const) {
+			const refused = await refusal(
+				laptop.flows.save(of, "build", twoNodes(), { kind }),
+			);
+			expect(refused.kind).toBe("conflict");
+		}
+		expect(
+			await laptop.flows.keepShapes(
+				of,
+				"build",
+				{ id: "a", type: "agent" },
+				{ data: { type: "object" } },
+			),
+		).toBe(false);
+		expect(
+			await laptop.flows.keepOutputTypes(of, "build", [
+				{ name: "x", value: "y", type: "text" },
+			]),
+		).toBe(false);
+		expect(bytes(document)).toEqual(before);
+	});
+
+	test("a save of another flow leaves it as it is", async () => {
+		const document = await storeFormat6();
+		const flowId = flowIdOf(document, "build") ?? "";
+		const raw = (flowMap(document).get(flowId) as Y.Map<unknown>).toJSON();
+		await laptop.flows.save(of, "other", twoNodes());
+		expect((flowMap(document).get(flowId) as Y.Map<unknown>).toJSON()).toEqual(
+			raw,
+		);
+	});
+
+	test("a schedule of it stays, and says that the flow does not load", async () => {
+		await storeFormat6();
 		const nightly = scheduleSchema.parse({
 			id: "nightly",
 			flow: "build",
 			cron: "0 2 * * *",
 		});
-		// The read has one error: node "b" names a profile to pick again. The
-		// stored format 6 has more: its Device is a name, which no read keeps.
-		const read = (await flows.flows(of)).build;
-		const errors =
-			read && "json" in read
-				? parseFlow(read.json, { name: "build" }).issues.filter(
-						(issue) => issue.severity === "error",
-					).length
-				: -1;
-		expect(errors).toBe(1);
 		const says = [
-			{
-				severity: "error" as const,
-				scheduleId: "nightly",
-				message:
-					'The flow "build" has an error. Fix the flow so this schedule can run.',
-			},
+			expect.objectContaining({ severity: "error", scheduleId: "nightly" }),
 		];
-		expect(await flows.saveSchedules(of, [nightly])).toEqual(says);
-		expect((await flows.schedules(of)).issues).toEqual(says);
+		expect(await laptop.flows.saveSchedules(of, [nightly])).toEqual(says);
+		const read = await laptop.flows.schedules(of);
+		expect(read.schedules).toEqual([nightly]);
+		expect(read.issues).toEqual(says);
 	});
 
-	test("upgradeFlows writes the current format once, with a revision of kind upgrade", async () => {
-		const flowId = await storeFormat6(laptop, "laptop");
-		const document = await laptop.document();
-		clock.at = 2_000;
-		expect(
-			await upgradeFlows(document, {
-				migrations,
-				deviceId: "laptop",
-				at: clock.at,
-			}),
-		).toEqual(["build"]);
-		expect(profiles(parsedFlows(flowSources(document)).build)).toEqual([
-			{ device: "laptop", profile: "p-laptop" },
-			"builder",
-		]);
-		expect(
-			flowRevisions(document, flowId).map((r) => [r.kind, r.flow.version]),
-		).toEqual([
-			["import", 6],
-			["upgrade", FLOW_VERSION],
-		]);
-		expect(
-			await upgradeFlows(document, {
-				migrations,
-				deviceId: "laptop",
-				at: 3_000,
-			}),
-		).toEqual([]);
-		expect(flowRevisions(document, flowId)).toHaveLength(2);
-	});
-
-	test("two Replicas that upgrade at once arrive at the same flow: the saver's profiles, not their own", async () => {
-		await storeFormat6(laptop, "laptop");
-		await sync(laptop, desktop);
-		for (const [device, deviceId] of [
-			[laptop, "laptop"],
-			[desktop, "desktop"],
-		] as const) {
-			await upgradeFlows(await device.document(), {
-				migrations,
-				deviceId,
-				at: 2_000,
-			});
-		}
-		await sync(laptop, desktop);
-		const left = parsedFlows(flowSources(await laptop.document())).build;
-		const right = parsedFlows(flowSources(await desktop.document())).build;
-		expect(left).toEqual(right);
-		expect(profiles(left)).toEqual([
-			{ device: "laptop", profile: "p-laptop" },
-			"builder",
-		]);
+	test("a person may delete it, and its revisions stay", async () => {
+		const document = await storeFormat6();
+		const flowId = flowIdOf(document, "build") ?? "";
+		await laptop.flows.remove(of, "build");
+		expect(await laptop.flows.flows(of)).toEqual({});
+		expect(flowRevisions(document, flowId)).toHaveLength(1);
 	});
 });
 
@@ -654,23 +594,6 @@ describe("schedules from before ids (ADR 14)", () => {
 	afterEach(async () => {
 		await host.dispose();
 	});
-
-	/** One Device named "MacBook" (id `mac-id`); "LE2316" is two Devices. */
-	const migrations: FlowMigrations = {
-		async forDevice(deviceId, scope) {
-			return {
-				deviceId,
-				deviceIdByName: (name) =>
-					name === "MacBook"
-						? "mac-id"
-						: // Only Ada has one Device named "studio".
-							name === "studio" && scope?.personId === "ada"
-							? "ada-studio"
-							: null,
-				profileIdByName: () => null,
-			};
-		},
-	};
 
 	/** Schedules as an older Night Shift saved them: no `schedulesVersion`, a `device`. */
 	async function storeVersion1(document: FlowDocument) {
@@ -710,21 +633,10 @@ describe("schedules from before ids (ADR 14)", () => {
 	});
 
 	test("upgrade drops the devices once", async () => {
-		await host.sandbox.db.insert(project).values({
-			id: of,
-			spaceId: host.sandbox.spaceId,
-			name: "Project",
-			createdAt: asDate(),
-		});
 		const document = await host.document();
 		await storeVersion1(document);
-		const flows = createProjectFlows({
-			documents: host.documents,
-			project: async () => ({ spaceId: host.sandbox.spaceId }),
-			deviceId: host.sandbox.deviceId,
-			migrations,
-		});
-		await flows.upgrade(async () => true);
+		expect(await upgradeSchedules(document)).toBe(true);
+		expect(await upgradeSchedules(document)).toBe(false);
 		expect(document.current.doc.getMap("meta").get("schedulesVersion")).toBe(3);
 		expect(
 			document.current.doc.getMap("schedules").get("mac"),

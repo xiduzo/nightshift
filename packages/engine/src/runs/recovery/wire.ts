@@ -1,7 +1,8 @@
 import type { Access } from "../../access";
+import { NIGHT_SHIFT } from "../../contract";
 import { openWork } from "../../graph";
 import { foldRun, type WaitReason } from "../../log";
-import { awaitsWorktree, runWorktree } from "../../read";
+import { awaitsWorktree, olderRun, runWorktree } from "../../read";
 import type { RunFacts, StartHolds, Turns } from "../walk";
 import { resumeGrace } from "./adapters/in/resume-grace";
 import {
@@ -82,6 +83,11 @@ export function wireRecovery(deps: RecoveryDeps): Recovery {
 	const recover = recoverRuns({
 		openWork: work,
 		turns,
+		olderRun: (runId) =>
+			openRun(NIGHT_SHIFT, { runId }).then(
+				({ run }) => olderRun(run),
+				() => null,
+			),
 		checkResume: check,
 		fold: foldRun,
 		whatIsOpen: openWork,

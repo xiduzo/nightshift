@@ -416,7 +416,9 @@ export type RunResume = {
 export type RunDetail = RunSummary & {
 	/** The copy of the flow taken when the run started. Edits to the file do not change it. */
 	flow: Flow;
-	/** Copies of every flow the run can call (through Call nodes), by name, taken at start. */
+	/** Why the copy does not read: then `flow` has no nodes. Absent: it reads. */
+	flowUnread?: "older" | "newer" | "invalid";
+	/** Copies of every flow the run can call (through Call nodes), by name, taken at start. One that does not read is left out. */
 	calledFlows: Record<string, Flow>;
 	/** The Flow revision the run started from. Null for a quick run, and a flow without revisions. */
 	flowRevision: string | null;

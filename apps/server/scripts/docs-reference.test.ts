@@ -288,16 +288,7 @@ describe("loadCommunityFlow", () => {
 		expect(flow?.description).toBe("Says hello.");
 	});
 
-	test("migrates a file of an older format, as an import does", () => {
-		const { flow, problems } = loadCommunityFlow(
-			"hello",
-			fileOf({ ...commandFile(), version: 6 }),
-		);
-		expect(problems).toEqual([]);
-		expect(flow?.version).toBe(FLOW_VERSION);
-	});
-
-	test("names a file that is not JSON, or of a newer format", () => {
+	test("names a file that is not JSON, or of another format", () => {
 		expect(loadCommunityFlow("a", "{ nope").problems[0]).toStartWith(
 			"It is not valid JSON",
 		);
@@ -307,7 +298,16 @@ describe("loadCommunityFlow", () => {
 			name: "a",
 			flow: null,
 			problems: [
-				`Its format is 99, and Night Shift reads up to format ${FLOW_VERSION}.`,
+				`Night Shift reads format ${FLOW_VERSION}. A newer version of Night Shift made this flow. Update Night Shift to use it.`,
+			],
+		});
+		expect(
+			loadCommunityFlow("a", fileOf({ ...commandFile(), version: 8 })),
+		).toEqual({
+			name: "a",
+			flow: null,
+			problems: [
+				`Night Shift reads format ${FLOW_VERSION}. An older version of Night Shift made this flow.`,
 			],
 		});
 	});

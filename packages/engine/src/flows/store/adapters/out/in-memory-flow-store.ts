@@ -5,9 +5,9 @@ import {
 	suffixedName,
 } from "@nightshift/flows";
 import type { FlowStore } from "../../application/ports";
-import { type FlowRevision, same } from "../../domain/flow-json";
+import { type FlowRevision, formatOf, same } from "../../domain/flow-json";
 import { mergedSchedule, withPerson } from "../../domain/flow-merge";
-import { flowNotFound, newerFlow } from "../../domain/flow-save";
+import { flowNotFound, foreignFlow } from "../../domain/flow-save";
 import { nodeWithShape, outputsWithTypes } from "../../domain/inferred";
 import type { FlowNotice } from "../../domain/notices";
 
@@ -29,24 +29,19 @@ type StoredDocument = {
 
 /** The in-memory `FlowStore`, with what a test sets and reads. */
 export type InMemoryFlowStore = FlowStore & {
-	/** Gives a Project a document: `projectIds` lists it. */
+	/** Gives a Project a document. */
 	seed(projectId: string, notices?: FlowNotice[]): void;
-	/** Every `upgrade`, in order. */
-	upgraded: { projectId: string; deviceId: string; spaceId: string }[];
-	/** Every read, in order: what it read the flows as. */
-	reads: {
-		projectId: string;
-		deviceId: string;
-		spaceId: string | undefined;
-	}[];
+	/** Makes the stored flow of that name one of the format before this one. */
+	putOlder(projectId: string, name: string): void;
+	/** Every Project read, in order. */
+	reads: string[];
 };
 
 /** As JSON: without `undefined` fields, and shared with nothing. */
 const plain = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 
 /**
- * The flows of each Project in memory. It reads no older format, so a read
- * brings none up. Ids count up from 1 (`flow-1`, `revision-1`, `notice-1`).
+ * The flows of each Project in memory. Ids count up from 1 (`flow-1`, `revision-1`, `notice-1`).
  */
 export function inMemoryFlowStore(): InMemoryFlowStore {
 	const documents = new Map<string, StoredDocument>();
@@ -99,24 +94,27 @@ export function inMemoryFlowStore(): InMemoryFlowStore {
 	};
 
 	const store: InMemoryFlowStore = {
-		upgraded: [],
 		reads: [],
 
 		seed(projectId, notices = []) {
 			documentOf(projectId).notices.push(...notices);
 		},
 
-		async read(projectId, at) {
-			store.reads.push({ projectId, ...at });
+		putOlder(projectId, name) {
+			const flow = current(documentOf(projectId), name);
+			if (flow) flow.json.version = FLOW_VERSION - 1;
+		},
+
+		async read(projectId) {
+			store.reads.push(projectId);
 			return sourcesOf(documentOf(projectId));
 		},
 
 		async save(projectId, save) {
 			const document = documentOf(projectId);
 			const found = document.flows.find((flow) => flow.name === save.name);
-			if (found && Number(found.json.version) > FLOW_VERSION) {
-				throw newerFlow(save.name);
-			}
+			const format = formatOf(Number(found?.json.version ?? FLOW_VERSION));
+			if (format !== "current") throw foreignFlow(save.name, format);
 			const snapshot = plain({ ...save.flow, version: FLOW_VERSION });
 			const flow = found ?? {
 				flowId: next("flow"),
@@ -207,18 +205,6 @@ export function inMemoryFlowStore(): InMemoryFlowStore {
 			document.notices = document.notices.filter(
 				(notice) => notice.id !== noticeId,
 			);
-		},
-
-		async projectIds() {
-			return [...documents.keys()];
-		},
-
-		async upgrade(projectId, upgrade) {
-			store.upgraded.push({
-				projectId,
-				deviceId: upgrade.deviceId,
-				spaceId: upgrade.spaceId,
-			});
 		},
 
 		async planMerge(source, destination, persons) {

@@ -33,7 +33,7 @@ describe("keepFlowShapes", () => {
 		expect(await keep(request)).toBe(true);
 		// A schema it kept is a schema: the next run keeps nothing.
 		expect(await keep(request)).toBe(false);
-		const revisions = await ports.store.revisions("project", "build", "space");
+		const revisions = await ports.store.revisions("project", "build");
 		expect(
 			revisions.map((r) => [r.kind, r.personId, r.deviceId, r.at]),
 		).toEqual([

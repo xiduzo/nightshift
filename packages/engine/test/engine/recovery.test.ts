@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { project, run } from "@nightshift/db/schema";
-import type { Flow } from "@nightshift/flows";
+import { FLOW_VERSION, type Flow } from "@nightshift/flows";
 import type {
 	EngineEventType,
 	EnginePayloads,
@@ -34,7 +34,7 @@ afterEach(async () => {
 
 const RUN_ID = "run-1";
 const flow: Flow = {
-	version: 2,
+	version: FLOW_VERSION,
 	start: "a",
 	nodes: [{ id: "a", type: "agent", prompt: "work" }],
 	edges: [],
@@ -74,7 +74,7 @@ async function insertRun(
 describe("startup recovery: what a dead daemon's work ends with", () => {
 	/** A flow with a Call once, a Call with each and a Decision, both Calls calling `inner`. */
 	const outer = {
-		version: 2,
+		version: FLOW_VERSION,
 		start: "once",
 		nodes: [
 			{ id: "once", type: "call", flow: "inner" },
@@ -89,7 +89,7 @@ describe("startup recovery: what a dead daemon's work ends with", () => {
 		edges: [],
 	} as unknown as Flow;
 	const inner = {
-		version: 2,
+		version: FLOW_VERSION,
 		start: "w",
 		nodes: [{ id: "w", type: "agent", prompt: "work" }],
 		edges: [],

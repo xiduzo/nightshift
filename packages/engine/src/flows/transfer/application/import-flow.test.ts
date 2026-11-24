@@ -6,7 +6,6 @@ import {
 	singleAgentFlow,
 } from "@nightshift/flows";
 import { allowing } from "../../../access/adapters/out/in-memory-access";
-import { NIGHT_SHIFT } from "../../../contract";
 import { inMemoryTransferPorts } from "../adapters/out/in-memory-neighbours";
 import { importFlow } from "./import-flow";
 
@@ -52,16 +51,6 @@ describe("importFlow", () => {
 		expect((await importFlow(ports)(ada, request)).name).toBe("build-2");
 	});
 
-	test("asks the migration of the Space for the Person who imports", async () => {
-		const ports = inMemoryTransferPorts();
-		await importFlow(ports)(ada, request);
-		await importFlow(ports)(NIGHT_SHIFT, request);
-		expect(ports.importMigrations.asked).toEqual([
-			{ spaceId: "space", personId: "ada" },
-			{ spaceId: "space", personId: null },
-		]);
-	});
-
 	test("refuses a file that is not a flow, and saves nothing", async () => {
 		const ports = inMemoryTransferPorts();
 		await expect(
@@ -86,6 +75,31 @@ describe("importFlow", () => {
 		expect(refused).toMatchObject({ kind: "invalid" });
 		expect((refused as Error).message).toContain(
 			"newer version of Night Shift",
+		);
+		expect(ports.flows.saves).toEqual([]);
+	});
+
+	test("refuses a flow from an older Night Shift, and saves nothing", async () => {
+		const ports = inMemoryTransferPorts();
+		const json = JSON.stringify({ ...JSON.parse(request.json), version: 8 });
+		await expect(
+			importFlow(ports)(ada, { ...request, json }),
+		).rejects.toMatchObject({
+			kind: "invalid",
+			message:
+				"An older version of Night Shift made this file. Night Shift cannot import it.",
+		});
+		expect(ports.flows.saves).toEqual([]);
+	});
+
+	test("refuses a file that is no whole flow, and says where", async () => {
+		const ports = inMemoryTransferPorts();
+		const json = JSON.stringify({ ...JSON.parse(request.json), start: 4 });
+		const refused = await importFlow(ports)(ada, { ...request, json }).catch(
+			(error: unknown) => error as Error,
+		);
+		expect((refused as Error).message).toStartWith(
+			"This file is not a valid flow at start: ",
 		);
 		expect(ports.flows.saves).toEqual([]);
 	});

@@ -1,5 +1,6 @@
 import { project, run } from "@nightshift/db/schema";
 import { migratedDb } from "@nightshift/db/testing";
+import { FLOW_VERSION } from "@nightshift/flows";
 import {
 	createRunBus,
 	createRunLog,
@@ -25,7 +26,7 @@ const FAR = "device-far";
 
 /** The flow of each run: one agent node, the step `s1` of the suite. */
 const FLOW = JSON.stringify({
-	version: 2,
+	version: FLOW_VERSION,
 	start: "a",
 	nodes: [{ id: "a", type: "agent", prompt: "work" }],
 	edges: [],

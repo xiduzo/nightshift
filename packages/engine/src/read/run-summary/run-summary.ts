@@ -1,4 +1,10 @@
-import { type Flow, flowSchema, migrateFlow } from "@nightshift/flows";
+import {
+	FLOW_VERSION,
+	type Flow,
+	flowSchema,
+	readFlow,
+} from "@nightshift/flows";
+import { Refusal } from "@nightshift/refusal";
 import { instant } from "@nightshift/time";
 import {
 	type CostTally,
@@ -27,6 +33,7 @@ import {
 	sumCost,
 } from "../run-views";
 import type {
+	RunDetail,
 	RunDevice,
 	RunSummary,
 	RunWalker,
@@ -43,28 +50,73 @@ import type {
  * Call nodes reads them.
  */
 
+/** What a run page shows in place of a flow that does not read: no steps on a canvas. */
+const NO_FLOW: Flow = flowSchema.parse({
+	version: FLOW_VERSION,
+	start: "none",
+	nodes: [],
+	edges: [],
+});
+
+/** What a person reads when a run cannot go on, by why its flow does not read. */
+const CANNOT_WALK = {
+	older:
+		"This run is from an older version of Night Shift. Start the flow again.",
+	newer:
+		"This run is from a newer version of Night Shift. Update Night Shift to continue it.",
+	invalid:
+		"Night Shift cannot read the flow of this run. Start the flow again.",
+} as const;
+
+/** A column of a run's snapshots. Null when it is not JSON. */
+function jsonOf(text: string): unknown {
+	try {
+		return JSON.parse(text);
+	} catch {
+		return null;
+	}
+}
+
 /**
- * A flow from a run's snapshot, in today's format: version 1 snapshots
- * migrate, and defaults apply. A snapshot that no longer parses is used as
- * it is, so an old run still shows.
+ * The flow the run started from, from the run's own snapshot, to walk it.
+ * Refuses a snapshot that does not read (`readFlow`).
  */
-export function snapshotFlow(json: unknown): Flow {
-	const migrated = migrateFlow(json);
-	const parsed = flowSchema.safeParse(migrated);
-	return parsed.success ? parsed.data : (migrated as Flow);
+export function parseRunFlow(row: Pick<RunRow, "flow">): Flow {
+	const read = readFlow(jsonOf(row.flow));
+	if (read.flow === null) throw new Refusal("invalid", CANNOT_WALK[read.why]);
+	return read.flow;
 }
 
-/** The flow the run started from, from the run's own snapshot. */
-export function parseRunFlow(row: RunRow): Flow {
-	return snapshotFlow(JSON.parse(row.flow));
+/** Why nothing can continue a run whose flow an older Night Shift made, or null. */
+export function olderRun(row: Pick<RunRow, "flow">): string | null {
+	const read = readFlow(jsonOf(row.flow));
+	return read.flow === null && read.why === "older" ? CANNOT_WALK.older : null;
 }
 
-/** The `body_flows` column holds every called flow (of Call nodes). */
-export function parseCalledFlows(row: RunRow): Record<string, Flow> {
-	const raw = JSON.parse(row.bodyFlows || "{}") as Record<string, unknown>;
+/**
+ * The flow of a run to show. A snapshot that does not read shows as a flow
+ * without nodes, with why (`flowUnread`): the steps come from the log.
+ */
+export function shownRunFlow(
+	row: Pick<RunRow, "flow">,
+): Pick<RunDetail, "flow" | "flowUnread"> {
+	const read = readFlow(jsonOf(row.flow));
+	return read.flow === null
+		? { flow: NO_FLOW, flowUnread: read.why }
+		: { flow: read.flow };
+}
+
+/**
+ * The flows of the run's Call nodes, by name (the `body_flows` column).
+ * One that does not read is left out.
+ */
+export function parseCalledFlows(
+	row: Pick<RunRow, "bodyFlows">,
+): Record<string, Flow> {
 	const flows: Record<string, Flow> = {};
-	for (const [name, flow] of Object.entries(raw)) {
-		flows[name] = snapshotFlow(flow);
+	for (const [name, json] of Object.entries(jsonOf(row.bodyFlows) ?? {})) {
+		const { flow } = readFlow(json);
+		if (flow !== null) flows[name] = flow;
 	}
 	return flows;
 }
@@ -302,7 +354,7 @@ function subflowRuns(
 		calls,
 		() =>
 			(parsed ??= {
-				flow: parseRunFlow(row),
+				flow: shownRunFlow(row).flow,
 				calledFlows: parseCalledFlows(row),
 			}),
 		(call) => call.flow,

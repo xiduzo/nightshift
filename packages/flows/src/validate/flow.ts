@@ -1,11 +1,9 @@
 import {
 	type Flow,
-	type FlowMigration,
 	type FlowNode,
 	fanOutsOf,
-	flowSchema,
-	migrateFlow,
 	nodeOutcomes,
+	readFlow,
 	tierNode,
 } from "../flow";
 import { isKitName } from "../kits";
@@ -322,24 +320,24 @@ const errorsOf: ErrorsOf = (flow, options, chain) =>
 		.length;
 
 /**
- * Migrates (`migrateFlow`, with `migration` for a flow of format 6 when
- * given), parses and validates unknown JSON. Schema errors come back as
- * issues.
+ * Reads (`readFlow`) and validates unknown JSON. Why it does not read comes
+ * back as issues.
  */
 export function parseFlow(
 	json: unknown,
-	options: ValidateOptions & { migration?: FlowMigration } = {},
+	options: ValidateOptions = {},
 ): { flow: Flow; issues: FlowIssue[] } | { flow: null; issues: FlowIssue[] } {
-	const { migration, ...validate } = options;
-	const result = flowSchema.safeParse(migrateFlow(json, migration));
-	if (!result.success) {
+	const read = readFlow(json);
+	if (read.flow === null) {
+		const { why, issues } = read;
 		return {
 			flow: null,
-			issues: result.error.issues.map((issue) => ({
+			issues: issues.map(({ path, message }) => ({
 				severity: "error",
-				message: `${issue.path.length > 0 ? issue.path.map(String).join(".") : "(root)"}: ${issue.message}`,
+				message:
+					why === "invalid" ? `${path || "(root)"}: ${message}` : message,
 			})),
 		};
 	}
-	return { flow: result.data, issues: validateFlow(result.data, validate) };
+	return { flow: read.flow, issues: validateFlow(read.flow, options) };
 }

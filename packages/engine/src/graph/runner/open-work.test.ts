@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { FlowNodeType } from "@nightshift/flows";
+import { FLOW_VERSION, type FlowNodeType } from "@nightshift/flows";
 import { foldRun, provedEndReason } from "../../log";
 
 import type {
@@ -109,7 +109,7 @@ function log() {
 /** A flow with every kind a cut treats on its own: an Agent, a Decision, a Call once and a Call with each. */
 const FLOWS: RunFlows = {
 	flow: {
-		version: 2,
+		version: FLOW_VERSION,
 		start: "a",
 		nodes: [
 			{ id: "a", type: "agent", prompt: "work" },
@@ -127,7 +127,7 @@ const FLOWS: RunFlows = {
 	},
 	called: {
 		inner: {
-			version: 2,
+			version: FLOW_VERSION,
 			start: "w",
 			nodes: [{ id: "w", type: "agent", prompt: "inner work" }],
 			edges: [],
@@ -391,11 +391,11 @@ describe("closingEvents: an old log or a broken snapshot", () => {
 describe("openWork: what a cut ends", () => {
 	test("a stop ends a parked step; an interrupt leaves it open, and the run with it", () => {
 		const { events } = log().started().step("g", "d", "decision").gate("g");
-		expect(openWork(foldRun(events), "stopped")).toMatchObject({
+		expect(openWork(foldRun(events), { kind: "stopped" })).toMatchObject({
 			steps: [{ id: "g" }],
 			endsRun: true,
 		});
-		expect(openWork(foldRun(events), "interrupted")).toEqual({
+		expect(openWork(foldRun(events), { kind: "interrupted" })).toEqual({
 			sessions: [],
 			steps: [],
 			endsRun: false,
@@ -408,19 +408,25 @@ describe("openWork: what a cut ends", () => {
 			.step("c", "once", "call")
 			.step("w", "w", "agent", { parentStepId: "c", itemId: null });
 		expect(
-			openWork(foldRun(events), "interrupted").steps.map((s) => s.id),
+			openWork(foldRun(events), { kind: "interrupted" }).steps.map((s) => s.id),
 		).toEqual(["w", "c"]);
 	});
 
 	test("an interrupt ends a run only when it ran", () => {
 		const running = log().started().step("s1", "a", "agent").session("s1", "x");
-		expect(openWork(foldRun(running.events), "interrupted")).toMatchObject({
+		expect(
+			openWork(foldRun(running.events), { kind: "interrupted" }),
+		).toMatchObject({
 			sessions: [{ id: "x" }],
 			steps: [{ id: "s1" }],
 			endsRun: true,
 		});
 		const ended = log().started().ended("finished");
-		expect(openWork(foldRun(ended.events), "interrupted").endsRun).toBe(false);
-		expect(openWork(foldRun(ended.events), "stopped").endsRun).toBe(false);
+		expect(
+			openWork(foldRun(ended.events), { kind: "interrupted" }).endsRun,
+		).toBe(false);
+		expect(openWork(foldRun(ended.events), { kind: "stopped" }).endsRun).toBe(
+			false,
+		);
 	});
 });

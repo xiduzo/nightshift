@@ -3,9 +3,8 @@ import {
 	FLOW_VERSION,
 	type Flow,
 	type FlowNodeType,
-	flowSchema,
-	migrateFlow,
 	nodeProfiles,
+	readFlow,
 } from "../flow";
 import {
 	calledFlowNames,
@@ -203,9 +202,7 @@ function flowsOf(
 ): Record<string, Flow | null> {
 	const flows: Record<string, Flow | null> = {};
 	for (const [name, file] of files) {
-		const result =
-			"json" in file ? flowSchema.safeParse(migrateFlow(file.json)) : null;
-		flows[name] = result?.success ? result.data : null;
+		flows[name] = "json" in file ? readFlow(file.json).flow : null;
 	}
 	return flows;
 }

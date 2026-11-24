@@ -1,10 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { flowSchema, singleAgentFlow } from "@nightshift/flows";
+import { FLOW_VERSION, flowSchema, singleAgentFlow } from "@nightshift/flows";
 import {
 	flowHistory,
-	revisionFlow,
+	restorableFlow,
 	revisionNotFound,
-	revisionNotValid,
 	revisionView,
 } from "./revisions";
 
@@ -48,6 +47,32 @@ describe("the history of a flow", () => {
 		expect(revisionView(history, "r-1", undefined).diff).not.toBeNull();
 	});
 
+	test("a revision of an older format is listed, without a flow or a diff", async () => {
+		const older = {
+			...revision,
+			id: "r-0",
+			kind: "upgrade",
+			flow: { ...flow, version: FLOW_VERSION - 1 },
+		};
+		const history = await flowHistory("build", {
+			sources: async () => ({ build: { json: flow, revision: "r-1" } }),
+			revisions: async () => [older, revision],
+			persons: none,
+			devices: none,
+			notFound: () => new Error("gone"),
+		});
+		expect(
+			history.items.map(({ id, kind, changes }) => [id, kind, changes]),
+		).toEqual([
+			["r-0", "upgrade", null],
+			["r-1", "save", null],
+		]);
+		const view = revisionView(history, "r-0", undefined);
+		expect([view.revision.flow, view.diff]).toEqual([null, null]);
+		expect(view.against.flow).toEqual(flow);
+		expect(revisionView(history, "r-1", "r-0").diff).toBeNull();
+	});
+
 	test("a flow that does not exist gives the refusal it is handed", async () => {
 		const history = flowHistory("gone", {
 			sources: async () => ({}),
@@ -64,10 +89,14 @@ describe("the history of a flow", () => {
 		expect(revisionNotFound().message).toBe(
 			"This revision does not exist. Open the flow's revisions again.",
 		);
-		expect(revisionNotValid().kind).toBe("invalid");
-		expect(revisionNotValid().message).toBe(
+		expect(restorableFlow(revision)).toEqual(flow);
+		expect(() => restorableFlow({ flow: { nodes: "no" } })).toThrow(
 			"This revision is not a valid flow, so you cannot restore it.",
 		);
-		expect(revisionFlow({ flow: { nodes: "no" } })).toBeNull();
+		expect(() =>
+			restorableFlow({ flow: { ...flow, version: FLOW_VERSION - 1 } }),
+		).toThrow(
+			"An older version of Night Shift made this flow. You cannot restore it.",
+		);
 	});
 });

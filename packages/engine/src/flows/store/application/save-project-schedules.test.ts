@@ -20,9 +20,7 @@ describe("saveProjectSchedules", () => {
 			nightly,
 		]);
 		expect(issues.length).toBeGreaterThan(0);
-		expect(ports.store.reads).toEqual([
-			{ projectId: "project", deviceId: "laptop", spaceId: "space" },
-		]);
+		expect(ports.store.reads).toEqual(["project"]);
 	});
 
 	test("refuses a Project this Replica does not have, and saves nothing", async () => {
@@ -32,6 +30,6 @@ describe("saveProjectSchedules", () => {
 			schedules: [nightly],
 		});
 		await expect(save).rejects.toThrow("This project does not exist.");
-		expect(await ports.store.projectIds()).toEqual(["project"]);
+		expect((await ports.store.schedules("gone")).schedules).toEqual([]);
 	});
 });

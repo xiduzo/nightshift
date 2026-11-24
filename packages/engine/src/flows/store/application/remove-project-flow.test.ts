@@ -21,8 +21,7 @@ describe("removeProjectFlow", () => {
 			at: 1,
 		});
 		await removeProjectFlow(ports)({ projectId: "project", name: "build" });
-		const here = { deviceId: "laptop", spaceId: "space" };
-		expect(await ports.store.read("project", here)).toEqual({});
+		expect(await ports.store.read("project")).toEqual({});
 	});
 
 	test("refuses a flow that does not exist", async () => {

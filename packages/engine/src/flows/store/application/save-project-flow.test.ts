@@ -17,7 +17,7 @@ describe("saveProjectFlow", () => {
 			flow: quick("Write"),
 		});
 		expect(issues).toEqual([]);
-		const revisions = await ports.store.revisions("project", "build", "space");
+		const revisions = await ports.store.revisions("project", "build");
 		expect(
 			revisions.map((r) => [r.kind, r.personId, r.deviceId, r.at]),
 		).toEqual([["save", null, "laptop", 1000]]);
@@ -32,7 +32,7 @@ describe("saveProjectFlow", () => {
 			kind: "restore",
 			personId: "ada",
 		});
-		const [revision] = await ports.store.revisions("project", "build", "space");
+		const [revision] = await ports.store.revisions("project", "build");
 		expect([revision?.kind, revision?.personId]).toEqual(["restore", "ada"]);
 	});
 
@@ -68,8 +68,6 @@ describe("saveProjectFlow", () => {
 			flow: quick("Write"),
 		});
 		await expect(save).rejects.toThrow("This project does not exist.");
-		expect(
-			await ports.store.read("gone", { deviceId: "x", spaceId: undefined }),
-		).toEqual({});
+		expect(await ports.store.read("gone")).toEqual({});
 	});
 });

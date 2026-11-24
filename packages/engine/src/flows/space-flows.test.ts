@@ -281,14 +281,6 @@ describe("moving a flow between projects", () => {
 		expect(node).not.toHaveProperty("model");
 	});
 
-	test("an import brings a flow of an older format up to date", async () => {
-		const flow = quick("Fix it");
-		const old = JSON.stringify({ ...flow, version: 5 });
-		await files.import(PROJECT, "old", old);
-		const loaded = await files.get(PROJECT, "old");
-		expect(loaded.flow?.version).toBe(FLOW_VERSION);
-	});
-
 	test("a copy into another project leaves the flows it calls behind, and says so", async () => {
 		await files.save(PROJECT, "helper", quick("Help"));
 		await files.save(PROJECT, "build", caller());

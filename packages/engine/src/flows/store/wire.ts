@@ -7,7 +7,6 @@ import type {
 } from "@nightshift/flows";
 import { now as timeNow } from "@nightshift/time";
 import type { FlowDocuments } from "../../documents";
-import type { FlowMigrations } from "../migrations";
 import { yjsFlowStore } from "./adapters/out/yjs-flow-store";
 import { dismissProjectFlowNotice } from "./application/dismiss-project-flow-notice";
 import { keepFlowOutputTypes } from "./application/keep-flow-output-types";
@@ -26,7 +25,6 @@ import {
 	saveProjectFlow,
 } from "./application/save-project-flow";
 import { saveProjectSchedules } from "./application/save-project-schedules";
-import { upgradeProjectFlows } from "./application/upgrade-project-flows";
 import type { FlowRevision } from "./domain/flow-json";
 import type { OutputType, StepShapes } from "./domain/inferred";
 import type { FlowNotice } from "./domain/notices";
@@ -40,8 +38,7 @@ export type FlowMerges = Pick<FlowStore, "planMerge" | "merge">;
 /**
  * The flows of the Projects this Replica has, in their flow documents
  * (ADR 2): the one door the engine reads and changes them through. Every
- * read and save, the Flow revisions, the schedules, the notices and the
- * upgrade to a newer format. Every Device reads and saves them, with or
+ * read and save, the Flow revisions, the schedules and the notices. Every Device reads and saves them, with or
  * without a Clone of the project. The merge of one Project's flows into
  * another's is in `flows/transfer/`.
  *
@@ -50,9 +47,8 @@ export type FlowMerges = Pick<FlowStore, "planMerge" | "merge">;
  */
 export type ProjectFlows = {
 	/**
-	 * Every flow of the project that this Night Shift reads, by name, with
-	 * its Flow revision. A flow of an older format reads as the Device that
-	 * saved it named its profiles and Devices.
+	 * Every flow of the project by name, as it is stored, with its Flow
+	 * revision. `readFlow` says whether this Night Shift reads it.
 	 */
 	flows(projectId: string): Promise<FlowSources>;
 	/** Saves a flow, a draft with errors too, as a new revision. Returns its issues. */
@@ -108,13 +104,6 @@ export type ProjectFlows = {
 	notices(projectId: string): Promise<FlowNotice[]>;
 	/** Removes a notice, on every Device of the Space. One that is gone already is no error. */
 	dismissNotice(projectId: string, noticeId: string): Promise<void>;
-	/**
-	 * Brings the flows and the schedules of an older format of every
-	 * Project whose Space this Replica keeps (`keeps`) to the current
-	 * format, once (ADR 3, ADR 14): a flow with a revision of kind
-	 * `upgrade` by Night Shift on this Device.
-	 */
-	upgrade(keeps: (spaceId: string) => Promise<boolean>): Promise<void>;
 };
 
 /**
@@ -123,7 +112,7 @@ export type ProjectFlows = {
  * gives the merge of the documents to `flows/transfer/`.
  */
 export function wireStore(deps: {
-	documents: Pick<FlowDocuments, "open" | "openAll">;
+	documents: Pick<FlowDocuments, "open">;
 	/**
 	 * The Project's Space. Throws (`not-found`) for a Project this Replica
 	 * does not have, or one that is removed.
@@ -133,19 +122,9 @@ export function wireStore(deps: {
 	deviceId: string | (() => Promise<string>);
 	/** The clock of a revision. Default `now`. */
 	now?: () => number;
-	/**
-	 * What brings a flow of an older format, a revision of it, and the
-	 * schedules, to the current format. Without it, a node keeps its
-	 * profile's name and the editor asks to pick the profile again, a
-	 * Device name is to choose again, and nothing upgrades.
-	 */
-	migrations?: FlowMigrations;
 }): ProjectFlows & { merges: FlowMerges } {
 	const clock = deps.now ?? timeNow;
-	const store = yjsFlowStore({
-		documents: deps.documents,
-		...(deps.migrations ? { migrations: deps.migrations } : {}),
-	});
+	const store = yjsFlowStore({ documents: deps.documents });
 	const projects: ProjectSpaces = {
 		spaceOf: async (projectId) => (await deps.project(projectId)).spaceId,
 	};
@@ -165,7 +144,6 @@ export function wireStore(deps: {
 	const saveSchedules = saveProjectSchedules(ports);
 	const notices = listProjectFlowNotices(ports);
 	const dismissNotice = dismissProjectFlowNotice(ports);
-	const upgrade = upgradeProjectFlows(ports);
 
 	return {
 		flows: (projectId) => flows({ projectId }),
@@ -189,8 +167,6 @@ export function wireStore(deps: {
 		notices: (projectId) => notices({ projectId }),
 		dismissNotice: (projectId, noticeId) =>
 			dismissNotice({ projectId, noticeId }),
-		// Without migrations nothing upgrades: no document is opened.
-		upgrade: deps.migrations ? (keeps) => upgrade({ keeps }) : async () => {},
 		merges: {
 			planMerge: (source, destination, persons) =>
 				store.planMerge(source, destination, persons),

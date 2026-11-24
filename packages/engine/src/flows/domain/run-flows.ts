@@ -5,7 +5,6 @@ import {
 	type FlowSources,
 	isKitName,
 	kitFlow,
-	migrateFlow,
 	parsedFlows,
 	parseFlow,
 	validateFlow,
@@ -33,7 +32,7 @@ function refuseErrors(issues: readonly FlowIssue[], what = "The flow"): void {
 /**
  * Loads, parses and validates the flow a run starts from, and every flow
  * it can call through Call nodes (by name, from the project's flow files,
- * or a kit of this Night Shift). Version 1 files migrate first. The run
+ * or a kit of this Night Shift). The run
  * keeps a copy of each, kits too, so a run on another Device walks the
  * same flows, and the Flow revision of each that has one.
  */
@@ -62,13 +61,10 @@ export function flowsForRun(
 				`The flow "${input.flowName}" does not exist.`,
 			);
 		}
-		const parsed = parseFlow(
-			migrateFlow("json" in source ? source.json : null),
-			{
-				flows: files,
-				name: input.flowName,
-			},
-		);
+		const parsed = parseFlow("json" in source ? source.json : null, {
+			flows: files,
+			name: input.flowName,
+		});
 		refuseErrors(parsed.issues);
 		if (!parsed.flow) {
 			throw new Refusal(
@@ -79,7 +75,7 @@ export function flowsForRun(
 		flow = parsed.flow;
 		flowName = input.flowName;
 	} else {
-		const parsed = parseFlow(migrateFlow(input.flow), { flows: files });
+		const parsed = parseFlow(input.flow, { flows: files });
 		refuseErrors(parsed.issues);
 		if (!parsed.flow) throw new Refusal("invalid", "The flow is not valid.");
 		flow = parsed.flow;

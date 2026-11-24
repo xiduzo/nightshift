@@ -6,7 +6,7 @@ import type { FlowDocuments, SpaceDocuments } from "./documents";
 import type { Git } from "./git";
 import type { PeersFactory } from "./peers";
 import type { PullRequestReader } from "./scores";
-import type { ProfileStore, RunSettings } from "./settings";
+import type { RunSettings } from "./settings";
 import type { MoveRows, ProjectsMoved } from "./space-move";
 import type { UsageNotes } from "./usage";
 
@@ -81,10 +81,6 @@ export type EngineOptions = {
 	 * `db`.
 	 */
 	flowDocuments?: FlowDocuments;
-	/**
-	 * This Device's profiles, which a flow of an older format names by id.
-	 */
-	profiles?: Pick<ProfileStore, "list">;
 	/**
 	 * The git port, for a new project's clone and remote and the branches
 	 * of a clone. Default: the git programs on this computer.

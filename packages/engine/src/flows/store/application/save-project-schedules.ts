@@ -4,12 +4,11 @@ import {
 	scheduleFlowInfos,
 	validateSchedules,
 } from "@nightshift/flows";
-import type { FlowStore, ProjectSpaces, ThisDevice } from "./ports";
+import type { FlowStore, ProjectSpaces } from "./ports";
 
 export type SaveProjectSchedulesPorts = {
 	store: Pick<FlowStore, "saveSchedules" | "read">;
 	projects: ProjectSpaces;
-	device: ThisDevice;
 };
 
 /**
@@ -23,9 +22,8 @@ export const saveProjectSchedules =
 		schedules: readonly Schedule[];
 	}): Promise<ScheduleIssue[]> => {
 		const { projectId, schedules } = request;
-		const spaceId = await ports.projects.spaceOf(projectId);
+		await ports.projects.spaceOf(projectId);
 		await ports.store.saveSchedules(projectId, schedules);
-		const deviceId = await ports.device.id();
-		const sources = await ports.store.read(projectId, { deviceId, spaceId });
+		const sources = await ports.store.read(projectId);
 		return validateSchedules(schedules, scheduleFlowInfos(sources));
 	};

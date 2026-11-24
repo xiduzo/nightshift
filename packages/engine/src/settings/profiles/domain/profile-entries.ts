@@ -1,6 +1,5 @@
 import {
 	isAgentProfile,
-	migrateToolSets,
 	type Profile,
 	type ProfileSettings,
 	profileSchema,
@@ -56,10 +55,7 @@ export function readProfiles(
 	for (const [id, value] of entries) {
 		const entry = entrySchema.safeParse(value);
 		if (!entry.success) continue;
-		// A profile saved with the GitHub tool set reads as one with `gh`.
-		const parsed = profileSettingsSchema.safeParse(
-			migrateToolSets(entry.data.settings),
-		);
+		const parsed = profileSettingsSchema.safeParse(entry.data.settings);
 		// An entry this version cannot read stays in the document, unused.
 		if (!parsed.success) continue;
 		out.set(id, {

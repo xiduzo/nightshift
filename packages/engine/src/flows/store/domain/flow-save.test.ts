@@ -3,7 +3,7 @@ import { Refusal } from "@nightshift/refusal";
 import {
 	checkFlowName,
 	flowNotFound,
-	newerFlow,
+	foreignFlow,
 	unreadableSchedules,
 } from "./flow-save";
 
@@ -23,10 +23,13 @@ describe("the words of a flow's save", () => {
 		expect(() => checkFlowName("build")).not.toThrow();
 	});
 
-	test("a flow of a newer Night Shift, and one that does not exist", () => {
-		expect(newerFlow("build").kind).toBe("conflict");
-		expect(newerFlow("build").message).toBe(
+	test("a flow of another Night Shift, and one that does not exist", () => {
+		expect(foreignFlow("build", "newer").kind).toBe("conflict");
+		expect(foreignFlow("build", "newer").message).toBe(
 			'A newer version of Night Shift saved the flow "build". Update Night Shift to change it.',
+		);
+		expect(foreignFlow("build", "older").message).toBe(
+			'An older version of Night Shift made the flow "build". You cannot change it here. Delete it, or use another name.',
 		);
 		expect(flowNotFound("build").kind).toBe("not-found");
 		expect(flowNotFound("build").message).toBe(

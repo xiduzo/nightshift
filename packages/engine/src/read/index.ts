@@ -11,10 +11,12 @@ export { pullRequestOf, stepMetrics } from "./run-metrics";
 export { runReading } from "./run-reading";
 export {
 	costFields,
+	olderRun,
 	parseCalledFlows,
 	parseRunFlow,
 	runDeviceId,
 	runFacts,
+	shownRunFlow,
 	toSummary,
 } from "./run-summary";
 export { type RunTrace, runTrace } from "./run-trace";

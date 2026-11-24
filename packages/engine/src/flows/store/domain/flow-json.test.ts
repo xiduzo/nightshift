@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { FLOW_VERSION } from "@nightshift/flows";
-import { olderFormat, readableRevision, same } from "./flow-json";
+import { formatOf, readableRevision, revisionKinds, same } from "./flow-json";
 
 describe("flow JSON", () => {
 	test("the same JSON whatever the order of the keys", () => {
@@ -10,10 +10,25 @@ describe("flow JSON", () => {
 		expect(same([1, 2], [2, 1])).toBe(false);
 	});
 
-	test("a flow of an older format", () => {
-		expect(olderFormat({ version: FLOW_VERSION - 1 })).toBe(true);
-		expect(olderFormat({ version: FLOW_VERSION })).toBe(false);
-		expect(olderFormat("nope")).toBe(false);
+	test("a format next to this one", () => {
+		expect(formatOf(FLOW_VERSION - 1)).toBe("older");
+		expect(formatOf(FLOW_VERSION)).toBe("current");
+		expect(formatOf(FLOW_VERSION + 1)).toBe("newer");
+	});
+
+	test("a revision of an older format is listed, of every kind, upgrade too", () => {
+		for (const kind of revisionKinds) {
+			const revision = {
+				id: "r",
+				at: 1,
+				personId: null,
+				deviceId: "laptop",
+				kind,
+				flow: { version: 1, anything: true },
+			};
+			expect(readableRevision(revision)).toEqual(revision);
+		}
+		expect(revisionKinds).toContain("upgrade");
 	});
 
 	test("a revision of a newer Night Shift, or one that does not read, is left out", () => {

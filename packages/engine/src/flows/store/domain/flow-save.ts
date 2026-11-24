@@ -9,7 +9,7 @@ import {
 	type ScheduleIssue,
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
-import type { RevisionKind } from "./flow-json";
+import type { FlowFormat, RevisionKind } from "./flow-json";
 
 /** Refuses (`invalid`) a name that no flow may have. */
 export function checkFlowName(name: string): void {
@@ -22,11 +22,16 @@ export function checkFlowName(name: string): void {
 	}
 }
 
-/** The refusal of a change to a flow that a newer Night Shift saved. */
-export function newerFlow(name: string): Refusal {
+/** The refusal of a change to a flow that another version of Night Shift saved. */
+export function foreignFlow(
+	name: string,
+	format: Exclude<FlowFormat, "current">,
+): Refusal {
 	return new Refusal(
 		"conflict",
-		`A newer version of Night Shift saved the flow "${name}". Update Night Shift to change it.`,
+		format === "newer"
+			? `A newer version of Night Shift saved the flow "${name}". Update Night Shift to change it.`
+			: `An older version of Night Shift made the flow "${name}". You cannot change it here. Delete it, or use another name.`,
 	);
 }
 

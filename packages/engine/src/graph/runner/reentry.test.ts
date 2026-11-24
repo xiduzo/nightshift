@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { FLOW_VERSION } from "@nightshift/flows";
 
 import { foldRun } from "../../log";
 import type {
@@ -252,7 +253,7 @@ describe("the daemon side agrees with the node side", () => {
 
 /** A flow of three top-level nodes: two Agents and a Call. */
 const FLOW = {
-	version: 2,
+	version: FLOW_VERSION,
 	start: "a",
 	nodes: [
 		{ id: "a", type: "agent", prompt: "first" },

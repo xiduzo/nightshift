@@ -3,11 +3,7 @@ import type { FlowIssue } from "@nightshift/flows";
 import type { Access } from "../../../access";
 import { type Actor, personOf } from "../../../contract";
 import type { ProjectFlows } from "../../store";
-import {
-	revisionFlow,
-	revisionNotFound,
-	revisionNotValid,
-} from "../domain/revisions";
+import { restorableFlow, revisionNotFound } from "../domain/revisions";
 import type { SpaceProjects } from "./ports";
 
 const SAVES_FLOWS: Permissions = { flow: ["save"] };
@@ -43,9 +39,7 @@ export const restoreFlowRevision =
 			(candidate) => candidate.id === request.revisionId,
 		);
 		if (revision === undefined) throw revisionNotFound();
-		const flow = revisionFlow(revision);
-		if (flow === null) throw revisionNotValid();
-		return ports.flows.save(projectId, name, flow, {
+		return ports.flows.save(projectId, name, restorableFlow(revision), {
 			kind: "restore",
 			personId: personOf(actor) ?? undefined,
 		});

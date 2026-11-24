@@ -6,12 +6,7 @@ import { importFlow } from "./application/import-flow";
 import { importStarters } from "./application/import-starters";
 import { mergeFlows } from "./application/merge-flows";
 import { planFlowMerge } from "./application/plan-flow-merge";
-import type {
-	Clock,
-	FlowUsage,
-	ImportMigrations,
-	SpaceProjects,
-} from "./application/ports";
+import type { Clock, FlowUsage, SpaceProjects } from "./application/ports";
 
 /** The moves of flows into and between projects, each use case bound to its ports. */
 export type FlowTransfer = ReturnType<typeof wireTransfer>;
@@ -29,8 +24,6 @@ export function wireTransfer(deps: {
 	merges: FlowMerges;
 	projects: SpaceProjects;
 	flows: Pick<ProjectFlows, "flows" | "save">;
-	/** What brings a file a Person imports to the current format. */
-	importMigrations?: ImportMigrations | undefined;
 	usage?: FlowUsage | undefined;
 }) {
 	const { projects, flows, usage } = deps;
@@ -38,9 +31,6 @@ export function wireTransfer(deps: {
 		access: deps.access,
 		projects,
 		flows,
-		...(deps.importMigrations
-			? { importMigrations: deps.importMigrations }
-			: {}),
 		...(usage ? { usage } : {}),
 	};
 	return {

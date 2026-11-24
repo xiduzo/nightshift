@@ -48,8 +48,12 @@ export type CutShort =
 	| { kind: "stopped" }
 	/** A step ran past its time budget or idle limit, and its timer did not end it. */
 	| ({ kind: "overdue" } & Overdue)
-	/** The daemon that walked the run died. `reason` is the run's end reason, when the run ran. */
-	| { kind: "interrupted"; reason: string };
+	/**
+	 * The daemon that walked the run died. `reason` is the run's end reason,
+	 * when the run ran. `waits`: its open Gates and sleeps end too, because
+	 * nothing can continue the run.
+	 */
+	| { kind: "interrupted"; reason: string; waits?: boolean };
 
 /** What a cut ends, from the log. */
 export type OpenWork = {
@@ -66,9 +70,13 @@ export type OpenWork = {
 };
 
 /** What a `cut` of the run's work ends, from the log. */
-export function openWork(runState: RunState, cut: CutShort["kind"]): OpenWork {
+export function openWork(
+	runState: RunState,
+	cut: Pick<CutShort, "kind"> & { waits?: boolean },
+): OpenWork {
+	const keepsWaits = cut.kind === "interrupted" && !cut.waits;
 	const parked = new Set(
-		cut === "interrupted" ? parkedSteps(runState).map((s) => s.id) : [],
+		keepsWaits ? parkedSteps(runState).map((s) => s.id) : [],
 	);
 	const { status } = runState;
 	return {
@@ -76,8 +84,7 @@ export function openWork(runState: RunState, cut: CutShort["kind"]): OpenWork {
 		steps: deriveSteps(runState)
 			.filter((s) => s.endedAt === null && !parked.has(s.id))
 			.sort((a, b) => b.startSeq - a.startSeq),
-		endsRun:
-			cut === "interrupted" ? status === "running" : isOpenStatus(status),
+		endsRun: keepsWaits ? status === "running" : isOpenStatus(status),
 	};
 }
 
@@ -165,7 +172,7 @@ export function closingEvents(
 	cut: CutShort,
 	flows: RunFlows | null,
 ): ClosingEvent[] {
-	const open = openWork(runState, cut.kind);
+	const open = openWork(runState, cut);
 	const rule = CUTS[cut.kind];
 	const reason =
 		cut.kind === "overdue"
@@ -254,7 +261,7 @@ export async function closeOpenWork(
 ): Promise<void> {
 	const runState = await deps.log.state(runId);
 	const flows =
-		openWork(runState, cut.kind).steps.length > 0
+		openWork(runState, cut).steps.length > 0
 			? await runFlowsOf(deps, runId)
 			: null;
 	const closing = closingEvents(runState, cut, flows);

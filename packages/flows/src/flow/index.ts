@@ -1,11 +1,10 @@
 /**
  * The flow format: the schema that puts the node types together, the
- * flow's own parts, migration of older files, and the walk from node to
+ * flow's own parts, the one reader of it, and the walk from node to
  * node. Not the flow document: that is how the engine keeps a
  * Project's flows (ADR 2).
  */
 
-export { type FlowMigration, migrateFlow, migrateToolSets } from "./migrate";
 export {
 	type CascadeNode,
 	cascadeOf,
@@ -52,11 +51,13 @@ export {
 	flowInputSchema,
 	flowSchema,
 	flowVariableSchema,
+	OLDER_FLOW,
 	type Outcome,
 	type Policy,
 	type PolicyValues,
 	policyFromSettings,
 	type ResolvedPolicy,
+	readFlow,
 	type SectionColor,
 	sectionColors,
 	type VariableType,

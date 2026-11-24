@@ -5,9 +5,9 @@ import {
 	type FlowDiffSummary,
 	type FlowSources,
 	flowDiffSummary,
-	flowSchema,
 	loadFlowSource,
-	migrateFlow,
+	OLDER_FLOW,
+	readFlow,
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 
@@ -51,12 +51,6 @@ export type RevisionView<Kind extends string = string> = {
 	diff: FlowDiff | null;
 };
 
-/** A revision's flow as the schema reads it, or null. */
-export function revisionFlow(revision: { flow: unknown }): Flow | null {
-	const parsed = flowSchema.safeParse(migrateFlow(revision.flow));
-	return parsed.success ? parsed.data : null;
-}
-
 /** The refusal of a revision that a flow does not have. */
 export function revisionNotFound(): Refusal {
 	return new Refusal(
@@ -65,11 +59,15 @@ export function revisionNotFound(): Refusal {
 	);
 }
 
-/** The refusal of a restore of a revision that is not a valid flow. */
-export function revisionNotValid(): Refusal {
-	return new Refusal(
+/** The flow to restore from a revision, or the refusal that says why there is none. */
+export function restorableFlow(revision: { flow: unknown }): Flow {
+	const read = readFlow(revision.flow);
+	if (read.flow !== null) return read.flow;
+	throw new Refusal(
 		"invalid",
-		"This revision is not a valid flow, so you cannot restore it.",
+		read.why === "older"
+			? `${OLDER_FLOW} You cannot restore it.`
+			: "This revision is not a valid flow, so you cannot restore it.",
 	);
 }
 
@@ -103,7 +101,7 @@ export async function flowHistory<R extends StoredRevision>(
 	const source = sources[name];
 	if (source === undefined) throw read.notFound();
 	const current = "json" in source ? (source.revision ?? null) : null;
-	const parsed = revisions.map(revisionFlow);
+	const parsed = revisions.map(({ flow }) => readFlow(flow).flow);
 	const [persons, devices] = await Promise.all([
 		read.persons(
 			revisions.flatMap((revision) =>

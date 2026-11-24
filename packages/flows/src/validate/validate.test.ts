@@ -2216,20 +2216,33 @@ describe("parseFlow with options", () => {
 		]);
 	});
 
-	test("migrates a version 1 flow first", () => {
-		const parsed = parseFlow({
-			version: 1,
-			params: [{ name: "epic", required: true }],
-			start: "worker",
-			nodes: [{ ...agent("worker"), prompt: "Epic {{params.epic}}" }],
-			edges: [],
+	test("a flow of another format gives one issue, and no flow", () => {
+		const of = (version: number) =>
+			parseFlow({ version, start: "worker", nodes: [], edges: [] });
+		expect(of(FLOW_VERSION - 1)).toEqual({
+			flow: null,
+			issues: [
+				{
+					severity: "error",
+					message: "An older version of Night Shift made this flow.",
+				},
+			],
 		});
-		expect(parsed.issues).toEqual([]);
-		expect(parsed.flow).toMatchObject({
-			version: FLOW_VERSION,
-			inputs: [{ name: "epic", type: "text", required: true }],
-			nodes: [{ prompt: "Epic {{epic}}" }],
-		});
+		expect(of(FLOW_VERSION + 1).issues).toEqual([
+			{
+				severity: "error",
+				message:
+					"A newer version of Night Shift made this flow. Update Night Shift to use it.",
+			},
+		]);
+	});
+
+	test("what does not fit the schema names where", () => {
+		expect(parseFlow("nope").issues[0]?.message).toStartWith("(root): ");
+		expect(
+			parseFlow({ version: FLOW_VERSION, start: 1, nodes: [], edges: [] })
+				.issues[0]?.message,
+		).toStartWith("start: ");
 	});
 });
 
@@ -2388,7 +2401,7 @@ describe("validateFlow: wait nodes", () => {
 	});
 
 	test("the schema takes every kind and refuses a bad one", () => {
-		const base = { version: 3, start: "w", edges: [] };
+		const base = { version: FLOW_VERSION, start: "w", edges: [] };
 		for (const until of [
 			{ kind: "duration", minutes: 15 },
 			{ kind: "time", at: "{{deploy_window}}" },

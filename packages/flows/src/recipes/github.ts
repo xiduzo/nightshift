@@ -1,12 +1,10 @@
 /**
  * Recipes: ready-made list sources for a Call node with `each`. The
- * assistant shows one as an example of a source command, and
- * `migrateFlow` turns an old `github` source into one.
+ * assistant shows one as an example of a source command.
  */
 
 /**
- * The GitHub source the engine read itself, before the List Source had
- * three adapters: the sub-issues of one parent issue.
+ * The sub-issues of one parent issue, and which of them.
  */
 type GithubSource = {
 	parent: string;

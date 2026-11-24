@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { flowSchema, singleAgentFlow } from "@nightshift/flows";
+import { FLOW_VERSION, flowSchema, singleAgentFlow } from "@nightshift/flows";
 import { allowing } from "../../../access/adapters/out/in-memory-access";
 import { inMemoryEditingPorts } from "../adapters/out/in-memory-neighbours";
 import { restoreFlowRevision } from "./restore-flow-revision";
@@ -37,12 +37,19 @@ describe("restoreFlowRevision", () => {
 		);
 		const [first] = await ports.flows.revisions("project", "build");
 		ports.flows.revisions = async () => [
-			{ ...(first ?? ({} as never)), flow: { version: 1, nodes: "no" } },
+			{
+				...(first ?? ({} as never)),
+				flow: { version: FLOW_VERSION, nodes: "no" },
+			},
+			{ ...(first ?? ({} as never)), id: "older", flow: { version: 1 } },
 		];
 		await expect(
 			restore(ada, { ...of, revisionId: first?.id ?? "" }),
 		).rejects.toThrow(
 			"This revision is not a valid flow, so you cannot restore it.",
+		);
+		await expect(restore(ada, { ...of, revisionId: "older" })).rejects.toThrow(
+			"An older version of Night Shift made this flow. You cannot restore it.",
 		);
 		expect(ports.flows.saves).toHaveLength(1);
 	});

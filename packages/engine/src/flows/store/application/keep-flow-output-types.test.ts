@@ -33,7 +33,7 @@ describe("keepFlowOutputTypes", () => {
 		expect(await keep({ projectId: "project", name: "build", types })).toBe(
 			false,
 		);
-		const revisions = await ports.store.revisions("project", "build", "space");
+		const revisions = await ports.store.revisions("project", "build");
 		expect(revisions.map((r) => [r.kind, r.personId, r.at])).toEqual([
 			["save", "ada", 1],
 			["infer", null, 1000],

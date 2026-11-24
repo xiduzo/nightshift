@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import type { AgentNode, Flow, FlowNode } from "@nightshift/flows";
+import {
+	type AgentNode,
+	FLOW_VERSION,
+	type Flow,
+	type FlowNode,
+} from "@nightshift/flows";
 import {
 	NO_BRANCHES,
 	preparedRun,
@@ -23,7 +28,7 @@ const agent = (id: string, fields: Record<string, unknown> = {}) =>
 
 const flowOf = (nodes: FlowNode[], inputs: Flow["inputs"] = []): Flow =>
 	({
-		version: 2,
+		version: FLOW_VERSION,
 		start: nodes[0]?.id ?? "a",
 		nodes,
 		edges: [],

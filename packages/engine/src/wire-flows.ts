@@ -1,14 +1,13 @@
 import type { Database } from "@nightshift/db";
 import type { Access } from "./access";
 import type { DeviceDirectory } from "./contract";
-import type { FlowDocuments, SpaceDocuments } from "./documents";
+import type { FlowDocuments } from "./documents";
 import type { EngineOptions } from "./engine-options";
 import {
 	type FlowTransfer,
 	type ProjectFlows,
 	wireEditing,
 	wireFlows,
-	wireMigrations,
 	wireStore,
 	wireTransfer,
 } from "./flows";
@@ -16,62 +15,34 @@ import type { RunLog } from "./log";
 import { forgetMemory, listMemory } from "./memory";
 import type { Projects } from "./projects";
 import { namesOf } from "./read";
-import { wireCopies } from "./settings";
 import { listKeptValues, resetKeptValue } from "./variables";
 
 /**
  * The flows block of the engine's composition (`wire.ts`): the flows and
- * schedules of every project in its flow document (`flows/store/`), what
- * brings a flow of an older format to the current one
- * (`flows/migrations/`), and the moves of flows (`flows/transfer/`): a
- * Person's export, import and copy. It comes after the projects block
+ * schedules of every project in its flow document (`flows/store/`),
+ * and the moves of flows (`flows/transfer/`): a Person's export, import and
+ * copy. It comes after the projects block
  * (`wire-projects.ts`), whose `projects` it takes.
  *
  * It gives `projectFlows` (with the merge of Personal) and `transfer`.
  */
 export function wireEngineFlows(deps: {
-	db: Database;
 	log: RunLog;
-	documents: SpaceDocuments;
 	flowDocuments: FlowDocuments;
-	directory: DeviceDirectory;
 	projects: Pick<Projects, "find">;
 	/** The engine is ready: a Person's verb waits for it. Made after this block. */
 	ready: () => Promise<unknown>;
-	/** This Device's name. */
-	deviceName: string;
-	options: Pick<EngineOptions, "profiles" | "usage">;
+	options: Pick<EngineOptions, "usage">;
 	now(): number;
 	access: Pick<Access, "openSpace">;
 }) {
-	const {
-		db,
-		log: runLog,
-		documents,
-		flowDocuments,
-		directory,
-		projects,
-		now,
-	} = deps;
-	/** What brings a flow or a schedule of an older format to the current one: its nodes name a Device's profile, and their Device, by id. */
-	const thisDevice = async () => ({
-		id: await runLog.walkerId(),
-		name: deps.deviceName,
-	});
-	const migrations = wireMigrations({
-		device: { device: thisDevice },
-		stored: { list: () => wireCopies({ db }).listStoredDevices() },
-		profiles: deps.options.profiles,
-		directory,
-		spaces: documents,
-	});
+	const { log: runLog, flowDocuments, projects, now } = deps;
 	/** The flows and schedules of every project: its flow document (ADR 2). */
 	const { merges, ...stored } = wireStore({
 		documents: flowDocuments,
 		project: (projectId) => projects.find(projectId),
 		deviceId: () => runLog.walkerId(),
 		now,
-		migrations,
 	});
 	const usage = deps.options.usage;
 	const transfer = wireTransfer({
@@ -85,10 +56,6 @@ export function wireEngineFlows(deps: {
 			},
 		},
 		flows: stored,
-		importMigrations: {
-			forScope: async (scope) =>
-				migrations.forDevice(await runLog.walkerId(), scope),
-		},
 		...(usage ? { usage } : {}),
 	});
 	/** The flows of every project, and the merge of one Project's flows into another's (the merge of Personal). */

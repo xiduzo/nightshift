@@ -5,17 +5,12 @@ import {
 } from "@nightshift/flows";
 import { type Actor, personOf } from "../../../contract";
 import type { ProjectFlows } from "../../store";
-import {
-	migratedFlow,
-	namesOf,
-	type StarterImport,
-} from "../domain/flow-files";
-import type { FlowUsage, ImportMigrations, SpaceProjects } from "./ports";
+import { flowOfFile, namesOf, type StarterImport } from "../domain/flow-files";
+import type { FlowUsage, SpaceProjects } from "./ports";
 
 export type ImportStartersPorts = {
 	projects: SpaceProjects;
 	flows: Pick<ProjectFlows, "flows" | "save">;
-	importMigrations?: ImportMigrations | undefined;
 	usage?: FlowUsage | undefined;
 };
 
@@ -39,10 +34,6 @@ export const importStarters =
 		const { spaceId, projectId } = request;
 		const personId = personOf(actor) ?? undefined;
 		await ports.projects.inSpace(projectId, spaceId);
-		const migration = await ports.importMigrations?.forScope({
-			spaceId,
-			personId: personId ?? null,
-		});
 		const taken = namesOf(await ports.flows.flows(projectId));
 		const result: StarterImport = { imported: [], skipped: [] };
 		for (const starter of starterList()) {
@@ -53,10 +44,7 @@ export const importStarters =
 			await ports.flows.save(
 				projectId,
 				starter.name,
-				withAgentProfiles(
-					migratedFlow(starter.source, migration),
-					request.agents ?? [],
-				),
+				withAgentProfiles(flowOfFile(starter.source), request.agents ?? []),
 				{ kind: "import", personId },
 			);
 			ports.usage?.note({

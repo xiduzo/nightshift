@@ -1,4 +1,4 @@
-import { type Flow, flowSchema, migrateFlow } from "../../../flow";
+import { type Flow, readFlow } from "../../../flow";
 import { starterList } from "../../../starters";
 import { type FlowAgent, flowAgents } from "./flow-agents";
 
@@ -8,8 +8,8 @@ import { type FlowAgent, flowAgents } from "./flow-agents";
  */
 export function starterAgents(): FlowAgent[] {
 	const flows = starterList().flatMap((starter): Flow[] => {
-		const parsed = flowSchema.safeParse(migrateFlow(starter.source));
-		return parsed.success ? [parsed.data] : [];
+		const { flow } = readFlow(starter.source);
+		return flow ? [flow] : [];
 	});
 	return flowAgents(flows);
 }

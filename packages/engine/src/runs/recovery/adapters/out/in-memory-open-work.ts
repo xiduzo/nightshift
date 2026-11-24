@@ -87,7 +87,7 @@ export function inMemoryOpenWork(walkerId = THIS_COMPUTER) {
 		},
 		async close(runId: string, cut: { kind: "interrupted"; reason: string }) {
 			twin.closed.push({ runId, reason: cut.reason });
-			const open = whatIsOpen(foldRun(twin.events(runId)), cut.kind);
+			const open = whatIsOpen(foldRun(twin.events(runId)), cut);
 			for (const session of open.sessions) {
 				append(
 					runId,

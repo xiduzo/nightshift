@@ -57,12 +57,16 @@ afterEach(() => {
 });
 
 /** Ports, and the reasons `checkResume` gives by run (none: the run continues). */
-function setup(why: Record<string, string> = {}) {
+function setup(
+	why: Record<string, string> = {},
+	older: Record<string, string> = {},
+) {
 	const ports = inMemoryRecoveryPorts();
 	const asked: string[] = [];
 	const recover = recoverRuns({
 		openWork: ports.openWork,
 		turns: ports.turns,
+		olderRun: async (runId) => older[runId] ?? null,
 		checkResume: async (runId) => {
 			asked.push(runId);
 			return why[runId] ?? null;
@@ -126,6 +130,34 @@ describe("recoverRuns", () => {
 		expect(ports.openWork.closed).toEqual([]);
 		expect(ports.turns.taken).toEqual([]);
 		expect(asked).toEqual([]);
+	});
+
+	test("a run of an older flow ends with its waits, and the next run goes on", async () => {
+		const reason = "This run is from an older version of Night Shift.";
+		const { ports, recover, asked } = setup(
+			{},
+			{ ran: reason, slept: reason, ended: reason },
+		);
+		ports.openWork.add("ran", ran("ran"));
+		ports.openWork.add("slept", slept("slept"));
+		ports.openWork.add(
+			"ended",
+			eventsOf("ended")
+				.push("RunStarted", started)
+				.push("RunEnded", { status: "finished", reason: null }).events,
+		);
+		ports.openWork.add("new", ran("new"));
+		expect(await recover()).toEqual(["new"]);
+		expect(ports.openWork.closed).toEqual([
+			{ runId: "ran", reason },
+			{ runId: "slept", reason },
+			{ runId: "new", reason: "Night Shift stopped while this run ran." },
+		]);
+		expect(ports.openWork.letGone).toEqual(["ran", "slept"]);
+		// Nothing wakes or prunes a run that nothing can continue.
+		expect(ports.turns.restored.map(({ runId }) => runId)).toEqual(["ended"]);
+		expect(ports.turns.taken.map(({ runId }) => runId)).toEqual(["new", "new"]);
+		expect(asked).toEqual(["new"]);
 	});
 
 	test("a run that ended has nothing open: recovery only restores it", async () => {

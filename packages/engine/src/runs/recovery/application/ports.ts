@@ -15,10 +15,13 @@ export type OpenWork = {
 	 * has not arrived is left out: its take-over gives it its walk state.
 	 */
 	walkedHere(): Promise<Map<string, LoggedEvent[]>>;
-	/** Ends the run's open work as a stop ends it, from the run's whole log, and tells the run's watchers. */
+	/**
+	 * Ends the run's open work as a stop ends it, from the run's whole log,
+	 * and tells the run's watchers. `waits`: its open Gates and sleeps too.
+	 */
 	close(
 		runId: string,
-		cut: { kind: "interrupted"; reason: string },
+		cut: { kind: "interrupted"; reason: string; waits?: boolean },
 	): Promise<void>;
 	/** An interrupted run that does not continue lets go of what it holds (leases). */
 	letGo(runId: string): Promise<void>;

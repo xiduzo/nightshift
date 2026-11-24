@@ -4,7 +4,6 @@ export { type ConfigUse, type FlowRef, wireConfigUse } from "./config-use";
 export { flowsForRun } from "./domain/run-flows";
 export type { FlowRevisionItem, FlowRevisionView } from "./editing";
 export { type FlowEditing, wireEditing } from "./editing";
-export { wireMigrations } from "./migrations";
 export {
 	type FlowMergePlan,
 	type FlowNotice,

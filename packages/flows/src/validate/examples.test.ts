@@ -74,8 +74,6 @@ describe("example flows", () => {
 
 describe("flow files of the repository", () => {
 	const root = join(import.meta.dir, "..", "..", "..", "..");
-	/** What the format steps read: old on purpose. */
-	const oldOnPurpose = "packages/flows/src/flow/migrate/fixtures/";
 	const isFlowFile = (json: unknown) =>
 		typeof json === "object" &&
 		json !== null &&
@@ -87,7 +85,6 @@ describe("flow files of the repository", () => {
 		"{apps,packages}/*/{src,test}/**/*.json",
 	]
 		.flatMap((pattern) => [...new Bun.Glob(pattern).scanSync(root)])
-		.filter((path) => !path.startsWith(oldOnPurpose))
 		.sort()
 		.map((path) => ({
 			path,

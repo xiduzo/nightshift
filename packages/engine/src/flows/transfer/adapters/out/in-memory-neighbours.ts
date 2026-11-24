@@ -1,15 +1,9 @@
-import type { FlowMigration } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { inMemoryAccess } from "../../../../access/adapters/out/in-memory-access";
 import type { UsageMoment } from "../../../../usage";
 import type { FlowMergePlan, FlowMerges } from "../../../store";
 import { inMemoryFlows } from "../../../store/adapters/out/in-memory-flows";
-import type {
-	Clock,
-	FlowUsage,
-	ImportMigrations,
-	SpaceProjects,
-} from "../../application/ports";
+import type { Clock, FlowUsage, SpaceProjects } from "../../application/ports";
 
 /**
  * The in-memory adapters of the ports that another slice or package fills
@@ -38,30 +32,6 @@ export function inMemoryDocumentMerges(): InMemoryDocumentMerges {
 		},
 	};
 	return merges;
-}
-
-/** The migration that names nothing: each node keeps its names, to pick again. */
-export function nameless(deviceId: string): FlowMigration {
-	return {
-		deviceId,
-		deviceIdByName: () => null,
-		profileIdByName: () => null,
-	};
-}
-
-export type InMemoryImportMigrations = ImportMigrations & {
-	asked: { spaceId: string; personId: string | null }[];
-};
-
-export function inMemoryImportMigrations(): InMemoryImportMigrations {
-	const migrations: InMemoryImportMigrations = {
-		asked: [],
-		async forScope(scope) {
-			migrations.asked.push(scope);
-			return nameless("laptop");
-		},
-	};
-	return migrations;
 }
 
 export function inMemoryClock(at: number): Clock {
@@ -113,7 +83,6 @@ export function inMemoryTransferPorts() {
 	return {
 		access,
 		clock: inMemoryClock(1000),
-		importMigrations: inMemoryImportMigrations(),
 		projects: inMemorySpaceProjects(spaces),
 		flows: inMemoryFlows(spaces),
 		usage: inMemoryFlowUsage(),

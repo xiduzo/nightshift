@@ -1,3 +1,5 @@
+import { Refusal } from "@nightshift/refusal";
+
 /**
  * Why Night Shift does not continue a run on its own after a restart. A
  * daemon that died left the run interrupted mid-step. The new daemon
@@ -89,6 +91,8 @@ export async function resumeBlock(facts: ResumeFacts): Promise<string | null> {
 		}
 		return null;
 	} catch (error) {
+		// The run's flow does not read: the refusal says it all.
+		if (error instanceof Refusal) return error.message;
 		return `Night Shift could not check it: ${error instanceof Error ? error.message : String(error)}`;
 	}
 }

@@ -20,7 +20,6 @@ import {
 	NIGHT_RANGES,
 	type OpenGate,
 	type ProjectRuns,
-	parseRunFlow,
 	type RunDetail,
 	type RunPage,
 	type RunStreamItem,
@@ -28,6 +27,7 @@ import {
 	runDeviceId,
 	runFacts,
 	runTrace,
+	shownRunFlow,
 	toSummary,
 } from "../../../../read";
 import { isTestRun } from "../../../../run-status";
@@ -345,7 +345,7 @@ export function inMemoryRunViews(
 					walker,
 					deviceOf(runDeviceId(row)),
 				),
-				flow: parseRunFlow(row),
+				...shownRunFlow(row),
 				calledFlows: {},
 				flowRevision: row.flowRevision,
 				steps: await pagesOf(row, stepsOf(row.id)),

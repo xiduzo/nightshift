@@ -17,18 +17,19 @@ export function stableJson(value: unknown): string {
 	);
 }
 
-/** A flow of a format older than this Night Shift's. */
-export function olderFormat(json: unknown): boolean {
-	const version =
-		typeof json === "object" && json !== null && "version" in json
-			? json.version
-			: undefined;
-	return typeof version === "number" && version < FLOW_VERSION;
+/** A format next to this Night Shift's. Only a `current` flow is read and changed. */
+export type FlowFormat = "older" | "current" | "newer";
+
+/** What the format of a stored flow is next to this Night Shift's. */
+export function formatOf(version: number): FlowFormat {
+	if (version === FLOW_VERSION) return "current";
+	return version < FLOW_VERSION ? "older" : "newer";
 }
 
 /**
  * Why a revision exists. `upgrade`: Night Shift brought the flow to a newer
- * format (`upgradeFlows`), nobody changed it. `infer`: Night Shift kept the
+ * format, nobody changed it. Nothing writes it now, and the history keeps
+ * it. `infer`: Night Shift kept the
  * shape of a run's data on a node that had no output schema (`keepShapes`),
  * or the type of a value on a flow output that had none (`keepOutputTypes`).
  * An older Night Shift does not read an `infer` revision: it leaves it out
@@ -57,9 +58,9 @@ const flowRevisionSchema = z.object({
 export type FlowRevision = z.infer<typeof flowRevisionSchema>;
 
 /**
- * A stored revision as this Night Shift reads it, or null: one that does
+ * A stored revision as this Night Shift lists it, or null: one that does
  * not read as a revision, and one from a newer Night Shift, stay for the
- * history only.
+ * history only. The flow of one in an older format does not read.
  */
 export function readableRevision(value: unknown): FlowRevision | null {
 	const parsed = flowRevisionSchema.safeParse(value);

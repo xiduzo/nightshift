@@ -14,6 +14,7 @@ import { runSummarySchema, runWalkerSchema } from "./summary-schemas";
 export const runDetailSchema = exact<RunDetail>()(
 	runSummarySchema.extend({
 		flow: flowSchema,
+		flowUnread: z.enum(["older", "newer", "invalid"]).optional(),
 		calledFlows: z.record(z.string(), flowSchema),
 		flowRevision: z.string().nullable(),
 		steps: z.array(stepSummarySchema),

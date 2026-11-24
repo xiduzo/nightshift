@@ -211,14 +211,10 @@ export function createEngine(
 
 	// --- flows (phase 3): `wire-flows.ts` ---
 	const { projectFlows, transfer } = wireEngineFlows({
-		db,
 		log: runLog,
-		documents,
 		flowDocuments,
-		directory,
 		projects,
 		ready: () => ready,
-		deviceName: device.name,
 		options,
 		now,
 		access,
@@ -302,7 +298,7 @@ export function createEngine(
 
 	// --- the start order ---
 	// Leases tracked, recovery, lease renewal, Space documents, remotes,
-	// clone imports, flow upgrade, the owner, the resumes. No lane changes
+	// clone imports, the owner, the resumes. No lane changes
 	// this block: R7 changes the two calls of `recovery` in its own file.
 	// The leases the runs here held when the last daemon stopped are renewed
 	// from now on: before recovery, which lets go of those of the runs that
@@ -329,8 +325,6 @@ export function createEngine(
 			// leaves it for the next start.
 			projects.readRemotes().catch(() => {}),
 		)
-		// The flows of format 6 of the Spaces this Replica keeps, once (ADR 3).
-		.then(() => upgradeKeptFlows())
 		// Whose runs are this computer's own: another Person's take an Offer.
 		.then(async () => {
 			ownerId = await directory.selfOwnerId();
@@ -340,24 +334,6 @@ export function createEngine(
 	// Every method awaits `ready` and sees the error there.
 	ready.catch(() => {});
 	ready.then(...settleReady);
-
-	/**
-	 * Brings the flows of format 6 of every Project whose Space this
-	 * Replica keeps to the current format, once (ADR 3). A failure is
-	 * logged, and the next start tries again; reads migrate meanwhile.
-	 */
-	async function upgradeKeptFlows(): Promise<void> {
-		try {
-			await projectFlows.upgrade(
-				async (spaceId) => !(await directory.hostedElsewhere(spaceId)),
-			);
-		} catch (error) {
-			console.warn(
-				"Night Shift could not bring the flows to their new format. It tries again at the next start:",
-				error,
-			);
-		}
-	}
 
 	// --- the names of Members (views and start read it) ---
 	/** A Person's name as the Space document's Members name them: a Device knows the Host's Persons only there. */

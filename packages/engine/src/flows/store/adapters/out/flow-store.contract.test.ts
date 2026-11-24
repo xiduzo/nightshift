@@ -1,5 +1,7 @@
 import { project } from "@nightshift/db/schema";
 import { migratedDb } from "@nightshift/db/testing";
+import { FLOW_VERSION } from "@nightshift/flows";
+import * as Y from "yjs";
 import { createFlowDocuments } from "../../../../documents";
 import { localSpaceId } from "../../../../testing/test-support";
 import { flowStoreContract } from "./flow-store.contract";
@@ -16,7 +18,12 @@ flowStoreContract("in memory", async () => {
 	const store = inMemoryFlowStore();
 	store.seed("project-1");
 	store.seed("project-2");
-	return { store, projects: ["project-1", "project-2"], close: async () => {} };
+	return {
+		store,
+		projects: ["project-1", "project-2"],
+		putOlder: async (projectId, name) => store.putOlder(projectId, name),
+		close: async () => {},
+	};
 });
 
 flowStoreContract("the flow documents, on libsql in memory", async () => {
@@ -30,6 +37,13 @@ flowStoreContract("the flow documents, on libsql in memory", async () => {
 	return {
 		store: yjsFlowStore({ documents }),
 		projects: ["project-1", "project-2"],
+		async putOlder(projectId, name) {
+			const { current } = await documents.open(projectId);
+			const flow = [...current.doc.getMap("flows").values()].find(
+				(value) => value instanceof Y.Map && value.get("name") === name,
+			) as Y.Map<unknown>;
+			await current.change(() => flow.set("version", FLOW_VERSION - 1));
+		},
 		close: () => documents.flush(),
 	};
 });

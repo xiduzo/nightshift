@@ -269,7 +269,7 @@ async function settled(
 /** A new daemon's startup recovery for the run, then its resume (`runs/recovery/`). */
 async function recover(runner: Runner, h: Harness): Promise<void> {
 	const events = await h.events();
-	const open = openWork(foldRun(events), "interrupted");
+	const open = openWork(foldRun(events), { kind: "interrupted" });
 	if (open.endsRun || open.steps.length > 0 || open.sessions.length > 0) {
 		await closeOpenWork(
 			{

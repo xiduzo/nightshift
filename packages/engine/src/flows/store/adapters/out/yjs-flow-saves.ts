@@ -1,22 +1,13 @@
 import { randomUUID } from "node:crypto";
-import {
-	FLOW_VERSION,
-	type Flow,
-	type FlowMigration,
-	type FlowSources,
-	flowSchema,
-	migrateFlow,
-} from "@nightshift/flows";
+import { FLOW_VERSION, type Flow } from "@nightshift/flows";
 import type * as Y from "yjs";
 import type { FlowDocument } from "../../../../documents";
-import type { FlowMigrations, MigrationScope } from "../../../migrations";
 import {
 	type FlowRevision,
-	olderFormat,
 	type RevisionKind,
 	same,
 } from "../../domain/flow-json";
-import { flowNotFound, newerFlow } from "../../domain/flow-save";
+import { flowNotFound, foreignFlow } from "../../domain/flow-save";
 import {
 	nodeWithShape,
 	type OutputType,
@@ -25,11 +16,7 @@ import {
 } from "../../domain/inferred";
 import {
 	applyFlow,
-	type FlowEntry,
-	flowEntries,
 	flowJson,
-	flowRevisions,
-	flowSources,
 	lastRevision,
 	mapsOf,
 	newFlowMap,
@@ -39,147 +26,16 @@ import {
 
 /**
  * The writes of the flows of a flow document, each a change of `current`
- * and then one of `history` (the revision), and the reads that bring a
- * flow of an older format to the current one. `yjs-flow-encoding.ts` has
- * the encoding they write.
+ * and then one of `history` (the revision). They change a flow of the
+ * current format only. `yjs-flow-encoding.ts` has the encoding they write.
  */
-
-/**
- * The Device a flow of an older format took its profiles from: the one
- * that saved its last revision, else this one (`fallback`). With the
- * Person who saved it, whose Devices a Device name means first.
- */
-function savedOn(
-	document: FlowDocument,
-	flowId: string,
-	fallback: string,
-): { deviceId: string; personId: string | null } {
-	const last = flowRevisions(document, flowId).at(-1);
-	return {
-		deviceId: last?.deviceId ?? fallback,
-		personId: last?.personId ?? null,
-	};
-}
-
-/**
- * The migration of one flow of an older format: by the Device that saved
- * it, in the Space of `spaceId`, for the Person who saved it.
- */
-function migrationOf(
-	document: FlowDocument,
-	migrations: FlowMigrations,
-	flowId: string | undefined,
-	deviceId: string,
-	spaceId: string | undefined,
-): Promise<FlowMigration> {
-	const saved =
-		flowId === undefined
-			? { deviceId, personId: null }
-			: savedOn(document, flowId, deviceId);
-	const scope: MigrationScope | undefined =
-		spaceId === undefined ? undefined : { spaceId, personId: saved.personId };
-	return migrations.forDevice(saved.deviceId, scope);
-}
-
-/**
- * `flowSources`, with each flow of an older format brought to the current
- * one by the Device that saved it (`FlowMigrations`): its nodes name a
- * Device's profile, and their Device, by id. `spaceId`: the Space of the
- * Project, whose Devices a name means. Without `migrations`, as
- * `flowSources` reads them, and a Device name is to choose again.
- */
-export async function upgradedSources(
-	document: FlowDocument,
-	migrations: FlowMigrations | undefined,
-	deviceId: string,
-	spaceId?: string,
-): Promise<FlowSources> {
-	const sources = flowSources(document);
-	if (!migrations) return sources;
-	const ids = new Map(
-		flowEntries(document).map((entry) => [entry.name, entry.flowId]),
-	);
-	for (const [name, source] of Object.entries(sources)) {
-		if (!("json" in source) || !olderFormat(source.json)) continue;
-		const migration = await migrationOf(
-			document,
-			migrations,
-			ids.get(name),
-			deviceId,
-			spaceId,
-		);
-		sources[name] = { ...source, json: migrateFlow(source.json, migration) };
-	}
-	return sources;
-}
-
-/**
- * Brings every flow of the document of an older format to the current one
- * (ADR 3: a node names a Device's profile, ADR 14: and its Device by id,
- * `FlowMigrations`), each with a revision of kind `upgrade` by Night Shift
- * on `deviceId`. A node whose profile or Device it cannot find keeps the
- * name, and the editor asks to pick it again. Returns the names of the
- * flows it brought up.
- *
- * Once per document: a flow of the current format does not change again.
- * The Replica that keeps the Project's Space runs it. Two Replicas that run
- * it at once read the same revisions and Device documents, so they write
- * the same nodes: what one writes, the other writes too.
- */
-export async function upgradeFlows(
-	document: FlowDocument,
-	input: {
-		migrations: FlowMigrations;
-		deviceId: string;
-		/** The Space of the Project, whose Devices a name means. */
-		spaceId?: string;
-		at: number;
-	},
-): Promise<string[]> {
-	const upgrades: { entry: FlowEntry; flow: Flow; revisionId: string }[] = [];
-	for (const entry of flowEntries(document)) {
-		if (entry.newer || entry.map.get("version") === FLOW_VERSION) continue;
-		const migration = await migrationOf(
-			document,
-			input.migrations,
-			entry.flowId,
-			input.deviceId,
-			input.spaceId,
-		);
-		const parsed = flowSchema.safeParse(
-			migrateFlow(flowJson(entry.map), migration),
-		);
-		// A flow this version cannot read stays as it is, and reads as before.
-		if (!parsed.success) continue;
-		upgrades.push({ entry, flow: parsed.data, revisionId: randomUUID() });
-	}
-	if (upgrades.length === 0) return [];
-	await document.current.change(() => {
-		for (const { entry, flow } of upgrades) applyFlow(entry.map, flow);
-	});
-	await document.history.change(() => {
-		for (const { entry, flow, revisionId } of upgrades) {
-			document.history.doc.getArray(entry.flowId).push([
-				plain({
-					id: revisionId,
-					at: input.at,
-					personId: null,
-					deviceId: input.deviceId,
-					kind: "upgrade",
-					flow: { ...flow, version: FLOW_VERSION },
-				} satisfies FlowRevision),
-			]);
-		}
-	});
-	return upgrades.map(({ entry }) => entry.name);
-}
 
 /**
  * Saves a flow under its name, a draft with errors too: a new flow when
  * no flow has the name. Writes only what changed, so an edit of one node
  * merges with an edit of another. A save that changes nothing since the
- * last revision adds none. Refuses (`conflict`) a flow that a newer Night
- * Shift saved.
+ * last revision adds none. Refuses (`conflict`) to write over a flow of
+ * another format.
  */
 export async function saveFlow(
 	document: FlowDocument,
@@ -195,7 +51,9 @@ export async function saveFlow(
 	const maps = mapsOf(document);
 	const scan = scanFlows(document);
 	const found = scan.entries.find((entry) => entry.name === input.name);
-	if (found?.newer) throw newerFlow(input.name);
+	if (found && found.format !== "current") {
+		throw foreignFlow(input.name, found.format);
+	}
 	const snapshot = { ...input.flow, version: FLOW_VERSION };
 	const flowId = found?.flowId ?? randomUUID();
 	const last = lastRevision(document, flowId);
@@ -236,9 +94,8 @@ export async function saveFlow(
  * the node's `output` becomes the shape of the field it types, marked
  * inferred (`outputInferred`), with one revision of kind `infer` by Night
  * Shift on `deviceId`. Writes only that node, so an edit of another node
- * merges with it. Writes nothing when the flow is gone, of another format
- * (a newer Night Shift saved it, or it waits for its upgrade), or the node
- * is gone, of another type, or has a schema already: a person's schema
+ * merges with it. Writes nothing when the flow is gone or of another
+ * format, or the node is gone, of another type, or has a schema already: a person's schema
  * always wins. Returns the revision's id, or null.
  */
 export async function keepShapes(
@@ -253,9 +110,7 @@ export async function keepShapes(
 ): Promise<string | null> {
 	const scan = scanFlows(document);
 	const found = scan.entries.find((entry) => entry.name === input.name);
-	if (!found || found.newer || found.map.get("version") !== FLOW_VERSION) {
-		return null;
-	}
+	if (found?.format !== "current") return null;
 	const store = found.map.get("nodes") as Y.Map<unknown>;
 	const node = nodeWithShape(
 		store.get(input.node.id),
@@ -307,9 +162,7 @@ export async function keepOutputTypes(
 ): Promise<string | null> {
 	const scan = scanFlows(document);
 	const found = scan.entries.find((entry) => entry.name === input.name);
-	if (!found || found.newer || found.map.get("version") !== FLOW_VERSION) {
-		return null;
-	}
+	if (found?.format !== "current") return null;
 	const scalars = found.map.get("scalars") as Y.Map<unknown>;
 	const outputs = outputsWithTypes(scalars.get("outputs"), input.types);
 	if (outputs === null) return null;
@@ -346,7 +199,7 @@ export async function removeFlow(
 	const maps = mapsOf(document);
 	const scan = scanFlows(document);
 	const found = scan.entries.find(
-		(entry) => entry.name === name && !entry.newer,
+		(entry) => entry.name === name && entry.format !== "newer",
 	);
 	if (!found) throw flowNotFound(name);
 	await document.current.change(() => {

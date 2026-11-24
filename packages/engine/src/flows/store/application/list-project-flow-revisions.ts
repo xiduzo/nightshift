@@ -8,8 +8,7 @@ export type ListProjectFlowRevisionsPorts = {
 
 /**
  * The revisions of the flow of that name, oldest first. Empty for a flow
- * that does not exist. A revision of an older format reads as the Device
- * that saved it named its profiles and Devices.
+ * that does not exist. The flow of a revision is as it was saved.
  */
 export const listProjectFlowRevisions =
 	(ports: ListProjectFlowRevisionsPorts) =>
@@ -17,6 +16,6 @@ export const listProjectFlowRevisions =
 		projectId: string;
 		name: string;
 	}): Promise<FlowRevision[]> => {
-		const spaceId = await ports.projects.spaceOf(request.projectId);
-		return ports.store.revisions(request.projectId, request.name, spaceId);
+		await ports.projects.spaceOf(request.projectId);
+		return ports.store.revisions(request.projectId, request.name);
 	};

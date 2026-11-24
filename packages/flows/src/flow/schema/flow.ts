@@ -27,8 +27,8 @@ import {
  * loops, unknown names, template references, calls between flows).
  *
  * A flow is a function: it declares `inputs`, runs its nodes, and returns
- * `outputs` to whoever called it (a run, or a Call node). Older files
- * migrate on load (`migrateFlow`).
+ * `outputs` to whoever called it (a run, or a Call node). Only this
+ * format is read (`readFlow`, ADR 43).
  *
  * Each node type has its own file in `nodes/`. This file puts them
  * together with the edges, inputs, outputs, variables, policy and the

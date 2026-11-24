@@ -66,8 +66,8 @@ export type SpaceFlows = {
 	export(projectId: string, name: string): Promise<FlowExport>;
 	/**
 	 * Saves the flow of a JSON file as a new flow of the project, a
-	 * revision of kind `import`. An older format is brought up to date
-	 * first. A name the project has already gets a suffix (`-2`).
+	 * revision of kind `import`. A file of an older format is refused. A
+	 * name the project has already gets a suffix (`-2`).
 	 */
 	import(
 		projectId: string,
