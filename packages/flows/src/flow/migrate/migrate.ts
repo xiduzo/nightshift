@@ -1,4 +1,5 @@
 import { githubSubIssuesCommand } from "../../recipes";
+import { FLOW_VERSION, flowSchema } from "../schema";
 import { isRecord } from "./record";
 import { migrateCallNodes, migrateDecisionNodes, migrateV1 } from "./v1-to-v4";
 import {
@@ -158,4 +159,76 @@ export function migrateToolSets(json: unknown): unknown {
 	if (!github || rest.type === "decision") return rest;
 	const clis = Array.isArray(rest.clis) ? rest.clis : [];
 	return { ...rest, clis: clis.includes("gh") ? clis : [...clis, "gh"] };
+}
+
+/**
+ * What a stored flow is, next to the current format:
+ * - `current`: it needs no change.
+ * - `rewritten`: `flow` is the same flow in the current format. Store it.
+ * - `unreadable`: this Night Shift cannot bring it up. Keep it as it is.
+ * - `newer`: a newer Night Shift wrote it. Keep it as it is.
+ */
+export type SnapshotUpgrade =
+	| { kind: "current" }
+	| { kind: "rewritten"; flow: Record<string, unknown> }
+	| { kind: "unreadable" }
+	| { kind: "newer" };
+
+/**
+ * The rule of the one-time rewrite of stored flows: a run snapshot, a
+ * called flow of one, or a flow revision, as JSON. Total and pure: it never
+ * throws and never changes `value`.
+ *
+ * A flow is old when `migrateFlow` changes its JSON, whatever its version:
+ * some steps hold for any version, and the schema alone drops the fields
+ * that they read. It is done when the result does not change again and
+ * `flowSchema` parses it.
+ *
+ * `flow` is the migrated JSON, not the parsed flow. It holds no defaults,
+ * and keeps the fields that this version does not know. A step of the chain
+ * drops some old fields: the caller keeps the original.
+ *
+ * A run snapshot takes no `migration`: a Device or a profile that it names
+ * by name keeps its name. A revision takes the one of its own Device.
+ */
+export function upgradeSnapshot(
+	value: unknown,
+	migration?: FlowMigration,
+): SnapshotUpgrade {
+	try {
+		return upgraded(value, migration);
+	} catch {
+		// Not JSON, or too deep to walk.
+		return { kind: "unreadable" };
+	}
+}
+
+function upgraded(
+	value: unknown,
+	migration: FlowMigration | undefined,
+): SnapshotUpgrade {
+	if (!isRecord(value)) return { kind: "unreadable" };
+	const { version } = value;
+	if (typeof version !== "number" || !Number.isInteger(version)) {
+		return { kind: "unreadable" };
+	}
+	// First: the steps for any version would change a newer flow too.
+	if (version > FLOW_VERSION) return { kind: "newer" };
+	// The step to version 3 reads a flow without nodes as an empty one.
+	if (!Array.isArray(value.nodes)) return { kind: "unreadable" };
+
+	const before = JSON.stringify(value);
+	// The JSON round trip also cuts the links to `value`.
+	const flow: unknown = JSON.parse(
+		JSON.stringify(migrateFlow(value, migration)),
+	);
+	const after = JSON.stringify(flow);
+	if (!isRecord(flow) || !flowSchema.safeParse(flow).success) {
+		return { kind: "unreadable" };
+	}
+	if (after === before) return { kind: "current" };
+	if (JSON.stringify(migrateFlow(flow)) !== after) {
+		return { kind: "unreadable" };
+	}
+	return { kind: "rewritten", flow };
 }
