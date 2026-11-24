@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { flowSchema, singleAgentFlow } from "@nightshift/flows";
+import { allowing } from "../../../access/adapters/out/in-memory-access";
 import { inMemoryEditingPorts } from "../adapters/out/in-memory-neighbours";
 import { readFlow } from "./read-flow";
 
@@ -32,5 +33,18 @@ describe("readFlow", () => {
 			name: "build",
 		});
 		await expect(read).rejects.toThrow("This project does not exist.");
+	});
+
+	test("every Member of the Space may, whatever the role, and nobody else", async () => {
+		const ports = inMemoryEditingPorts();
+		expect(
+			await ports.access.whoMay("space", (actor) =>
+				readFlow(ports)(actor, {
+					spaceId: "space",
+					projectId: "project",
+					name: "build",
+				}),
+			),
+		).toEqual(allowing("owner", "admin", "member", "viewer"));
 	});
 });

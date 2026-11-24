@@ -65,7 +65,7 @@ export function wireTransfer(deps: {
 		...(usage ? { usage } : {}),
 	};
 	return {
-		exportFlow: exportFlow({ projects, flows }),
+		exportFlow: exportFlow({ access: deps.access, projects, flows }),
 		importFlow: importFlow(people),
 		importStarters: importStarters(people),
 		copyFlow: copyFlow({

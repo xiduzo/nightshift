@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { allowing } from "../../../access/adapters/out/in-memory-access";
 import { inMemoryEditingPorts } from "../adapters/out/in-memory-neighbours";
 import { listFlowNotices } from "./list-flow-notices";
 
@@ -30,5 +31,17 @@ describe("listFlowNotices", () => {
 			projectId: "elsewhere",
 		});
 		await expect(list).rejects.toThrow("This project does not exist.");
+	});
+
+	test("every Member of the Space may, whatever the role, and nobody else", async () => {
+		const ports = inMemoryEditingPorts();
+		expect(
+			await ports.access.whoMay("space", (actor) =>
+				listFlowNotices(ports)(actor, {
+					spaceId: "space",
+					projectId: "project",
+				}),
+			),
+		).toEqual(allowing("owner", "admin", "member", "viewer"));
 	});
 });

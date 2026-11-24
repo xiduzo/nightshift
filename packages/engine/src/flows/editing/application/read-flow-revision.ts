@@ -1,3 +1,4 @@
+import type { Access } from "../../../access";
 import type { Actor } from "../../../contract";
 import type { ProjectFlows } from "../../store";
 import { flowNotFound, type RevisionKind } from "../../store";
@@ -12,6 +13,7 @@ import type { Names, SpaceProjects } from "./ports";
 export type FlowRevisionView = RevisionView<RevisionKind>;
 
 export type ReadFlowRevisionPorts = {
+	access: Pick<Access, "openSpace">;
 	projects: SpaceProjects;
 	flows: Pick<ProjectFlows, "flows" | "revisions">;
 	names: Names;
@@ -20,11 +22,12 @@ export type ReadFlowRevisionPorts = {
 /**
  * One revision of a flow of a project of the Space with its flow, and the
  * diff to it from `against`: another revision, or the flow as it is now.
+ * A Member of the Space may, whatever the role (`access.openSpace`).
  */
 export const readFlowRevision =
 	(ports: ReadFlowRevisionPorts) =>
 	async (
-		_actor: Actor,
+		actor: Actor,
 		request: {
 			spaceId: string;
 			projectId: string;
@@ -33,6 +36,7 @@ export const readFlowRevision =
 			against?: string;
 		},
 	): Promise<FlowRevisionView> => {
+		await ports.access.openSpace(actor, { spaceId: request.spaceId });
 		const { projectId, name } = request;
 		await ports.projects.inSpace(projectId, request.spaceId);
 		const history = await flowHistory(name, {

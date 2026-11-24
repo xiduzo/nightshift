@@ -30,8 +30,8 @@ const NO_NAMES = async () => new Map<string, string>();
 /**
  * The editing of the flows of a Space: list, read, save and remove flows,
  * their notices, their revisions and a restore, and the kept values and
- * node memory of a flow on this computer. Each use case checks that the
- * project is in the Space first.
+ * node memory of a flow on this computer. Each use case asks who may act,
+ * then checks that the project is in the Space.
  */
 export function wireEditing(deps: {
 	access: Pick<Access, "openSpace">;
@@ -52,9 +52,9 @@ export function wireEditing(deps: {
 		devices: deps.names?.devices ?? NO_NAMES,
 	};
 	return {
-		listFlows: listFlows({ projects, flows }),
-		readFlow: readFlow({ projects, flows }),
-		readFlowMap: readFlowMap({ projects, flows }),
+		listFlows: listFlows({ access, projects, flows }),
+		readFlow: readFlow({ access, projects, flows }),
+		readFlowMap: readFlowMap({ access, projects, flows }),
 		saveFlow: saveFlow({
 			access,
 			projects,
@@ -62,18 +62,18 @@ export function wireEditing(deps: {
 			...(deps.usage ? { usage: deps.usage } : {}),
 		}),
 		removeFlow: removeFlow({ access, projects, flows }),
-		listFlowNotices: listFlowNotices({ projects, flows }),
+		listFlowNotices: listFlowNotices({ access, projects, flows }),
 		dismissFlowNotice: dismissFlowNotice({ access, projects, flows }),
-		listFlowRevisions: listFlowRevisions({ projects, flows, names }),
-		readFlowRevision: readFlowRevision({ projects, flows, names }),
+		listFlowRevisions: listFlowRevisions({ access, projects, flows, names }),
+		readFlowRevision: readFlowRevision({ access, projects, flows, names }),
 		restoreFlowRevision: restoreFlowRevision({
 			access,
 			projects,
 			flows,
 		}),
-		listKeptValues: listKeptValues({ projects, kept }),
+		listKeptValues: listKeptValues({ access, projects, kept }),
 		resetKeptValue: resetKeptValue({ access, projects, kept }),
-		listNodeMemory: listNodeMemory({ projects, memory }),
+		listNodeMemory: listNodeMemory({ access, projects, memory }),
 		forgetNodeMemory: forgetNodeMemory({ access, projects, memory }),
 	};
 }

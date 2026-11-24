@@ -4,6 +4,7 @@ import {
 	flowSchema,
 	singleAgentFlow,
 } from "@nightshift/flows";
+import { allowing } from "../../../access/adapters/out/in-memory-access";
 import { inMemoryTransferPorts } from "../adapters/out/in-memory-neighbours";
 import { exportFlow } from "./export-flow";
 
@@ -52,5 +53,18 @@ describe("exportFlow", () => {
 				name: "build",
 			}),
 		).rejects.toMatchObject({ kind: "not-found" });
+	});
+
+	test("every Member of the Space may, whatever the role, and nobody else", async () => {
+		const ports = inMemoryTransferPorts();
+		expect(
+			await ports.access.whoMay("space", (actor) =>
+				exportFlow(ports)(actor, {
+					spaceId: "space",
+					projectId: "project",
+					name: "build",
+				}),
+			),
+		).toEqual(allowing("owner", "admin", "member", "viewer"));
 	});
 });
