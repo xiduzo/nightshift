@@ -1,16 +1,16 @@
 import { describe, expect, test } from "bun:test";
 import { allowing } from "../../../access/adapters/out/in-memory-access";
 import type { Actor } from "../../../contract";
-import { inMemoryCatalogPorts } from "../adapters/out/in-memory-neighbours";
 import { SLEEPS, stillRunning, WAITS_AT_GATE } from "../domain/words";
+import { catalogPorts } from "../test-support";
 import { removeProject } from "./remove-project";
 
 const ADA: Actor = { personId: "person-ada", door: "session" };
 
 /** A project of the Space `s1`, as another Device's Clone brought it. */
-function seeded() {
-	const ports = inMemoryCatalogPorts();
-	ports.store.addProject({
+async function seeded() {
+	const ports = await catalogPorts();
+	await ports.addProject({
 		id: "p1",
 		spaceId: "s1",
 		name: "app",
@@ -21,7 +21,7 @@ function seeded() {
 
 describe("removeProject", () => {
 	test("marks the project removed in its Space document, and its fact", async () => {
-		const ports = seeded();
+		const ports = await seeded();
 		await removeProject(ports)(ADA, { spaceId: "s1", projectId: "p1" });
 		expect(
 			ports.spaceProjects.documentOf("s1").projects.get("p1")?.removedAt,
@@ -37,7 +37,7 @@ describe("removeProject", () => {
 			["waiting", false, WAITS_AT_GATE],
 			["sleeping", false, SLEEPS],
 		] as const) {
-			const ports = seeded();
+			const ports = await seeded();
 			ports.runs.add("r1", "p1", status);
 			if (active) ports.runs.activate("r1");
 			await expect(
@@ -48,7 +48,7 @@ describe("removeProject", () => {
 	});
 
 	test("owners and admins may, and nobody else", async () => {
-		const ports = seeded();
+		const ports = await seeded();
 		expect(
 			await ports.access.whoMay(
 				"s1",

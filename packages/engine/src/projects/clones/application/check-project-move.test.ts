@@ -1,27 +1,27 @@
 import { describe, expect, test } from "bun:test";
 import { asDate } from "@nightshift/time";
 import { HOSTED_ELSEWHERE, PROJECT_NOT_FOUND } from "../../keep";
-import { inMemoryClonesPorts } from "../adapters/out/in-memory-neighbours";
 import { NO_SUCH_SPACE } from "../domain/move";
+import { clonesPorts } from "../test-support";
 import { checkProjectMove } from "./check-project-move";
 
 /** `app` in `s1` with a Clone here, `lib` in `s1` without one, `old` removed, `team` in `s2`. */
 async function seeded() {
-	const ports = inMemoryClonesPorts();
-	ports.store.addProject({
+	const ports = await clonesPorts();
+	await ports.addProject({
 		id: "app",
 		spaceId: "s1",
 		name: "app",
 		remote: "github.com/acme/app",
 	});
-	ports.store.addProject({ id: "lib", spaceId: "s1", name: "lib" });
-	ports.store.addProject({
+	await ports.addProject({ id: "lib", spaceId: "s1", name: "lib" });
+	await ports.addProject({
 		id: "old",
 		spaceId: "s1",
 		name: "old",
 		removedAt: asDate(9),
 	});
-	ports.store.addProject({ id: "team", spaceId: "s2", name: "team" });
+	await ports.addProject({ id: "team", spaceId: "s2", name: "team" });
 	await ports.store.addClone({
 		spaceId: "s1",
 		projectId: "app",

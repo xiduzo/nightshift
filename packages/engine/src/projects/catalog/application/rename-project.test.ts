@@ -2,15 +2,15 @@ import { describe, expect, test } from "bun:test";
 import { allowing } from "../../../access/adapters/out/in-memory-access";
 import type { Actor } from "../../../contract";
 import { PROJECT_NOT_FOUND } from "../../keep";
-import { inMemoryCatalogPorts } from "../adapters/out/in-memory-neighbours";
+import { catalogPorts } from "../test-support";
 import { renameProject } from "./rename-project";
 
 const ADA: Actor = { personId: "person-ada", door: "session" };
 
 /** A project of the Space `s1`, as another Device's Clone brought it. */
-function seeded() {
-	const ports = inMemoryCatalogPorts();
-	ports.store.addProject({
+async function seeded() {
+	const ports = await catalogPorts();
+	await ports.addProject({
 		id: "p1",
 		spaceId: "s1",
 		name: "app",
@@ -21,7 +21,7 @@ function seeded() {
 
 describe("renameProject", () => {
 	test("a new name in the Space document, and its fact; the same name again changes nothing", async () => {
-		const ports = seeded();
+		const ports = await seeded();
 		const renamed = await renameProject(ports)(ADA, {
 			spaceId: "s1",
 			projectId: "p1",
@@ -43,7 +43,7 @@ describe("renameProject", () => {
 	});
 
 	test("a project of another Space is not found", async () => {
-		const ports = seeded();
+		const ports = await seeded();
 		await expect(
 			renameProject(ports)(ADA, { spaceId: "s2", projectId: "p1", name: "x" }),
 		).rejects.toThrow(PROJECT_NOT_FOUND);
@@ -51,7 +51,7 @@ describe("renameProject", () => {
 	});
 
 	test("owners, admins and members may, and nobody else", async () => {
-		const ports = seeded();
+		const ports = await seeded();
 		expect(
 			await ports.access.whoMay(
 				"s1",

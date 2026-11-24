@@ -9,30 +9,23 @@ import type {
 	SpaceHolds,
 	ThisDevice,
 } from "../../application/ports";
-import {
-	type InMemoryProjectStore,
-	inMemoryProjectStore,
-	projectRecords,
-} from "./in-memory-project-store";
-import { inMemorySpaceProjects } from "./in-memory-space-projects";
 
 /**
  * The in-memory adapters of the ports that another vertical fills
- * (`@filledBy` in `application/ports.ts`), and `inMemoryKeepPorts`, which
- * gives a use-case test every shared port of the Projects at once. Test
- * code: production code never imports this file.
+ * (`@filledBy` in `application/ports.ts`). Test code: production code never
+ * imports this file.
  */
 
 /** This computer, as the twins name it. */
 export const HERE = "this-computer";
 
-/** The log of the Project facts: each fact in order, and its batch runs on the store. */
-export function inMemoryProjectLog(store: Pick<InMemoryProjectStore, "apply">) {
+/** The log of the Project facts: each fact in order, after `run` ran its batch. */
+export function inMemoryProjectLog(run: (batch: RowBatch) => Promise<void>) {
 	const facts: Parameters<ProjectLog["append"]>[0][] = [];
 	const log = {
 		facts,
 		async append(fact: Parameters<ProjectLog["append"]>[0], before?: RowBatch) {
-			if (before) store.apply(before);
+			if (before) await run(before);
 			facts.push(fact);
 		},
 	};
@@ -117,25 +110,13 @@ export function inMemorySpaceHolds() {
 	return twin satisfies SpaceHolds;
 }
 
+/** This computer. */
+export function inMemoryThisDevice() {
+	return { deviceId: async () => HERE } satisfies ThisDevice;
+}
+
 /** New ids: `project-1`, `project-2`, and so on. */
 export function inMemoryIds() {
 	let next = 0;
 	return { projectId: () => `project-${++next}` } satisfies NewIds;
-}
-
-/** Every shared port of the Projects in memory at once: where each use-case test starts. */
-export function inMemoryKeepPorts() {
-	const store = inMemoryProjectStore(projectRecords(HERE));
-	return {
-		store,
-		spaceProjects: inMemorySpaceProjects(undefined, (spaceId, id, entry) =>
-			store.project(spaceId, id, entry),
-		),
-		projectLog: inMemoryProjectLog(store),
-		thisDevice: { deviceId: async () => HERE } satisfies ThisDevice,
-		repos: inMemoryRepos(),
-		directory: inMemoryProjectDirectory(),
-		spaceHolds: inMemorySpaceHolds(),
-		ids: inMemoryIds(),
-	};
 }

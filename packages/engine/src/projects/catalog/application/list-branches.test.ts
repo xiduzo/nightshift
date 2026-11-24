@@ -2,15 +2,15 @@ import { describe, expect, test } from "bun:test";
 import { allowing } from "../../../access/adapters/out/in-memory-access";
 import type { Actor } from "../../../contract";
 import { NOT_ON_THIS_COMPUTER, PROJECT_NOT_FOUND } from "../../keep";
-import { inMemoryCatalogPorts } from "../adapters/out/in-memory-neighbours";
+import { catalogPorts } from "../test-support";
 import { listBranches } from "./list-branches";
 
 const ADA: Actor = { personId: "person-ada", door: "session" };
 
 /** A project of the Space `s1`, as another Device's Clone brought it. */
-function seeded() {
-	const ports = inMemoryCatalogPorts();
-	ports.store.addProject({
+async function seeded() {
+	const ports = await catalogPorts();
+	await ports.addProject({
 		id: "p1",
 		spaceId: "s1",
 		name: "app",
@@ -21,7 +21,7 @@ function seeded() {
 
 describe("listBranches", () => {
 	test("the branches of the folder here", async () => {
-		const ports = seeded();
+		const ports = await seeded();
 		ports.repos.add("/work/app", "git@github.com:acme/app.git");
 		await ports.store.addClone({
 			spaceId: "s1",
@@ -35,8 +35,8 @@ describe("listBranches", () => {
 	});
 
 	test("none for a project without a folder; refused for one not on this computer or not in the Space", async () => {
-		const ports = seeded();
-		ports.store.addProject({
+		const ports = await seeded();
+		await ports.addProject({
 			id: "p2",
 			spaceId: "s1",
 			name: "feeds",
@@ -54,7 +54,7 @@ describe("listBranches", () => {
 	});
 
 	test("every Member of the Space may, whatever the role, and nobody else", async () => {
-		const ports = inMemoryCatalogPorts();
+		const ports = await catalogPorts();
 		expect(
 			await ports.access.whoMay("s1", (actor) =>
 				listBranches(ports)(actor, { spaceId: "s1", projectId: "p1" }),

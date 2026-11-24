@@ -44,7 +44,7 @@ export function inMemorySpaceProjects(
 		spaceId: string,
 		projectId: string,
 		entry: MemoryProjectEntry,
-	) => void = () => {},
+	) => Promise<void> = async () => {},
 ) {
 	let clock = 0;
 	const documentOf = (spaceId: string) => {
@@ -70,10 +70,10 @@ export function inMemorySpaceProjects(
 		}
 		document.devices.set(clone.deviceId, clone.deviceName);
 	};
-	const changed = (spaceId: string) => {
+	const changed = async (spaceId: string) => {
 		records.changes.push(spaceId);
 		for (const [id, entry] of documentOf(spaceId).projects) {
-			projected(spaceId, id, entry);
+			await projected(spaceId, id, entry);
 		}
 	};
 
@@ -106,7 +106,7 @@ export function inMemorySpaceProjects(
 					? {}
 					: { removedAt: removed ? ++clock : null }),
 			});
-			changed(row.spaceId);
+			await changed(row.spaceId);
 			return true;
 		},
 		async create(spaceId: string, projectId: string, entry: NewProjectEntry) {
@@ -116,13 +116,13 @@ export function inMemorySpaceProjects(
 				createdAt: ++clock,
 				removedAt: null,
 			});
-			changed(spaceId);
+			await changed(spaceId);
 			return true;
 		},
 		async recordCloneHere(spaceId: string, clone: CloneRecord) {
 			if (records.hostedElsewhere.has(spaceId)) return false;
 			record(documentOf(spaceId), clone);
-			changed(spaceId);
+			await changed(spaceId);
 			return true;
 		},
 		async recordClone(spaceId: string, clone: CloneRecord) {
@@ -137,7 +137,7 @@ export function inMemorySpaceProjects(
 				return "without-folder" as const;
 			}
 			record(document, clone);
-			changed(spaceId);
+			await changed(spaceId);
 			return "recorded" as const;
 		},
 		async setClones(
@@ -171,7 +171,7 @@ export function inMemorySpaceProjects(
 				(c) => c.deviceId !== input.deviceId || !removed.includes(c.projectId),
 			);
 			for (const projectId of has) record(document, { ...input, projectId });
-			changed(spaceId);
+			await changed(spaceId);
 			return { added, removed };
 		},
 		async take(
@@ -206,7 +206,7 @@ export function inMemorySpaceProjects(
 				if (entry) entry.removedAt = null;
 			}
 			for (const clone of taken.clones ?? []) record(document, clone);
-			changed(spaceId);
+			await changed(spaceId);
 		},
 		async forgetDevice(deviceId: string) {
 			for (const [spaceId, document] of records.documents) {
@@ -218,7 +218,7 @@ export function inMemorySpaceProjects(
 					(c) => c.deviceId !== deviceId,
 				);
 				document.devices.delete(deviceId);
-				changed(spaceId);
+				await changed(spaceId);
 			}
 		},
 		async clones(spaceId: string, projectIds: readonly string[]) {

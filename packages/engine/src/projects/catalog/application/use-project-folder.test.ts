@@ -2,16 +2,16 @@ import { describe, expect, test } from "bun:test";
 import { allowing } from "../../../access/adapters/out/in-memory-access";
 import type { Actor } from "../../../contract";
 import { NO_FOLDER, PROJECT_NOT_FOUND } from "../../keep";
-import { inMemoryCatalogPorts } from "../adapters/out/in-memory-neighbours";
 import { otherRepository, stillRunning } from "../domain/words";
+import { catalogPorts } from "../test-support";
 import { useProjectFolder } from "./use-project-folder";
 
 const ADA: Actor = { personId: "person-ada", door: "session" };
 
 /** A project of the Space `s1`, as another Device's Clone brought it. */
-function seeded() {
-	const ports = inMemoryCatalogPorts();
-	ports.store.addProject({
+async function seeded() {
+	const ports = await catalogPorts();
+	await ports.addProject({
 		id: "p1",
 		spaceId: "s1",
 		name: "app",
@@ -22,7 +22,7 @@ function seeded() {
 
 describe("useProjectFolder", () => {
 	test("a copy a person has becomes the folder of a project not here yet", async () => {
-		const ports = seeded();
+		const ports = await seeded();
 		ports.repos.add("/work/mine", "git@github.com:Acme/App.git");
 		const used = await useProjectFolder(ports)(ADA, {
 			spaceId: "s1",
@@ -34,7 +34,7 @@ describe("useProjectFolder", () => {
 	});
 
 	test("a folder of another repository is refused", async () => {
-		const ports = seeded();
+		const ports = await seeded();
 		ports.repos.add("/work/other", "git@github.com:acme/other.git");
 		await expect(
 			useProjectFolder(ports)(ADA, {
@@ -43,11 +43,11 @@ describe("useProjectFolder", () => {
 				repoPath: "/work/other",
 			}),
 		).rejects.toThrow(otherRepository("github.com/acme/app"));
-		expect(ports.store.records.clones).toEqual([]);
+		expect(await ports.clones()).toEqual([]);
 	});
 
 	test("refused while a run of the project runs a step in the folder it has", async () => {
-		const ports = seeded();
+		const ports = await seeded();
 		await ports.store.addClone({
 			spaceId: "s1",
 			projectId: "p1",
@@ -67,8 +67,8 @@ describe("useProjectFolder", () => {
 	});
 
 	test("a project without a folder never gets one", async () => {
-		const ports = inMemoryCatalogPorts();
-		ports.store.addProject({
+		const ports = await catalogPorts();
+		await ports.addProject({
 			id: "p1",
 			spaceId: "s1",
 			name: "feeds",
@@ -85,7 +85,7 @@ describe("useProjectFolder", () => {
 	});
 
 	test("another folder takes the place of the one a project has", async () => {
-		const ports = seeded();
+		const ports = await seeded();
 		await ports.store.addClone({
 			spaceId: "s1",
 			projectId: "p1",
@@ -98,14 +98,12 @@ describe("useProjectFolder", () => {
 			projectId: "p1",
 			repoPath: "/work/two",
 		});
-		expect(ports.store.records.clones.map((c) => c.path)).toEqual([
-			"/work/two",
-		]);
+		expect((await ports.clones()).map((c) => c.path)).toEqual(["/work/two"]);
 	});
 
 	test("a folder that is another project's is refused, and so is a project of another Space", async () => {
-		const ports = seeded();
-		ports.store.addProject({ id: "lib", spaceId: "s1", name: "lib" });
+		const ports = await seeded();
+		await ports.addProject({ id: "lib", spaceId: "s1", name: "lib" });
 		await ports.store.addClone({
 			spaceId: "s1",
 			projectId: "lib",
@@ -126,7 +124,7 @@ describe("useProjectFolder", () => {
 	});
 
 	test("asks project:add: owners, admins and members may, and nobody else", async () => {
-		const ports = seeded();
+		const ports = await seeded();
 		ports.repos.add("/work/mine", "git@github.com:acme/app.git");
 		expect(
 			await ports.access.whoMay(
@@ -137,7 +135,7 @@ describe("useProjectFolder", () => {
 						projectId: "p1",
 						repoPath: "/work/mine",
 					}),
-				() => [ports.store.records.clones],
+				async () => [await ports.clones()],
 			),
 		).toEqual(allowing("owner", "admin", "member"));
 	});

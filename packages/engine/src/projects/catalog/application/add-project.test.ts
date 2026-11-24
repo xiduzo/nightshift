@@ -2,15 +2,15 @@ import { describe, expect, test } from "bun:test";
 import { Refusal } from "@nightshift/refusal";
 import { allowing } from "../../../access/adapters/out/in-memory-access";
 import { type Actor, NIGHT_SHIFT } from "../../../contract";
-import { inMemoryCatalogPorts } from "../adapters/out/in-memory-neighbours";
 import { alreadyHere, HOSTED_NEEDS_REMOTE } from "../domain/words";
+import { catalogPorts } from "../test-support";
 import { addProject } from "./add-project";
 
 const ADA: Actor = { personId: "person-ada", door: "session" };
 
 describe("addProject", () => {
 	test("is refused in a Space whose Projects move", async () => {
-		const ports = inMemoryCatalogPorts();
+		const ports = await catalogPorts();
 		ports.repos.add("/work/late", "git@github.com:acme/late.git");
 		ports.spaceHolds.held.add("s1");
 		await expect(
@@ -24,7 +24,7 @@ describe("addProject", () => {
 	});
 
 	test("a folder becomes a project with its remote, a Clone here, and its flows come in", async () => {
-		const ports = inMemoryCatalogPorts();
+		const ports = await catalogPorts();
 		ports.repos.add("/work/app", "git@github.com:acme/app.git");
 		const added = await addProject(ports)(ADA, {
 			spaceId: "s1",
@@ -36,9 +36,7 @@ describe("addProject", () => {
 			remote: "github.com/acme/app",
 			repoPath: "/work/app",
 		});
-		expect(ports.store.records.clones.map((c) => c.path)).toEqual([
-			"/work/app",
-		]);
+		expect((await ports.clones()).map((c) => c.path)).toEqual(["/work/app"]);
 		expect(
 			ports.spaceProjects.documentOf("s1").projects.get("project-1"),
 		).toMatchObject({ name: "app", folder: true });
@@ -46,8 +44,8 @@ describe("addProject", () => {
 	});
 
 	test("a folder whose origin names a known project makes a Clone of it", async () => {
-		const ports = inMemoryCatalogPorts();
-		ports.store.addProject({
+		const ports = await catalogPorts();
+		await ports.addProject({
 			id: "p1",
 			spaceId: "s1",
 			name: "app",
@@ -69,13 +67,11 @@ describe("addProject", () => {
 				},
 			},
 		]);
-		expect(ports.store.records.clones.map((c) => c.path)).toEqual([
-			"/work/mine",
-		]);
+		expect((await ports.clones()).map((c) => c.path)).toEqual(["/work/mine"]);
 	});
 
 	test("a second folder of a project here is refused while the first exists", async () => {
-		const ports = inMemoryCatalogPorts();
+		const ports = await catalogPorts();
 		ports.repos.add("/one", "git@github.com:acme/app.git");
 		ports.repos.add("/two", "https://github.com/acme/app");
 		await addProject(ports)(ADA, { spaceId: "s1", repoPath: "/one" });
@@ -85,8 +81,8 @@ describe("addProject", () => {
 	});
 
 	test("a project of another Space is refused", async () => {
-		const ports = inMemoryCatalogPorts();
-		ports.store.addProject({
+		const ports = await catalogPorts();
+		await ports.addProject({
 			id: "p1",
 			spaceId: "s2",
 			name: "app",
@@ -102,7 +98,7 @@ describe("addProject", () => {
 	});
 
 	test("in a Space a Host keeps, the Host adds the project and this folder is its Clone; a folder without a remote is refused", async () => {
-		const ports = inMemoryCatalogPorts();
+		const ports = await catalogPorts();
 		ports.directory.hostElsewhere("team");
 		ports.spaceProjects.hostElsewhere("team");
 		ports.repos.add("/work/app", "https://github.com/acme/app.git");
@@ -122,7 +118,7 @@ describe("addProject", () => {
 	});
 
 	test("owners, admins and members may, and nobody else", async () => {
-		const ports = inMemoryCatalogPorts();
+		const ports = await catalogPorts();
 		ports.repos.add("/work/app", "git@github.com:acme/app.git");
 		expect(
 			await ports.access.whoMay(
@@ -135,7 +131,7 @@ describe("addProject", () => {
 	});
 
 	test("a project whose folder moved follows it to the new folder", async () => {
-		const ports = inMemoryCatalogPorts();
+		const ports = await catalogPorts();
 		ports.repos.add("/old", "git@github.com:acme/app.git");
 		const added = await addProject(ports)(ADA, {
 			spaceId: "s1",
@@ -148,11 +144,11 @@ describe("addProject", () => {
 			repoPath: "/moved",
 		});
 		expect(again).toMatchObject({ id: added.id, repoPath: "/moved" });
-		expect(ports.store.records.clones.map((c) => c.path)).toEqual(["/moved"]);
+		expect((await ports.clones()).map((c) => c.path)).toEqual(["/moved"]);
 	});
 
 	test("folders without a remote stay projects of their own, and the same folder is the same project", async () => {
-		const ports = inMemoryCatalogPorts();
+		const ports = await catalogPorts();
 		ports.repos.add("/a");
 		ports.repos.add("/b");
 		const add = (repoPath: string) =>

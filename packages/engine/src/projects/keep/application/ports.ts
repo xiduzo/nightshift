@@ -18,9 +18,8 @@ import type {
 
 /**
  * The driven ports the requests of the Projects share: the rows, the Space
- * documents, the log, git, the Device directory and the Host relay. A port
- * of its own has a real adapter, an in-memory adapter and a contract suite
- * in `adapters/out/`. Another vertical fills a port with `@filledBy`.
+ * documents, the log, git, the Device directory and the Host relay. The
+ * adapters of its own ports sit in `adapters/out/`. Another vertical fills a port with `@filledBy`.
  */
 
 /** The `project` and `clone` rows of this Replica. */
