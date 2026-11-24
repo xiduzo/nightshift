@@ -1,5 +1,5 @@
 {
-	"version": 6,
+	"version": 9,
 	"description": "An agent reviews a pull request. You read the review, and Night Shift posts it on GitHub when you agree.",
 	"inputs": [
 		{
@@ -26,14 +26,15 @@
 				"x": 0,
 				"y": 0
 			},
+			"timeoutMinutes": 30,
 			"type": "agent",
 			"prompt": "Review pull request {{pr}} of this repository. Read it with `gh`: its description (`gh pr view {{pr}}`), the linked issue, and the diff (`gh pr diff {{pr}}`). Do not change the code and do not post anything: a person reads your review first.\n\nLook for bugs, missing tests, and changes the description does not explain. Report `approve` when it can merge as it is, else `request-changes`. Put a short `summary` of your verdict in the data, and one entry in `comments` per finding: the file `path`, the `line` in the new version, and the `body`.",
 			"harness": "claude-code",
 			"model": "sonnet",
-			"permissionMode": "auto",
 			"effort": "high",
+			"permissionMode": "auto",
+			"session": "fresh",
 			"clis": ["gh"],
-			"timeoutMinutes": 30,
 			"outcomes": [
 				{
 					"name": "approve",
@@ -81,7 +82,6 @@
 			},
 			"type": "value",
 			"by": "rule",
-			"expression": "{ \"text\": $count(review.data.comments) = 0 ? \"No comments.\" : $join(review.data.comments.(\"- `\" & path & \":\" & $string(line) & \"`: \" & body), \"\\n\") }",
 			"output": {
 				"type": "object",
 				"properties": {
@@ -90,7 +90,8 @@
 					}
 				},
 				"required": ["text"]
-			}
+			},
+			"expression": "{ \"text\": $count(review.data.comments) = 0 ? \"No comments.\" : $join(review.data.comments.(\"- `\" & path & \":\" & $string(line) & \"`: \" & body), \"\\n\") }"
 		},
 		{
 			"id": "confirm",
@@ -120,9 +121,10 @@
 				"x": 960,
 				"y": 0
 			},
+			"timeoutMinutes": 5,
 			"type": "command",
 			"command": "# Templates arrive as environment variables, so the review text is never shell code.\nset -e\ncase \"{{review.outcome}}\" in\n\tapprove) verdict=--approve ;;\n\t*) verdict=--request-changes ;;\nesac\n# GitHub refuses to approve or request changes on your own pull request: comment instead.\nauthor=$(gh pr view \"{{pr}}\" --json author --jq .author.login)\nme=$(gh api user --jq .login)\nif [ \"$author\" = \"$me\" ]; then\n\tverdict=--comment\nfi\nbody=$(printf '%s\\n\\n%s' \"{{review.data.summary}}\" \"{{comments.data.text}}\")\ngh pr review \"{{pr}}\" \"$verdict\" --body \"$body\"",
-			"timeoutMinutes": 5
+			"stdout": "text"
 		}
 	],
 	"edges": [

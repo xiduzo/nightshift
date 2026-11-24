@@ -2,7 +2,7 @@
 
 These three flows rebuild `tools/night-shift/night-shift.py` of the rpgdotexe repo as Night Shift flows. They build the Features and the Traces of one Epic while nobody is present, and leave a stack of pull requests for the morning.
 
-Night Shift knows nothing of Epics, Features, or Traces. A flow is a function with inputs and outputs, and these three call each other: `night` takes the Epic number as its input `epic`. Its Call node reads the Epic's sub-issues with `gh` and runs `feature` once per Feature, with the issue as the input `item`. `feature` does the same for its Traces and `trace`. A flow reads its input with a path (`{{item.number}}`, `{{item.parent.number}}`), the engine's facts about the element from `run` (`{{run.branch}}`, `{{run.base_branch}}`), and what a called flow returned from the Call node's `results`. The files are format version 6. Night Shift brings them to the current format, version 7, when you import them.
+Night Shift knows nothing of Epics, Features, or Traces. A flow is a function with inputs and outputs, and these three call each other: `night` takes the Epic number as its input `epic`. Its Call node reads the Epic's sub-issues with `gh` and runs `feature` once per Feature, with the issue as the input `item`. `feature` does the same for its Traces and `trace`. A flow reads its input with a path (`{{item.number}}`, `{{item.parent.number}}`), the engine's facts about the element from `run` (`{{run.branch}}`, `{{run.base_branch}}`), and what a called flow returned from the Call node's `results`. The files are in the current flow format.
 
 | Flow | Inputs | Outputs | Does |
 | --- | --- | --- | --- |
@@ -10,25 +10,27 @@ Night Shift knows nothing of Epics, Features, or Traces. A flow is a function wi
 | `feature.json` | `item` (json, required): the Feature issue. | `prs`, `tune_pr`, `checkpoint`, `ci`, `steering` | Runs `trace` for each Trace of the Feature (label `trace`, not `implemented`), blockers first, each on its own branch on top of the last. Then the checkpoint: a rule checks that every Trace is built, the validator verifies and tunes on a `tune/` branch, the night waits for CI, the orchestrator writes steering notes, and a rule continues or halts the night. |
 | `trace.json` | `item` (json, required): the Trace issue. | `pr`, `scenarios`, `tries` | The worker builds the Trace, the check runs, a failed check goes back to a fresh worker (3 tries), then the orchestrator rescues it. A Trace that passes gets a pull request on the stack and the label `implemented`. A Trace that still fails ends as failed, so the Traces that wait on it are blocked. |
 
-## The agent profiles
+## The agent roles
 
-The script has three roles. Each is an Agent Profile on the Agents page, and the Agent nodes name it in `profile`. A node sets nothing else, so the model, the effort and the permission mode of a role change in one place, and the next run picks the change up. `profiles.json` holds the three, in the shape the Agents page saves.
+The script has three roles. Each Agent node sets the harness, the model, the effort, the permission mode and the CLI tools of its role:
 
-| Profile | Harness | Model | Effort | Permission mode | CLI tools | Used by |
+| Role | Harness | Model | Effort | Permission mode | CLI tools | Used by |
 | --- | --- | --- | --- | --- | --- | --- |
-| `worker` | Claude Code | `sonnet` | high | auto | `gh` | `trace` → `worker` |
-| `validator` | Claude Code | `sonnet` | high | auto | `gh` | `feature` → `validate` |
-| `orchestrator` | Claude Code | `opus` | high | auto | `gh` | `trace` → `rescue`, `feature` → `steer` |
+| Worker | Claude Code | `sonnet` | high | auto | `gh` | `trace` → `worker` |
+| Validator | Claude Code | `sonnet` | high | auto | `gh` | `feature` → `validate` |
+| Orchestrator | Claude Code | `opus` | high | auto | `gh` | `trace` → `rescue`, `feature` → `steer` |
 
-The script's default worker is a local OpenCode model. Night Shift has only the Claude Code harness wired up for the night, so the worker runs on Sonnet, the setup the script's README gives as its example. To try another harness or model for one role, edit that profile; the flows stay as they are.
+A profile belongs to one Device ([ADR 3](../../docs/adr/0003-a-profile-belongs-to-one-device.md)), so a file to share names none. To change a role in one place, make a profile for it on the Agents page. After the import, choose the profile on each of its nodes.
+
+The script's default worker is a local OpenCode model. Night Shift has only the Claude Code harness wired up for the night, so the worker runs on Sonnet, the setup the script's README gives as its example. To try another harness or model for one role, change its nodes.
 
 The agents get the script's prompts, not the `wtf.*` skills: those skills ask the person questions, and nobody is awake. The four prompts end with the same block of repository rules; change it in all four.
 
 ## How to use it
 
-1. On the Agents page, add the CLI tool `gh` (under Tools), then the three profiles from `profiles.json`: `worker`, `validator` and `orchestrator`. Night Shift has no import for profiles yet, so add each one by hand with the values of the table.
+1. On the Agents page, add the CLI tool `gh` (under Tools).
 2. Add your rpgdotexe clone as a project in Night Shift.
-3. Save the three flows into the project. Night Shift keeps flows itself, so do not copy the files into the clone. Choose Import in the project's flow list for each file in `examples/rpgdotexe/flows/`, or run `nightshift flows import <file>` for each one in your clone's folder. A flow that names a profile or a CLI tool the daemon does not have refuses to start, and the editor lists it as an issue. The import gives each Agent node the profile of that name on this computer, so the editor shows "worker on <your computer>" ([ADR 3](../../docs/adr/0003-a-profile-belongs-to-one-device.md)).
+3. Save the three flows into the project. Night Shift keeps flows itself, so do not copy the files into the clone. Choose Import in the project's flow list for each file in `examples/rpgdotexe/flows/`, or run `nightshift flows import <file>` for each one in your clone's folder. A flow that names a CLI tool the daemon does not have refuses to start, and the editor lists it as an issue.
 4. Run the flow `night`: the start dialog asks for the Epic number (the input `epic`, like `night-shift.py <epic>`) and a stop time. At the stop time the night starts no new work. The Trace that was running ends as failed, and the night still links the stack and writes the report. The next run continues, because a Trace with the label `implemented` counts as done. A usage limit that resets after the stop time ends the night at once.
 5. In the morning, read the stack of pull requests, `.build/night/STATUS.md` in the run's worktree, and the comment of the checkpoint on each Feature.
 
@@ -41,7 +43,7 @@ The seven node types, and where the night uses them:
 | Node | Where | Why this node |
 | --- | --- | --- |
 | Agent | `worker`, `rescue`, `validate`, `steer` | A session on a harness. `validate` and `steer` have an output schema, so their findings are data (`{{validate.data.summary}}`, `{{steer.data.sound_base}}`), not a file the next step parses. |
-| Command | the check, the format, the branches, the pull requests, the labels, the report | Everything `gh`, `git` and `python3` do. `prepare`, `deliver` and `deliver_tune` print JSON (`"output": "json"`), so later nodes read `{{prepare.data.scenarios}}` and `{{deliver.data.url}}`. |
+| Command | the check, the format, the branches, the pull requests, the labels, the report | Everything `gh`, `git` and `python3` do. `prepare`, `deliver` and `deliver_tune` print JSON (`"stdout": "json"`), so later nodes read `{{prepare.data.scenarios}}` and `{{deliver.data.url}}`. |
 | Decision by rule | `built`, `verdict` | A choice over typed values, no model: `traces.failed_count > 0 or …` and `steer.data.sound_base = false`. The script's DECIDE step is the orchestrator's verdict read by a rule. |
 | Value by rule | `scenarios`, `prs`, `stack` | A JSONata expression over the results of a Call node: the scenarios of all Traces of a Feature, the pull requests of a Feature, the pull requests of the night. Replaces the files the script passed between steps (`feature-scenarios.txt`). |
 | Wait | `ci` | Sleeps until `gh pr checks` is green on every pull request of the Feature, polling every 5 minutes, 30 minutes at most. No step and no session while it sleeps. `timeout` is a fact for the orchestrator, not a halt. |
@@ -57,22 +59,22 @@ Not used: a Decision by a person (nobody is awake), a Decision by a model (the i
 | `fetch_plan`, `blockers_first`, Features first | `night` → `features` (Call with `each`, a `gh api graphql` command: label `feature`) |
 | Traces of a Feature, `next_action`, a blocked Trace skips its dependents | `feature` → `traces` (Call with `each`, a `gh api graphql` command: label `trace`, done on `implemented`, not `draft`; `branch: per-item`) |
 | `build_trace`: branch, `write_context` (`context.json`, `TRACE.md`, `FEATURE.md`) | `trace` → `prepare` (the engine makes the branch; the node prints the base and the scenarios as JSON) |
-| `worker_prompt` + `RULES` + `trace_task` / `fix_task`, a new session each try | `trace` → `worker` (profile `worker`, `session: fresh`, 90 min, idle 30) |
+| `worker_prompt` + `RULES` + `trace_task` / `fix_task`, a new session each try | `trace` → `worker` (role Worker, `session: fresh`, 90 min, idle 30) |
 | `format_swift` | `trace` → `format` |
 | `loop_gate` (loose changes, no commit, protected files) + `gate` | `trace` → `check` |
 | `--attempts 3` | edge `check` → `worker` on `fail`, `max: 2` (3 tries in all) |
-| `rescue_prompt` on the orchestrator | `trace` → `rescue` (profile `orchestrator`, 75 min) |
+| `rescue_prompt` on the orchestrator | `trace` → `rescue` (role Orchestrator, 75 min) |
 | rescue 2: `fix_prompt`, resuming the rescue session | edge `recheck` → `rescue` on `fail`, `max: 1`, `session: resume` |
 | `block_trace` (commit the loose work) | `trace` → `blocked`, which ends as `fail` |
 | `deliver` + `pr_body` + `label(..., "implemented")` | `trace` → `deliver` (prints the pull request as JSON; the flow returns it as `pr`) |
 | `finish_feature`: only when every Trace is built | `feature` → `built` (Decision by rule over the counts of `traces`) and `not_built` (a comment on the Feature, then `fail`) |
 | the scenarios of the whole Feature | `feature` → `scenarios` (Value by rule over `traces.results`) |
 | the `tune/` branch | `feature` → `tune_start` |
-| `validate_prompt`, `validation.json` | `feature` → `validate` (profile `validator`, 75 min, an output schema instead of the file) |
+| `validate_prompt`, `validation.json` | `feature` → `validate` (role Validator, 75 min, an output schema instead of the file) |
 | the check of the tuning, "validate fix" (resumed), removal when it still fails | `check_tune`, edge back to `validate` (`max: 1`), `drop_tune` |
 | tuning pull request, `mark_verified` (label only), `comment` | `feature` → `deliver_tune` (from `validate.data`) |
 | the pull requests of the Feature | `feature` → `prs` (Value by rule), then `ci` (Wait on `gh pr checks`) |
-| `orchestrate_prompt`, task 1: STEER | `feature` → `steer` (profile `orchestrator`, an output schema with `sound_base`) |
+| `orchestrate_prompt`, task 1: STEER | `feature` → `steer` (role Orchestrator, an output schema with `sound_base`) |
 | "the orchestrator must not change the code" | `feature` → `undo_steer` |
 | `orchestrate_prompt`, task 2: DECIDE (`verdict.json`) | `feature` → `verdict` (Decision by rule: `halt` when `steer.data.sound_base = false` or the orchestrator gave no report) |
 | halt stops the night | `night` → `features` with `haltOn: ["halt"]` |
@@ -98,5 +100,5 @@ Not used: a Decision by a person (nobody is awake), a Decision by a model (the i
 - In `feature.json`, after `traces`, the worktree is on the tip of the stack. `tune_start` branches off it. The engine does not know the `tune/` branch, so the next Feature's Traces do not build on the tuning, and the tuning pull requests are not part of the linked stack.
 - The night's Call has `branch: shared`: the stack is the Traces. The first Trace of the next Feature must start on the last Trace that finished, also across Features.
 - `session: resume` resumes the node's session of the same item, not of an earlier item.
-- A Command node with `"output": "json"` reads all of stdout as JSON. `deliver` and `deliver_tune` send their log to stderr (`exec 3>&1 1>&2`) and print one JSON line at the end.
+- A Command node with `"stdout": "json"` reads all of stdout as JSON. `deliver` and `deliver_tune` send their log to stderr (`exec 3>&1 1>&2`) and print one JSON line at the end.
 - `gh pr checks` exits 0 only when every check of the pull request passed. A repository without checks never reaches `done`: the Wait ends `timeout` after 30 minutes, and the night goes on.

@@ -41,7 +41,7 @@ import { createEngine } from "../../src/wire";
 /**
  * Flow format 2: inputs and outputs, templates with paths, the Call
  * node (once, and over any list), Agent outcomes and output schemas, and
- * runs and flow files of format 1.
+ * runs of format 1 and the example flows.
  */
 
 let sandbox: Sandbox;
@@ -73,7 +73,7 @@ function makeEngine(
 			db: sandbox.db,
 			harnesses: { "claude-code": harness },
 			dataDir: sandbox.dataDir,
-			// The format 1 flows had the GitHub tool set: now the CLI tool gh.
+			// The agents of the rpgdotexe flows use the CLI tool gh.
 			cliTools: cliToolsOf(["gh"]),
 			which: (name) => `/usr/local/bin/${name}`,
 			...options,
@@ -1302,20 +1302,21 @@ describe("flow format 1", () => {
 		expect(stepOf(detail, "loop").items).toHaveLength(1);
 	});
 
-	test("the rpgdotexe flows of format 1 start and walk to the first agent", async () => {
-		const fixtures = join(
+	test("the rpgdotexe example flows start and walk to the first agent", async () => {
+		const examples = join(
 			import.meta.dir,
 			"..",
 			"..",
-			"src",
-			"testing",
-			"fixtures",
-			"rpgdotexe-v1",
+			"..",
+			"..",
+			"examples",
+			"rpgdotexe",
+			"flows",
 		);
 		const flows: Record<string, unknown> = {};
 		for (const name of ["night", "feature", "trace"]) {
 			flows[name] = JSON.parse(
-				await readFile(join(fixtures, `${name}.json`), "utf8"),
+				await readFile(join(examples, `${name}.json`), "utf8"),
 			);
 		}
 		saved = flows;
@@ -1343,7 +1344,7 @@ describe("flow format 1", () => {
 		]);
 		const bin = join(sandbox.root, "bin");
 		await mkdir(bin, { recursive: true });
-		// The migrated For Each sources ask `gh api graphql` for the sub-issues
+		// The sources of the Call nodes ask `gh api graphql` for the sub-issues
 		// of their parent: the fake answers with the items, per parent number,
 		// and logs each parent it was asked for.
 		const reads = join(sandbox.root, "gh-reads.txt");

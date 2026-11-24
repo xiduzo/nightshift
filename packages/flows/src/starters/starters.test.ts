@@ -103,7 +103,7 @@ describe("the starters", () => {
 		}
 	});
 
-	test("each starter comes to the current format with no errors", () => {
+	test("each starter has no errors", () => {
 		const flows: Record<string, Flow | null> = Object.fromEntries(
 			starterList().map(({ name, source }) => [name, parseFlow(source).flow]),
 		);

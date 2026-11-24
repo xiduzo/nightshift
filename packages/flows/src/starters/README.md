@@ -1,6 +1,6 @@
 # Starter flows
 
-Small, self-contained flows that ship with Night Shift. Change them to fit a project. The files are format version 6. Night Shift brings them to the current format, version 8, when you import them. Each one runs unattended: the agents use Claude Code in `auto` permission mode, and only a Gate waits for a person.
+Small, self-contained flows that ship with Night Shift. Change them to fit a project. The files are in the current flow format. Each one runs unattended: the agents use Claude Code in `auto` permission mode, and only a Gate waits for a person.
 
 ## The starter standard
 

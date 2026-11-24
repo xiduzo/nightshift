@@ -1,5 +1,5 @@
 {
-	"version": 6,
+	"version": 9,
 	"description": "An agent splits your goal into small tasks. Night Shift builds and checks each task on top of the one before. An agent then reviews the result.",
 	"inputs": [
 		{
@@ -46,13 +46,14 @@
 				"x": 0,
 				"y": 0
 			},
+			"timeoutMinutes": 30,
 			"type": "agent",
 			"prompt": "Plan this goal for the repository of your working directory. Read the code first; do not change it.\n\nThe goal:\n\n{{goal}}\n\nThe person answered your earlier question (empty when you did not ask one):\n\n{{clarify.note}}\n\nSplit the goal into small tasks that an agent can each build and test in under an hour. Give each task a short `id` (lowercase, for example `t1`), a `title`, the `details` the builder needs (files, behaviour, how to test it), and `dependsOn`: the ids of the tasks it builds on. Order them so a task comes after the tasks it depends on.\n\nReport `planned` with the tasks. When the goal is too unclear to plan, report `unclear` with an empty task list, and put your question in the summary.",
 			"harness": "claude-code",
 			"model": "sonnet",
-			"permissionMode": "auto",
 			"effort": "high",
-			"timeoutMinutes": 30,
+			"permissionMode": "auto",
+			"session": "fresh",
 			"outcomes": [
 				{
 					"name": "planned",
@@ -155,7 +156,8 @@
 					"value": "{{planner.data.tasks}}"
 				},
 				"as": "item",
-				"branch": "per-item"
+				"branch": "per-item",
+				"haltOn": ["halt"]
 			}
 		},
 		{
@@ -165,13 +167,14 @@
 				"x": 960,
 				"y": 0
 			},
+			"timeoutMinutes": 30,
 			"type": "agent",
 			"prompt": "Review the work of an unattended run in the repository of your working directory. Do not change the code.\n\nThe goal:\n\n{{goal}}\n\nThe tasks and how they ended:\n\n{{build.summary}}\n\nRead the changes since `{{run.base_ref}}` (for example `git log {{run.base_ref}}..HEAD` and `git diff {{run.base_ref}}...HEAD`). Check that they reach the goal, are tested, and do not break anything.\n\nReport `approved` when the work is ready to merge, else `changes-requested`. List each problem in `issues`, one short sentence each (an empty list when there are none).",
 			"harness": "claude-code",
 			"model": "sonnet",
-			"permissionMode": "auto",
 			"effort": "high",
-			"timeoutMinutes": 30,
+			"permissionMode": "auto",
+			"session": "fresh",
 			"outcomes": [
 				{
 					"name": "approved",

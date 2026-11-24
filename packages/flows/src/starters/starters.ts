@@ -12,7 +12,7 @@ import watchLogs from "./flows/watch-logs.json";
  * Starters: small flows that ship with Night Shift, for a person to change.
  * Unlike a kit, a starter is copied into a project as the project's own
  * flow, when the project is added or from its file (`README.md`). The files
- * are format 6: an import brings them to the current format.
+ * are in the current format.
  *
  * Each one meets the starter standard of the README: it fits any project,
  * needs one agent login only, is self-contained, and starts on its own. A

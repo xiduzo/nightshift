@@ -1,17 +1,15 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { FLOW_VERSION, type Flow, flowSchema, migrateFlow } from "../flow";
+import { FLOW_VERSION, type Flow, flowSchema } from "../flow";
 import { canMakeSection, sectionBoundary, sectionOf } from "./shape";
 
 /** The 20-node flow of the canvas research, as a person wrote it. */
 const factory = flowSchema.parse(
-	migrateFlow(
-		JSON.parse(
-			readFileSync(
-				join(import.meta.dir, "fixtures", "feature-factory.json"),
-				"utf8",
-			),
+	JSON.parse(
+		readFileSync(
+			join(import.meta.dir, "fixtures", "feature-factory.json"),
+			"utf8",
 		),
 	),
 );

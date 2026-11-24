@@ -48,11 +48,11 @@
 	"nodes": [
 		{
 			"id": "branch",
-			"type": "command",
 			"position": {
 				"x": 0,
 				"y": 328
 			},
+			"type": "command",
 			"command": "prepare \"{{issue}}\"",
 			"stdout": "json",
 			"exits": [
@@ -71,21 +71,21 @@
 		},
 		{
 			"id": "rest",
-			"type": "command",
 			"position": {
 				"x": 384,
 				"y": 472
 			},
+			"type": "command",
 			"command": "echo \"Busy: {{branch.data.key}}\"",
 			"stdout": "text"
 		},
 		{
 			"id": "design",
-			"type": "command",
 			"position": {
 				"x": 384,
 				"y": 192
 			},
+			"type": "command",
 			"command": "designs \"{{branch.data.key}}\"",
 			"stdout": "json",
 			"exits": [
@@ -108,15 +108,16 @@
 		},
 		{
 			"id": "spec",
-			"type": "agent",
 			"position": {
 				"x": 768,
 				"y": 192
 			},
+			"type": "agent",
 			"prompt": "Write the spec for {{branch.data.key}}. Notes: {{notes}}. Designs: {{design.data}}. Answers: {{clarify.note}}. Last check: {{validate.log_tail}}",
 			"harness": "claude-code",
 			"model": "sonnet",
 			"permissionMode": "acceptEdits",
+			"session": "fresh",
 			"outcomes": [
 				{
 					"name": "specified"
@@ -131,13 +132,12 @@
 		},
 		{
 			"id": "clarify",
-			"type": "decision",
 			"position": {
 				"x": 1152,
 				"y": 256
 			},
+			"type": "decision",
 			"prompt": "Answer the questions: {{spec.data.questions}}",
-			"by": "person",
 			"options": [
 				{
 					"name": "answer"
@@ -145,15 +145,23 @@
 				{
 					"name": "stop"
 				}
-			]
+			],
+			"by": "person"
 		},
 		{
 			"id": "validate",
-			"type": "command",
 			"position": {
 				"x": 1152,
 				"y": 0
 			},
+			"set": [
+				{
+					"variable": "spec_commit",
+					"value": "{{validate.data.commit}}",
+					"on": ["valid"]
+				}
+			],
+			"type": "command",
 			"command": "check-spec \"{{spec.data.name}}\"",
 			"stdout": "json",
 			"exits": [
@@ -168,34 +176,14 @@
 				{
 					"name": "failed"
 				}
-			],
-			"set": [
-				{
-					"variable": "spec_commit",
-					"value": "{{validate.data.commit}}",
-					"on": ["valid"]
-				}
 			]
 		},
 		{
 			"id": "build",
-			"type": "agent",
 			"position": {
 				"x": 0,
 				"y": 848
 			},
-			"prompt": "Build {{spec.data.name}} on {{vars.spec_commit}}. Fix: {{vars.findings}}. Note: {{human.note}}. Last check: {{stack.log_tail}}",
-			"harness": "claude-code",
-			"model": "sonnet",
-			"permissionMode": "acceptEdits",
-			"outcomes": [
-				{
-					"name": "built"
-				},
-				{
-					"name": "blocked"
-				}
-			],
 			"set": [
 				{
 					"variable": "findings",
@@ -210,15 +198,29 @@
 					"expression": "vars.round + 1",
 					"on": ["built"]
 				}
+			],
+			"type": "agent",
+			"prompt": "Build {{spec.data.name}} on {{vars.spec_commit}}. Fix: {{vars.findings}}. Note: {{human.note}}. Last check: {{stack.log_tail}}",
+			"harness": "claude-code",
+			"model": "sonnet",
+			"permissionMode": "acceptEdits",
+			"session": "fresh",
+			"outcomes": [
+				{
+					"name": "built"
+				},
+				{
+					"name": "blocked"
+				}
 			]
 		},
 		{
 			"id": "stack",
-			"type": "command",
 			"position": {
 				"x": 384,
 				"y": 920
 			},
+			"type": "command",
 			"command": "check-layers \"{{vars.spec_commit}}\"",
 			"stdout": "json",
 			"exits": [
@@ -237,11 +239,11 @@
 		},
 		{
 			"id": "scope",
-			"type": "command",
 			"position": {
 				"x": 768,
 				"y": 920
 			},
+			"type": "command",
 			"command": "check-scope",
 			"stdout": "text",
 			"exits": [
@@ -260,42 +262,23 @@
 		},
 		{
 			"id": "ux",
-			"type": "agent",
 			"position": {
 				"x": 1152,
 				"y": 984
 			},
-			"prompt": "Review the change. Layers: {{stack.data.layers}}",
-			"harness": "claude-code",
-			"model": "sonnet",
-			"permissionMode": "acceptEdits",
-			"outcomes": [
-				{
-					"name": "pass"
-				},
-				{
-					"name": "changes"
-				}
-			],
 			"set": [
 				{
 					"variable": "findings",
 					"expression": "$append(vars.findings, [ux.data])",
 					"on": ["changes"]
 				}
-			]
-		},
-		{
-			"id": "ui_design",
+			],
 			"type": "agent",
-			"position": {
-				"x": 1536,
-				"y": 984
-			},
 			"prompt": "Review the change. Layers: {{stack.data.layers}}",
 			"harness": "claude-code",
 			"model": "sonnet",
 			"permissionMode": "acceptEdits",
+			"session": "fresh",
 			"outcomes": [
 				{
 					"name": "pass"
@@ -303,26 +286,27 @@
 				{
 					"name": "changes"
 				}
-			],
+			]
+		},
+		{
+			"id": "ui_design",
+			"position": {
+				"x": 1536,
+				"y": 984
+			},
 			"set": [
 				{
 					"variable": "findings",
 					"expression": "$append(vars.findings, [ui_design.data])",
 					"on": ["changes"]
 				}
-			]
-		},
-		{
-			"id": "security",
+			],
 			"type": "agent",
-			"position": {
-				"x": 1920,
-				"y": 912
-			},
 			"prompt": "Review the change. Layers: {{stack.data.layers}}",
 			"harness": "claude-code",
 			"model": "sonnet",
 			"permissionMode": "acceptEdits",
+			"session": "fresh",
 			"outcomes": [
 				{
 					"name": "pass"
@@ -330,26 +314,27 @@
 				{
 					"name": "changes"
 				}
-			],
+			]
+		},
+		{
+			"id": "security",
+			"position": {
+				"x": 1920,
+				"y": 912
+			},
 			"set": [
 				{
 					"variable": "findings",
 					"expression": "$append(vars.findings, [security.data])",
 					"on": ["changes"]
 				}
-			]
-		},
-		{
-			"id": "code",
+			],
 			"type": "agent",
-			"position": {
-				"x": 2304,
-				"y": 912
-			},
 			"prompt": "Review the change. Layers: {{stack.data.layers}}",
 			"harness": "claude-code",
 			"model": "sonnet",
 			"permissionMode": "acceptEdits",
+			"session": "fresh",
 			"outcomes": [
 				{
 					"name": "pass"
@@ -357,24 +342,44 @@
 				{
 					"name": "changes"
 				}
-			],
+			]
+		},
+		{
+			"id": "code",
+			"position": {
+				"x": 2304,
+				"y": 912
+			},
 			"set": [
 				{
 					"variable": "findings",
 					"expression": "$append(vars.findings, [code.data])",
 					"on": ["changes"]
 				}
+			],
+			"type": "agent",
+			"prompt": "Review the change. Layers: {{stack.data.layers}}",
+			"harness": "claude-code",
+			"model": "sonnet",
+			"permissionMode": "acceptEdits",
+			"session": "fresh",
+			"outcomes": [
+				{
+					"name": "pass"
+				},
+				{
+					"name": "changes"
+				}
 			]
 		},
 		{
 			"id": "verdict",
-			"type": "decision",
 			"position": {
 				"x": 2688,
 				"y": 848
 			},
+			"type": "decision",
 			"prompt": "",
-			"by": "rule",
 			"options": [
 				{
 					"name": "changes",
@@ -383,19 +388,28 @@
 				{
 					"name": "pass"
 				}
-			]
+			],
+			"by": "rule"
 		},
 		{
 			"id": "approver",
-			"type": "agent",
 			"position": {
 				"x": 3072,
 				"y": 768
 			},
+			"set": [
+				{
+					"variable": "approved",
+					"expression": "true",
+					"on": ["approve"]
+				}
+			],
+			"type": "agent",
 			"prompt": "Decide. Reviews: {{ux.summary}} {{ui_design.summary}} {{security.summary}} {{code.summary}}. Builds: {{vars.round}}. Build: {{build.data}}",
 			"harness": "claude-code",
 			"model": "sonnet",
 			"permissionMode": "acceptEdits",
+			"session": "fresh",
 			"outcomes": [
 				{
 					"name": "approve"
@@ -403,34 +417,26 @@
 				{
 					"name": "escalate"
 				}
-			],
-			"set": [
-				{
-					"variable": "approved",
-					"expression": "true",
-					"on": ["approve"]
-				}
 			]
 		},
 		{
 			"id": "publish",
-			"type": "command",
 			"position": {
 				"x": 3456,
 				"y": 856
 			},
+			"type": "command",
 			"command": "publish \"{{build.data.layers}}\"",
 			"stdout": "json"
 		},
 		{
 			"id": "route",
-			"type": "decision",
 			"position": {
 				"x": 3840,
 				"y": 848
 			},
+			"type": "decision",
 			"prompt": "",
-			"by": "rule",
 			"options": [
 				{
 					"name": "approved",
@@ -439,17 +445,17 @@
 				{
 					"name": "needs-human"
 				}
-			]
+			],
+			"by": "rule"
 		},
 		{
 			"id": "human",
-			"type": "decision",
 			"position": {
 				"x": 4224,
 				"y": 856
 			},
+			"type": "decision",
 			"prompt": "Decide. {{approver.summary}} {{build.summary}} {{publish.data.prs}} {{vars.findings}}",
-			"by": "person",
 			"options": [
 				{
 					"name": "approve"
@@ -463,25 +469,26 @@
 				{
 					"name": "keep"
 				}
-			]
+			],
+			"by": "person"
 		},
 		{
 			"id": "ready",
-			"type": "command",
 			"position": {
 				"x": 4608,
 				"y": 1320
 			},
+			"type": "command",
 			"command": "ready \"{{publish.data.prs}}\"",
 			"stdout": "text"
 		},
 		{
 			"id": "close",
-			"type": "command",
 			"position": {
 				"x": 4608,
 				"y": 888
 			},
+			"type": "command",
 			"command": "close \"{{publish.data.prs}}\" \"{{human.note}}\"",
 			"stdout": "text"
 		}

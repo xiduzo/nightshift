@@ -1,5 +1,5 @@
 {
-	"version": 6,
+	"version": 9,
 	"description": "An agent builds a task, and a check proves it after each try. Sonnet tries up to 3 times, each try with the last failure. Then Opus tries.",
 	"inputs": [
 		{
@@ -38,19 +38,19 @@
 				"x": 0,
 				"y": 0
 			},
+			"timeoutMinutes": 60,
 			"type": "agent",
 			"prompt": "Implement this task in the repository of your working directory:\n\n{{task}}\n\nWhen you are done, `{{check}}` must pass. Run it yourself before you report. Keep the change small and focused, and commit it with a clear message. The check also fails when changes are not committed. Nobody is awake: do not ask a question, decide.",
-			"permissionMode": "auto",
 			"effort": "high",
+			"permissionMode": "auto",
 			"session": "fresh",
-			"timeoutMinutes": 60,
 			"idleMinutes": 20,
 			"cascade": [
 				{
 					"label": "sonnet",
+					"tries": 3,
 					"harness": "claude-code",
-					"model": "sonnet",
-					"tries": 3
+					"model": "sonnet"
 				},
 				{
 					"label": "opus",

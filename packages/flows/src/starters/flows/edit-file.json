@@ -1,5 +1,5 @@
 {
-	"version": 6,
+	"version": 9,
 	"description": "An agent applies an instruction to one file. per-file runs it once for each file.",
 	"inputs": [
 		{
@@ -17,6 +17,7 @@
 			"required": true
 		}
 	],
+	"outputs": [],
 	"start": "edit",
 	"nodes": [
 		{
@@ -26,12 +27,13 @@
 				"x": 0,
 				"y": 0
 			},
+			"timeoutMinutes": 20,
 			"type": "agent",
 			"prompt": "Apply this instruction to the file `{{item.path}}`, and only to that file:\n\n{{instruction}}\n\nWhen the instruction does not apply to this file, change nothing and report `pass`. Do not commit: other agents work on the same branch, and the flow commits at the end.",
 			"harness": "claude-code",
 			"model": "sonnet",
 			"permissionMode": "auto",
-			"timeoutMinutes": 20,
+			"session": "fresh",
 			"idleMinutes": 10
 		},
 		{
@@ -41,9 +43,10 @@
 				"x": 320,
 				"y": 0
 			},
+			"timeoutMinutes": 5,
 			"type": "command",
 			"command": "# Put the file back as it was, so half-done edits are not committed. Then fail the step.\ngit checkout -- \"{{item.path}}\" 2>/dev/null || true\nexit 1",
-			"timeoutMinutes": 5
+			"stdout": "text"
 		}
 	],
 	"edges": [

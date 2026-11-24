@@ -1,5 +1,5 @@
 {
-	"version": 6,
+	"version": 9,
 	"description": "Finds new errors in your logs without a model. An agent looks for the cause, and you decide if an agent fixes it.",
 	"inputs": [
 		{
@@ -40,9 +40,10 @@
 				"x": 0,
 				"y": 0
 			},
+			"timeoutMinutes": 10,
 			"type": "command",
 			"command": "# No model in this step. It keeps the lines that match, as fingerprints\n# without numbers, ids and times, and drops the fingerprints seen before.\nset -eu\nseen=\"${NS_KNOWLEDGE:-}/watch-logs/seen.txt\"\n[ -f \"$seen\" ] || seen=/dev/null\ntmp=$(mktemp -d)\ntrap 'rm -rf \"$tmp\"' EXIT\nif ! sh -c \"{{logs}}\" > \"$tmp/log\" 2>&1; then\n\techo \"The logs command failed:\"\n\ttail -n 20 \"$tmp/log\"\n\texit 1\nfi\nexport LC_ALL=C\ntr '\\t' ' ' < \"$tmp/log\" | tr -d '\\000-\\010\\013-\\037\\177' \\\n\t| { grep -Ei -e \"{{pattern}}\" || true; } > \"$tmp/hits\"\nsed -E -e 's/[0-9a-fA-F]{8}-[0-9a-fA-F-]{27}/<id>/g' \\\n\t-e 's/0x[0-9a-fA-F]+|[0-9a-fA-F]{16,}/<id>/g' \\\n\t-e 's/[0-9]+/<n>/g' -e 's/ +/ /g' -e 's/^ //' -e 's/ $//' \\\n\t\"$tmp/hits\" > \"$tmp/prints\"\n# One example line per new fingerprint, at most 50.\npaste \"$tmp/prints\" \"$tmp/hits\" \\\n\t| awk -F '\\t' 'FILENAME == ARGV[1] { seen[$0] = 1; next } !($1 in seen) && !($1 in shown) { shown[$1] = 1; print }' \"$seen\" - \\\n\t| head -n 50 > \"$tmp/new\"\nif [ ! -s \"$tmp/new\" ]; then\n\techo \"No new errors.\"\n\texit 0\nfi\n# The lines on stdin as one JSON string.\njson() {\n\tsed -e 's/\\\\/\\\\\\\\/g' -e 's/\"/\\\\\"/g' \\\n\t\t| awk 'BEGIN { printf \"\\\"\" } { printf \"%s%s\", (NR > 1 ? \"\\\\n\" : \"\"), $0 } END { print \"\\\"\" }'\n}\ncount=$(wc -l < \"$tmp/new\" | tr -d ' ')\necho \"$count new kinds of error.\"\nprintf '{\"outcome\":\"new\",\"count\":%s,\"lines\":%s,\"fingerprints\":%s}\\n' \"$count\" \\\n\t\"$(cut -f 2- \"$tmp/new\" | json)\" \"$(cut -f 1 \"$tmp/new\" | json)\" > \"$NS_OUTPUT\"",
-			"timeoutMinutes": 10,
+			"stdout": "text",
 			"exits": [
 				{
 					"name": "new",
@@ -80,24 +81,12 @@
 				"x": 320,
 				"y": 0
 			},
+			"timeoutMinutes": 30,
 			"type": "agent",
 			"prompt": "These lines are new in the logs of this project, one line per kind of error:\n\n```\n{{read.data.lines}}\n```\n\nFind their cause in the code of your working directory. Read the code and its git history. Do not change any file.\n\nReport one outcome:\n- `found`: a real problem. Propose the smallest fix.\n- `noise`: expected or harmless. Say why in `cause`.\n- `fail`: you cannot find the cause. Say what you checked in `cause`.\n\nAlways fill in `summary` (one sentence: what goes wrong), `cause`, `fix` (\"None.\" when nothing needs a fix) and `severity`.",
-			"permissionMode": "auto",
 			"effort": "high",
+			"permissionMode": "auto",
 			"session": "fresh",
-			"timeoutMinutes": 30,
-			"cascade": [
-				{
-					"label": "sonnet",
-					"harness": "claude-code",
-					"model": "sonnet"
-				},
-				{
-					"label": "opus",
-					"harness": "claude-code",
-					"model": "opus"
-				}
-			],
 			"outcomes": [
 				{
 					"name": "found",
@@ -133,7 +122,19 @@
 					}
 				},
 				"required": ["summary", "cause", "fix", "severity"]
-			}
+			},
+			"cascade": [
+				{
+					"label": "sonnet",
+					"harness": "claude-code",
+					"model": "sonnet"
+				},
+				{
+					"label": "opus",
+					"harness": "claude-code",
+					"model": "opus"
+				}
+			]
 		},
 		{
 			"id": "unsolved",
@@ -199,9 +200,10 @@
 				"x": 1280,
 				"y": 0
 			},
+			"timeoutMinutes": 5,
 			"type": "command",
 			"command": "# Adds the fingerprints to the list that later runs skip.\nset -eu\nif [ -z \"${NS_KNOWLEDGE:-}\" ]; then\n\techo \"This step needs the project's knowledge folder.\"\n\texit 1\nfi\nseen=\"$NS_KNOWLEDGE/watch-logs/seen.txt\"\nmkdir -p \"$NS_KNOWLEDGE/watch-logs\"\nif [ ! -f \"$seen\" ]; then\n\techo \"# Log errors that watch-logs does not show again, one per line.\" > \"$seen\"\nfi\nprintf '%s\\n' \"{{read.data.fingerprints}}\" >> \"$seen\"\necho \"Added {{read.data.count}} kinds of error to watch-logs/seen.txt.\"",
-			"timeoutMinutes": 5
+			"stdout": "text"
 		},
 		{
 			"id": "done",

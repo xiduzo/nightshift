@@ -1,5 +1,5 @@
 {
-	"version": 6,
+	"version": 9,
 	"description": "The rpgdotexe night: builds each Feature of one Epic, blockers first, like `night-shift.py <epic>`. Then links the pull requests into a stack and writes the night report.",
 	"inputs": [
 		{
@@ -39,6 +39,7 @@
 			},
 			"type": "call",
 			"flow": "feature",
+			"inputs": {},
 			"each": {
 				"source": {
 					"kind": "command",
@@ -58,7 +59,6 @@
 			},
 			"type": "value",
 			"by": "rule",
-			"expression": "{ \"urls\": [features.results.outputs.[prs, tune_pr][$type($) = \"string\" and $ != \"\"]] }",
 			"output": {
 				"type": "object",
 				"properties": {
@@ -70,7 +70,8 @@
 					}
 				},
 				"required": ["urls"]
-			}
+			},
+			"expression": "{ \"urls\": [features.results.outputs.[prs, tune_pr][$type($) = \"string\" and $ != \"\"]] }"
 		},
 		{
 			"id": "link_stack",
@@ -79,9 +80,10 @@
 				"x": 640,
 				"y": 0
 			},
+			"timeoutMinutes": 10,
 			"type": "command",
 			"command": "# Links the Trace pull requests of the night into one stack on GitHub, bottom to top. Needs the gh stack extension.\nurls=$(printf '%s' \"{{stack.data.urls}}\" | python3 -c 'import json, sys; print(\" \".join(json.load(sys.stdin)))')\nset -- $urls\nif [ \"$#\" -lt 2 ]; then\n\techo \"Fewer than 2 pull requests: nothing to link.\"\n\texit 0\nfi\nif ! gh stack --help >/dev/null 2>&1; then\n\techo \"The gh stack extension is not installed (gh extension install github/gh-stack). Link the stack by hand: gh stack link $*\"\n\texit 0\nfi\ngh stack link \"$@\"",
-			"timeoutMinutes": 10
+			"stdout": "text"
 		},
 		{
 			"id": "summary",
@@ -90,9 +92,10 @@
 				"x": 960,
 				"y": 0
 			},
+			"timeoutMinutes": 10,
 			"type": "command",
 			"command": "# The report of the night, as STATUS.md in the worktree and in the log. The headline comes again at the end, so the end of the log always has it.\nmkdir -p .build/night\nstack=$(printf '%s' \"{{stack.data.urls}}\" | python3 -c '\nimport json, sys\ntry:\n    urls = json.load(sys.stdin)\nexcept ValueError:\n    urls = []\nprint(\"\".join(\"- \" + str(url) + \"\\n\" for url in urls if url) or \"- none\")\n')\nheadline=$(printf 'The night: %s. Features: %s done, %s failed, %s blocked, %s waiting.' \"{{features.outcome}}\" \"{{features.done_count}}\" \"{{features.failed_count}}\" \"{{features.blocked_count}}\" \"{{features.waiting_count}}\")\n{\n\tprintf '# The night: %s\\n\\n' \"{{features.outcome}}\"\n\tprintf 'Features: %s done, %s failed, %s blocked, %s waiting.\\n\\n' \"{{features.done_count}}\" \"{{features.failed_count}}\" \"{{features.blocked_count}}\" \"{{features.waiting_count}}\"\n\tprintf '%s\\n\\n' \"{{features.summary}}\"\n\tprintf 'The stack, bottom to top (linked on GitHub: %s):\\n\\n%s\\n' \"{{link_stack.outcome}}\" \"$stack\"\n\tprintf '\\nYour open pull requests, to read in the morning:\\n\\n'\n\tgh pr list --state open --author @me --json number,title,url --jq '.[] | \"- #\\(.number) \\(.title) \\(.url)\"' || true\n} | tee .build/night/STATUS.md\nprintf '\\n%s\\n' \"$headline\"",
-			"timeoutMinutes": 10
+			"stdout": "text"
 		}
 	],
 	"edges": [

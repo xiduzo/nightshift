@@ -1,5 +1,5 @@
 {
-	"version": 6,
+	"version": 9,
 	"description": "An agent drafts a slide deck, and you keep it or ask for changes. Night Shift commits the deck you keep.",
 	"inputs": [
 		{
@@ -32,11 +32,21 @@
 				"x": 0,
 				"y": 0
 			},
+			"timeoutMinutes": 30,
 			"type": "agent",
 			"prompt": "Draft a slide deck about this:\n\n{{source}}\n\nWhen it names a file or a git range, read it in the project of your working directory. Do not change any file.\n\nWrite Marp Markdown: front matter with `marp: true`, then `---` between slides. Give each slide a title and at most five short lines. Report the whole deck in `deck`.\n\nYour last draft and what the person wants changed, both empty on the first draft:\n\n{{draft.data.deck}}\n\n{{review.note}}",
 			"permissionMode": "auto",
 			"session": "fresh",
-			"timeoutMinutes": 30,
+			"output": {
+				"type": "object",
+				"properties": {
+					"deck": {
+						"type": "string",
+						"pattern": "marp: true"
+					}
+				},
+				"required": ["deck"]
+			},
 			"cascade": [
 				{
 					"label": "sonnet",
@@ -48,17 +58,7 @@
 					"harness": "claude-code",
 					"model": "opus"
 				}
-			],
-			"output": {
-				"type": "object",
-				"properties": {
-					"deck": {
-						"type": "string",
-						"pattern": "marp: true"
-					}
-				},
-				"required": ["deck"]
-			}
+			]
 		},
 		{
 			"id": "review",
@@ -90,9 +90,10 @@
 				"x": 640,
 				"y": 0
 			},
+			"timeoutMinutes": 5,
 			"type": "command",
 			"command": "# Writes the deck you kept to the project and commits it.\nset -e\nmkdir -p \"$(dirname \"{{file}}\")\"\nprintf '%s\\n' \"{{draft.data.deck}}\" > \"{{file}}\"\ngit add -- \"{{file}}\"\nif git diff --cached --quiet; then\n\techo 'Nothing changed.'\n\texit 0\nfi\ngit commit -q -m \"draft-slides: {{file}}\"",
-			"timeoutMinutes": 5
+			"stdout": "text"
 		},
 		{
 			"id": "done",

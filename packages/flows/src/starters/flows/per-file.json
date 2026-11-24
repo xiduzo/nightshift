@@ -1,5 +1,5 @@
 {
-	"version": 6,
+	"version": 9,
 	"description": "An agent applies the same instruction to each file that matches a glob. Night Shift then commits all changes at once.",
 	"inputs": [
 		{
@@ -17,6 +17,7 @@
 			"required": true
 		}
 	],
+	"outputs": [],
 	"start": "each",
 	"nodes": [
 		{
@@ -37,7 +38,8 @@
 					"command": "git ls-files -z --cached --others --exclude-standard -- \":(glob){{glob}}\" \\\n  | tr '\\000' '\\n' | LC_ALL=C sort -u \\\n  | awk 'BEGIN { printf \"[\" } { gsub(/\\\\/, \"\\\\\\\\\"); gsub(/\"/, \"\\\\\\\"\"); printf \"%s{\\\"id\\\":\\\"%s\\\",\\\"title\\\":\\\"%s\\\",\\\"path\\\":\\\"%s\\\"}\", (NR > 1 ? \",\" : \"\"), $0, $0, $0 } END { print \"]\" }'"
 				},
 				"as": "item",
-				"branch": "shared"
+				"branch": "shared",
+				"haltOn": ["halt"]
 			}
 		},
 		{
@@ -47,9 +49,10 @@
 				"x": 320,
 				"y": 0
 			},
+			"timeoutMinutes": 5,
 			"type": "command",
 			"command": "set -e\ngit add -A\nif git diff --cached --quiet; then\n\techo 'Nothing changed.'\n\texit 0\nfi\ngit commit -m \"per-file: {{glob}}\" -m \"{{instruction}}\" -m \"{{each.summary}}\"",
-			"timeoutMinutes": 5
+			"stdout": "text"
 		}
 	],
 	"edges": [

@@ -1,5 +1,5 @@
 {
-	"version": 8,
+	"version": 9,
 	"description": "An agent updates the components of the project to match one Figma frame, and your check proves the change. You keep the change or drop it.",
 	"inputs": [
 		{
@@ -35,7 +35,6 @@
 			},
 			"type": "value",
 			"by": "rule",
-			"expression": "(\n  $link := $match(frame, /node-id=([0-9]+)(?:-|:|%3A)([0-9]+)/i)[0];\n  $bare := $match($trim(frame), /^([0-9]+)[-:]([0-9]+)$/)[0];\n  $found := $exists($link) ? $link : $bare;\n  { \"id\": $exists($found) ? $found.groups[0] & \":\" & $found.groups[1] : \"\" }\n)",
 			"output": {
 				"type": "object",
 				"properties": {
@@ -45,7 +44,8 @@
 					}
 				},
 				"required": ["id"]
-			}
+			},
+			"expression": "(\n  $link := $match(frame, /node-id=([0-9]+)(?:-|:|%3A)([0-9]+)/i)[0];\n  $bare := $match($trim(frame), /^([0-9]+)[-:]([0-9]+)$/)[0];\n  $found := $exists($link) ? $link : $bare;\n  { \"id\": $exists($found) ? $found.groups[0] & \":\" & $found.groups[1] : \"\" }\n)"
 		},
 		{
 			"id": "bad_frame",
@@ -65,13 +65,13 @@
 				"x": 320,
 				"y": 0
 			},
+			"timeoutMinutes": 5,
 			"type": "tool",
 			"connection": "figma",
 			"tool": "get_design_context",
 			"arguments": {
 				"nodeId": "{{node_id.data.id}}"
-			},
-			"timeoutMinutes": 5
+			}
 		},
 		{
 			"id": "update",
@@ -80,19 +80,19 @@
 				"x": 640,
 				"y": 0
 			},
+			"timeoutMinutes": 60,
 			"type": "agent",
 			"prompt": "Make the components of this project match a Figma frame. Figma gave this design context for the frame {{node_id.data.id}}:\n\n{{design.text}}\n\nThe code in it is a reference, not code to paste. Find the components of the project that the frame shows, and update their layout, spacing, colors, type and text. Use the project's own components, design tokens and styles. Add a component only when the project has none for a part of the frame. Do not change what the frame does not show.\n\nWhen you are done, `{{check}}` must pass. Run it yourself before you report. When you cannot make it pass, report `fail`. Do not commit: a person looks at the change first. In your summary, name each component you changed and what changed. Nobody is awake: do not ask a question, decide.",
-			"permissionMode": "auto",
 			"effort": "high",
+			"permissionMode": "auto",
 			"session": "fresh",
-			"timeoutMinutes": 60,
 			"idleMinutes": 20,
 			"cascade": [
 				{
 					"label": "sonnet",
+					"tries": 2,
 					"harness": "claude-code",
-					"model": "sonnet",
-					"tries": 2
+					"model": "sonnet"
 				},
 				{
 					"label": "opus",
@@ -108,9 +108,10 @@
 				"x": 960,
 				"y": 0
 			},
+			"timeoutMinutes": 30,
 			"type": "command",
 			"command": "sh -c \"{{check}}\"",
-			"timeoutMinutes": 30
+			"stdout": "text"
 		},
 		{
 			"id": "confirm",
@@ -140,9 +141,10 @@
 				"x": 1600,
 				"y": 0
 			},
+			"timeoutMinutes": 5,
 			"type": "command",
 			"command": "set -e\ngit add -A\nif git diff --cached --quiet; then\n\techo 'Nothing changed.'\n\texit 0\nfi\ngit commit -m \"figma-to-code: frame {{node_id.data.id}}\" -m \"{{frame}}\" -m \"{{update.summary}}\"",
-			"timeoutMinutes": 5
+			"stdout": "text"
 		},
 		{
 			"id": "dropped",
