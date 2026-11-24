@@ -27,7 +27,6 @@ import { knowledgeTools } from "../../../knowledge";
 import type { BridgedTool } from "../../../port";
 import { asBridgedTools } from "../../../tools";
 import type { TerminalPort } from "../../application/terminal-resources";
-import { flowJson } from "../../catalog";
 import {
 	AUTHORING_TOOLS,
 	errorsOf,
@@ -35,6 +34,7 @@ import {
 	flowRows,
 	issueLines,
 } from "../../domain/authoring";
+import { flowJson } from "../../suggestion";
 import {
 	chooseProject,
 	projectOfFolder,

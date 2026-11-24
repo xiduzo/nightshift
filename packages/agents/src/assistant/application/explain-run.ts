@@ -1,33 +1,10 @@
-import type { AgentProfileSettings, ExplanationEvent } from "@nightshift/flows";
-import type { AgentHarness, ValueResult } from "../../port";
+import type { ExplanationEvent } from "@nightshift/flows";
 import { explanationPrompt } from "../catalog";
 import { type AuthoringRun, runReport } from "../domain/authoring";
-import type { SessionLimits } from "../domain/session";
-import type { AssistantSessions } from "./ports";
+import type { AssistantVia, Sessions } from "../sessions";
 
+/** The most characters of an answer: a few sentences. */
 const ANSWER_LIMIT = 1_200;
-
-/** An agent of this computer answers: a read-only session in a folder. */
-export type AgentVia = {
-	kind: "agent";
-	harness: AgentHarness;
-	profile: Pick<AgentProfileSettings, "model" | "effort">;
-	cwd: string;
-	limits?: SessionLimits;
-};
-
-/** A model answers: one call that returns the report. */
-export type ModelVia = {
-	kind: "model";
-	ask: (input: {
-		prompt: string;
-		output: Record<string, unknown>;
-		signal: AbortSignal;
-	}) => Promise<ValueResult>;
-};
-
-/** What answers for a built-in agent that gives one report. */
-export type AssistantVia = AgentVia | ModelVia;
 
 export type ExplainRunInput = {
 	run: AuthoringRun;
@@ -35,11 +12,9 @@ export type ExplainRunInput = {
 	signal: AbortSignal;
 };
 
-export const explainRun = (ports: {
-	sessions: Pick<AssistantSessions, "runReport">;
-}) =>
+export const explainRun = (ports: Pick<Sessions, "runReport">) =>
 	async function* (input: ExplainRunInput): AsyncGenerator<ExplanationEvent> {
-		for await (const event of ports.sessions.runReport(input.via, {
+		for await (const event of ports.runReport(input.via, {
 			prompt: explanationPrompt(
 				runReport(input.run, input.run.flow, "The flow"),
 			),
@@ -55,6 +30,7 @@ export const explainRun = (ports: {
 					yield { type: "error", message: event.message };
 					return;
 				case "end": {
+					// A harness that ends without a report answered in its text.
 					const answer = plain(event.report?.summary || event.text);
 					if (answer === "") {
 						yield {

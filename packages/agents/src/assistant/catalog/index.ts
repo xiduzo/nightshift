@@ -7,6 +7,11 @@ export {
 	toolAnnotations,
 	toolsOf,
 } from "./domain/builtin-tools";
+export {
+	type ChatExchange,
+	chatFollowUpPrompt,
+	chatPrompt,
+} from "./domain/chat-prompt";
 export { chatCanUseTools, resumesOnAnotherModel } from "./domain/chat-rules";
 export type { AgentCheck } from "./domain/check-agent";
 export { CHECK_LIMITS, CHECK_PROMPT } from "./domain/check-limits";
@@ -17,10 +22,3 @@ export {
 	type RunLearnings,
 	reportedLearnings,
 } from "./domain/learn-prompt";
-export type { ToolServerResource } from "./domain/mcp";
-export type { ChatExchange } from "./domain/prompts";
-export {
-	chatFollowUpPrompt,
-	chatPrompt,
-	flowJson,
-} from "./domain/prompts";

@@ -8,7 +8,7 @@ import {
 	withinTier,
 } from "../../catalog/domain/builtin-tools";
 import { AUTHORING_TOOLS } from "../../domain/authoring";
-import { RUN_TOOLS } from "../../terminal";
+import { RUN_TOOLS } from "../../domain/terminal-runs";
 import { HISTORY_TOOLS } from "./tanstack-history-tools";
 import { TERMINAL_TOOLS } from "./tanstack-terminal-tools";
 

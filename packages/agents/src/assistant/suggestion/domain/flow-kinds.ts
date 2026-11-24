@@ -8,8 +8,8 @@ import {
 	flowReads,
 	hasCascade,
 } from "@nightshift/flows";
+import { draftSummary, nodesReading } from "./flow-text";
 import { json, type KindPrompt, quoted } from "./kind";
-import { draftSummary, nodesReading } from "./prompts";
 
 /** A node in one line: its id, type and label, and the start of its prompt or command. */
 function nodeLine(node: FlowNode): string {

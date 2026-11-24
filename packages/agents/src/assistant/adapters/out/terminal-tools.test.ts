@@ -14,7 +14,7 @@ import type { TerminalPort } from "../../application/terminal-resources";
 import type {
 	TerminalGate,
 	TerminalRunSummary,
-} from "../../terminal/domain/terminal-runs";
+} from "../../domain/terminal-runs";
 import { terminalTools } from "./tanstack-terminal-tools";
 
 const flow: Flow = flowSchema.parse({
@@ -114,6 +114,21 @@ async function connect(
 }
 
 describe("nightshift mcp tools", () => {
+	test("each tool has the hints of its tier: a write is marked before a client calls it", async () => {
+		const { client } = await connect(fakePort());
+		const hints = Object.fromEntries(
+			(await client.listTools()).tools.map((t) => [t.name, t.annotations]),
+		);
+		expect(hints.list_runs).toEqual({
+			readOnlyHint: true,
+			destructiveHint: false,
+		});
+		expect(hints.stop_run).toEqual({
+			readOnlyHint: false,
+			destructiveHint: true,
+		});
+	});
+
 	test("lists the terminal tool set: no draft, no proposal", async () => {
 		const { client } = await connect(fakePort());
 		const names = (await client.listTools()).tools.map((t) => t.name).sort();

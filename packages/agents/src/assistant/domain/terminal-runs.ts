@@ -5,8 +5,9 @@
  * tools read and write through the same procedures as the web app, over a
  * `TerminalRunPort`.
  */
-import type { Flow, ProjectFlowMap } from "@nightshift/flows";
+import type { ProjectFlowMap } from "@nightshift/flows";
 import { iso, parseInstant } from "@nightshift/time";
+import type { AuthoringRun } from "./authoring";
 
 /** The names of the run tools only the terminal has. */
 export const RUN_TOOLS = {
@@ -40,30 +41,6 @@ export type TerminalCost = {
 	calls: number;
 	/** How sure the cost is, when the run's metrics say. */
 	basis: "billed" | "estimated" | "unknown" | null;
-};
-
-/** Run shape the terminal port returns for get_run (mirrors authoring). */
-export type TerminalAuthoringRun = {
-	id: string;
-	status: string;
-	reason: string | null;
-	test?: { pinned: string[]; skipped: string[] };
-	inputs: Record<string, unknown>;
-	flow: Flow;
-	steps: {
-		id: string;
-		flow: string | null;
-		nodeId: string;
-		nodeType: string;
-		visit: number;
-		outcome: string | null;
-		error: string | null;
-		note: string | null;
-		test?: "pinned" | "skipped";
-	}[];
-	failedStepId: string | null;
-	transcript: string[];
-	transcriptHolds?: "so-far" | "cut";
 };
 
 /** A run in the list of `list_runs`. */
@@ -144,7 +121,7 @@ export type TerminalRunPort = {
 		projectId: string,
 		runId: string,
 	): Promise<{
-		run: TerminalAuthoringRun;
+		run: AuthoringRun;
 		flowName: string | null;
 		cost: TerminalCost;
 		prUrl: string | null;

@@ -12,7 +12,6 @@
 import { flowSchema, proposalIssues } from "@nightshift/flows";
 import { toolDefinition } from "@tanstack/ai";
 import type { BridgedTool } from "../../../port";
-import { flowJson } from "../../catalog";
 import {
 	AUTHORING_TOOLS,
 	type AuthoringPort,
@@ -23,6 +22,7 @@ import {
 	PROPOSAL_REFUSALS,
 	runReport,
 } from "../../domain/authoring";
+import { flowJson } from "../../suggestion";
 
 const noInput: Record<string, unknown> = {
 	type: "object",

@@ -1,4 +1,5 @@
-export type ToolServerResource = {
+/** A file of a project's knowledge, as an MCP resource. */
+export type KnowledgeResource = {
 	uri: string;
 	name: string;
 	title?: string;
@@ -38,7 +39,7 @@ export function knowledgeResourceRow(
 	projectId: string,
 	projectName: string,
 	file: { path: string; size: number },
-): ToolServerResource {
+): KnowledgeResource {
 	return {
 		uri: knowledgeUri(projectId, file.path),
 		name: file.path,

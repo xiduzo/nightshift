@@ -5,7 +5,6 @@ import { now as timeNow } from "@nightshift/time";
 import { toolDefinition } from "@tanstack/ai";
 import type { BridgedTool } from "../../../port";
 import { AUTHORING_TOOLS, field, runReport } from "../../domain/authoring";
-import type { TerminalProject } from "../../terminal";
 import {
 	costText,
 	gateIdOf,
@@ -19,7 +18,8 @@ import {
 	sinceProperty,
 	statusesOf,
 	type TerminalRunPort,
-} from "../../terminal";
+} from "../../domain/terminal-runs";
+import type { TerminalProject } from "../../terminal";
 
 const RUNS_DEFAULT = 10;
 const RUNS_MAX = 50;

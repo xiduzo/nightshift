@@ -9,14 +9,14 @@
  */
 import type {
 	CallToolResult,
+	Resource,
 	Server,
+	ToolAnnotations,
 	Transport,
 } from "@modelcontextprotocol/server";
 import type { BridgedTool } from "../../../port";
-import type { McpToolServer } from "../../application/ports";
-import { toolAnnotations } from "../../catalog";
 
-export type ToolServerInfo = {
+type ToolServerInfo = {
 	name: string;
 	version: string;
 	/** What the agent reads first: how to use the tools. */
@@ -25,20 +25,9 @@ export type ToolServerInfo = {
 	resources?: ToolServerResources;
 };
 
-/** One resource the server lists. */
-export type ToolServerResource = {
-	uri: string;
-	name: string;
-	title?: string;
-	description?: string;
-	mimeType?: string;
-	/** Bytes. */
-	size?: number;
-};
-
 /** The resources of a tool server: a list, and the text of one by its URI. */
-export type ToolServerResources = {
-	list(): Promise<ToolServerResource[]>;
+type ToolServerResources = {
+	list(): Promise<Resource[]>;
 	/** The resource's text. Null: no such resource. */
 	read(uri: string): Promise<{ text: string; mimeType: string } | null>;
 };
@@ -46,12 +35,16 @@ export type ToolServerResources = {
 /** The error code of a resource that is not there, as the MCP spec names it. */
 const RESOURCE_NOT_FOUND = -32002;
 
+/** The hints of a tool, by its name: whether it only reads, whether it can destroy. */
+type AnnotationsOf = (name: string) => ToolAnnotations | undefined;
+
 const EMPTY_INPUT = { type: "object", properties: {} } as const;
 
 /** An MCP server that lists `tools` and runs their calls. */
 async function toolServer(
 	tools: readonly BridgedTool[],
 	info: ToolServerInfo,
+	annotationsOf: AnnotationsOf,
 ): Promise<Server> {
 	const { ProtocolError, Server } = await import(
 		"@modelcontextprotocol/server"
@@ -91,7 +84,7 @@ async function toolServer(
 			name: tool.name,
 			description: tool.description,
 			// Hints from the tool's tier, so a client can ask before a write.
-			annotations: toolAnnotations(tool.name),
+			annotations: annotationsOf(tool.name),
 			inputSchema: (tool.inputSchema ?? EMPTY_INPUT) as {
 				type: "object";
 				[key: string]: unknown;
@@ -134,16 +127,17 @@ function errorResult(text: string): CallToolResult {
  * Serves `tools` on `transport` (default: this process's stdin and
  * stdout) until the other end closes it.
  */
-/** The real adapter of `McpToolServer`. */
-export function mcpToolServer(): McpToolServer<Transport, Server> {
-	return {
-		async serve(tools, info, transport) {
-			const server = await toolServer(tools, info);
-			const { StdioServerTransport } = await import(
-				"@modelcontextprotocol/server/stdio"
-			);
-			await server.connect(transport ?? new StdioServerTransport());
-			return server;
-		},
+export const serveTools =
+	(annotationsOf: AnnotationsOf) =>
+	async (
+		tools: readonly BridgedTool[],
+		info: ToolServerInfo,
+		transport?: Transport,
+	): Promise<Server> => {
+		const server = await toolServer(tools, info, annotationsOf);
+		const { StdioServerTransport } = await import(
+			"@modelcontextprotocol/server/stdio"
+		);
+		await server.connect(transport ?? new StdioServerTransport());
+		return server;
 	};
-}

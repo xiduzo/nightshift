@@ -1,14 +1,12 @@
 import type {
-	AgentProfileSettings,
 	AssistantUsage,
 	FlowPlace,
 	SuggestionEvent,
 	SuggestionRequest,
 } from "@nightshift/flows";
-import type { AgentHarness, ValueResult } from "../../../port";
+import type { AssistantReport, AssistantVia, Sessions } from "../../sessions";
+import { retryPrompt } from "../domain/flow-text";
 import type { ProjectFacts } from "../domain/project-facts";
-import { retryPrompt } from "../domain/prompts";
-import type { AssistantReport } from "../domain/session";
 import { suggestionPrompt } from "../domain/suggestion-prompt";
 import {
 	cannotSuggest,
@@ -16,7 +14,6 @@ import {
 	SUGGESTION_ATTEMPTS,
 	suggestionDataSchema,
 } from "../domain/suggestion-rules";
-import type { SuggestSessions } from "./ports";
 
 const sum = (a: AssistantUsage, b: AssistantUsage) => {
 	const costUsd =
@@ -30,29 +27,6 @@ const sum = (a: AssistantUsage, b: AssistantUsage) => {
 	};
 };
 
-/** What answers a suggestion, as the assistant's sessions take it. */
-type SessionLimits = { turns?: number; usd?: number };
-
-type AgentVia = {
-	kind: "agent";
-	harness: AgentHarness;
-	profile: Pick<AgentProfileSettings, "model" | "effort">;
-	cwd: string;
-	limits?: SessionLimits;
-};
-
-type ModelVia = {
-	kind: "model";
-	ask: (input: {
-		prompt: string;
-		/** A JSON Schema the answer is held to. */
-		output: Record<string, unknown>;
-		signal: AbortSignal;
-	}) => Promise<ValueResult>;
-};
-
-export type AssistantVia = AgentVia | ModelVia;
-
 export type SuggestFieldInput = {
 	request: SuggestionRequest;
 	via: AssistantVia;
@@ -62,10 +36,9 @@ export type SuggestFieldInput = {
 
 export type ProjectFactsReader = (folder: string) => Promise<ProjectFacts>;
 
-export const suggestField = (ports: {
-	sessions: SuggestSessions;
-	readProjectFacts: ProjectFactsReader;
-}) =>
+export const suggestField = (
+	ports: Pick<Sessions, "runReport"> & { readProjectFacts: ProjectFactsReader },
+) =>
 	async function* (input: SuggestFieldInput): AsyncGenerator<SuggestionEvent> {
 		const { request, via, place, signal } = input;
 		const refusal = cannotSuggest(request);
@@ -94,7 +67,7 @@ export const suggestField = (ports: {
 			let last: AssistantUsage | null = null;
 			let report: AssistantReport | null = null;
 			let ended = false;
-			for await (const event of ports.sessions.runReport(via, {
+			for await (const event of ports.runReport(via, {
 				prompt,
 				...(resume ? { resumeSessionId: resume } : {}),
 				report: { output },

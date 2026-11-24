@@ -3,8 +3,8 @@
  * an Agent's own outcomes. Its context is the edges that leave the node.
  */
 import { type Flow, type FlowNode, nodeOutcomes } from "@nightshift/flows";
+import { nodesReading } from "./flow-text";
 import { json, type KindPrompt, quoted } from "./kind";
-import { nodesReading } from "./prompts";
 
 /** The edges that leave `node`: each outcome and where it goes. */
 function outgoing(flow: Flow, node: FlowNode): string[] {

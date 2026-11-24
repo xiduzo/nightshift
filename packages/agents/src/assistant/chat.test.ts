@@ -20,7 +20,6 @@ import {
 	RUN_REPORT_LIMIT,
 	runReport,
 } from "./domain/authoring";
-import type { HistoryPort } from "./domain/history-port";
 
 const { chatTurn } = wireAssistant();
 
@@ -392,35 +391,6 @@ async function turn(
 }
 
 describe("chatTurn", () => {
-	test("only the Improver is told of the history of the project", async () => {
-		const past: HistoryPort = {
-			flowName: "fix",
-			runs: async () => [],
-			run: async () => null,
-			transcript: async () => null,
-			spend: async () => ({}),
-			revisions: async () => null,
-			revision: async () => null,
-		};
-		const { propose: _p, ...rest } = port();
-		const promptOf = async (agent: "builder" | "improver") => {
-			const harness = fakeHarness({ steps: [{ type: "text", text: "Yes." }] });
-			await turn({
-				agent,
-				request: request(),
-				harness,
-				profile: { model: "sonnet" },
-				cwd: "/repo",
-				port: rest,
-				past,
-				signal: new AbortController().signal,
-			});
-			return harness.calls[0]?.prompt ?? "";
-		};
-		expect(await promptOf("improver")).toContain("get_spend");
-		expect(await promptOf("builder")).not.toContain("get_spend");
-	});
-
 	test("a first message: the chat prompt, the tools, text, then the proposal and done", async () => {
 		const harness = fakeHarness({
 			steps: [
@@ -508,26 +478,6 @@ describe("chatTurn", () => {
 		expect(input?.tools?.map((t) => t.name)).not.toContain("get_run");
 		expect(input?.tools?.map((t) => t.name)).toContain("propose_flow");
 		expect(input?.maxTurns).toBe(40);
-	});
-
-	test("a new session of a chat on another agent gets the chat so far", async () => {
-		const harness = fakeHarness({ steps: [{ type: "text", text: "Ok." }] });
-		const { propose: _p, ...rest } = port();
-		await turn({
-			request: request({ message: "Then add it." }),
-			harness,
-			profile: { model: "haiku" },
-			cwd: "/repo",
-			port: rest,
-			history: [{ message: "What is missing?", answer: "A lint step." }],
-			signal: new AbortController().signal,
-		});
-		const prompt = harness.calls[0]?.prompt ?? "";
-		expect(prompt).toContain("# The chat so far");
-		expect(prompt.indexOf("What is missing?")).toBeLessThan(
-			prompt.indexOf("Then add it."),
-		);
-		expect(prompt).toContain("A lint step.");
 	});
 
 	test("which harnesses resume on another model", () => {

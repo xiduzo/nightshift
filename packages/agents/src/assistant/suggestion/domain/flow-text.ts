@@ -1,4 +1,8 @@
-/** Prompt helpers for field suggestions (kept local for the suggestion slice). */
+/**
+ * A flow as text for a prompt: as JSON and in a few lines, what a template
+ * in a node can read, who reads a node's data, and the retry after an
+ * invalid suggestion.
+ */
 import {
 	type Flow,
 	type FlowNode,
@@ -8,14 +12,12 @@ import {
 	templateScope,
 } from "@nightshift/flows";
 
-function fieldLine(field: TemplateField): string {
-	const notes = [
-		field.json ? "JSON: a path below it works" : "",
-		field.description ?? "",
-	].filter(Boolean);
-	return `- \`{{${field.ref}}}\`${notes.length > 0 ? `: ${notes.join(". ")}` : ""}`;
-}
-
+/**
+ * The flow as JSON for the agent. `canvas: false` leaves out what only the
+ * canvas needs (positions, Sections): for a prompt about one field. A tool
+ * that hands the agent a flow to change keeps them, else the agent's
+ * proposal drops the person's Sections and layout.
+ */
 export function flowJson(
 	flow: Flow | FlowNode,
 	{ canvas = true }: { canvas?: boolean } = {},
@@ -27,6 +29,14 @@ export function flowJson(
 			key === "position" || key === "sections" ? undefined : value,
 		2,
 	);
+}
+
+function fieldLine(field: TemplateField): string {
+	const notes = [
+		field.json ? "JSON: a path below it works" : "",
+		field.description ?? "",
+	].filter(Boolean);
+	return `- \`{{${field.ref}}}\`${notes.length > 0 ? `: ${notes.join(". ")}` : ""}`;
 }
 
 /** Every reference a template in this flow may use, as a Markdown list. */

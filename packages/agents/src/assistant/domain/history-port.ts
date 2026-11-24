@@ -1,23 +1,7 @@
 /** Ports and shapes the history tools of the chat read. Pure types. */
 import type { FlowDiff, FlowDiffSummary } from "@nightshift/flows";
 import type { AuthoringRun } from "./authoring";
-/** What a run cost, as Night Shift knows it (mirrors terminal). */
-export type TerminalCost = {
-	usd: number;
-	estimated: boolean;
-	missing: number;
-	calls: number;
-	basis: "billed" | "estimated" | "unknown" | null;
-};
-
-export type TerminalRunStatus =
-	| "running"
-	| "waiting"
-	| "sleeping"
-	| "finished"
-	| "failed"
-	| "stopped"
-	| "interrupted";
+import type { TerminalCost, TerminalRunStatus } from "./terminal-runs";
 
 /** A run of the project in `list_runs`. */
 export type HistoryRun = {

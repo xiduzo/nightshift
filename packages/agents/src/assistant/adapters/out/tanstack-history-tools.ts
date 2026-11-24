@@ -14,7 +14,6 @@ import { iso, now as timeNow } from "@nightshift/time";
 import { toolDefinition } from "@tanstack/ai";
 import type { BridgedTool } from "../../../port";
 import { estimateCostUsd } from "../../../pricing";
-import { flowJson } from "../../catalog";
 import {
 	type AuthoringRun,
 	cut,
@@ -22,7 +21,13 @@ import {
 	runReport,
 } from "../../domain/authoring";
 import type { HistoryPort, HistoryRunDetail } from "../../domain/history-port";
-import { costText, RUN_STATUSES, sinceOf, statusesOf } from "../../terminal";
+import {
+	costText,
+	RUN_STATUSES,
+	sinceOf,
+	statusesOf,
+} from "../../domain/terminal-runs";
+import { flowJson } from "../../suggestion";
 
 /** The tool names. `get_run` takes the place of the authoring tool of that name. */
 export const HISTORY_TOOLS = {

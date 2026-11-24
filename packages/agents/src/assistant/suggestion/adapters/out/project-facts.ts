@@ -8,8 +8,6 @@ import { join } from "node:path";
 
 import type { ProjectFacts } from "../../domain/project-facts";
 
-export type { ProjectFacts };
-
 const LOCK_FILES: [file: string, manager: string][] = [
 	["bun.lock", "bun"],
 	["bun.lockb", "bun"],

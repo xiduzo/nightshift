@@ -5,18 +5,17 @@ import {
 	type RunLearnings,
 	reportedLearnings,
 } from "../catalog";
-import type { AssistantVia } from "./explain-run";
-import type { AssistantSessions } from "./ports";
+import type { AssistantVia, Sessions } from "../sessions";
 
 export const learnFromRun =
-	(ports: { sessions: Pick<AssistantSessions, "runReport"> }) =>
+	(ports: Pick<Sessions, "runReport">) =>
 	async (input: {
 		evidence: string;
 		via: AssistantVia;
 		signal: AbortSignal;
 	}): Promise<RunLearnings> => {
 		let usage: AssistantUsage | null = null;
-		for await (const event of ports.sessions.runReport(input.via, {
+		for await (const event of ports.runReport(input.via, {
 			prompt: learnFromRunPrompt(input.evidence),
 			report: { output: LEARN_OUTPUT },
 			signal: input.signal,

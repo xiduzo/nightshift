@@ -12,15 +12,15 @@ import type {
 	AuthoringSkill,
 	AuthoringToolInfo,
 } from "../domain/authoring";
+import type { TerminalRunPort } from "../domain/terminal-runs";
 import {
 	chooseProject,
+	type KnowledgeResource,
 	knowledgeResourceRow,
 	mimeOfKnowledgePath,
 	parseKnowledgeUri,
 	type TerminalProject,
-	type TerminalRunPort,
 } from "../terminal";
-import type { ToolServerResources } from "./serve-tools";
 
 const READ_BYTES = 1024 * 1024;
 
@@ -58,10 +58,17 @@ export type KnowledgeResourcePort = Pick<KnowledgePort, "readKnowledge"> & {
 	knowledgeFiles(projectId: string): Promise<{ path: string; size: number }[]>;
 };
 
+/** The resources of a tool server: a list, and the text of one by its URI. */
+type KnowledgeResources = {
+	list(): Promise<KnowledgeResource[]>;
+	/** The resource's text. Null: no such resource. */
+	read(uri: string): Promise<{ text: string; mimeType: string } | null>;
+};
+
 export const terminalResources = (
 	port: KnowledgeResourcePort,
 	options: { project?: string | null; folder?: string | null } = {},
-): ToolServerResources => ({
+): KnowledgeResources => ({
 	async list() {
 		const projects = await port.projects();
 		const choice = chooseProject(
@@ -70,7 +77,7 @@ export const terminalResources = (
 			options.folder ?? null,
 		);
 		const listed = choice.kind === "found" ? [choice.project] : projects;
-		const out = [];
+		const out: KnowledgeResource[] = [];
 		for (const project of listed) {
 			for (const file of await port.knowledgeFiles(project.id)) {
 				out.push(knowledgeResourceRow(project.id, project.name, file));

@@ -18,7 +18,6 @@ import {
 	takesSuggestion,
 } from "@nightshift/flows";
 import { z } from "zod";
-import type { AssistantReport } from "./session";
 
 /** How many times the agent may answer: once, and once more with the problems. */
 export const SUGGESTION_ATTEMPTS = 2;
@@ -171,7 +170,7 @@ function at(path: readonly PropertyKey[]): string {
  */
 export function checkSuggestion(
 	request: SuggestionRequest,
-	report: AssistantReport,
+	report: { summary: string; data?: unknown },
 	place: FlowPlace,
 ): { suggestion: Suggestion } | { problems: string[] } {
 	const data =

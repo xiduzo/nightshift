@@ -5,11 +5,10 @@ import type { AgentProfileSettings } from "@nightshift/flows";
 import type { AgentHarness } from "../../port";
 import type { AgentCheck } from "../catalog";
 import { CHECK_LIMITS, CHECK_PROMPT } from "../catalog";
-import { AT_LIMIT } from "../domain/session";
-import type { AssistantSessions } from "./ports";
+import { AT_LIMIT, type Sessions } from "../sessions";
 
 export const checkAgent =
-	(ports: { sessions: Pick<AssistantSessions, "run"> }) =>
+	(ports: Pick<Sessions, "runSession">) =>
 	async (input: {
 		harness: AgentHarness;
 		profile: Pick<AgentProfileSettings, "model" | "effort">;
@@ -17,7 +16,7 @@ export const checkAgent =
 		signal: AbortSignal;
 	}): Promise<AgentCheck> => {
 		let text = "";
-		for await (const event of ports.sessions.run({
+		for await (const event of ports.runSession({
 			...input,
 			prompt: CHECK_PROMPT,
 			limits: CHECK_LIMITS,
@@ -29,6 +28,7 @@ export const checkAgent =
 					: { answered: false, why: "The agent stopped without an answer." };
 			}
 			if (event.type === "error") {
+				// An answer that came before the limit is still an answer.
 				if (event.message === AT_LIMIT && text.trim() !== "") {
 					return { answered: true };
 				}

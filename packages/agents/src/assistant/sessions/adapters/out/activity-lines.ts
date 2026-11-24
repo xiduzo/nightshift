@@ -1,5 +1,11 @@
+/**
+ * What the assistant does now, in plain words: "Reads package.json". The
+ * person sees these lines while they wait, so they never show a raw tool
+ * name. Each harness names its tools its own way (`Read`, `read`,
+ * `mcp__tanstack__report_step`, `tanstack_report_step`); this reads them all.
+ */
 import { isAbsolute, relative } from "node:path";
-import { bareToolName } from "../../catalog";
+import { bareToolName } from "../../../catalog";
 
 function field(input: unknown, keys: readonly string[]): string | undefined {
 	if (typeof input !== "object" || input === null) return undefined;
@@ -10,6 +16,7 @@ function field(input: unknown, keys: readonly string[]): string | undefined {
 	return undefined;
 }
 
+/** A path as the person knows it: relative to the project's folder. */
 function shown(path: string, cwd: string): string {
 	if (!isAbsolute(path)) return path.replace(/^\.\//, "");
 	const inside = relative(cwd, path);
@@ -44,6 +51,11 @@ const QUIET = new Set([
 	"toolsearch",
 ]);
 
+/**
+ * The line for one tool call, or null for a call the person need not see
+ * (the agent's own to-do list). `describe` names Night Shift's own tools
+ * first; a tool nobody knows becomes "Looks through the project".
+ */
 export function activityOf(
 	name: string,
 	input: unknown,
