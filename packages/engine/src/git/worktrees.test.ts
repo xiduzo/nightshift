@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
-import { mkdir } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { itemBranchName } from "../contract";
 import {
@@ -83,6 +83,40 @@ describe("createWorktree", () => {
 				"HEAD",
 			]),
 		).toBe("nightshift/abcd1234");
+	});
+
+	test("given runs that start at once in one clone, when each has its Person, then each copy commits in that Person's name", async () => {
+		const ids = Array.from({ length: 8 }, (_, i) => `once000${i}`);
+		const copies = await Promise.all(
+			ids.map((shortId) =>
+				createWorktree({
+					repoPath: sandbox.repoPath,
+					shortId,
+					author: { name: shortId, email: `${shortId}@example.com` },
+				}),
+			),
+		);
+		const emails = await Promise.all(
+			copies.map(({ worktreePath }) =>
+				mustGit(worktreePath, ["config", "--get", "user.email"]),
+			),
+		);
+		expect(emails).toEqual(ids.map((id) => `${id}@example.com`));
+	});
+
+	test("given a clone that has per-worktree config, when a run starts while its config is locked, then the run gets its copy", async () => {
+		const author = { name: "Bo", email: "bo@example.com" };
+		const { repoPath } = sandbox;
+		await createWorktree({ repoPath, shortId: "lock0001", author });
+		await writeFile(join(repoPath, ".git", "config.lock"), "");
+		const copy = await createWorktree({
+			repoPath,
+			shortId: "lock0002",
+			author,
+		});
+		expect(
+			await mustGit(copy.worktreePath, ["config", "--get", "user.email"]),
+		).toBe("bo@example.com");
 	});
 
 	test("resolves an explicit base ref to a commit", async () => {

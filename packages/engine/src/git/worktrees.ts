@@ -46,6 +46,9 @@ function changesShown(changes: readonly string[]): string {
 	return changes.length > 5 ? `${shown} and ${changes.length - 5} more` : shown;
 }
 
+/** The clones that get per-worktree config now: runs that start at once turn it on once. */
+const turningOn = new Map<string, Promise<void>>();
+
 /** The git operations on clones and run worktrees. */
 export type Worktrees = ReturnType<typeof createWorktrees>;
 
@@ -283,7 +286,8 @@ export function createWorktrees(git: Git) {
 			worktreePath,
 			baseRef,
 		]);
-		if (input.author) await setWorktreeAuthor(worktreePath, input.author);
+		if (input.author)
+			await setWorktreeAuthor(input.repoPath, worktreePath, input.author);
 		return {
 			worktreePath,
 			branch,
@@ -300,14 +304,18 @@ export function createWorktrees(git: Git) {
 	 * worktree's own file without it.
 	 */
 	async function setWorktreeAuthor(
+		repoPath: string,
 		worktreePath: string,
 		author: { name: string; email: string },
 	): Promise<void> {
-		await gitOrThrow(git, worktreePath, [
-			"config",
-			"extensions.worktreeConfig",
-			"true",
-		]);
+		let pending = turningOn.get(repoPath);
+		if (!pending) {
+			pending = turnOnWorktreeConfig(repoPath).finally(() =>
+				turningOn.delete(repoPath),
+			);
+			turningOn.set(repoPath, pending);
+		}
+		await pending;
 		await gitOrThrow(git, worktreePath, [
 			"config",
 			"--worktree",
@@ -320,6 +328,23 @@ export function createWorktrees(git: Git) {
 			"user.email",
 			author.email,
 		]);
+	}
+
+	/**
+	 * Lets the worktrees of a clone have their own config. Writes the clone's
+	 * config only once: git refuses a write while another one holds its lock.
+	 */
+	async function turnOnWorktreeConfig(repoPath: string): Promise<void> {
+		const key = "extensions.worktreeConfig";
+		const current = await git.run(repoPath, [
+			"config",
+			"--local",
+			"--bool",
+			"--get",
+			key,
+		]);
+		if (current.exitCode === 0 && current.stdout === "true") return;
+		await gitOrThrow(git, repoPath, ["config", key, "true"]);
 	}
 
 	/** The checked-out branch of a worktree, or null when HEAD is detached. */
@@ -485,7 +510,8 @@ export function createWorktrees(git: Git) {
 				worktreePath,
 				commit,
 			]);
-			if (input.author) await setWorktreeAuthor(worktreePath, input.author);
+			if (input.author)
+				await setWorktreeAuthor(input.repoPath, worktreePath, input.author);
 		}
 		return { worktreePath, branch, baseRef: commit };
 	}
