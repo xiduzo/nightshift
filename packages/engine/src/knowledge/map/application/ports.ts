@@ -24,5 +24,5 @@ export type NotTopicsFile = {
  * @filledBy engine/knowledge
  */
 export type AskedQuestions = {
-	asked(projectId: string): Promise<MapQuestion[]>;
+	asked(request: { projectId: string }): Promise<MapQuestion[]>;
 };

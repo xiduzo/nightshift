@@ -14,7 +14,6 @@ export type SetMeaningPorts = {
 
 /** Turns search by meaning on or off for a project. */
 export type SetMeaning = {
-	actor: Actor;
 	spaceId: string;
 	projectId: string;
 	on: boolean;
@@ -28,12 +27,10 @@ export type SetMeaning = {
  */
 export const setMeaning =
 	(ports: SetMeaningPorts) =>
-	async ({
-		actor,
-		spaceId,
-		projectId,
-		on,
-	}: SetMeaning): Promise<KnowledgeMeaningStatus> => {
+	async (
+		actor: Actor,
+		{ spaceId, projectId, on }: SetMeaning,
+	): Promise<KnowledgeMeaningStatus> => {
 		await ports.access.openSpace(actor, { spaceId, need: CHANGES_KNOWLEDGE });
 		await (await ports.documents.open(projectId)).setMeaning(on);
 		return ports.meaning(projectId);

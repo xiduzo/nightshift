@@ -37,7 +37,6 @@ export type LookAtLinksPorts = {
 
 /** The project, and the links a person told, in their order. */
 export type LookAtLinks = {
-	actor: Actor;
 	spaceId: string;
 	projectId: string;
 	urls: readonly string[];
@@ -55,12 +54,10 @@ export type LookAtLinks = {
  */
 export const lookAtLinks =
 	(ports: LookAtLinksPorts) =>
-	async ({
-		actor,
-		spaceId,
-		projectId,
-		urls,
-	}: LookAtLinks): Promise<LinkLook[]> => {
+	async (
+		actor: Actor,
+		{ spaceId, projectId, urls }: LookAtLinks,
+	): Promise<LinkLook[]> => {
 		await ports.access.openSpace(actor, { spaceId, need: SAVES_FLOWS });
 		const reader = await readerOf(
 			(await ports.documents.open(projectId)).reader(),

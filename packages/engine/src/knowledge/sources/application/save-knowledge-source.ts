@@ -22,7 +22,6 @@ export type SaveKnowledgeSourcePorts = {
 
 /** The source to save, in which project, and what the person may do. */
 export type SaveKnowledgeSource = {
-	actor: Actor;
 	spaceId: string;
 	projectId: string;
 	/** The flow's name of a source the page added. Unset: a new source. */
@@ -47,9 +46,10 @@ export type SaveKnowledgeSource = {
 export const saveKnowledgeSource =
 	(ports: SaveKnowledgeSourcePorts) =>
 	async (
+		actor: Actor,
 		input: SaveKnowledgeSource,
 	): Promise<{ name: string; issues: FlowIssue[] }> => {
-		await ports.access.openSpace(input.actor, {
+		await ports.access.openSpace(actor, {
 			spaceId: input.spaceId,
 			need: SAVES_FLOWS,
 		});

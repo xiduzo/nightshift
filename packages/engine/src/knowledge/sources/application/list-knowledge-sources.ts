@@ -70,7 +70,7 @@ export const listKnowledgeSources =
 		] = await Promise.all([
 			ports.files.listing(projectId),
 			ports.fillingFlows({ projectId }),
-			ports.readers.ready(projectId),
+			ports.readers.ready({ projectId }),
 		]);
 		return {
 			files,

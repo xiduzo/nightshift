@@ -423,7 +423,7 @@ describe("the quick look", () => {
 			dataDir,
 			setting: async () => setting,
 			rules: () => open,
-		}).look(NIGHT_SHIFT, "space-1", "p1", urls);
+		}).look(NIGHT_SHIFT, { spaceId: "space-1", projectId: "p1", urls });
 
 	test("a feed, a file, a video page, a sign-in and a gone page, by their answers", async () => {
 		site["/news.rss"] = {

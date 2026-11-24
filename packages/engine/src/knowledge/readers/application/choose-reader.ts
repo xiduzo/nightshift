@@ -13,7 +13,6 @@ export type ChooseReaderPorts = {
 
 /** The project, and the reader a person chose for it. */
 export type ChooseReader = {
-	actor: Actor;
 	spaceId: string;
 	projectId: string;
 	setting: PageReaderSetting;
@@ -27,12 +26,10 @@ export type ChooseReader = {
  */
 export const chooseReader =
 	(ports: ChooseReaderPorts) =>
-	async ({
-		actor,
-		spaceId,
-		projectId,
-		setting,
-	}: ChooseReader): Promise<PageReaderSetting> => {
+	async (
+		actor: Actor,
+		{ spaceId, projectId, setting }: ChooseReader,
+	): Promise<PageReaderSetting> => {
 		await ports.access.openSpace(actor, { spaceId, need: CHANGES_KNOWLEDGE });
 		const document = await ports.documents.open(projectId);
 		await document.setReader(setting);

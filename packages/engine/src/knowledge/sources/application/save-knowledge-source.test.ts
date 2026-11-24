@@ -25,8 +25,7 @@ const refusalOf = (work: Promise<unknown>) =>
 describe("saveKnowledgeSource", () => {
 	test("adds the flow with a free name, then its schedule", async () => {
 		const ports = inMemorySourcesPorts();
-		const saved = await saveKnowledgeSource(ports)({
-			actor: NIGHT_SHIFT,
+		const saved = await saveKnowledgeSource(ports)(NIGHT_SHIFT, {
 			spaceId: "space-1",
 			projectId: "p1",
 			source: web,
@@ -53,8 +52,7 @@ describe("saveKnowledgeSource", () => {
 
 	test("without keepUpToDate the schedules are not read", async () => {
 		const ports = inMemorySourcesPorts();
-		await saveKnowledgeSource(ports)({
-			actor: NIGHT_SHIFT,
+		await saveKnowledgeSource(ports)(NIGHT_SHIFT, {
 			spaceId: "space-1",
 			projectId: "p1",
 			source: web,
@@ -70,8 +68,7 @@ describe("saveKnowledgeSource", () => {
 		const ports = inMemorySourcesPorts();
 		const save = saveKnowledgeSource(ports);
 		const forbidden = await refusalOf(
-			save({
-				actor: NIGHT_SHIFT,
+			save(NIGHT_SHIFT, {
 				spaceId: "space-1",
 				projectId: "p1",
 				source: web,
@@ -82,8 +79,7 @@ describe("saveKnowledgeSource", () => {
 		expect(forbidden).toBeInstanceOf(Refusal);
 		expect((forbidden as Refusal).message).toBe(OWNER_ONLY);
 		const invalid = await refusalOf(
-			save({
-				actor: NIGHT_SHIFT,
+			save(NIGHT_SHIFT, {
 				spaceId: "space-1",
 				projectId: "p1",
 				source: web,
@@ -104,8 +100,7 @@ describe("saveKnowledgeSource", () => {
 			await ports.access.whoMay(
 				"space-1",
 				(actor) =>
-					saveKnowledgeSource(ports)({
-						actor,
+					saveKnowledgeSource(ports)(actor, {
 						spaceId: "space-1",
 						projectId: "p1",
 						source: web,

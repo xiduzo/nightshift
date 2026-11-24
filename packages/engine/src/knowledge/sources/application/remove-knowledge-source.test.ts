@@ -61,8 +61,7 @@ const refusalOf = (work: Promise<unknown>) =>
 describe("removeKnowledgeSource", () => {
 	test("removes the files first, then the schedules, then the flow", async () => {
 		const ports = await setup();
-		const removed = await removeKnowledgeSource(ports)({
-			actor: NIGHT_SHIFT,
+		const removed = await removeKnowledgeSource(ports)(NIGHT_SHIFT, {
 			spaceId: "space-1",
 			projectId: "p1",
 			name: "web",
@@ -86,8 +85,7 @@ describe("removeKnowledgeSource", () => {
 			"drawn",
 			callFlow("kit:knowledge/web", { urls: "https://e.f", folder: "pages" }),
 		);
-		const removed = await removeKnowledgeSource(ports)({
-			actor: NIGHT_SHIFT,
+		const removed = await removeKnowledgeSource(ports)(NIGHT_SHIFT, {
 			spaceId: "space-1",
 			projectId: "p1",
 			name: "web",
@@ -101,8 +99,7 @@ describe("removeKnowledgeSource", () => {
 	test("checks first: a source with a schedule refuses someone else, and nothing changes", async () => {
 		const ports = await setup();
 		const refusal = await refusalOf(
-			removeKnowledgeSource(ports)({
-				actor: NIGHT_SHIFT,
+			removeKnowledgeSource(ports)(NIGHT_SHIFT, {
 				spaceId: "space-1",
 				projectId: "p1",
 				name: "web",
@@ -121,8 +118,7 @@ describe("removeKnowledgeSource", () => {
 		await ports.reconciler.startStep("p1");
 		expect(
 			await refusalOf(
-				removeKnowledgeSource(ports)({
-					actor: NIGHT_SHIFT,
+				removeKnowledgeSource(ports)(NIGHT_SHIFT, {
 					spaceId: "space-1",
 					projectId: "p1",
 					name: "web",
@@ -138,8 +134,7 @@ describe("removeKnowledgeSource", () => {
 	test("a flow that is no source refuses", async () => {
 		const ports = await setup();
 		const refusal = await refusalOf(
-			removeKnowledgeSource(ports)({
-				actor: NIGHT_SHIFT,
+			removeKnowledgeSource(ports)(NIGHT_SHIFT, {
 				spaceId: "space-1",
 				projectId: "p1",
 				name: "nothing",
@@ -161,8 +156,7 @@ describe("removeKnowledgeSource", () => {
 				await ports.access.whoMay(
 					"space-1",
 					(actor) =>
-						removeKnowledgeSource(ports)({
-							actor,
+						removeKnowledgeSource(ports)(actor, {
 							spaceId: "space-1",
 							projectId: "p1",
 							name: "web",

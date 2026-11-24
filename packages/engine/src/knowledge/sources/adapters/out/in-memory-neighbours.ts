@@ -106,14 +106,13 @@ export function inMemorySourcesSpace(): InMemorySourcesSpace {
  */
 export function inMemorySourcesPorts(sync = inMemorySync()) {
 	let clock = 1_000_000;
-	const ready = checkReaderReady({ documents: sync.documents });
 	return {
 		access: inMemoryAccess(),
 		space: inMemorySourcesSpace(),
 		sync,
 		files: inMemoryFiles(sync).reader,
 		reconciler: sync.reconciler,
-		readers: { ready: (projectId: string) => ready({ projectId }) },
+		readers: { ready: checkReaderReady({ documents: sync.documents }) },
 		wait: inMemoryWait(),
 		device: { id: "device-here", name: "This Mac" },
 		now: () => clock,

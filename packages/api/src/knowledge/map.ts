@@ -18,7 +18,9 @@ export const knowledgeMap = {
 				"Gives the Map of a project's knowledge: its files, their topics, the files close in meaning, the questions that found them and the learnings that wait.",
 		})
 		.output(output(knowledgeMapSchema))
-		.handler(({ context, input }) => context.knowledge.map(input.projectId)),
+		.handler(({ context, input }) =>
+			context.knowledge.map({ projectId: input.projectId }),
+		),
 	/**
 	 * Marks a word as not a topic on the Map, or puts it back. The list syncs
 	 * with the knowledge, so every computer of the Space draws the same Map.
@@ -37,15 +39,12 @@ export const knowledgeMap = {
 		})
 		.output(output(knowledgeMapSchema.shape.notTopics))
 		.handler(({ context, input }) =>
-			context.knowledge.markNotTopic(
-				context.actor,
-				context.spaceId,
-				input.projectId,
-				{
-					word: input.word,
-					notTopic: input.notTopic,
-					by: context.session.user.id,
-				},
-			),
+			context.knowledge.markNotTopic(context.actor, {
+				spaceId: context.spaceId,
+				projectId: input.projectId,
+				word: input.word,
+				notTopic: input.notTopic,
+				by: context.session.user.id,
+			}),
 		),
 };

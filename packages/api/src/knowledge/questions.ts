@@ -26,7 +26,8 @@ export const knowledgeQuestions = {
 		})
 		.output(output(knowledgeQuestionsSchema))
 		.handler(({ context, input }) =>
-			context.knowledge.questions(input.projectId, {
+			context.knowledge.questions({
+				projectId: input.projectId,
 				...(input.limit !== undefined ? { limit: input.limit } : {}),
 			}),
 		),
@@ -48,16 +49,13 @@ export const knowledgeQuestions = {
 		})
 		.output(output(knowledgeQuestionsSchema.shape.set))
 		.handler(({ context, input }) =>
-			context.knowledge.markQuestion(
-				context.actor,
-				context.spaceId,
-				input.projectId,
-				{
-					query: input.query,
-					answers: input.answers,
-					by: context.session.user.id,
-				},
-			),
+			context.knowledge.markQuestion(context.actor, {
+				spaceId: context.spaceId,
+				projectId: input.projectId,
+				query: input.query,
+				answers: input.answers,
+				by: context.session.user.id,
+			}),
 		),
 	/**
 	 * Runs the project's question set against each way to search on this

@@ -292,7 +292,7 @@ describe("a page's read", () => {
 		const { meaning, embeddings } = fakeMeaning();
 		const a = await device(meaning);
 		await a.publish({ "learnings/proposed/run-1.s1.md": `- ${CAR}\n` });
-		await a.knowledge.map("p1");
+		await a.knowledge.map({ projectId: "p1" });
 		await Bun.sleep(20);
 		expect(embeddings.embedded).toBe(0);
 	});
@@ -353,7 +353,11 @@ describe("when the notes cannot be compared, the list is as it was", () => {
 		const { meaning, embeddings } = fakeMeaning();
 		const a = await device(meaning);
 		await a.publish(notes);
-		await a.knowledge.setMeaning(NIGHT_SHIFT, "space-1", "p1", false);
+		await a.knowledge.setMeaning(NIGHT_SHIFT, {
+			spaceId: "space-1",
+			projectId: "p1",
+			on: false,
+		});
 		await expectPlain(a, embeddings);
 	});
 });

@@ -28,8 +28,7 @@ describe("syncKnowledgeSource", () => {
 				edges: [],
 			}),
 		);
-		const run = await syncKnowledgeSource(ports)({
-			actor: NIGHT_SHIFT,
+		const run = await syncKnowledgeSource(ports)(NIGHT_SHIFT, {
 			spaceId: "space-1",
 			projectId: "p1",
 			name: "web",
@@ -41,8 +40,7 @@ describe("syncKnowledgeSource", () => {
 
 	test("a flow that is no source starts nothing", async () => {
 		const ports = inMemorySourcesPorts();
-		const refusal = await syncKnowledgeSource(ports)({
-			actor: NIGHT_SHIFT,
+		const refusal = await syncKnowledgeSource(ports)(NIGHT_SHIFT, {
 			spaceId: "space-1",
 			projectId: "p1",
 			name: "nothing",
@@ -58,8 +56,7 @@ describe("syncKnowledgeSource", () => {
 			await ports.access.whoMay(
 				"space-1",
 				(actor) =>
-					syncKnowledgeSource(ports)({
-						actor,
+					syncKnowledgeSource(ports)(actor, {
 						spaceId: "space-1",
 						projectId: "p1",
 						name: "web",

@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, expect, test } from "bun:test";
+import type { KnowledgeSource } from "@nightshift/flows";
 import { createSpaceArchive } from "../archive";
 import type { Actor } from "../contract";
 import { createSyncedDocuments } from "../documents";
@@ -50,11 +51,23 @@ const requests: Record<
 	string,
 	[need: object, request: (knowledge: Knowledge) => Promise<unknown>]
 > = {
-	setMeaning: [CHANGES, (k) => k.setMeaning(ACTOR, "space", "project", true)],
-	look: [{ flow: ["save"] }, (k) => k.look(ACTOR, "space", "project", [])],
+	setMeaning: [
+		CHANGES,
+		(k) =>
+			k.setMeaning(ACTOR, { spaceId: "space", projectId: "project", on: true }),
+	],
+	look: [
+		{ flow: ["save"] },
+		(k) => k.look(ACTOR, { spaceId: "space", projectId: "project", urls: [] }),
+	],
 	setReader: [
 		CHANGES,
-		(k) => k.setReader(ACTOR, "space", "project", { kind: "nightshift" }),
+		(k) =>
+			k.setReader(ACTOR, {
+				spaceId: "space",
+				projectId: "project",
+				setting: { kind: "nightshift" },
+			}),
 	],
 	settleLearning: [
 		CHANGES,
@@ -99,7 +112,9 @@ const requests: Record<
 	markQuestion: [
 		CHANGES,
 		(k) =>
-			k.markQuestion(ACTOR, "space", "project", {
+			k.markQuestion(ACTOR, {
+				spaceId: "space",
+				projectId: "project",
 				query: "query",
 				answers: [],
 				by: null,
@@ -108,7 +123,9 @@ const requests: Record<
 	markNotTopic: [
 		CHANGES,
 		(k) =>
-			k.markNotTopic(ACTOR, "space", "project", {
+			k.markNotTopic(ACTOR, {
+				spaceId: "space",
+				projectId: "project",
 				word: "word",
 				notTopic: true,
 				by: null,
@@ -117,28 +134,33 @@ const requests: Record<
 	"sources.save": [
 		{ flow: ["save"] },
 		(k) =>
-			k.sources(SPACE).save(
-				ACTOR,
-				"space",
-				"project",
-				{
-					source: {} as Parameters<
-						ReturnType<Knowledge["sources"]>["save"]
-					>[3]["source"],
-				},
-				MAY,
-			),
+			k.sources(SPACE).save(ACTOR, {
+				spaceId: "space",
+				projectId: "project",
+				source: {} as KnowledgeSource,
+				may: MAY,
+			}),
 	],
 	"sources.remove": [
 		{ flow: ["remove"] },
 		(k) =>
-			k
-				.sources(SPACE)
-				.remove(ACTOR, "space", "project", "name", { files: false }, MAY),
+			k.sources(SPACE).remove(ACTOR, {
+				spaceId: "space",
+				projectId: "project",
+				name: "name",
+				files: false,
+				may: MAY,
+			}),
 	],
 	"sources.sync": [
 		CHANGES,
-		(k) => k.sources(SPACE).sync(ACTOR, "space", "project", "name", "starter"),
+		(k) =>
+			k.sources(SPACE).sync(ACTOR, {
+				spaceId: "space",
+				projectId: "project",
+				name: "name",
+				startedBy: "starter",
+			}),
 	],
 };
 

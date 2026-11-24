@@ -23,7 +23,6 @@ export type RemoveKnowledgeSourcePorts = {
 
 /** The source to remove, by its flow's name, and what the person may do. */
 export type RemoveKnowledgeSource = {
-	actor: Actor;
 	spaceId: string;
 	projectId: string;
 	name: string;
@@ -43,14 +42,10 @@ export type RemoveKnowledgeSource = {
  */
 export const removeKnowledgeSource =
 	(ports: RemoveKnowledgeSourcePorts) =>
-	async ({
-		actor,
-		spaceId,
-		projectId,
-		name,
-		files,
-		may,
-	}: RemoveKnowledgeSource): Promise<{ removedFiles: number }> => {
+	async (
+		actor: Actor,
+		{ spaceId, projectId, name, files, may }: RemoveKnowledgeSource,
+	): Promise<{ removedFiles: number }> => {
 		await ports.access.openSpace(actor, { spaceId, need: REMOVES_FLOWS });
 		if (files) {
 			await ports.access.openSpace(actor, {
