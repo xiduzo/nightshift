@@ -3,7 +3,10 @@ import type { Flow } from "@nightshift/flows";
 import { inMemoryConfigUsePorts } from "../adapters/out/in-memory-neighbours";
 import { listProfileUse } from "./list-profile-use";
 
-const at = { spaceId: "s1", personId: "ada" };
+const at = {
+	spaceId: "s1",
+	actor: { personId: "ada", door: "session" as const },
+};
 const flowOf = (...nodes: unknown[]) =>
 	({ nodes, inputs: [], edges: [] }) as never as Flow;
 const agent = (id: string, device: string, profile: string) => ({

@@ -3,6 +3,7 @@ import {
 	type Profile,
 	profileSecrets,
 } from "@nightshift/flows";
+import type { PersonActor } from "../../../contract";
 import { type FlowRef, type FlowUse, profileUseKey } from "./flow-use";
 
 /**
@@ -13,7 +14,7 @@ import { type FlowRef, type FlowUse, profileUseKey } from "./flow-use";
  */
 
 /** Who asks, in which Space: the Space's flows and secrets as that Person sees them. */
-export type Asker = { spaceId: string; personId: string };
+export type Asker = { spaceId: string; actor: PersonActor };
 
 /** Whose secrets: a project's, or the Space's (ADR 18). */
 export type SecretOwner = { projectId: string } | "space";

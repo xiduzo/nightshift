@@ -11,7 +11,9 @@ import {
 } from "@nightshift/db/schema";
 import { asDate } from "@nightshift/time";
 import * as Y from "yjs";
+import { inMemoryAccess } from "../access/adapters/out/in-memory-access";
 import { inMemoryComputer } from "../access/computer/adapters/out/in-memory-computer";
+import { NIGHT_SHIFT } from "../contract";
 import {
 	type DeviceDocument,
 	deviceDocumentName,
@@ -54,6 +56,8 @@ function stores(document: DeviceDocument) {
 			document,
 		}),
 		connections: createConnectionStore({
+			computerAccess: inMemoryComputer(),
+			access: inMemoryAccess(),
 			document,
 			env: {},
 			secrets: noSecrets,
@@ -132,7 +136,7 @@ describe("the Device document", () => {
 		});
 		expect(s.profiles.get("builder")?.description).toBe("Builds.");
 		// A secret saved before keeps when it was set.
-		expect((await s.connections.secrets()).secrets).toMatchObject([
+		expect((await s.connections.secrets(NIGHT_SHIFT)).secrets).toMatchObject([
 			{ name: "TRACKER_TOKEN", saved: true, setAt: SECRET_SET_AT },
 		]);
 	});

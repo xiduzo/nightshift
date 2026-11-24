@@ -1,3 +1,4 @@
+import type { ComputerAccess } from "../../../access";
 import type { Actor } from "../../../contract";
 import {
 	type KnownSecrets,
@@ -12,6 +13,7 @@ import {
 } from "../../scopes";
 
 export type ListSecretsPorts = {
+	computerAccess: Pick<ComputerAccess, "openComputer">;
 	facts: Pick<SecretFacts, "saved" | "usedAt">;
 	references: SecretReferences;
 	personal: Reach<Pick<PersonalSecrets, "list">>;
@@ -24,13 +26,13 @@ export type ListSecrets = { named?: Iterable<string> };
 
 /**
  * Lists the secrets: the Personal ones, this computer's saved ones, the
- * ones connections reference and `named`, with where each is set and
- * when. Names and times only, never a value. The doors check the owner of
- * this computer first, so the actor is not read.
+ * ones connections reference and `named`, with where each is set and when.
+ * Names and times only, never a value. Only the owner of this computer may.
  */
 export const listSecrets =
 	(ports: ListSecretsPorts) =>
-	async (_actor: Actor, { named = [] }: ListSecrets): Promise<SecretList> => {
+	async (actor: Actor, { named = [] }: ListSecrets): Promise<SecretList> => {
+		ports.computerAccess.openComputer(actor);
 		const personal = await listPersonalNames(ports);
 		return secretRows({
 			personal,

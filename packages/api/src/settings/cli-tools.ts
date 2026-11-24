@@ -25,7 +25,7 @@ export const cliTools = {
 		.handler(({ context }) =>
 			context.configUse.cliTools({
 				spaceId: context.spaceId,
-				personId: context.session.user.id,
+				actor: context.actor,
 			}),
 		),
 	/** The programs this computer can run by name, to pick one from. */

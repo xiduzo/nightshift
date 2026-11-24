@@ -1,4 +1,4 @@
-import { type Edits, wireEdits } from "./edits";
+import { type EditAccess, type Edits, wireEdits } from "./edits";
 import { type SecretSource, sourceOf, wireScopes } from "./scopes";
 import { type Uses, wireUses } from "./uses";
 
@@ -17,12 +17,18 @@ export type Secrets = Uses &
 		onSecretsChange(listener: () => void): () => void;
 	};
 
-export function wireSecrets(deps: Parameters<typeof wireScopes>[0]): Secrets {
+export function wireSecrets(
+	deps: Parameters<typeof wireScopes>[0] & EditAccess,
+): Secrets {
 	const scopes = wireScopes(deps);
 	const { facts, known, env } = scopes;
 	return {
 		...wireUses(scopes),
-		...wireEdits(scopes),
+		...wireEdits({
+			...scopes,
+			computerAccess: deps.computerAccess,
+			access: deps.access,
+		}),
 		secretSource: (name) =>
 			sourceOf(name, { personal: known.personal, saved: facts.saved(), env }),
 		onSecretsChange(listener) {

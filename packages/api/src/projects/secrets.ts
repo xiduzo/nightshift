@@ -45,7 +45,7 @@ export const projectSecrets = {
 		.handler(async ({ context }) =>
 			listed(
 				await context.configUse.sharedSecrets(
-					{ spaceId: context.spaceId, personId: context.session.user.id },
+					{ spaceId: context.spaceId, actor: context.actor },
 					{ projectId: context.project.projectId },
 				),
 				await context.access.can(SAVING),
@@ -65,7 +65,6 @@ export const projectSecrets = {
 				project: context.project,
 				name: input.name,
 				value: input.value,
-				personId: context.session.user.id,
 			}),
 		),
 	removeSecret: projectProcedure(
@@ -78,7 +77,6 @@ export const projectSecrets = {
 			context.deviceConfig.removeProjectSecret(context.actor, {
 				project: context.project,
 				name: input.name,
-				personId: context.session.user.id,
 			}),
 		),
 	/**
@@ -100,7 +98,6 @@ export const projectSecrets = {
 				project: context.project,
 				name: input.name,
 				to: input.to,
-				personId: context.session.user.id,
 			}),
 		),
 	/**
@@ -122,7 +119,6 @@ export const projectSecrets = {
 				name: input.name,
 				from: input.from,
 				project: context.project,
-				personId: context.session.user.id,
 			}),
 		),
 	/**
@@ -138,7 +134,7 @@ export const projectSecrets = {
 		.handler(async ({ context }) =>
 			listed(
 				await context.configUse.sharedSecrets(
-					{ spaceId: context.spaceId, personId: context.session.user.id },
+					{ spaceId: context.spaceId, actor: context.actor },
 					"space",
 				),
 				await context.access.can(SAVING),
@@ -156,7 +152,6 @@ export const projectSecrets = {
 				spaceId: context.spaceId,
 				name: input.name,
 				value: input.value,
-				personId: context.session.user.id,
 			}),
 		),
 	removeSpaceSecret: permitted(SAVING)
@@ -167,7 +162,6 @@ export const projectSecrets = {
 			context.deviceConfig.removeSpaceSecret(context.actor, {
 				spaceId: context.spaceId,
 				name: input.name,
-				personId: context.session.user.id,
 			}),
 		),
 	/** Moves a secret of this computer, or a Personal one, into the session's Space. */
@@ -183,7 +177,6 @@ export const projectSecrets = {
 				name: input.name,
 				from: input.from,
 				spaceId: context.spaceId,
-				personId: context.session.user.id,
 			}),
 		),
 	/** Moves a secret of the Space to this computer, or to the owner's Personal secrets. */
@@ -199,7 +192,6 @@ export const projectSecrets = {
 				spaceId: context.spaceId,
 				name: input.name,
 				to: input.to,
-				personId: context.session.user.id,
 			}),
 		),
 	/**

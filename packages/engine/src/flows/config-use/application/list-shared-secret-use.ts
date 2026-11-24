@@ -51,11 +51,11 @@ export const listSharedSecretUse =
 		try {
 			listed =
 				owner === "space"
-					? await ports.connections.spaceSecrets(at.spaceId, at.personId)
-					: await ports.connections.projectSecrets(
-							{ spaceId: at.spaceId, projectId: owner.projectId },
-							at.personId,
-						);
+					? await ports.connections.spaceSecrets(at.actor, at.spaceId)
+					: await ports.connections.projectSecrets(at.actor, {
+							spaceId: at.spaceId,
+							projectId: owner.projectId,
+						});
 		} catch (error) {
 			if (error instanceof Refusal && error.kind === "unavailable") {
 				return null;

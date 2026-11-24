@@ -45,6 +45,8 @@ type OfThisComputer = Pick<ConfigOptions, "computerAccess">;
 
 export async function wireDaemonConfig(
 	deps: OfThisComputer & {
+		/** Who may act in a Space (`wireDaemonAccess`). */
+		access: ConfigOptions["access"];
 		env: DaemonEnv;
 		dataDir: string;
 		document: ConfigOptions["document"];
@@ -75,6 +77,7 @@ export async function wireDaemonConfig(
 
 	const config = wireSettings({
 		computerAccess: deps.computerAccess,
+		access: deps.access,
 		document: deps.document,
 		env: fallbacks,
 		secrets: await secretStore({ dataDir, ...keyStore }),

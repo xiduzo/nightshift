@@ -1,7 +1,10 @@
 import type { AgentNode, McpServer } from "@nightshift/flows";
 import { now as timeNow } from "@nightshift/time";
+import type { Access, ComputerAccess } from "../../access";
 import {
+	type Actor,
 	NIGHT_SHIFT,
+	type PersonActor,
 	type ProjectRef,
 	type SecretEnv,
 	type SecretUse,
@@ -67,7 +70,7 @@ export type ConnectionStore = {
 	 * where each is set and when. A name saved in both scopes is listed
 	 * once per scope, Personal first.
 	 */
-	secrets(named?: Iterable<string>): Promise<SecretList>;
+	secrets(actor: Actor, named?: Iterable<string>): Promise<SecretList>;
 	/** A secret's value, to use: the scopes of `use` in their order (`secretScopes`). */
 	secret(name: string, use?: SecretUse): Promise<string | undefined>;
 	/**
@@ -78,69 +81,23 @@ export type ConnectionStore = {
 	webhookSecret(name: string, project: ProjectRef): Promise<string | undefined>;
 	/** Where a secret's value comes from, as this computer knows the Personal names now. */
 	secretSource(name: string): SecretSource;
-	/** Saves a value in a scope. Default: this computer. */
+	/** Night Shift saves a value in a scope. Default: this computer. A person saves one through `secretEdits`. */
 	setSecret(name: string, value: string, scope?: SecretScope): Promise<void>;
-	/** Removes the saved value of a scope. Default: this computer. */
+	/** Removes the saved value of a scope, when the owner's home Host asks. Default: this computer. */
 	removeSecret(name: string, scope?: SecretScope): Promise<void>;
 	/**
-	 * Moves a saved secret to another scope, and the person never types it
+	 * Moves a saved secret to another scope when the owner's home Host asks,
+	 * and the person never types it
 	 * again (ADR 13, decision 7): it reads the value where it is, saves it
 	 * in `to`, then removes the copy it moved from. Refuses when the scope
 	 * it moves from has no value of that name.
 	 */
 	moveSecret(name: string, to: SecretScope): Promise<void>;
 	/**
-	 * The secrets of a Project, as `personId` may see them: names, when
-	 * each was set and by whom. Throws when they cannot be read now.
+	 * Moves a saved secret of this computer into the Project for its owner,
+	 * whose id the home Host gives: a move that another of the owner's
+	 * Devices asked for (`@nightshift/devices`).
 	 */
-	projectSecrets(
-		project: ProjectRef,
-		personId: string,
-	): Promise<ProjectSecretName[]>;
-	/** Saves or replaces a Project secret, as `personId`. */
-	setProjectSecret(
-		project: ProjectRef,
-		name: string,
-		value: string,
-		personId: string,
-	): Promise<void>;
-	removeProjectSecret(
-		project: ProjectRef,
-		name: string,
-		personId: string,
-	): Promise<void>;
-	/**
-	 * Moves a saved secret of this computer, or a Personal one, into the
-	 * Project (ADR 13, decision 7): it reads the value where it is, saves it
-	 * as the Project's, then removes the copy it moved from.
-	 */
-	/** The secrets of a Space (ADR 18): as `projectSecrets`, for the whole Space. */
-	spaceSecrets(spaceId: string, personId: string): Promise<ProjectSecretName[]>;
-	setSpaceSecret(
-		spaceId: string,
-		name: string,
-		value: string,
-		personId: string,
-	): Promise<void>;
-	removeSpaceSecret(
-		spaceId: string,
-		name: string,
-		personId: string,
-	): Promise<void>;
-	/** Moves a saved secret of this computer, or a Personal one, into a Space. */
-	moveToSpace(
-		name: string,
-		from: SecretScope,
-		spaceId: string,
-		personId: string,
-	): Promise<void>;
-	/** Moves a Space's secret to this computer, or to its owner's Personal secrets. */
-	moveFromSpace(
-		spaceId: string,
-		name: string,
-		to: SecretScope,
-		personId: string,
-	): Promise<void>;
 	moveToProject(
 		name: string,
 		from: SecretScope,
@@ -148,15 +105,18 @@ export type ConnectionStore = {
 		personId: string,
 	): Promise<void>;
 	/**
-	 * Moves a Project secret to this computer or to the Person's Personal
-	 * secrets. The Project's copy goes only after the new one is saved.
+	 * The secrets of a Project, as the Person who asks may see them: names,
+	 * when each was set and by whom. Throws when they cannot be read now.
 	 */
-	moveFromProject(
+	projectSecrets(
+		actor: PersonActor,
 		project: ProjectRef,
-		name: string,
-		to: SecretScope,
-		personId: string,
-	): Promise<void>;
+	): Promise<ProjectSecretName[]>;
+	/** The secrets of a Space (ADR 18): as `projectSecrets`, for the whole Space. */
+	spaceSecrets(
+		actor: PersonActor,
+		spaceId: string,
+	): Promise<ProjectSecretName[]>;
 	/** An Agent node's MCP servers: its connections, with `${NAME}` expanded. */
 	mcpServersFor(
 		node: Pick<AgentNode, "connections">,
@@ -232,10 +192,14 @@ export type Connections = ConnectionStore & {
 /**
  * The connections over this computer's Device document, and the secrets
  * as the use cases of `secrets` give them (`wireSecrets`). The members of
- * the store only call a bound use case. The doors check the owner of this
- * computer first, so the store acts as Night Shift.
+ * the store only call a bound use case. The reads of a person take who asks. What
+ * Night Shift does itself, and what the home Host asks of this computer,
+ * acts as Night Shift.
  */
 export function wireConnections(options: {
+	/** Who may ask for the secrets: the owner of this computer, and a role in the Space. */
+	computerAccess: Pick<ComputerAccess, "openComputer">;
+	access: Pick<Access, "openSpace">;
 	document: DeviceDocument;
 	env: Readonly<Record<string, string | undefined>>;
 	secrets: SecretBackend;
@@ -258,6 +222,8 @@ export function wireConnections(options: {
 	const { document } = options;
 	const saved = yjsSavedConnections(document);
 	const secrets = wireSecrets({
+		computerAccess: options.computerAccess,
+		access: options.access,
 		document,
 		env: options.env,
 		computer: options.secrets,
@@ -274,7 +240,6 @@ export function wireConnections(options: {
 		const found = saved.read().get(name);
 		return found ? withVariables(found, secrets.secretSource) : null;
 	};
-	const as = NIGHT_SHIFT;
 	return {
 		// The document is read when it opens; a remote edit applies at once.
 		// The Personal names are read at their first use.
@@ -287,35 +252,26 @@ export function wireConnections(options: {
 		get: view,
 		save: write,
 		remove: (name) => saved.remove(name),
-		secrets: (named = []) => secrets.listSecrets(as, { named }),
+		secrets: (actor, named = []) => secrets.listSecrets(actor, { named }),
 		secret: (name, use) => secrets.readSecret({ name, use }),
 		webhookSecret: (name, project) =>
 			secrets.readWebhookSecret({ name, project }),
 		secretSource: secrets.secretSource,
 		setSecret: (name, value, scope) =>
-			secrets.saveSecret(as, { name, value, scope }),
-		removeSecret: (name, scope) => secrets.removeSecret(as, { name, scope }),
-		moveSecret: (name, to) => secrets.moveSecret(as, { name, to }),
-		projectSecrets: (project, personId) =>
-			secrets.listProjectSecrets(as, { project, personId }),
-		setProjectSecret: (project, name, value, personId) =>
-			secrets.saveProjectSecret(as, { project, name, value, personId }),
-		removeProjectSecret: (project, name, personId) =>
-			secrets.removeProjectSecret(as, { project, name, personId }),
+			secrets.saveSecret(NIGHT_SHIFT, { name, value, scope }),
+		removeSecret: (name, scope) =>
+			secrets.removeSecret(NIGHT_SHIFT, { name, scope }),
+		moveSecret: (name, to) => secrets.moveSecret(NIGHT_SHIFT, { name, to }),
+		// The Host's call names the owner: the keeper checks their role.
 		moveToProject: (name, from, project, personId) =>
-			secrets.moveSecretToProject(as, { name, from, project, personId }),
-		moveFromProject: (project, name, to, personId) =>
-			secrets.moveSecretFromProject(as, { project, name, to, personId }),
-		spaceSecrets: (spaceId, personId) =>
-			secrets.listSpaceSecrets(as, { spaceId, personId }),
-		setSpaceSecret: (spaceId, name, value, personId) =>
-			secrets.saveSpaceSecret(as, { spaceId, name, value, personId }),
-		removeSpaceSecret: (spaceId, name, personId) =>
-			secrets.removeSpaceSecret(as, { spaceId, name, personId }),
-		moveToSpace: (name, from, spaceId, personId) =>
-			secrets.moveSecretToSpace(as, { name, from, spaceId, personId }),
-		moveFromSpace: (spaceId, name, to, personId) =>
-			secrets.moveSecretFromSpace(as, { spaceId, name, to, personId }),
+			secrets.moveSecretToProject(
+				{ personId, door: "command" },
+				{ name, from, project },
+			),
+		projectSecrets: (actor, project) =>
+			secrets.listProjectSecrets(actor, { project }),
+		spaceSecrets: (actor, spaceId) =>
+			secrets.listSpaceSecrets(actor, { spaceId }),
 		mcpServersFor: (node, use) => expand({ node, use }),
 		expandForTest,
 		expandEnv: (values, use) => secrets.expandSecretReferences({ values, use }),

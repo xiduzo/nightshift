@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
-import { valueStore } from "@nightshift/engine";
+import { NIGHT_SHIFT, valueStore } from "@nightshift/engine";
 import {
 	createConnectionStore,
 	createSandbox,
@@ -81,10 +81,9 @@ describe("moveTelemetryHeaders", () => {
 			OTEL_HEADER_X_SCOPE_ORGID: "night",
 		});
 		// The secrets are on the Secrets page, and the export reads them.
-		expect((await h.secrets.secrets()).secrets.map((s) => s.name)).toEqual([
-			"OTEL_HEADER_AUTHORIZATION",
-			"OTEL_HEADER_X_SCOPE_ORGID",
-		]);
+		expect(
+			(await h.secrets.secrets(NIGHT_SHIFT)).secrets.map((s) => s.name),
+		).toEqual(["OTEL_HEADER_AUTHORIZATION", "OTEL_HEADER_X_SCOPE_ORGID"]);
 		const expanded = await h.secrets.expandEnv(
 			h.settings.current().telemetryHeaders,
 		);

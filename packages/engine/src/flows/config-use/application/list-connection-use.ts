@@ -76,19 +76,19 @@ export const listConnectionUse =
 			},
 			use,
 		);
-		const listed = await ports.connections.secrets(users.named);
+		const listed = await ports.connections.secrets(at.actor, users.named);
 		const rows = listed.secrets.map((secret) => ({
 			secret,
 			of: users.of(secret.name),
 		}));
 		const covers = await coverage(
 			sharedNames({
-				space: () => ports.connections.spaceSecrets(at.spaceId, at.personId),
+				space: () => ports.connections.spaceSecrets(at.actor, at.spaceId),
 				project: (projectId) =>
-					ports.connections.projectSecrets(
-						{ spaceId: at.spaceId, projectId },
-						at.personId,
-					),
+					ports.connections.projectSecrets(at.actor, {
+						spaceId: at.spaceId,
+						projectId,
+					}),
 			}),
 			rows.flatMap(({ of }) => [...of.flows, ...of.webhooks]),
 		);

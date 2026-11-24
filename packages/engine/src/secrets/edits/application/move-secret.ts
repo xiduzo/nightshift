@@ -14,14 +14,16 @@ export type MoveSecret = { name: string; to: SecretScope };
 
 /**
  * Moves a saved secret to the other scope of this computer's Person, and
- * the person never types it again (ADR 13, decision 7): it reads the
- * value where it is, saves it in `to`, then removes the copy it moved
- * from. Refuses when the scope it moves from has no value of that name.
- * The refusal names the secret, never its value.
+ * the person never types it again (ADR 13, decision 7): it reads the value
+ * where it is, saves it in `to`, then removes the copy it moved from.
+ * Refuses when the scope it moves from has no value of that name. The
+ * refusal names the secret, never its value. Only the owner of this
+ * computer may.
  */
 export const moveSecret =
 	(ports: ScopePorts) =>
-	async (_actor: Actor, { name, to }: MoveSecret): Promise<void> => {
+	async (actor: Actor, { name, to }: MoveSecret): Promise<void> => {
+		ports.computerAccess.openComputer(actor);
 		secretNameSchema.parse(name);
 		const from: SecretScope = to === "personal" ? "computer" : "personal";
 		const value = movedValue(await valueIn(ports, from, name), from, name);

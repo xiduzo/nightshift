@@ -13,7 +13,10 @@ import {
 /** This computer's id: its profiles are the ones flows name with it. */
 const HERE = "d1";
 /** Who asks, in which Space. */
-const AT: Asker = { spaceId: "s1", personId: "ada" };
+const AT: Asker = {
+	spaceId: "s1",
+	actor: { personId: "ada", door: "session" },
+};
 
 /** A secret reference, as a person writes it. */
 const ref = (name: string) => `\${${name}}`;
@@ -194,7 +197,8 @@ function configUse(
 		connections: {
 			list: () => connections,
 			// The store's view: the names asked for and those connections read, none saved but `saved`.
-			secrets: async (named = []) => {
+			secrets: async (actor, named = []) => {
+				expect(actor).toEqual(AT.actor);
 				const usedBy = new Map<string, string[]>();
 				for (const c of connections) {
 					for (const { name } of c.variables) {
@@ -221,12 +225,12 @@ function configUse(
 					),
 				};
 			},
-			projectSecrets: (at, personId) => {
-				expect([at.spaceId, personId]).toEqual([AT.spaceId, AT.personId]);
+			projectSecrets: (actor, at) => {
+				expect([at.spaceId, actor]).toEqual([AT.spaceId, AT.actor]);
 				return keptOf(at.projectId);
 			},
-			spaceSecrets: (spaceId, personId) => {
-				expect([spaceId, personId]).toEqual([AT.spaceId, AT.personId]);
+			spaceSecrets: (actor, spaceId) => {
+				expect([spaceId, actor]).toEqual([AT.spaceId, AT.actor]);
 				return keptOf("space");
 			},
 		},

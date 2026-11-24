@@ -1,4 +1,6 @@
-import type { Actor, ProjectRef } from "../../../contract";
+import type { Permissions } from "@nightshift/auth";
+import type { Access } from "../../../access";
+import type { PersonActor, ProjectRef } from "../../../contract";
 import {
 	checkSecret,
 	type KnownSecrets,
@@ -7,30 +9,41 @@ import {
 	reachProjects,
 } from "../../scopes";
 
+const SAVES_FLOWS: Permissions = { flow: ["save"] };
+
 export type SaveProjectSecretPorts = {
+	access: Pick<Access, "openSpace">;
 	projects: Reach<Pick<ProjectSecrets, "set">>;
 	known: Pick<KnownSecrets, "projectNamesOf">;
 };
 
-/** The Project, the secret, and the Person who saves it. */
+/** The Project and the secret. */
 export type SaveProjectSecret = {
 	project: ProjectRef;
 	name: string;
 	value: string;
-	personId: string;
 };
 
 /**
- * Saves or replaces a Project secret, as `personId`: the keeper checks
- * that their role saves Flows, so the actor is not read.
+ * Saves or replaces a Project secret, as the Person who asks. Their role
+ * must save Flows. The keeper checks it too.
  */
 export const saveProjectSecret =
 	(ports: SaveProjectSecretPorts) =>
 	async (
-		_actor: Actor,
-		{ project, name, value, personId }: SaveProjectSecret,
+		actor: PersonActor,
+		{ project, name, value }: SaveProjectSecret,
 	): Promise<void> => {
+		await ports.access.openSpace(actor, {
+			spaceId: project.spaceId,
+			need: SAVES_FLOWS,
+		});
 		checkSecret(name, value);
-		await reachProjects(ports.projects).set(project, name, value, personId);
+		await reachProjects(ports.projects).set(
+			project,
+			name,
+			value,
+			actor.personId,
+		);
 		ports.known.projectNamesOf(project.projectId).add(name);
 	};

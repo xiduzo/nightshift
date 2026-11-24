@@ -2,12 +2,9 @@ import {
 	createKnowledgeFolderLocks,
 	createOllama,
 	createSpaceArchive,
-	type createSpaceDocuments,
 	type Knowledge,
 	measuredMeaning,
-	memberRole,
 	transcriptLines,
-	wireAccess,
 	wireKnowledge,
 } from "@nightshift/engine";
 import {
@@ -23,7 +20,6 @@ import {
 } from "./runtime";
 
 type KnowledgeDeps = Parameters<typeof wireKnowledge>[0];
-type SpaceDocuments = ReturnType<typeof createSpaceDocuments>;
 type FollowRunsDeps = Parameters<Knowledge["followRuns"]>[0];
 
 /**
@@ -37,8 +33,8 @@ export async function wireDaemonKnowledge(deps: {
 	db: KnowledgeDeps["db"];
 	dataDir: string;
 	documents: KnowledgeDeps["documents"];
-	/** The Space documents: the Members a Command's Person is read from. */
-	spaces: Pick<SpaceDocuments, "open">;
+	/** Who may act in a Space (`wireDaemonAccess`). */
+	access: KnowledgeDeps["access"];
 	device: KnowledgeDeps["device"];
 	usage: KnowledgeDeps["usage"];
 	settings: ConfigStores["settings"];
@@ -96,22 +92,9 @@ export async function wireDaemonKnowledge(deps: {
 	const knowledge = await slots.replace(
 		"nightshiftKnowledge",
 		() => {
-			const access = wireAccess({
-				log: {
-					row: async () => {
-						throw new Error("unused");
-					},
-					walkedHere: async () => false,
-				},
-				members: {
-					db: deps.db,
-					documentRole: async (spaceId, personId) =>
-						memberRole(await deps.spaces.open(spaceId), personId),
-				},
-			});
 			return wireKnowledge({
 				db: deps.db,
-				access,
+				access: deps.access,
 				dataDir,
 				documents: deps.documents,
 				archive,

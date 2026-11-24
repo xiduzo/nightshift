@@ -2,7 +2,10 @@ import { describe, expect, test } from "bun:test";
 import { inMemoryConfigUsePorts } from "../adapters/out/in-memory-neighbours";
 import { listCliToolUse } from "./list-cli-tool-use";
 
-const at = { spaceId: "s1", personId: "ada" };
+const at = {
+	spaceId: "s1",
+	actor: { personId: "ada", door: "session" as const },
+};
 const tool = (name: string, secrets: string[], signIn = false) => ({
 	name,
 	login: {

@@ -29,7 +29,7 @@ export const profiles = {
 		.handler(({ context }) =>
 			context.configUse.profiles({
 				spaceId: context.spaceId,
-				personId: context.session.user.id,
+				actor: context.actor,
 			}),
 		),
 	save: ownerProcedure

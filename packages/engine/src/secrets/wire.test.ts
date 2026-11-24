@@ -2,7 +2,9 @@ import { describe, expect, spyOn, test } from "bun:test";
 import { createDb } from "@nightshift/db";
 import { migrateDb } from "@nightshift/db/migrate";
 import * as Y from "yjs";
-import { NIGHT_SHIFT } from "../contract";
+import { inMemoryAccess } from "../access/adapters/out/in-memory-access";
+import { inMemoryComputer } from "../access/computer/adapters/out/in-memory-computer";
+import { NIGHT_SHIFT, type PersonActor } from "../contract";
 import { openDeviceDocument } from "../documents";
 import { inMemoryComputerSecrets } from "./scopes/adapters/out/in-memory-computer-secrets";
 import {
@@ -18,6 +20,7 @@ import { wireSecrets } from "./wire";
  * reply, and a read fails closed.
  */
 
+const ADA: PersonActor = { personId: "ada", door: "session" };
 const VALUE = "v4lue-that-must-not-leak";
 const RUN = { spaceId: "space-1", projectId: "app", runId: "run-1" };
 
@@ -28,7 +31,11 @@ async function wired() {
 	const computer = inMemoryComputerSecrets();
 	const personal = inMemoryPersonalSecrets();
 	const projects = inMemoryProjectSecrets();
+	const access = inMemoryAccess();
+	access.members.join("space-1", "ada", "member");
 	const secrets = wireSecrets({
+		computerAccess: inMemoryComputer({ id: () => "ada" }),
+		access,
 		document,
 		env: { TOKEN: "env-fallback" },
 		computer,
@@ -86,30 +93,26 @@ describe("a secret value never reaches a reply to a person", () => {
 	test("the lists and the refusals name secrets, never their values", async () => {
 		const { projects, secrets } = await wired();
 		await secrets.saveSecret(NIGHT_SHIFT, { name: "TOKEN", value: VALUE });
-		await secrets.saveProjectSecret(NIGHT_SHIFT, {
+		await secrets.saveProjectSecret(ADA, {
 			project: RUN,
 			name: "PROJ",
 			value: VALUE,
-			personId: "ada",
 		});
 		const replies = [
 			await secrets.listSecrets(NIGHT_SHIFT, {}),
-			await secrets.listProjectSecrets(NIGHT_SHIFT, {
+			await secrets.listProjectSecrets(ADA, {
 				project: RUN,
-				personId: "ada",
 			}),
-			await secrets.listSpaceSecrets(NIGHT_SHIFT, {
+			await secrets.listSpaceSecrets(ADA, {
 				spaceId: "space-1",
-				personId: "ada",
 			}),
 		];
 		projects.fail(new Error("refused"));
 		const refusal = await secrets
-			.moveSecretToProject(NIGHT_SHIFT, {
+			.moveSecretToProject(ADA, {
 				name: "TOKEN",
 				from: "computer",
 				project: RUN,
-				personId: "ada",
 			})
 			.catch((error: Error) => error.message);
 		expect(JSON.stringify([...replies, refusal])).not.toContain(VALUE);

@@ -4,7 +4,10 @@ import { Refusal } from "@nightshift/refusal";
 import { inMemoryConfigUsePorts } from "../adapters/out/in-memory-neighbours";
 import { listSharedSecretUse } from "./list-shared-secret-use";
 
-const at = { spaceId: "s1", personId: "ada" };
+const at = {
+	spaceId: "s1",
+	actor: { personId: "ada", door: "session" as const },
+};
 const flowOf = (...nodes: unknown[]) =>
 	({ nodes, inputs: [], edges: [] }) as never as Flow;
 const uses = (secret: string) =>

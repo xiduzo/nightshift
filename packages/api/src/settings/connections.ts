@@ -37,7 +37,7 @@ export const connections = {
 		.handler(({ context }) =>
 			context.configUse.connections({
 				spaceId: context.spaceId,
-				personId: context.session.user.id,
+				actor: context.actor,
 			}),
 		),
 	/** Runs `--version` and the login check of one CLI. Read-only. */

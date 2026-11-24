@@ -179,7 +179,7 @@ describe("the daemon, wired in one process", () => {
 		await turnOff(you);
 	});
 
-	test("its owner reaches its settings, its secrets and its guided setup, and another Person is refused inside", async () => {
+	test("its owner reaches its settings, its secrets, its Space's secrets and its guided setup, and another Person is refused inside", async () => {
 		dir = await mkdtemp(join(tmpdir(), "nightshift-daemon-"));
 		const daemon = await start(envIn(dir));
 		for (const path of [
@@ -189,6 +189,10 @@ describe("the daemon, wired in one process", () => {
 		]) {
 			await rpc(daemon, path);
 		}
+		await rpc(daemon, "projects/setSpaceSecret", { name: "TOKEN", value: "v" });
+		expect(await rpc(daemon, "projects/spaceSecrets")).toMatchObject({
+			secrets: [{ name: "TOKEN" }],
+		});
 		const setup = hot.nightshiftAgentSetup as AgentSetup;
 		expect(() =>
 			setup.status({

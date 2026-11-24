@@ -1,3 +1,5 @@
+import { inMemoryAccess } from "../../../../access/adapters/out/in-memory-access";
+import { inMemoryComputer } from "../../../../access/computer/adapters/out/in-memory-computer";
 import type { ProjectRef, StepRun } from "../../../../contract";
 import type {
 	PersonalSecrets,
@@ -207,7 +209,12 @@ export function inMemorySecretsPorts() {
 	const reachable = { personal: true, projects: true };
 	const clock = { now: 120_000 };
 	const place = { host: false };
+	const access = inMemoryAccess();
+	access.members.join("space-1", "ada", "member");
 	const ports = {
+		/** `ada` owns this computer, and is a member of the Space `space-1`. */
+		computerAccess: inMemoryComputer({ id: () => "ada" }),
+		access,
 		computer: inMemoryComputerSecrets(),
 		facts: inMemorySecretFacts(),
 		references: inMemorySecretReferences(),

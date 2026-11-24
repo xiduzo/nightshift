@@ -1,4 +1,6 @@
-import type { Actor } from "../../../contract";
+import type { Permissions } from "@nightshift/auth";
+import type { Access } from "../../../access";
+import type { PersonActor } from "../../../contract";
 import {
 	checkSecret,
 	type ProjectSecrets,
@@ -6,33 +8,39 @@ import {
 	reachProjects,
 } from "../../scopes";
 
+const SAVES_FLOWS: Permissions = { flow: ["save"] };
+
 export type SaveSpaceSecretPorts = {
+	access: Pick<Access, "openSpace">;
 	projects: Reach<Pick<ProjectSecrets, "space">>;
 };
 
-/** The Space, the secret, and the Person who saves it. */
+/** The Space and the secret. */
 export type SaveSpaceSecret = {
 	spaceId: string;
 	name: string;
 	value: string;
-	personId: string;
 };
 
 /**
- * Saves or replaces a Space secret, as `personId`: the keeper checks that
- * their role saves Flows, so the actor is not read.
+ * Saves or replaces a Space secret, as the Person who asks. Their role must
+ * save Flows. The keeper checks it too.
  */
 export const saveSpaceSecret =
 	(ports: SaveSpaceSecretPorts) =>
 	async (
-		_actor: Actor,
-		{ spaceId, name, value, personId }: SaveSpaceSecret,
+		actor: PersonActor,
+		{ spaceId, name, value }: SaveSpaceSecret,
 	): Promise<void> => {
+		await ports.access.openSpace(actor, {
+			spaceId,
+			need: SAVES_FLOWS,
+		});
 		checkSecret(name, value);
 		await reachProjects(ports.projects).space.set(
 			spaceId,
 			name,
 			value,
-			personId,
+			actor.personId,
 		);
 	};

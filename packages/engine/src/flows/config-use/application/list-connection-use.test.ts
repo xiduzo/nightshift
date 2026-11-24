@@ -4,7 +4,10 @@ import type { Connection } from "../../../settings";
 import { inMemoryConfigUsePorts } from "../adapters/out/in-memory-neighbours";
 import { listConnectionUse } from "./list-connection-use";
 
-const at = { spaceId: "s1", personId: "ada" };
+const at = {
+	spaceId: "s1",
+	actor: { personId: "ada", door: "session" as const },
+};
 const flowOf = (...nodes: unknown[]) =>
 	({ nodes, inputs: [], edges: [] }) as never as Flow;
 const connection = (name: string, ...secrets: string[]) =>

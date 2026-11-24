@@ -13,7 +13,6 @@ import {
 	createSyncedDocuments,
 	type PersonalSecrets,
 	type ProjectSecrets,
-	wireComputer,
 } from "@nightshift/engine";
 import { createTelemetry } from "@nightshift/telemetry";
 import { instant } from "@nightshift/time";
@@ -42,6 +41,7 @@ import {
 	stopOnSignals,
 } from "./runtime";
 import { moveTelemetryHeaders, usageFacts } from "./telemetry";
+import { wireDaemonAccess } from "./wire-access";
 import { wireDaemonAssistant } from "./wire-assistant";
 import { openOwner, wireDaemonAuth } from "./wire-auth";
 import { openDeviceConfig, wireDaemonConfig, wireSetups } from "./wire-config";
@@ -242,8 +242,11 @@ async function makeDaemon(
 	/** The Person who owns this computer, and their personal Space. */
 	const owner = await openOwner({ db, auth, self: registry.owner });
 	const { person, localSession } = owner;
-	/** Who may ask of this computer, its settings and its programs: its owner. */
-	const computerAccess = wireComputer({ id: () => person.userId });
+	const { access, computerAccess } = wireDaemonAccess({
+		db,
+		spaces,
+		ownerId: person.userId,
+	});
 
 	// Every Space's document, before the relay serves them: the Projects of a
 	// Replica from before them are imported here, once.
@@ -254,6 +257,7 @@ async function makeDaemon(
 	let projectSecrets: ProjectSecrets | null = null;
 	const { config, keyStore, toolLaunchers } = await wireDaemonConfig({
 		computerAccess,
+		access,
 		env,
 		dataDir,
 		document,
@@ -330,7 +334,7 @@ async function makeDaemon(
 		db,
 		dataDir,
 		documents,
-		spaces,
+		access,
 		device,
 		usage: telemetry,
 		settings,
@@ -494,7 +498,7 @@ async function makeDaemon(
 		config,
 		toolLaunchers,
 		deviceId: device.id,
-		space: asked,
+		space: (at) => engine.space(at.spaceId, at.actor),
 		ollama,
 		usage: telemetry,
 	});

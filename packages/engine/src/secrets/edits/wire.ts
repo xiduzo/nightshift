@@ -1,3 +1,4 @@
+import type { Access, ComputerAccess } from "../../access";
 import type { Scopes } from "../scopes";
 import { listProjectSecrets } from "./application/list-project-secrets";
 import { listSecrets } from "./application/list-secrets";
@@ -21,6 +22,12 @@ import { saveSpaceSecret } from "./application/save-space-secret";
  * no adapter of its own.
  */
 
+/** Who may edit: the owner of this computer, and a role in the Space. */
+export type EditAccess = {
+	computerAccess: Pick<ComputerAccess, "openComputer">;
+	access: Pick<Access, "openSpace">;
+};
+
 /** The use cases of the edits, bound to their ports. */
 export type Edits = {
 	listSecrets: ReturnType<typeof listSecrets>;
@@ -39,7 +46,7 @@ export type Edits = {
 	moveSecretFromSpace: ReturnType<typeof moveSecretFromSpace>;
 };
 
-export function wireEdits(scopes: Scopes): Edits {
+export function wireEdits(scopes: Scopes & EditAccess): Edits {
 	return {
 		listSecrets: listSecrets(scopes),
 		saveSecret: saveSecret(scopes),

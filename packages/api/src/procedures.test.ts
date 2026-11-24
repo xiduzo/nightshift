@@ -443,7 +443,10 @@ const project = { projectId: "p1" };
 const flowRef = { ...project, name: "night" };
 const at = { spaceId: SPACE, ...project };
 /** Who asks, in which Space: the session's Person in the session's Space. */
-const ASKER = { spaceId: SPACE, personId: PERSON };
+const ASKER = {
+	spaceId: SPACE,
+	actor: { personId: PERSON, door: "session" },
+};
 /** Who asks the engine: the session's Person, through the session's door. */
 const ASKING = { personId: PERSON, door: "session" };
 const secret = { name: "GH_TOKEN" };
@@ -614,15 +617,15 @@ const ROUTES: Route[] = [
 	route("projects.move", { ...project, spaceId: SPACE }, { project: ["move"] }, "space.moveProject", ["p1", SPACE]),
 	// A project's secrets, and the Space's (ADR 13, 18).
 	route("projects.secrets", project, "session", "configUse.sharedSecrets", [ASKER, project]),
-	route("projects.setSecret", { ...project, ...secret, value: "v" }, SAVE, "deviceConfig.saveProjectSecret", [ASKING, { project: at, name: "GH_TOKEN", value: "v", personId: PERSON }]),
-	route("projects.removeSecret", { ...project, ...secret }, SAVE, "deviceConfig.removeProjectSecret", [ASKING, { project: at, name: "GH_TOKEN", personId: PERSON }]),
-	route("projects.moveSecretOut", { ...project, ...secret, to: "personal" }, OWNER_SAVING, "deviceConfig.moveSecretFromProject", [ASKING, { project: at, name: "GH_TOKEN", to: "personal", personId: PERSON }]),
-	route("projects.moveSecretIn", { ...project, ...secret, from: "personal" }, OWNER_SAVING, "deviceConfig.moveSecretToProject", [ASKING, { name: "GH_TOKEN", from: "personal", project: at, personId: PERSON }]),
+	route("projects.setSecret", { ...project, ...secret, value: "v" }, SAVE, "deviceConfig.saveProjectSecret", [ASKING, { project: at, name: "GH_TOKEN", value: "v" }]),
+	route("projects.removeSecret", { ...project, ...secret }, SAVE, "deviceConfig.removeProjectSecret", [ASKING, { project: at, name: "GH_TOKEN" }]),
+	route("projects.moveSecretOut", { ...project, ...secret, to: "personal" }, OWNER_SAVING, "deviceConfig.moveSecretFromProject", [ASKING, { project: at, name: "GH_TOKEN", to: "personal" }]),
+	route("projects.moveSecretIn", { ...project, ...secret, from: "personal" }, OWNER_SAVING, "deviceConfig.moveSecretToProject", [ASKING, { name: "GH_TOKEN", from: "personal", project: at }]),
 	route("projects.spaceSecrets", undefined, "session", "configUse.sharedSecrets", [ASKER, "space"]),
-	route("projects.setSpaceSecret", { ...secret, value: "v" }, SAVE, "deviceConfig.saveSpaceSecret", [ASKING, { spaceId: SPACE, name: "GH_TOKEN", value: "v", personId: PERSON }]),
-	route("projects.removeSpaceSecret", secret, SAVE, "deviceConfig.removeSpaceSecret", [ASKING, { spaceId: SPACE, name: "GH_TOKEN", personId: PERSON }]),
-	route("projects.moveSecretToSpace", { ...secret, from: "personal" }, OWNER_SAVING, "deviceConfig.moveSecretToSpace", [ASKING, { name: "GH_TOKEN", from: "personal", spaceId: SPACE, personId: PERSON }]),
-	route("projects.moveSecretFromSpace", { ...secret, to: "personal" }, OWNER_SAVING, "deviceConfig.moveSecretFromSpace", [ASKING, { spaceId: SPACE, name: "GH_TOKEN", to: "personal", personId: PERSON }]),
+	route("projects.setSpaceSecret", { ...secret, value: "v" }, SAVE, "deviceConfig.saveSpaceSecret", [ASKING, { spaceId: SPACE, name: "GH_TOKEN", value: "v" }]),
+	route("projects.removeSpaceSecret", secret, SAVE, "deviceConfig.removeSpaceSecret", [ASKING, { spaceId: SPACE, name: "GH_TOKEN" }]),
+	route("projects.moveSecretToSpace", { ...secret, from: "personal" }, OWNER_SAVING, "deviceConfig.moveSecretToSpace", [ASKING, { name: "GH_TOKEN", from: "personal", spaceId: SPACE }]),
+	route("projects.moveSecretFromSpace", { ...secret, to: "personal" }, OWNER_SAVING, "deviceConfig.moveSecretFromSpace", [ASKING, { spaceId: SPACE, name: "GH_TOKEN", to: "personal" }]),
 	route("projects.moveSecretFromDevice", { ...project, ...secret, deviceId: "laptop" }, OWNER_SAVING, "devices.moveSecretOn", ["laptop", "GH_TOKEN", { to: "project", ...at }]),
 	// Knowledge (ADR 4).
 	route("knowledge.get", project, "session", ["space.listProjects", "knowledge.sources"]),
@@ -1095,7 +1098,6 @@ describe("a procedure keyed by a project", () => {
 					project: { spaceId: SPACE, projectId: "p1" },
 					name: "GH_TOKEN",
 					value: "v",
-					personId: PERSON,
 				},
 			],
 		});

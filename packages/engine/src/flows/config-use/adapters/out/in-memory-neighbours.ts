@@ -89,7 +89,7 @@ export function inMemoryConfiguredConnections(): InMemoryConfiguredConnections {
 		personal: "available",
 		shared: {},
 		list: () => store.connections,
-		async secrets(named = []) {
+		async secrets(_actor, named = []) {
 			const usedBy = new Map<string, string[]>();
 			for (const c of store.connections) {
 				for (const { name } of c.variables) {
@@ -108,7 +108,7 @@ export function inMemoryConfiguredConnections(): InMemoryConfiguredConnections {
 			}));
 			return { secrets, personal: store.personal };
 		},
-		projectSecrets: (project) => sharedOf(project.projectId),
+		projectSecrets: (_actor, project) => sharedOf(project.projectId),
 		spaceSecrets: () => sharedOf("space"),
 	};
 	return store;

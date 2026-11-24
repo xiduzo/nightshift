@@ -1,6 +1,6 @@
 import { HARNESS_LABELS } from "@nightshift/agents/harness-facts";
 import { findProgram } from "@nightshift/agents/types";
-import type { ComputerAccess } from "../access";
+import type { Access, ComputerAccess } from "../access";
 import type { DeviceDocument } from "../documents";
 import type { PersonalSecrets, ProjectSecrets } from "../secrets";
 import { type CliToolStore, wireCliTools } from "./cli-tools";
@@ -55,6 +55,8 @@ export function wireSettings(deps: {
 	/** Who may ask of this computer: its owner. */
 	computerAccess: Pick<ComputerAccess, "openComputer">;
 	document: DeviceDocument;
+	/** Who may act in a Space: its secrets. */
+	access: Pick<Access, "openSpace">;
 	/** The fallback of every setting and every `${NAME}`: the environment. */
 	env: Readonly<Record<string, string | undefined>>;
 	/** Where the secrets saved for this computer go (`secretStore`). */
@@ -81,6 +83,8 @@ export function wireSettings(deps: {
 	});
 	const { expandConnectionForTest, secretEdits, ...connections } =
 		wireConnections({
+			computerAccess,
+			access: deps.access,
 			document,
 			env,
 			secrets,

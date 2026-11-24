@@ -1,19 +1,21 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { connection } from "@nightshift/db/schema";
-import type { StepRun } from "../contract";
+import { NIGHT_SHIFT, type PersonActor, type StepRun } from "../contract";
 import {
 	type PersonalSecrets,
 	type ProjectSecrets,
 	unreachableNote,
 } from "../secrets";
+import { createConnectionStore } from "../testing/config-stores";
 import { createSandbox, type Sandbox } from "../testing/test-support";
-import {
-	type ConnectionInput,
-	type ConnectionStore,
-	wireConnections as createConnectionStore,
-	type SecretBackend,
+import type {
+	ConnectionInput,
+	ConnectionStore,
+	SecretBackend,
 } from "./connections";
 import { referencedVariables } from "./connections/domain/saved-connection";
+
+const ANN: PersonActor = { personId: "ann", door: "session" };
 
 let sandbox: Sandbox;
 beforeEach(async () => {
@@ -74,7 +76,7 @@ async function savedNow() {
 
 /** The rows of the Secrets page. */
 async function listed(store: ConnectionStore, named?: Iterable<string>) {
-	return (await store.secrets(named)).secrets;
+	return (await store.secrets(NIGHT_SHIFT, named)).secrets;
 }
 
 /** A clock a test moves by hand. */
@@ -243,7 +245,7 @@ describe("secrets", () => {
 
 		const never = { setAt: null, usedAt: null };
 		const scope = "computer";
-		expect(await store.secrets()).toEqual({
+		expect(await store.secrets(NIGHT_SHIFT)).toEqual({
 			personal: "available",
 			secrets: [
 				{
@@ -699,7 +701,12 @@ function memoryProjects(initial: Record<string, Record<string, string>> = {}) {
 	const values = new Map(
 		Object.entries(initial).map(([id, v]) => [id, new Map(Object.entries(v))]),
 	);
-	const state = { down: false, calls: 0, asked: [] as StepRun[] };
+	const state = {
+		down: false,
+		calls: 0,
+		asked: [] as StepRun[],
+		by: [] as string[],
+	};
 	const check = () => {
 		state.calls += 1;
 		if (state.down) throw new Error("The Host cannot be reached.");
@@ -734,8 +741,9 @@ function memoryProjects(initial: Record<string, Record<string, string>> = {}) {
 				}),
 			);
 		},
-		async set({ projectId }, name, value) {
+		async set({ projectId }, name, value, personId) {
 			check();
+			state.by.push(personId);
 			of(projectId).set(name, value);
 		},
 		async remove({ projectId }, name) {
@@ -861,20 +869,32 @@ describe("Project secrets (ADR 13)", () => {
 		const { store, personal } = await scopedStore({
 			personal: { TOKEN: "personal-token" },
 		});
-		await store.moveToSpace("TOKEN", "personal", "space-1", "ann");
-		expect(await store.spaceSecrets("space-1", "ann")).toMatchObject([
+		await store.secretEdits.moveSecretToSpace(ANN, {
+			name: "TOKEN",
+			from: "personal",
+			spaceId: "space-1",
+		});
+		expect(await store.spaceSecrets(ANN, "space-1")).toMatchObject([
 			{ name: "TOKEN" },
 		]);
 		expect((await personal.port.values(["TOKEN"])).TOKEN).toBeUndefined();
 
-		await store.moveFromSpace("space-1", "TOKEN", "computer", "ann");
-		expect(await store.spaceSecrets("space-1", "ann")).toEqual([]);
+		await store.secretEdits.moveSecretFromSpace(ANN, {
+			spaceId: "space-1",
+			name: "TOKEN",
+			to: "computer",
+		});
+		expect(await store.spaceSecrets(ANN, "space-1")).toEqual([]);
 		expect(await store.secretEnv(["TOKEN"])).toEqual({
 			ok: true,
 			env: { TOKEN: "personal-token" },
 		});
 		await expect(
-			store.moveToSpace("NOPE", "personal", "space-1", "ann"),
+			store.secretEdits.moveSecretToSpace(ANN, {
+				name: "NOPE",
+				from: "personal",
+				spaceId: "space-1",
+			}),
 		).rejects.toThrow("NOPE is not a Personal secret.");
 	});
 
@@ -942,17 +962,28 @@ describe("Project secrets (ADR 13)", () => {
 
 	test("list, set and remove a Project secret: the value goes to the Project only", async () => {
 		const { store, keychain, projects } = await scopedStore({});
-		await store.setProjectSecret(project, "DB_URL", "postgres://x", "ann");
+		await store.secretEdits.saveProjectSecret(ANN, {
+			project,
+			name: "DB_URL",
+			value: "postgres://x",
+		});
 		expect(projects.values.get("app")?.get("DB_URL")).toBe("postgres://x");
 		expect(keychain.values.has("DB_URL")).toBe(false);
 		expect((await savedNow()).secrets).toEqual([]);
-		expect(await store.projectSecrets(project, "ann")).toEqual([
+		expect(await store.projectSecrets(ANN, project)).toEqual([
 			{ name: "DB_URL", setAt: 9, setBy: { id: "ann", name: "Ann" } },
 		]);
-		await store.removeProjectSecret(project, "DB_URL", "ann");
+		await store.secretEdits.removeProjectSecret(ANN, {
+			project,
+			name: "DB_URL",
+		});
 		expect(projects.values.get("app")?.has("DB_URL")).toBe(false);
 		await expect(
-			store.setProjectSecret(project, "EMPTY", "", "ann"),
+			store.secretEdits.saveProjectSecret(ANN, {
+				project,
+				name: "EMPTY",
+				value: "",
+			}),
 		).rejects.toThrow("A secret needs a value.");
 	});
 
@@ -962,6 +993,7 @@ describe("Project secrets (ADR 13)", () => {
 			personal: { API_KEY: "sk" },
 		});
 		await store.moveToProject("GH_TOKEN", "computer", project, "ann");
+		expect(projects.state.by).toEqual(["ann"]);
 		expect(projects.values.get("app")?.get("GH_TOKEN")).toBe("ghp");
 		expect(keychain.values.has("GH_TOKEN")).toBe(false);
 		expect((await savedNow()).secrets).toEqual([]);
@@ -977,14 +1009,26 @@ describe("Project secrets (ADR 13)", () => {
 		const { store, keychain, personal, projects } = await scopedStore({
 			projects: { app: { DB_URL: "postgres://x", API_KEY: "sk" } },
 		});
-		await store.moveFromProject(project, "DB_URL", "computer", "ann");
+		await store.secretEdits.moveSecretFromProject(ANN, {
+			project,
+			name: "DB_URL",
+			to: "computer",
+		});
 		expect(keychain.values.get("DB_URL")).toBe("postgres://x");
 		expect(projects.values.get("app")?.has("DB_URL")).toBe(false);
-		await store.moveFromProject(project, "API_KEY", "personal", "ann");
+		await store.secretEdits.moveSecretFromProject(ANN, {
+			project,
+			name: "API_KEY",
+			to: "personal",
+		});
 		expect(personal.values.get("API_KEY")).toBe("sk");
 		expect(projects.values.get("app")?.has("API_KEY")).toBe(false);
 		await expect(
-			store.moveFromProject(project, "API_KEY", "computer", "ann"),
+			store.secretEdits.moveSecretFromProject(ANN, {
+				project,
+				name: "API_KEY",
+				to: "computer",
+			}),
 		).rejects.toThrow("API_KEY is not a secret of this project.");
 	});
 });

@@ -1,4 +1,8 @@
 import { describe, expect, test } from "bun:test";
+import {
+	inMemoryComputer,
+	ONLY_THE_OWNER,
+} from "../../../access/computer/adapters/out/in-memory-computer";
 import { NIGHT_SHIFT } from "../../../contract";
 import { inMemorySecretsPorts } from "../../scopes/adapters/out/in-memory-neighbours";
 import { moveSecret } from "./move-secret";
@@ -50,4 +54,13 @@ describe("moveSecret", () => {
 			move(NIGHT_SHIFT, { name: "TOKEN", to: "computer" }),
 		).rejects.toThrow("TOKEN is not a Personal secret.");
 	});
+});
+
+test("only the owner of this computer may, and nothing happens before the check", async () => {
+	const computerAccess = inMemoryComputer();
+	// The other ports are not there: a use of one before the check fails.
+	const act = moveSecret({ computerAccess } as never);
+	expect(
+		await computerAccess.whoMay((actor) => act(actor, {} as never)),
+	).toEqual(ONLY_THE_OWNER);
 });

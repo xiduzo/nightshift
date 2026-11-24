@@ -65,7 +65,7 @@ export const listCliToolUse =
 		);
 		const listed =
 			references.length > 0
-				? await ports.connections.secrets(references)
+				? await ports.connections.secrets(at.actor, references)
 				: null;
 		const here = new Set(
 			(listed?.secrets ?? []).flatMap((secret) =>
@@ -73,12 +73,12 @@ export const listCliToolUse =
 			),
 		);
 		const namesOf = sharedNames({
-			space: () => ports.connections.spaceSecrets(at.spaceId, at.personId),
+			space: () => ports.connections.spaceSecrets(at.actor, at.spaceId),
 			project: (projectId) =>
-				ports.connections.projectSecrets(
-					{ spaceId: at.spaceId, projectId },
-					at.personId,
-				),
+				ports.connections.projectSecrets(at.actor, {
+					spaceId: at.spaceId,
+					projectId,
+				}),
 		});
 		const kept =
 			references.length > 0
