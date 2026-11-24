@@ -161,18 +161,73 @@ export function flowStoreContract(
 				});
 			}));
 
-		test("a merge apart takes no id and no name of what comes later, and runs nothing", () =>
+		test("a merge apart takes no id and no name of what comes later, and what names a flow follows it", () =>
 			withStore(async ({ store, projects: [source, destination] }) => {
-				await store.saveSchedules(source, [nightly("build", "night")]);
-				for (let i = 0; i < 2; i++) {
-					await store.merge(source, destination, { at: 9, apart: "abcd" });
-				}
-				expect((await store.schedules(destination)).schedules).toEqual([
-					{ ...nightly("build", "night-abcd"), enabled: false },
-				]);
-				expect((await store.schedules(source)).schedules).toEqual([
+				const call = (flow: string, tier: string) =>
+					flowSchema.parse({
+						...quick("Call"),
+						start: "call",
+						nodes: [
+							{
+								id: "call",
+								type: "call",
+								position: { x: 0, y: 0 },
+								flow,
+								cascade: [{ flow: tier }, { by: "person" }, {}],
+							},
+							{
+								id: "kit",
+								type: "call",
+								position: { x: 0, y: 0 },
+								flow: "kit:github/create-branch",
+							},
+						],
+						edges: [],
+					});
+				const long = "x".repeat(59);
+				await store.save(source, saving("build", quick("Build"), 1));
+				await store.save(
+					source,
+					saving("caller", call("build", `${long}a`), 1),
+				);
+				await store.save(source, saving(`${long}a`, quick("A"), 1));
+				await store.save(source, saving(`${long}b`, quick("B"), 1));
+				const all = [
 					nightly("build", "night"),
-				]);
+					nightly(`${long}a`, `${long}a`),
+					nightly(`${long}b`, `${long}b`),
+				];
+				await store.saveSchedules(source, all);
+				for (let i = 0; i < 2; i++) {
+					await store.merge(source, destination, { at: 9, apart: "abcdef12" });
+				}
+				// What the other side has comes later.
+				await store.save(destination, saving("build", quick("Theirs"), 0));
+
+				const read = await store.read(destination, here);
+				const text = (name: string | undefined) =>
+					JSON.stringify(read[name as string]);
+				expect(Object.keys(read)).toHaveLength(5);
+				expect(text("build")).toContain("Theirs");
+				expect(text("build-abcdef12")).toContain("Build");
+				const { schedules } = await store.schedules(destination);
+				expect(schedules.map((s) => s.enabled)).toEqual([false, false, false]);
+				expect(new Set(schedules.map((s) => s.id)).size).toBe(3);
+				expect(schedules[0]).toEqual({
+					...nightly("build-abcdef12", "night-abcdef12"),
+					enabled: false,
+				});
+				expect(text(schedules[1]?.flow)).toContain('"A"');
+				expect(text(schedules[2]?.flow)).toContain('"B"');
+				const calls = text("caller-abcdef12");
+				expect(calls).toContain('"flow":"build-abcdef12"');
+				expect(calls).toContain(`"flow":"${schedules[1]?.flow}"`);
+				expect(calls).toContain('"flow":"kit:github/create-branch"');
+				// The source stays as it was.
+				expect((await store.schedules(source)).schedules).toEqual(all);
+				expect(
+					JSON.stringify((await store.read(source, here)).caller),
+				).toContain('"flow":"build"');
 			}));
 
 		test("a note is added once per marker, also after it was dismissed", () =>

@@ -109,8 +109,8 @@ export type FlowStore = {
 	/**
 	 * Merges the flows of `source`, their revisions and its schedules into
 	 * `destination`. Runs again safely. `apart`: `destination` is not all
-	 * here, so each schedule takes an id of its own with this suffix and is
-	 * off, and each flow reads as younger than every other one.
+	 * here, so each flow takes a name and each schedule an id of its own with
+	 * this suffix, and each schedule is off.
 	 */
 	merge(
 		source: string,

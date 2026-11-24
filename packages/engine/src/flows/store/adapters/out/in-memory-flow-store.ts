@@ -6,7 +6,12 @@ import {
 } from "@nightshift/flows";
 import type { FlowStore } from "../../application/ports";
 import { type FlowRevision, same } from "../../domain/flow-json";
-import { apartId, mergedSchedule, withPerson } from "../../domain/flow-merge";
+import {
+	apartNames,
+	mergedSchedule,
+	withCalls,
+	withPerson,
+} from "../../domain/flow-merge";
 import { flowNotFound, newerFlow } from "../../domain/flow-save";
 import { nodeWithShape, outputsWithTypes } from "../../domain/inferred";
 import type { FlowNotice } from "../../domain/notices";
@@ -270,16 +275,22 @@ export function inMemoryFlowStore(): InMemoryFlowStore {
 			const persons = merge.persons ?? {};
 			const { apart } = merge;
 			const from = documentOf(source);
+			const into = documentOf(destination);
 			const plan =
 				apart === undefined
 					? await store.planMerge(source, destination, persons)
 					: {
-							flows: {},
-							schedules: Object.fromEntries(
-								from.schedules.map((s) => [s.id, apartId(s.id, apart)]),
+							flows: apartNames(
+								from.flows.map((flow) => flow.name),
+								apart,
+								new Set(into.flows.map((flow) => flow.name)),
+							),
+							schedules: apartNames(
+								from.schedules.map((s) => s.id),
+								apart,
+								new Set(into.schedules.map((s) => s.id)),
 							),
 						};
-			const into = documentOf(destination);
 			for (const [flowId, revisions] of from.revisions) {
 				const list = into.revisions.get(flowId) ?? [];
 				const known = new Set(list.map((revision) => revision.id));
@@ -294,8 +305,14 @@ export function inMemoryFlowStore(): InMemoryFlowStore {
 			if (into.merged.has(source)) return plan;
 			for (const flow of from.flows) {
 				if (into.flows.some((other) => other.flowId === flow.flowId)) continue;
+				const copy = plain(flow);
+				if (apart !== undefined && Array.isArray(copy.json.nodes)) {
+					copy.json.nodes = copy.json.nodes.map((node) =>
+						withCalls(node, plan.flows),
+					);
+				}
 				into.flows.push({
-					...plain(flow),
+					...copy,
 					name: plan.flows[flow.name] ?? flow.name,
 				});
 			}

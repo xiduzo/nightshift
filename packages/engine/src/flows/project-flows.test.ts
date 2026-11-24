@@ -28,7 +28,7 @@ type MergingFlows = ProjectFlows & {
 	merge(
 		source: string,
 		destination: string,
-		options?: { persons?: Readonly<Record<string, string>> },
+		options?: { persons?: Readonly<Record<string, string>>; apart?: string },
 	): ReturnType<ReturnType<typeof mergeFlows>>;
 };
 
@@ -63,6 +63,7 @@ function flowsOn(over: FlowDocuments): MergingFlows {
 				source,
 				destination,
 				...(options.persons ? { persons: options.persons } : {}),
+				...(options.apart ? { apart: options.apart } : {}),
 			}),
 	};
 }
@@ -327,5 +328,79 @@ describe("the merge of one project's flows into another's", () => {
 			flows: {},
 			schedules: {},
 		});
+	});
+});
+
+describe("a merge apart", () => {
+	const called = (prompt: string): Flow =>
+		flowSchema.parse(
+			singleAgentFlow({
+				prompt,
+				model: "sonnet",
+				permissionMode: "acceptEdits",
+			}),
+		);
+
+	test("a flow that is there already keeps its name, and its schedules name it so", async () => {
+		await flows.save("from", "build", called("Build"));
+		const from = await documents.open("from");
+		const into = await documents.open("into");
+		Y.applyUpdate(into.current.doc, Y.encodeStateAsUpdate(from.current.doc));
+		await flows.saveSchedules("from", [
+			scheduleSchema.parse({ id: "night", flow: "build", cron: "0 3 * * *" }),
+		]);
+
+		await flows.merge("from", "into", { apart: "abcd" });
+
+		expect(Object.keys(await flows.flows("into"))).toEqual(["build"]);
+		const { schedules } = await flows.schedules("into");
+		expect(schedules.map((s) => [s.id, s.flow])).toEqual([
+			["night-abcd", "build"],
+		]);
+	});
+
+	test("a copy that does not read goes along hidden, and takes no name of what comes later", async () => {
+		// Two Devices that made the same flow before they synced.
+		await flows.save("from", "build", called("Build"));
+		await flows.save("twin", "build", called("Build"));
+		const from = await documents.open("from");
+		const twin = await documents.open("twin");
+		Y.applyUpdate(from.current.doc, Y.encodeStateAsUpdate(twin.current.doc));
+		expect(Object.keys(await flows.flows("from"))).toEqual(["build"]);
+
+		await flows.merge("from", "into", { apart: "abcd" });
+
+		expect(Object.keys(await flows.flows("into"))).toEqual(["build-abcd"]);
+	});
+
+	test("a name and an id that the destination has stay its own", async () => {
+		await flows.save("into", "build-abcd", called("Theirs"));
+		await flows.saveSchedules("into", [
+			scheduleSchema.parse({
+				id: "night-abcd",
+				flow: "build-abcd",
+				cron: "0 1 * * *",
+			}),
+		]);
+		await flows.save("from", "build", called("Ours"));
+		await flows.saveSchedules("from", [
+			scheduleSchema.parse({ id: "night", flow: "build", cron: "0 3 * * *" }),
+		]);
+
+		const plan = await flows.merge("from", "into", { apart: "abcd" });
+
+		expect(plan).toEqual({
+			flows: { build: "build-abcd-2" },
+			schedules: { night: "night-abcd-2" },
+		});
+		expect(JSON.stringify((await flows.flows("into"))["build-abcd"])).toContain(
+			"Theirs",
+		);
+		expect(
+			(await flows.schedules("into")).schedules.map((s) => [s.id, s.flow]),
+		).toEqual([
+			["night-abcd", "build-abcd"],
+			["night-abcd-2", "build-abcd-2"],
+		]);
 	});
 });

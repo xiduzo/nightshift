@@ -888,7 +888,7 @@ describe("leaving the home Host keeps a copy", () => {
 				NIGHT_SHIFT,
 			);
 			expect((await own.flows.list(onA.id)).map((f) => f.name)).toEqual([
-				"hello",
+				expect.stringMatching(/^hello-[0-9a-f]{8}$/),
 			]);
 			const { schedules } = await own.listSchedules(onA.id);
 			expect(schedules.map((s) => [s.id, s.enabled])).toEqual([
@@ -914,7 +914,7 @@ describe("leaving the home Host keeps a copy", () => {
 			const split = await membershipOf(link).revoked(home);
 			const own = paired.device.space(split?.spaceId as string, NIGHT_SHIFT);
 			expect((await own.flows.list(onA.id)).map((f) => f.name)).toEqual([
-				"hello",
+				expect.stringMatching(/^hello-[0-9a-f]{8}$/),
 			]);
 			expect((await own.listSchedules(onA.id)).schedules).toHaveLength(1);
 			// Nothing of the source goes.
@@ -924,7 +924,9 @@ describe("leaving the home Host keeps a copy", () => {
 		test("stay with their project of a shared Space", async () => {
 			const { onA, link } = await waiting(true);
 			await membershipOf(link).leave();
-			expect(await flowsIn(onA.id)).toEqual(["hello"]);
+			expect(await flowsIn(onA.id)).toEqual([
+				expect.stringMatching(/^hello-[0-9a-f]{8}$/),
+			]);
 		});
 
 		test("that do not merge keep the split going: the Project each goes to is not forgotten", async () => {
@@ -945,7 +947,7 @@ describe("leaving the home Host keeps a copy", () => {
 			const split = await membershipOf(link).revoked(home);
 			const own = paired.device.space(split?.spaceId as string, NIGHT_SHIFT);
 			expect((await own.flows.list(onA.id)).map((f) => f.name)).toEqual([
-				"hello",
+				expect.stringMatching(/^hello-[0-9a-f]{8}$/),
 			]);
 		});
 	});
@@ -1000,6 +1002,97 @@ describe("leaving the home Host keeps a copy", () => {
 				expect(await flowNames(source)).toEqual(["hello"]);
 			});
 		}
+	}
+
+	for (const wins of [1, 4_000_000_000]) {
+		test(`a schedule of flows that waited starts the flow it was made for, also after a join again (writer ${wins})`, async () => {
+			const { onA, link, source } = await waitingForHost();
+			// Before the leave: a flow that calls another one.
+			const here = createProjectFlows({
+				documents: paired.flows,
+				project: async () => ({ spaceId: "" }),
+				deviceId: b.deviceId,
+			});
+			await here.save(source, "caller", {
+				...quickFlow,
+				start: "call",
+				nodes: [
+					{
+						id: "call",
+						type: "call",
+						position: { x: 0, y: 0 },
+						flow: "hello",
+						inputs: {},
+					},
+				],
+			} as Flow);
+			await here.saveSchedules(source, [
+				...(await here.schedules(source)).schedules,
+				{
+					id: "second",
+					flow: "caller",
+					inputs: {},
+					cron: "0 1 * * *",
+					enabled: true,
+				},
+			]);
+			const flowsOnA = () =>
+				createProjectFlows({
+					documents: createFlowDocuments({ db: a.db }),
+					project: async () => ({ spaceId: "" }),
+					deviceId: "a",
+				});
+			await flowsOnA().save(onA.id, "hello", {
+				...quickFlow,
+				nodes: [{ ...quickFlow.nodes[0], command: "echo host" }],
+			} as Flow);
+			(await paired.flows.open(onA.id)).current.doc.clientID = wins;
+
+			await revoke();
+			const split = await membershipOf(link).revoked(home);
+			const own = paired.device.space(split?.spaceId as string, NIGHT_SHIFT);
+			const { schedules } = await own.listSchedules(onA.id);
+			const ours = (await own.flows.list(onA.id)).map((f) => f.name);
+			const hello = schedules.find((s) => s.id.startsWith("nightly"))?.flow;
+			expect(ours).toContain(hello as string);
+			// On, off and new while apart.
+			await own.saveSchedules(onA.id, [
+				...schedules.map((s) => ({
+					...s,
+					enabled: s.id.startsWith("nightly"),
+				})),
+				{
+					id: "new-here",
+					flow: hello as string,
+					inputs: {},
+					cron: "0 4 * * *",
+					enabled: true,
+				},
+			]);
+			await joinAgain();
+			await membershipOf(undefined).beforeJoin();
+			const { link: again } = linkToA();
+			await ready(again);
+			await membershipOf(again).merge();
+			const synced = await syncedSchedules(onA.id);
+			const flows = await flowsOnA().flows(onA.id);
+			const started = (name: string | undefined) =>
+				JSON.stringify(flows[name as string]);
+			expect(synced.map((s) => [s.id.split("-")[0], s.enabled]).sort()).toEqual(
+				[
+					["new", true],
+					["nightly", true],
+					["second", false],
+				],
+			);
+			for (const s of synced) {
+				expect(started(s.flow)).not.toContain("echo host");
+				if (s.id.startsWith("second")) {
+					expect(started(s.flow)).toContain(`"flow":"${hello}"`);
+				} else expect(started(s.flow)).toContain("echo hello");
+			}
+			expect(started("hello")).toContain("echo host");
+		});
 	}
 
 	test("a project without a folder comes along: every Device has it", async () => {
