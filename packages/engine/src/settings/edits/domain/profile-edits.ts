@@ -1,8 +1,6 @@
 import {
-	type AgentHarnessName,
 	type AgentProfile,
 	type CustomAgent,
-	customAgentSchema,
 	customAgentSlug,
 	HARNESS_CATALOG,
 	type HarnessName,
@@ -20,9 +18,9 @@ export type ProfileView = Profile & { id: string; updatedAt: number };
  * The edits of this computer's configuration that touch more than one of
  * its parts: a profile names connections and CLI tools, a rename or a
  * removal changes the profiles that name it, and the harnesses are
- * settings. Each step checks, then writes, in one fixed order. Each takes
- * the parts it reads and writes as functions: the use cases give their
- * ports, and the guided setups give the stores.
+ * settings. Here is what two of them share. Each step checks, then writes, in
+ * one fixed order. Each takes the parts it reads and writes as functions:
+ * the use cases give their ports, and the guided setups give the stores.
  */
 
 /** The profiles, as an edit reads and saves them. */
@@ -43,13 +41,9 @@ export type NamedTools = { get(name: string): unknown };
 export type HarnessBook = {
 	current(): {
 		harnesses: HarnessName[];
-		customAgents: CustomAgent[];
 		agentPermissionMode: AgentProfile["permissionMode"];
 	};
-	save(patch: {
-		harnesses?: HarnessName[];
-		customAgents?: CustomAgent[];
-	}): Promise<unknown>;
+	save(patch: { harnesses: HarnessName[] }): Promise<unknown>;
 };
 
 export const PROFILE_REMOVED = "This profile was removed. Add it again.";
@@ -58,6 +52,10 @@ export const CUSTOM_AGENT_REMOVED =
 
 export function profileNameTaken(name: string): string {
 	return `A profile named "${name}" already exists. Pick another name.`;
+}
+
+export function connectionTaken(name: string): string {
+	return `A connection named "${name}" already exists. Pick another name.`;
 }
 
 export function noConnectionsNamed(names: readonly string[]): string {
@@ -152,65 +150,6 @@ export async function addHarness(
 	const added = stores.settings.current().harnesses;
 	if (added.includes(harness)) return;
 	await stores.settings.save({ harnesses: [...added, harness] });
-}
-
-/**
- * Removes a harness, or a custom agent for good. Refused while a profile
- * runs on it. `labels` are what a person calls each built-in harness.
- */
-export async function removeHarness(
-	stores: { settings: HarnessBook; profiles: Pick<ProfileBook, "list"> },
-	harness: AgentHarnessName,
-	labels: Readonly<Record<HarnessName, string>>,
-): Promise<void> {
-	const values = stores.settings.current();
-	const custom = customAgentOf(values.customAgents, harness);
-	const label = isCustomHarness(harness)
-		? (custom?.label ?? harness)
-		: labels[harness];
-	const using = stores.profiles
-		.list()
-		.filter((p) => isAgentProfile(p) && p.harness === harness)
-		.map((p) => p.name);
-	if (using.length > 0) {
-		throw new Refusal("conflict", harnessInUse(using, label));
-	}
-	if (isCustomHarness(harness)) {
-		await stores.settings.save({
-			customAgents: values.customAgents.filter((a) => a !== custom),
-		});
-		return;
-	}
-	await stores.settings.save({
-		harnesses: values.harnesses.filter((h) => h !== harness),
-	});
-}
-
-/**
- * Adds a custom agent, or changes one (`previousSlug`). Its slug, the name
- * flows use, never changes: a flow that names it keeps working.
- */
-export async function saveCustomAgent(
-	stores: { settings: HarnessBook },
-	agent: CustomAgent,
-	previousSlug?: string,
-): Promise<CustomAgent> {
-	const agents = stores.settings.current().customAgents;
-	if (previousSlug === undefined) {
-		if (agents.some((a) => a.slug === agent.slug)) {
-			throw new Refusal("conflict", customAgentTaken(agent.slug));
-		}
-		await stores.settings.save({ customAgents: [...agents, agent] });
-		return customAgentSchema.parse(agent);
-	}
-	if (!agents.some((a) => a.slug === previousSlug)) {
-		throw new Refusal("not-found", CUSTOM_AGENT_REMOVED);
-	}
-	const saved = customAgentSchema.parse({ ...agent, slug: previousSlug });
-	await stores.settings.save({
-		customAgents: agents.map((a) => (a.slug === previousSlug ? saved : a)),
-	});
-	return saved;
 }
 
 /**

@@ -1,3 +1,4 @@
+import { Refusal } from "@nightshift/refusal";
 import type { ComputerAccess } from "../../../access";
 import type { Actor } from "../../../contract";
 import type {
@@ -6,7 +7,7 @@ import type {
 	ConnectionStore,
 } from "../../connections";
 import type { ProfileStore } from "../../profiles";
-import { saveConnection as saveConnectionStep } from "../domain/tool-edits";
+import { connectionTaken, rewriteProfiles } from "../domain/profile-edits";
 
 export type SaveConnectionPorts = {
 	computerAccess: Pick<ComputerAccess, "openComputer">;
@@ -27,5 +28,25 @@ export const saveConnection =
 		request: { connection: ConnectionInput; previousName?: string },
 	): Promise<Connection> => {
 		ports.computerAccess.openComputer(actor);
-		return saveConnectionStep(ports, request.connection, request.previousName);
+		const { connection, previousName } = request;
+		if (
+			previousName !== connection.name &&
+			ports.connections.get(connection.name)
+		) {
+			throw new Refusal("conflict", connectionTaken(connection.name));
+		}
+		const saved = await ports.connections.save(connection);
+		if (previousName && previousName !== connection.name) {
+			await ports.connections.remove(previousName);
+			await rewriteProfiles(ports.profiles, (p) =>
+				p.connections.includes(previousName)
+					? {
+							connections: p.connections.map((c) =>
+								c === previousName ? connection.name : c,
+							),
+						}
+					: null,
+			);
+		}
+		return saved;
 	};

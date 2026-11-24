@@ -44,6 +44,20 @@ describe("saveConnection", () => {
 		});
 	});
 
+	test("a change that keeps the name is no other connection", async () => {
+		const ports = {
+			connections: inMemoryConnections(["gh"]),
+			profiles: inMemoryProfiles(),
+		};
+		const save = saveConnection({
+			...ports,
+			computerAccess: inMemoryComputer(),
+		});
+		const changed = { name: "gh", server: { ...server, command: "other-mcp" } };
+		await save(NIGHT_SHIFT, { connection: changed, previousName: "gh" });
+		expect(ports.connections.get("gh")).toMatchObject(changed);
+	});
+
 	test("refuses a name another connection has", async () => {
 		const ports = {
 			connections: inMemoryConnections(["gh"]),

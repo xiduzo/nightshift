@@ -1,9 +1,15 @@
-import type { AgentHarnessName, HarnessName } from "@nightshift/flows";
+import {
+	type AgentHarnessName,
+	type HarnessName,
+	isAgentProfile,
+	isCustomHarness,
+} from "@nightshift/flows";
+import { Refusal } from "@nightshift/refusal";
 import type { ComputerAccess } from "../../../access";
 import type { Actor } from "../../../contract";
 import type { ProfileStore } from "../../profiles";
 import type { SettingsStore } from "../../settings";
-import { removeHarness as removeHarnessStep } from "../domain/profile-edits";
+import { customAgentOf, harnessInUse } from "../domain/profile-edits";
 
 export type RemoveHarnessPorts = {
 	computerAccess: Pick<ComputerAccess, "openComputer">;
@@ -25,5 +31,26 @@ export const removeHarness =
 		request: { harness: AgentHarnessName },
 	): Promise<void> => {
 		ports.computerAccess.openComputer(actor);
-		return removeHarnessStep(ports, request.harness, ports.labels);
+		const { harness } = request;
+		const values = ports.settings.current();
+		const custom = customAgentOf(values.customAgents, harness);
+		const label = isCustomHarness(harness)
+			? (custom?.label ?? harness)
+			: ports.labels[harness];
+		const using = ports.profiles
+			.list()
+			.filter((p) => isAgentProfile(p) && p.harness === harness)
+			.map((p) => p.name);
+		if (using.length > 0) {
+			throw new Refusal("conflict", harnessInUse(using, label));
+		}
+		if (isCustomHarness(harness)) {
+			await ports.settings.save({
+				customAgents: values.customAgents.filter((a) => a !== custom),
+			});
+			return;
+		}
+		await ports.settings.save({
+			harnesses: values.harnesses.filter((h) => h !== harness),
+		});
 	};

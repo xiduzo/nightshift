@@ -2,7 +2,7 @@ import type { ComputerAccess } from "../../../access";
 import type { Actor } from "../../../contract";
 import type { ConnectionStore } from "../../connections";
 import type { ProfileStore } from "../../profiles";
-import { removeConnection as removeConnectionStep } from "../domain/tool-edits";
+import { rewriteProfiles } from "../domain/profile-edits";
 
 export type RemoveConnectionPorts = {
 	computerAccess: Pick<ComputerAccess, "openComputer">;
@@ -18,5 +18,11 @@ export const removeConnection =
 	(ports: RemoveConnectionPorts) =>
 	async (actor: Actor, request: { name: string }): Promise<void> => {
 		ports.computerAccess.openComputer(actor);
-		return removeConnectionStep(ports, request.name);
+		const { name } = request;
+		await ports.connections.remove(name);
+		await rewriteProfiles(ports.profiles, (p) =>
+			p.connections.includes(name)
+				? { connections: p.connections.filter((c) => c !== name) }
+				: null,
+		);
 	};

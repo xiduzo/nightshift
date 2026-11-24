@@ -2,7 +2,7 @@ import type { ComputerAccess } from "../../../access";
 import type { Actor } from "../../../contract";
 import type { CliToolStore } from "../../cli-tools";
 import type { ProfileStore } from "../../profiles";
-import { removeCliTool as removeCliToolStep } from "../domain/tool-edits";
+import { rewriteProfiles } from "../domain/profile-edits";
 
 export type RemoveCliToolPorts = {
 	computerAccess: Pick<ComputerAccess, "openComputer">;
@@ -18,5 +18,9 @@ export const removeCliTool =
 	(ports: RemoveCliToolPorts) =>
 	async (actor: Actor, request: { name: string }): Promise<void> => {
 		ports.computerAccess.openComputer(actor);
-		return removeCliToolStep(ports, request.name);
+		const { name } = request;
+		await ports.cliTools.remove(name);
+		await rewriteProfiles(ports.profiles, (p) =>
+			p.clis.includes(name) ? { clis: p.clis.filter((c) => c !== name) } : null,
+		);
 	};
