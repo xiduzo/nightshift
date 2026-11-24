@@ -261,3 +261,30 @@ Each entry names its source. "Read" means found by reading and not reproduced.
 - The checks add about 1 second to check-rings. The rules and generators add about 900
   lines net. Their tests are the largest part.
 - A literal in the call is enough to pass the forward check. A review judges that.
+
+### T. The last twins (0a03e8b95, 3e8988a87)
+
+- The twins of the run views and the setup processes run no code of a real adapter. The twin
+  list of ADR 41 is empty. 22 of 22 mutants are red in the two contracts.
+- The lane adds 510 lines net. The run-views twin is most of it. This buys independent tests,
+  not a smaller codebase.
+- The twin leaves out what no test asks: sessions, sleeps, resumes, hand-offs, take-over.
+- Outside devices, each test that needs a migrated database starts from `migratedDb()`. The
+  tests of the migration itself do not. Seven contracts in devices follow.
+
+### MB. Membership: merge, split and leave (ed3f33e0d, e88d905bc)
+
+- Of the 48 mutants that P1a left, 4 are equivalent. The other 44 are red: 42 of them had no
+  test that failed in any suite tried, 2 were caught in apps/server.
+- Three forwards of the registry are gone. Use-case debt: 11 lines, then 9 (T), then 3. The
+  three role writes of auth are left.
+- The lane adds about 820 lines of tests and a 380-line twin, more than planned.
+- The new tests found faults of the product. None is fixed here. Two concern data, both
+  reproduced on the real engine. Nothing is deleted in them, but no page shows the data:
+  1. A Project joins a Project of the Host, and its flow documents still wait. When this
+     computer then leaves the Host, the split Project has no flows.
+  2. A Project that the Person adds while a merge is stopped keeps the old Space. The Person
+     is a Member of no Space that holds it.
+- The twin copies the order of the engine by hand. The merge and split suites are the only
+  proof on a real database. The split and merge of knowledge data are not proven.
+- At ed3f33e0d alone the ring check is red, because the debt lines left one commit later.
