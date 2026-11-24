@@ -8,7 +8,7 @@ import { otherVersion } from "@nightshift/refusal";
 import type { Caller } from "../../../contract";
 import type { DeviceVersions } from "../domain/host";
 import { requireHost } from "../domain/host";
-import { NO_ACCESS, NO_PERMISSION, ROLE_WORDS } from "../domain/words";
+import { NO_ACCESS, NO_PERMISSION } from "../domain/words";
 import type {
 	HostSettings,
 	KeyedCallCodes,
@@ -96,7 +96,7 @@ function callerOf(
 		async may(spaceId, need: Permissions, words) {
 			const found = await role(spaceId);
 			if (!found || !ports.roles.roleAllows(found, need)) {
-				ports.codes.forbidden(words ?? ROLE_WORDS);
+				ports.codes.forbidden(words ?? ports.roles.refusalWords());
 			}
 		},
 	};

@@ -4,7 +4,7 @@ import { PROTOCOL_VERSION } from "@nightshift/refusal";
 import { NOT_A_HOST } from "../../../contract";
 import type { PairedDevice } from "../../registry";
 import { inMemoryHostPorts } from "../adapters/out/in-memory-neighbours";
-import { NO_ACCESS, NO_PERMISSION, ROLE_WORDS } from "../domain/words";
+import { NO_ACCESS, NO_PERMISSION } from "../domain/words";
 import { admitKeyedCall } from "./admit-keyed-call";
 
 const keyOf = (fields: Partial<DeviceKeyAccess> = {}): DeviceKeyAccess => ({
@@ -156,7 +156,10 @@ describe("admitKeyedCall", () => {
 		});
 		await expect(
 			caller.may("space-1", { run: ["start"] }),
-		).rejects.toMatchObject({ code: "FORBIDDEN", message: ROLE_WORDS });
+		).rejects.toMatchObject({
+			code: "FORBIDDEN",
+			message: "Your role in this Space does not allow this.",
+		});
 		await expect(
 			caller.may("space-1", { offer: ["make"] }, "Not for a viewer."),
 		).rejects.toMatchObject({

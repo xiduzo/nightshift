@@ -19,10 +19,6 @@ export const NO_ACCESS =
 /** A key that does not hold the permission the procedure names. */
 export const NO_PERMISSION = "This device may not do this here." as const;
 
-/** A role that does not allow the call, as the Host says it to a Device. */
-export const ROLE_WORDS =
-	"Your role in this Space does not allow this. Ask an owner or admin of the Space to change your role." as const;
-
 /** The default name of a Device that did not say one when it asked for a code. */
 export const DEFAULT_DEVICE_NAME = "Device" as const;
 

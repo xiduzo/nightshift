@@ -2,6 +2,7 @@ import type { DeviceKeyAccess, DeviceKeyPermission } from "@nightshift/auth";
 import {
 	type Auth,
 	bearerDeviceKey,
+	ROLE_REFUSAL,
 	roleAllows,
 	wireDeviceKeys,
 	wirePairing,
@@ -99,6 +100,7 @@ export function wireHost(deps: HostDeps) {
 		roleIn: (personId: string, spaceId: string) =>
 			spacesBound.findRole({ personId, spaceId }),
 		roleAllows,
+		refusalWords: () => ROLE_REFUSAL.message,
 	};
 	const pairingPorts = {
 		pairings: {

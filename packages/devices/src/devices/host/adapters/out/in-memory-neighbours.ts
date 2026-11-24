@@ -286,6 +286,7 @@ export function inMemorySpaceRoles() {
 		roleAllows(role: Role, _need: { run?: string[] }) {
 			return role !== "viewer";
 		},
+		refusalWords: () => "Your role in this Space does not allow this.",
 	};
 	return twin satisfies SpaceRoles & { roles: Map<string, Role | null> };
 }

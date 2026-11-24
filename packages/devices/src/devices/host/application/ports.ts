@@ -87,6 +87,8 @@ export type PersonSpaces = {
 export type SpaceRoles = {
 	roleIn(personId: string, spaceId: string): Promise<Role | null>;
 	roleAllows(role: Role, need: Permissions): boolean;
+	/** The words of a role that does not allow a request (`ROLE_REFUSAL`). */
+	refusalWords(): string;
 };
 
 /**
