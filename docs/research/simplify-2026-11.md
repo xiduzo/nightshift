@@ -171,8 +171,10 @@ Each entry names its source. "Read" means found by reading and not reproduced.
 - The claim was high. The 55 neighbour files were counted in all packages. In the engine they
   go from 5,107 to 4,344 lines. "Runs 16" does not hold for ports that runs fills.
 - Seven fakes were wrong about the real sibling. None hid a fault of the product.
-- 21 mutants on callers: 18 red. Open: `others.has(folder)` in `remove-knowledge-source`, and
-  one in `tool-edits` that ran against the wrong test.
+- 21 mutants on callers: 17 red, 2 more after a test was tightened, and the last 2 after
+  280a5e8b3. The first count of 18 was wrong.
+- 280a5e8b3 also removes AgentConfig and DeciderConfig, with their casts. 42 ports are now
+  removed and 20 stay.
 - What stays, and what frees it, is in the ledger of the lane. The main causes are cycles
   (`knowledge/files`, map, secrets) and ports that the wire composes.
 
