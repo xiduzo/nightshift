@@ -48,6 +48,31 @@ Read `docs/steering/STRUCTURE.md` before you add a file, a folder or a package.
 - **Do not copy a known deviation** (section 8 of `STRUCTURE.md`). Old code that breaks
   a rule is debt, not a pattern.
 
+# Only forward: no legacy
+
+We only move forward. We do not keep an old thing because it exists.
+
+- **Replace means remove.** The change that adds the new way removes the old way: the
+  code, its callers, its tests, its fixtures, its docs and its names. Two ways to do one
+  thing is not a finished change.
+- **No code for a caller that is gone.** No alias, re-export, optional argument, flag,
+  fallback or "deprecated" mark that only keeps an old caller alive. Change the callers.
+- **A new test replaces the old test.** When a use-case test covers what an older test
+  proves, remove the older test in the same change. First make sure that the new test
+  fails for the same fault.
+- **Old data moves once.** A format change ships one migration to the new shape. Code
+  after that migration reads only the new shape.
+- **An old reader needs a name and an end.** Keep compatibility only for a reader that
+  runs today and that we cannot update in the same change: a released phone build, a
+  Host, a file that a person owns. The comment names that reader and the condition that
+  removes the code. Without both, remove it.
+- **Git is the archive.** No commented-out code, no unused export, no "just in case".
+- **Do not build on legacy.** When your change meets old code of this kind, remove it
+  first. If it is too large for the change, tell the owner. Do not copy it.
+
+Database migrations, `docs/adr/` and `docs/research/` are records, not legacy. A removal
+never deletes the data of a person.
+
 # UI: shadcn/ui only
 
 The web app (`apps/web`) is built from [shadcn/ui components](https://ui.shadcn.com/docs/components)
