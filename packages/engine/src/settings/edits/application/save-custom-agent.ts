@@ -1,9 +1,11 @@
 import type { CustomAgent } from "@nightshift/flows";
 import type { Actor } from "../../../contract";
+import type { SettingsStore } from "../../settings";
 import { saveCustomAgent as saveCustomAgentStep } from "../domain/profile-edits";
-import type { EditedSettings } from "./ports";
 
-export type SaveCustomAgentPorts = { settings: EditedSettings };
+export type SaveCustomAgentPorts = {
+	settings: Pick<SettingsStore, "current" | "save">;
+};
 
 /**
  * Adds a custom agent, or changes one (`previousSlug`). Its slug, the name

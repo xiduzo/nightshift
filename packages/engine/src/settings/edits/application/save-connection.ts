@@ -1,11 +1,15 @@
 import type { Actor } from "../../../contract";
-import type { Connection, ConnectionInput } from "../../connections";
+import type {
+	Connection,
+	ConnectionInput,
+	ConnectionStore,
+} from "../../connections";
+import type { ProfileStore } from "../../profiles";
 import { saveConnection as saveConnectionStep } from "../domain/tool-edits";
-import type { EditedConnections, EditedProfiles } from "./ports";
 
 export type SaveConnectionPorts = {
-	connections: EditedConnections;
-	profiles: Pick<EditedProfiles, "list" | "save">;
+	connections: Pick<ConnectionStore, "get" | "save" | "remove">;
+	profiles: Pick<ProfileStore, "list" | "save">;
 };
 
 /**

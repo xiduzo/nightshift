@@ -1,4 +1,5 @@
 import type { Access } from "../../access";
+import type { ProjectFlows } from "../store";
 import { dismissFlowNotice } from "./application/dismiss-flow-notice";
 import { forgetNodeMemory } from "./application/forget-node-memory";
 import { listFlowNotices } from "./application/list-flow-notices";
@@ -11,7 +12,6 @@ import type {
 	KeptValues,
 	Names,
 	NodeMemory,
-	SavedFlows,
 	SpaceProjects,
 } from "./application/ports";
 import { readFlow } from "./application/read-flow";
@@ -36,7 +36,10 @@ const NO_NAMES = async () => new Map<string, string>();
 export function wireEditing(deps: {
 	access: Pick<Access, "openSpace">;
 	projects: SpaceProjects;
-	flows: SavedFlows;
+	flows: Pick<
+		ProjectFlows,
+		"flows" | "save" | "remove" | "revisions" | "notices" | "dismissNotice"
+	>;
 	/** Without them, a revision names nobody and no Device. */
 	names?: Partial<Names>;
 	usage?: FlowUsage;

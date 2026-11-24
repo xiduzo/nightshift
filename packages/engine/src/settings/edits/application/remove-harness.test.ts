@@ -1,10 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import type { AgentProfile } from "@nightshift/flows";
 import { NIGHT_SHIFT } from "../../../contract";
-import {
-	inMemoryEditedProfiles,
-	inMemoryEditedSettings,
-} from "../adapters/out/in-memory-neighbours";
+import { inMemoryProfiles } from "../../profiles/adapters/out/in-memory-profiles";
+import { inMemorySettings } from "../../settings/adapters/out/in-memory-settings";
 import { removeHarness } from "./remove-harness";
 
 function profile(over: Partial<AgentProfile> = {}): AgentProfile {
@@ -25,8 +23,8 @@ const labels = { gemini: "Gemini CLI" } as Parameters<
 
 describe("removeHarness", () => {
 	test("refuses to remove a harness a profile runs on, then removes it", async () => {
-		const settings = inMemoryEditedSettings({ harnesses: ["gemini"] });
-		const profiles = inMemoryEditedProfiles();
+		const settings = inMemorySettings({ harnesses: ["gemini"] });
+		const profiles = inMemoryProfiles();
 		const remove = removeHarness({ settings, profiles, labels });
 		await profiles.save(profile({ harness: "gemini" }));
 		await expect(remove(NIGHT_SHIFT, { harness: "gemini" })).rejects.toThrow(
@@ -34,7 +32,7 @@ describe("removeHarness", () => {
 		);
 		const empty = removeHarness({
 			settings,
-			profiles: inMemoryEditedProfiles(),
+			profiles: inMemoryProfiles(),
 			labels,
 		});
 		await empty(NIGHT_SHIFT, { harness: "gemini" });
@@ -42,14 +40,20 @@ describe("removeHarness", () => {
 	});
 
 	test("removes a custom agent for good", async () => {
-		const settings = inMemoryEditedSettings({
+		const settings = inMemorySettings({
 			customAgents: [
-				{ slug: "goose", label: "Goose", command: "goose", args: [], env: {} },
+				{
+					slug: "goose",
+					label: "Goose",
+					command: "goose",
+					args: [],
+					env: {},
+				},
 			],
 		});
 		await removeHarness({
 			settings,
-			profiles: inMemoryEditedProfiles(),
+			profiles: inMemoryProfiles(),
 			labels,
 		})(NIGHT_SHIFT, { harness: "acp:goose" });
 		expect(settings.current().customAgents).toEqual([]);

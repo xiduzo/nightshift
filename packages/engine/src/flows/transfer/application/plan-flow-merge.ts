@@ -1,8 +1,7 @@
-import type { FlowMergePlan } from "../../store";
-import type { DocumentMerges } from "./ports";
+import type { FlowMergePlan, FlowMerges } from "../../store";
 
 export type PlanFlowMergePorts = {
-	merges: Pick<DocumentMerges, "planMerge">;
+	merges: Pick<FlowMerges, "planMerge">;
 };
 
 /**

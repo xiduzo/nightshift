@@ -1,10 +1,11 @@
 import type { Actor } from "../../../contract";
+import type { CliToolStore } from "../../cli-tools";
+import type { ProfileStore } from "../../profiles";
 import { removeCliTool as removeCliToolStep } from "../domain/tool-edits";
-import type { EditedCliTools, EditedProfiles } from "./ports";
 
 export type RemoveCliToolPorts = {
-	cliTools: Pick<EditedCliTools, "remove">;
-	profiles: Pick<EditedProfiles, "list" | "save">;
+	cliTools: Pick<CliToolStore, "remove">;
+	profiles: Pick<ProfileStore, "list" | "save">;
 };
 
 /** Removes a CLI tool, and takes it off the profiles that name it. */

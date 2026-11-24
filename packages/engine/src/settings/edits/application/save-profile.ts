@@ -1,19 +1,17 @@
 import type { Profile } from "@nightshift/flows";
 import type { Actor } from "../../../contract";
+import type { CliToolStore } from "../../cli-tools";
+import type { ConnectionStore } from "../../connections";
+import type { ProfileStore } from "../../profiles";
 import {
 	type ProfileView,
 	saveProfile as saveProfileStep,
 } from "../domain/profile-edits";
-import type {
-	EditedCliTools,
-	EditedConnections,
-	EditedProfiles,
-} from "./ports";
 
 export type SaveProfilePorts = {
-	connections: Pick<EditedConnections, "get">;
-	cliTools: Pick<EditedCliTools, "get">;
-	profiles: EditedProfiles;
+	connections: Pick<ConnectionStore, "get">;
+	cliTools: Pick<CliToolStore, "get">;
+	profiles: Pick<ProfileStore, "get" | "byName" | "list" | "save">;
 };
 
 /**

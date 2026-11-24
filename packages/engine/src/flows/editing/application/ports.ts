@@ -1,7 +1,6 @@
 import type { MemoryFlow, NodeMemory as Remembered } from "../../../memory";
 import type { UsageMoment } from "../../../usage";
 import type { KeptFlow, KeptValue } from "../../../variables";
-import type { ProjectFlows } from "../../store";
 
 /**
  * The projects of a Space, for the one check of every verb.
@@ -14,16 +13,6 @@ export type SpaceProjects = {
 	 */
 	inSpace(projectId: string, spaceId: string): Promise<void>;
 };
-
-/**
- * The flows of the Projects as Night Shift reads and saves them
- * (`ProjectFlows`, `flows/store/`).
- * @filledBy engine/flows
- */
-export type SavedFlows = Pick<
-	ProjectFlows,
-	"flows" | "save" | "remove" | "revisions" | "notices" | "dismissNotice"
->;
 
 /**
  * The names of Persons and of Devices, by id. One without a name is

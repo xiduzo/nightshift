@@ -1,4 +1,7 @@
 import type { Profile, Schedule } from "@nightshift/flows";
+import type { ProfileStore } from "../../../settings";
+import type { FlowMigrations } from "../../migrations";
+import type { FlowImports } from "../../store";
 import {
 	type CloneHere,
 	type CloneImport,
@@ -18,26 +21,18 @@ import {
 } from "../domain/clone-import";
 import type { TrackedState } from "../domain/legacy-folder";
 import { parseLegacyProfiles } from "../domain/legacy-profiles";
-import type {
-	Clock,
-	CloneDocuments,
-	CloneFolders,
-	DeviceProfiles,
-	Migrations,
-	SavedDocuments,
-	ThisDevice,
-} from "./ports";
+import type { Clock, CloneFolders, SavedDocuments, ThisDevice } from "./ports";
 
 export type ImportCloneFolderPorts = {
-	documents: CloneDocuments;
+	documents: FlowImports;
 	folders: CloneFolders;
 	saved: SavedDocuments;
 	device: ThisDevice;
 	clock: Clock;
 	/** Without them, a folder with profiles stays. */
-	profiles?: DeviceProfiles | undefined;
+	profiles?: Pick<ProfileStore, "list" | "save"> | undefined;
 	/** Without them, a node keeps its profile's name, to pick again. */
-	migrations?: Migrations | undefined;
+	migrations?: Pick<FlowMigrations, "forDevice"> | undefined;
 };
 
 /**
@@ -184,7 +179,7 @@ export const importCloneFolder =
  * end. Returns the labels it made, and the profiles that got another label.
  */
 async function importProfiles(
-	store: DeviceProfiles,
+	store: Pick<ProfileStore, "list" | "save">,
 	profiles: readonly Profile[],
 ): Promise<{ made: string[]; labelled: LabelledProfile[] }> {
 	const made: string[] = [];

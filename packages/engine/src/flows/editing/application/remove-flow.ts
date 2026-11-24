@@ -1,14 +1,15 @@
 import type { Permissions } from "@nightshift/auth";
 import type { Access } from "../../../access";
 import type { Actor } from "../../../contract";
-import type { SavedFlows, SpaceProjects } from "./ports";
+import type { ProjectFlows } from "../../store";
+import type { SpaceProjects } from "./ports";
 
 const REMOVES_FLOWS: Permissions = { flow: ["remove"] };
 
 export type RemoveFlowPorts = {
 	access: Pick<Access, "openSpace">;
 	projects: SpaceProjects;
-	flows: Pick<SavedFlows, "remove">;
+	flows: Pick<ProjectFlows, "remove">;
 };
 
 /**

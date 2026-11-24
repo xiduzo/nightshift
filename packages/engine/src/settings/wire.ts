@@ -12,7 +12,6 @@ import {
 import { type Edits, wireEdits } from "./edits";
 import { type ProfileStore, wireProfiles } from "./profiles";
 import {
-	HARNESS_BIN,
 	type SettingsStore,
 	type WiredSettings,
 	wireSettings as wireSettingsStore,
@@ -90,11 +89,7 @@ export function wireSettings(deps: {
 	const { saveCliTool, ...cliTools } = wireCliTools({ document });
 	const { removeProfile, ...profiles } = wireProfiles({ document });
 	const edits = wireEdits({
-		settings: {
-			current: () => settings.current(),
-			save: (patch) => settings.save(patch),
-			bin: (harness) => String(settings.current()[HARNESS_BIN[harness]]),
-		},
+		settings,
 		profiles,
 		connections,
 		cliTools,

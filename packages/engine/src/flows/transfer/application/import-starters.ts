@@ -4,21 +4,17 @@ import {
 	withAgentProfiles,
 } from "@nightshift/flows";
 import { type Actor, personOf } from "../../../contract";
+import type { ProjectFlows } from "../../store";
 import {
 	migratedFlow,
 	namesOf,
 	type StarterImport,
 } from "../domain/flow-files";
-import type {
-	FlowUsage,
-	ImportMigrations,
-	SavedFlows,
-	SpaceProjects,
-} from "./ports";
+import type { FlowUsage, ImportMigrations, SpaceProjects } from "./ports";
 
 export type ImportStartersPorts = {
 	projects: SpaceProjects;
-	flows: Pick<SavedFlows, "flows" | "save">;
+	flows: Pick<ProjectFlows, "flows" | "save">;
 	importMigrations?: ImportMigrations | undefined;
 	usage?: FlowUsage | undefined;
 };

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { NIGHT_SHIFT } from "../../../contract";
-import { inMemoryEditedSettings } from "../adapters/out/in-memory-neighbours";
+import { inMemorySettings } from "../../settings/adapters/out/in-memory-settings";
 import { saveCustomAgent } from "./save-custom-agent";
 
 const goose = {
@@ -13,7 +13,7 @@ const goose = {
 
 describe("saveCustomAgent", () => {
 	test("adds an agent, refuses a taken slug or a removed agent, and keeps the slug on a change", async () => {
-		const settings = inMemoryEditedSettings();
+		const settings = inMemorySettings();
 		const save = saveCustomAgent({ settings });
 		await save(NIGHT_SHIFT, { agent: goose });
 		await expect(save(NIGHT_SHIFT, { agent: goose })).rejects.toThrow(

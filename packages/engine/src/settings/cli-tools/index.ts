@@ -2,7 +2,6 @@
 
 export {
 	type CliTool,
-	type CliToolInput,
 	cliToolGitSchema,
 	cliToolInputSchema,
 	programOf,

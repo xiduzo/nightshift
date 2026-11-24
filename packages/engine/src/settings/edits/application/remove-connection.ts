@@ -1,10 +1,11 @@
 import type { Actor } from "../../../contract";
+import type { ConnectionStore } from "../../connections";
+import type { ProfileStore } from "../../profiles";
 import { removeConnection as removeConnectionStep } from "../domain/tool-edits";
-import type { EditedConnections, EditedProfiles } from "./ports";
 
 export type RemoveConnectionPorts = {
-	connections: Pick<EditedConnections, "remove">;
-	profiles: Pick<EditedProfiles, "list" | "save">;
+	connections: Pick<ConnectionStore, "remove">;
+	profiles: Pick<ProfileStore, "list" | "save">;
 };
 
 /** Removes a connection, and takes it off the profiles that name it. */

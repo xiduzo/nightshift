@@ -1,24 +1,21 @@
 import type { Actor } from "../../../contract";
-import { programOf } from "../../cli-tools";
+import { type CliToolStore, programOf } from "../../cli-tools";
+import type { ConnectionStore } from "../../connections";
+import type { ProfileStore } from "../../profiles";
+import { HARNESS_BIN, type SettingsStore } from "../../settings";
 import {
 	foundPrograms,
 	programToSetUp,
 	type SetUpProgram,
 } from "../domain/found-programs";
 import { agentProfileOn } from "../domain/profile-edits";
-import type {
-	EditedCliTools,
-	EditedConnections,
-	EditedProfiles,
-	EditedSettings,
-	Programs,
-} from "./ports";
+import type { Programs } from "./ports";
 
 export type SetUpProgramPorts = {
-	settings: EditedSettings;
-	profiles: EditedProfiles;
-	cliTools: EditedCliTools;
-	connections: Pick<EditedConnections, "get">;
+	settings: Pick<SettingsStore, "current" | "save">;
+	profiles: Pick<ProfileStore, "get" | "byName" | "list" | "save">;
+	cliTools: Pick<CliToolStore, "get" | "list" | "save">;
+	connections: Pick<ConnectionStore, "get">;
 	programs: Programs;
 };
 
@@ -37,7 +34,8 @@ export const setUpProgram =
 		const found = programToSetUp(
 			foundPrograms(
 				{
-					bin: ports.settings.bin,
+					bin: (harness) =>
+						String(ports.settings.current()[HARNESS_BIN[harness]]),
 					profiles: ports.profiles.list(),
 					toolPrograms: ports.cliTools.list().map(programOf),
 				},

@@ -1,19 +1,17 @@
 import { describe, expect, test } from "bun:test";
 import { NIGHT_SHIFT } from "../../../contract";
-import {
-	inMemoryEditedCliTools,
-	inMemoryEditedProfiles,
-	inMemoryEditedSettings,
-	inMemoryPrograms,
-} from "../adapters/out/in-memory-neighbours";
+import { inMemoryCliTools } from "../../cli-tools/adapters/out/in-memory-cli-tools";
+import { inMemoryProfiles } from "../../profiles/adapters/out/in-memory-profiles";
+import { inMemorySettings } from "../../settings/adapters/out/in-memory-settings";
+import { inMemoryPrograms } from "../adapters/out/in-memory-neighbours";
 import { listFoundPrograms } from "./list-found-programs";
 
 describe("listFoundPrograms", () => {
 	test("offers the agent CLIs and the kits' tools it finds, agents first", () => {
 		const list = listFoundPrograms({
-			settings: inMemoryEditedSettings({ bins: { "claude-code": "claude" } }),
-			profiles: inMemoryEditedProfiles(),
-			cliTools: inMemoryEditedCliTools(),
+			settings: inMemorySettings({ claudeBin: "claude" }),
+			profiles: inMemoryProfiles(),
+			cliTools: inMemoryCliTools(),
 			programs: inMemoryPrograms(["claude", "pi", "gh", "aws"]),
 		});
 		expect(list(NIGHT_SHIFT)).toEqual([
@@ -31,11 +29,11 @@ describe("listFoundPrograms", () => {
 	test("nothing on this computer offers nothing, and a harness's setting names its program", () => {
 		const list = (programs: string[]) =>
 			listFoundPrograms({
-				settings: inMemoryEditedSettings({
-					bins: { "claude-code": "claude-beta" },
+				settings: inMemorySettings({
+					claudeBin: "claude-beta",
 				}),
-				profiles: inMemoryEditedProfiles(),
-				cliTools: inMemoryEditedCliTools(),
+				profiles: inMemoryProfiles(),
+				cliTools: inMemoryCliTools(),
 				programs: inMemoryPrograms(programs),
 			})(NIGHT_SHIFT).map((found) => found.program);
 		expect(list([])).toEqual([]);
@@ -43,11 +41,11 @@ describe("listFoundPrograms", () => {
 	});
 
 	test("a tool that runs the program counts as set up", async () => {
-		const cliTools = inMemoryEditedCliTools();
+		const cliTools = inMemoryCliTools();
 		await cliTools.save({ name: "gh-work", program: "gh" });
 		const list = listFoundPrograms({
-			settings: inMemoryEditedSettings(),
-			profiles: inMemoryEditedProfiles(),
+			settings: inMemorySettings(),
+			profiles: inMemoryProfiles(),
 			cliTools,
 			programs: inMemoryPrograms(["gh", "acli"]),
 		});

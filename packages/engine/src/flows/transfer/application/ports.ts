@@ -1,8 +1,5 @@
 import type { FlowMigration } from "@nightshift/flows";
-import type { ProfileStore } from "../../../settings";
 import type { UsageMoment } from "../../../usage";
-import type { FlowMigrations } from "../../migrations";
-import type { FlowImports, FlowMerges, ProjectFlows } from "../../store";
 import type { CloneHere } from "../domain/clone-import";
 import type { LegacyFolder, TrackedState } from "../domain/legacy-folder";
 
@@ -49,39 +46,12 @@ export type ClonesHere = {
 };
 
 /**
- * The flow documents of the Projects, for the import of a Clone's folder
- * (`FlowImports`, `flows/store/`).
- * @filledBy engine/flows
- */
-export type CloneDocuments = FlowImports;
-
-/**
- * The merge of one Project's flow documents into another's (`FlowMerges`,
- * `flows/store/`).
- * @filledBy engine/flows
- */
-export type DocumentMerges = FlowMerges;
-
-/**
  * Writes every document the import changed to the database.
  * @filledBy engine/documents
  */
 export type SavedDocuments = {
 	flush(): Promise<void>;
 };
-
-/**
- * This Device's profiles.
- * @filledBy engine/settings
- */
-export type DeviceProfiles = Pick<ProfileStore, "list" | "save">;
-
-/**
- * What brings a flow of an older format to the current one on a Device
- * (`FlowMigrations`, `flows/migrations/`).
- * @filledBy engine/flows
- */
-export type Migrations = Pick<FlowMigrations, "forDevice">;
 
 /**
  * This Device: the owner of its Clones, and the name a notice gives it.
@@ -108,13 +78,6 @@ export type SpaceProjects = {
 	 */
 	inSpace(projectId: string, spaceId: string): Promise<void>;
 };
-
-/**
- * The flows of the Projects as Night Shift reads and saves them
- * (`ProjectFlows`, `flows/store/`).
- * @filledBy engine/flows
- */
-export type SavedFlows = Pick<ProjectFlows, "flows" | "save">;
 
 /**
  * What brings an imported file of an older format to the current format:

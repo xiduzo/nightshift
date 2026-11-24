@@ -1,11 +1,12 @@
 import type { AgentHarnessName, HarnessName } from "@nightshift/flows";
 import type { Actor } from "../../../contract";
+import type { ProfileStore } from "../../profiles";
+import type { SettingsStore } from "../../settings";
 import { removeHarness as removeHarnessStep } from "../domain/profile-edits";
-import type { EditedProfiles, EditedSettings } from "./ports";
 
 export type RemoveHarnessPorts = {
-	settings: EditedSettings;
-	profiles: Pick<EditedProfiles, "list">;
+	settings: Pick<SettingsStore, "current" | "save">;
+	profiles: Pick<ProfileStore, "list">;
 	/** What a person calls each built-in harness. */
 	labels: Readonly<Record<HarnessName, string>>;
 };

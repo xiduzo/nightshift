@@ -1,10 +1,11 @@
 import { type LoadedFlow, loadFlowSource } from "@nightshift/flows";
 import type { Actor } from "../../../contract";
-import type { SavedFlows, SpaceProjects } from "./ports";
+import type { ProjectFlows } from "../../store";
+import type { SpaceProjects } from "./ports";
 
 export type ReadFlowPorts = {
 	projects: SpaceProjects;
-	flows: Pick<SavedFlows, "flows">;
+	flows: Pick<ProjectFlows, "flows">;
 };
 
 /**

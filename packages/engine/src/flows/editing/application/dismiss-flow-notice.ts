@@ -1,9 +1,10 @@
 import type { Actor } from "../../../contract";
-import type { SavedFlows, SpaceProjects } from "./ports";
+import type { ProjectFlows } from "../../store";
+import type { SpaceProjects } from "./ports";
 
 export type DismissFlowNoticePorts = {
 	projects: SpaceProjects;
-	flows: Pick<SavedFlows, "dismissNotice">;
+	flows: Pick<ProjectFlows, "dismissNotice">;
 };
 
 /**

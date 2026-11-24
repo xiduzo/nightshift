@@ -1,25 +1,16 @@
-import type {
-	Flow,
-	FlowMigration,
-	FlowSources,
-	Profile,
-	Schedule,
-} from "@nightshift/flows";
+import type { FlowMigration, FlowSources, Schedule } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { inMemoryAccess } from "../../../../access/adapters/out/in-memory-access";
-import type { ProfileView } from "../../../../settings";
+import { inMemoryProfiles } from "../../../../settings/profiles/adapters/out/in-memory-profiles";
 import type { UsageMoment } from "../../../../usage";
-import type { FlowMergePlan } from "../../../store";
+import type { FlowMigrations } from "../../../migrations";
+import type { FlowImports, FlowMergePlan, FlowMerges } from "../../../store";
+import { inMemoryFlows } from "../../../store/adapters/out/in-memory-flows";
 import type {
 	Clock,
-	CloneDocuments,
-	DeviceProfiles,
-	DocumentMerges,
 	FlowUsage,
 	ImportMigrations,
-	Migrations,
 	SavedDocuments,
-	SavedFlows,
 	SpaceProjects,
 	ThisDevice,
 } from "../../application/ports";
@@ -34,7 +25,7 @@ import { inMemoryClonesHere } from "./in-memory-clones-here";
  * code never imports this file.
  */
 
-type ImportDocument = Awaited<ReturnType<CloneDocuments["open"]>>;
+type ImportDocument = Awaited<ReturnType<FlowImports["open"]>>;
 
 /** One flow document in memory, as the import of a Clone's folder sees it. */
 export type InMemoryImportDocument = ImportDocument & {
@@ -46,7 +37,7 @@ export type InMemoryImportDocument = ImportDocument & {
 	writes: string[];
 };
 
-export type InMemoryCloneDocuments = CloneDocuments & {
+export type InMemoryCloneDocuments = FlowImports & {
 	document(projectId: string): InMemoryImportDocument;
 	/** Every Project opened, in order. */
 	opened: string[];
@@ -102,7 +93,7 @@ export function inMemoryCloneDocuments(): InMemoryCloneDocuments {
 }
 
 /** The merges of a test: each call, and the plan every call gives back. */
-export type InMemoryDocumentMerges = DocumentMerges & {
+export type InMemoryDocumentMerges = FlowMerges & {
 	plan: FlowMergePlan;
 	calls: { verb: string; source: string; destination: string; with: unknown }[];
 };
@@ -144,29 +135,6 @@ export function inMemorySavedDocuments(): InMemorySavedDocuments {
 	return saved;
 }
 
-/** This Device's profiles in memory. A profile saved without an id gets `profile-<n>`. */
-export type InMemoryDeviceProfiles = DeviceProfiles & {
-	profiles: ProfileView[];
-};
-
-export function inMemoryDeviceProfiles(): InMemoryDeviceProfiles {
-	let counter = 0;
-	const store: InMemoryDeviceProfiles = {
-		profiles: [],
-		list: () => store.profiles,
-		async save(input: Profile, id?: string) {
-			const view: ProfileView = {
-				...input,
-				id: id ?? `profile-${++counter}`,
-				updatedAt: 1000,
-			};
-			store.profiles = [...store.profiles, view];
-			return view;
-		},
-	};
-	return store;
-}
-
 /** The migration that names nothing: each node keeps its names, to pick again. */
 export function nameless(deviceId: string): FlowMigration {
 	return {
@@ -176,7 +144,7 @@ export function nameless(deviceId: string): FlowMigration {
 	};
 }
 
-export type InMemoryMigrations = Migrations & {
+export type InMemoryMigrations = Pick<FlowMigrations, "forDevice"> & {
 	asked: { deviceId: string; spaceId: string | undefined }[];
 };
 
@@ -234,42 +202,6 @@ export function inMemorySpaceProjects(
 	return projects;
 }
 
-/** The saved flows of each project, as stored. A save finds no issue. */
-export type InMemorySavedFlows = SavedFlows & {
-	stored: Map<string, FlowSources>;
-	/** Every save, in order. */
-	saves: {
-		projectId: string;
-		name: string;
-		flow: Flow;
-		kind: string | undefined;
-		personId: string | undefined;
-	}[];
-};
-
-export function inMemorySavedFlows(): InMemorySavedFlows {
-	const flows: InMemorySavedFlows = {
-		stored: new Map(),
-		saves: [],
-		flows: async (projectId) => flows.stored.get(projectId) ?? {},
-		async save(projectId, name, flow, options = {}) {
-			flows.saves.push({
-				projectId,
-				name,
-				flow,
-				kind: options.kind,
-				personId: options.personId,
-			});
-			flows.stored.set(projectId, {
-				...(flows.stored.get(projectId) ?? {}),
-				[name]: { json: flow, revision: options.kind ?? "save" },
-			});
-			return [];
-		},
-	};
-	return flows;
-}
-
 export type InMemoryFlowUsage = FlowUsage & { notes: UsageMoment[] };
 
 export function inMemoryFlowUsage(): InMemoryFlowUsage {
@@ -293,6 +225,7 @@ export function inMemoryTransferPorts() {
 	const access = inMemoryAccess();
 	access.members.join("space", "ada", "member");
 	access.members.join("elsewhere", "ada", "member");
+	const spaces = { project: "space", other: "space" };
 	return {
 		access,
 		documents: inMemoryCloneDocuments(),
@@ -300,13 +233,13 @@ export function inMemoryTransferPorts() {
 		saved: inMemorySavedDocuments(),
 		device: inMemoryThisDevice("laptop", "MacBook"),
 		clock: inMemoryClock(1000),
-		profiles: inMemoryDeviceProfiles(),
+		profiles: inMemoryProfiles(),
 		migrations: inMemoryMigrations(),
 		importMigrations: inMemoryImportMigrations(),
 		clones: inMemoryClonesHere(),
 		runs: createImportRuns(),
-		projects: inMemorySpaceProjects({ project: "space", other: "space" }),
-		flows: inMemorySavedFlows(),
+		projects: inMemorySpaceProjects(spaces),
+		flows: inMemoryFlows(spaces),
 		usage: inMemoryFlowUsage(),
 		merges: inMemoryDocumentMerges(),
 	};

@@ -1,24 +1,22 @@
 import { describe, expect, test } from "bun:test";
 import { NIGHT_SHIFT } from "../../../contract";
-import {
-	inMemoryEditedCliTools,
-	inMemoryEditedConnections,
-	inMemoryEditedProfiles,
-	inMemoryEditedSettings,
-	inMemoryPrograms,
-} from "../adapters/out/in-memory-neighbours";
+import { inMemoryCliTools } from "../../cli-tools/adapters/out/in-memory-cli-tools";
+import { inMemoryConnections } from "../../connections/adapters/out/in-memory-connections";
+import { inMemoryProfiles } from "../../profiles/adapters/out/in-memory-profiles";
+import { inMemorySettings } from "../../settings/adapters/out/in-memory-settings";
+import { inMemoryPrograms } from "../adapters/out/in-memory-neighbours";
 import { setUpProgram } from "./set-up-program";
 
 function wired(found: string[]) {
 	const ports = {
-		settings: inMemoryEditedSettings({
+		settings: inMemorySettings({
 			harnesses: ["claude-code"],
 			agentPermissionMode: "acceptEdits",
-			bins: { "claude-code": "claude" },
+			claudeBin: "claude",
 		}),
-		profiles: inMemoryEditedProfiles(),
-		cliTools: inMemoryEditedCliTools(),
-		connections: inMemoryEditedConnections(),
+		profiles: inMemoryProfiles(),
+		cliTools: inMemoryCliTools(),
+		connections: inMemoryConnections(),
 		programs: inMemoryPrograms(found),
 	};
 	return { ports, setUp: setUpProgram(ports) };

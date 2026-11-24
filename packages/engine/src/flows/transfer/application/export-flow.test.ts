@@ -31,7 +31,7 @@ describe("exportFlow", () => {
 
 	test("refuses a flow that is not valid", async () => {
 		const ports = inMemoryTransferPorts();
-		ports.flows.stored.set("project", { broken: { jsonError: "bad" } });
+		ports.flows.flows = async () => ({ broken: { jsonError: "bad" } });
 		const exported = exportFlow(ports)(ada, {
 			spaceId: "space",
 			projectId: "project",

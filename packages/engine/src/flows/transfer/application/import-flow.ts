@@ -6,20 +6,16 @@ import {
 } from "@nightshift/flows";
 import type { Access } from "../../../access";
 import { type Actor, personOf } from "../../../contract";
+import type { ProjectFlows } from "../../store";
 import { importedFlow, namesOf, type SavedFlow } from "../domain/flow-files";
-import type {
-	FlowUsage,
-	ImportMigrations,
-	SavedFlows,
-	SpaceProjects,
-} from "./ports";
+import type { FlowUsage, ImportMigrations, SpaceProjects } from "./ports";
 
 const SAVES_FLOWS: Permissions = { flow: ["save"] };
 
 export type ImportFlowPorts = {
 	access: Pick<Access, "openSpace">;
 	projects: SpaceProjects;
-	flows: Pick<SavedFlows, "flows" | "save">;
+	flows: Pick<ProjectFlows, "flows" | "save">;
 	/** Without them, a node keeps its profile's name and its Device's name, to pick again. */
 	importMigrations?: ImportMigrations | undefined;
 	usage?: FlowUsage | undefined;

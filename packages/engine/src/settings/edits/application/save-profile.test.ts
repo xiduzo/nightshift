@@ -1,11 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import type { AgentProfile } from "@nightshift/flows";
 import { NIGHT_SHIFT } from "../../../contract";
-import {
-	inMemoryEditedCliTools,
-	inMemoryEditedConnections,
-	inMemoryEditedProfiles,
-} from "../adapters/out/in-memory-neighbours";
+import { inMemoryCliTools } from "../../cli-tools/adapters/out/in-memory-cli-tools";
+import { inMemoryConnections } from "../../connections/adapters/out/in-memory-connections";
+import { inMemoryProfiles } from "../../profiles/adapters/out/in-memory-profiles";
 import { saveProfile } from "./save-profile";
 
 function profile(over: Partial<AgentProfile> = {}): AgentProfile {
@@ -22,9 +20,9 @@ function profile(over: Partial<AgentProfile> = {}): AgentProfile {
 
 function wired() {
 	const ports = {
-		connections: inMemoryEditedConnections(["gh"]),
-		cliTools: inMemoryEditedCliTools(),
-		profiles: inMemoryEditedProfiles(),
+		connections: inMemoryConnections(["gh"]),
+		cliTools: inMemoryCliTools(),
+		profiles: inMemoryProfiles(),
 	};
 	return { ports, save: saveProfile(ports) };
 }

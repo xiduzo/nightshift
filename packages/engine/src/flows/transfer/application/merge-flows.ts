@@ -1,8 +1,8 @@
-import type { FlowMergePlan } from "../../store";
-import type { Clock, DocumentMerges } from "./ports";
+import type { FlowMergePlan, FlowMerges } from "../../store";
+import type { Clock } from "./ports";
 
 export type MergeFlowsPorts = {
-	merges: Pick<DocumentMerges, "merge">;
+	merges: Pick<FlowMerges, "merge">;
 	clock: Clock;
 };
 

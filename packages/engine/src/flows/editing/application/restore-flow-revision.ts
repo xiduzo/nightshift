@@ -2,19 +2,20 @@ import type { Permissions } from "@nightshift/auth";
 import type { FlowIssue } from "@nightshift/flows";
 import type { Access } from "../../../access";
 import { type Actor, personOf } from "../../../contract";
+import type { ProjectFlows } from "../../store";
 import {
 	revisionFlow,
 	revisionNotFound,
 	revisionNotValid,
 } from "../domain/revisions";
-import type { SavedFlows, SpaceProjects } from "./ports";
+import type { SpaceProjects } from "./ports";
 
 const SAVES_FLOWS: Permissions = { flow: ["save"] };
 
 export type RestoreFlowRevisionPorts = {
 	access: Pick<Access, "openSpace">;
 	projects: SpaceProjects;
-	flows: Pick<SavedFlows, "revisions" | "save">;
+	flows: Pick<ProjectFlows, "revisions" | "save">;
 };
 
 /**

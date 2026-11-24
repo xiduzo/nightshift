@@ -1,19 +1,14 @@
-import type { Flow } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { inMemoryAccess } from "../../../../access/adapters/out/in-memory-access";
 import type { MemoryFlow, NodeMemory as Remembered } from "../../../../memory";
 import type { UsageMoment } from "../../../../usage";
 import type { KeptFlow, KeptValue } from "../../../../variables";
-import {
-	type InMemoryFlowStore,
-	inMemoryFlowStore,
-} from "../../../store/adapters/out/in-memory-flow-store";
+import { inMemoryFlows } from "../../../store/adapters/out/in-memory-flows";
 import type {
 	FlowUsage,
 	KeptValues,
 	Names,
 	NodeMemory,
-	SavedFlows,
 	SpaceProjects,
 } from "../../application/ports";
 
@@ -43,53 +38,6 @@ export function inMemorySpaceProjects(
 		},
 	};
 	return projects;
-}
-
-/** The saved flows over the in-memory `FlowStore`, on the Device `laptop` at 1000. A save finds no issue. */
-export type InMemorySavedFlows = SavedFlows & {
-	store: InMemoryFlowStore;
-	/** Every save, in order. */
-	saves: {
-		projectId: string;
-		name: string;
-		flow: Flow;
-		kind: string | undefined;
-		personId: string | undefined;
-	}[];
-};
-
-export function inMemorySavedFlows(): InMemorySavedFlows {
-	const store = inMemoryFlowStore();
-	const here = { deviceId: "laptop", spaceId: undefined };
-	const flows: InMemorySavedFlows = {
-		store,
-		saves: [],
-		flows: (projectId) => store.read(projectId, here),
-		async save(projectId, name, flow, options = {}) {
-			flows.saves.push({
-				projectId,
-				name,
-				flow,
-				kind: options.kind,
-				personId: options.personId,
-			});
-			await store.save(projectId, {
-				name,
-				flow,
-				kind: options.kind ?? "save",
-				personId: options.personId ?? null,
-				deviceId: "laptop",
-				at: 1000,
-			});
-			return [];
-		},
-		remove: (projectId, name) => store.remove(projectId, name),
-		revisions: (projectId, name) => store.revisions(projectId, name, undefined),
-		notices: (projectId) => store.notices(projectId),
-		dismissNotice: (projectId, noticeId) =>
-			store.dismissNotice(projectId, noticeId),
-	};
-	return flows;
 }
 
 export function inMemoryNames(
@@ -168,14 +116,15 @@ export function inMemoryEditingPorts() {
 	const access = inMemoryAccess();
 	access.members.join("space", "ada", "member");
 	access.members.join("elsewhere", "ada", "member");
+	const spaces = {
+		project: "space",
+		other: "space",
+		elsewhere: "another-space",
+	};
 	return {
 		access,
-		projects: inMemorySpaceProjects({
-			project: "space",
-			other: "space",
-			elsewhere: "another-space",
-		}),
-		flows: inMemorySavedFlows(),
+		projects: inMemorySpaceProjects(spaces),
+		flows: inMemoryFlows(spaces),
 		names: inMemoryNames({ ada: "Ada" }, { laptop: "Laptop" }),
 		usage: inMemoryFlowUsage(),
 		kept: inMemoryKeptValues(),

@@ -1,6 +1,9 @@
 import type { Database } from "@nightshift/db";
 import type { Access } from "../../access";
 import type { Git } from "../../git";
+import type { ProfileStore } from "../../settings";
+import type { FlowMigrations } from "../migrations";
+import type { FlowImports, FlowMerges, ProjectFlows } from "../store";
 import { drizzleClonesHere } from "./adapters/out/drizzle-clones-here";
 import { fsCloneFolders } from "./adapters/out/fs-clone-folders";
 import { copyFlow } from "./application/copy-flow";
@@ -12,14 +15,9 @@ import { mergeFlows } from "./application/merge-flows";
 import { planFlowMerge } from "./application/plan-flow-merge";
 import type {
 	Clock,
-	CloneDocuments,
-	DeviceProfiles,
-	DocumentMerges,
 	FlowUsage,
 	ImportMigrations,
-	Migrations,
 	SavedDocuments,
-	SavedFlows,
 	SpaceProjects,
 	ThisDevice,
 } from "./application/ports";
@@ -40,18 +38,18 @@ export function wireTransfer(deps: {
 	db: Database;
 	git: Pick<Git, "run">;
 	/** The flow documents, for the import of a Clone's folder. */
-	documents: CloneDocuments;
+	documents: FlowImports;
 	saved: SavedDocuments;
 	device: ThisDevice;
 	clock: Clock;
 	/** The merge of the flow documents. */
-	merges: DocumentMerges;
+	merges: FlowMerges;
 	/** This Device's profiles. Without them, a folder with profiles stays. */
-	profiles?: DeviceProfiles | undefined;
+	profiles?: Pick<ProfileStore, "list" | "save"> | undefined;
 	/** What brings a Clone's flows to the current format on this Device. */
-	migrations?: Migrations | undefined;
+	migrations?: Pick<FlowMigrations, "forDevice"> | undefined;
 	projects: SpaceProjects;
-	flows: SavedFlows;
+	flows: Pick<ProjectFlows, "flows" | "save">;
 	/** What brings a file a Person imports to the current format. */
 	importMigrations?: ImportMigrations | undefined;
 	usage?: FlowUsage | undefined;

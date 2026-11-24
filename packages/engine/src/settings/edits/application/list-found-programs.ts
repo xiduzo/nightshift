@@ -1,17 +1,14 @@
 import type { Actor } from "../../../contract";
-import { programOf } from "../../cli-tools";
+import { type CliToolStore, programOf } from "../../cli-tools";
+import type { ProfileStore } from "../../profiles";
+import { HARNESS_BIN, type SettingsStore } from "../../settings";
 import { type FoundProgram, foundPrograms } from "../domain/found-programs";
-import type {
-	EditedCliTools,
-	EditedProfiles,
-	EditedSettings,
-	Programs,
-} from "./ports";
+import type { Programs } from "./ports";
 
 export type ListFoundProgramsPorts = {
-	settings: Pick<EditedSettings, "bin">;
-	profiles: Pick<EditedProfiles, "list">;
-	cliTools: Pick<EditedCliTools, "list">;
+	settings: Pick<SettingsStore, "current">;
+	profiles: Pick<ProfileStore, "list">;
+	cliTools: Pick<CliToolStore, "list">;
 	programs: Programs;
 };
 
@@ -24,7 +21,8 @@ export const listFoundPrograms =
 	(_actor: Actor): FoundProgram[] =>
 		foundPrograms(
 			{
-				bin: ports.settings.bin,
+				bin: (harness) =>
+					String(ports.settings.current()[HARNESS_BIN[harness]]),
 				profiles: ports.profiles.list(),
 				toolPrograms: ports.cliTools.list().map(programOf),
 			},

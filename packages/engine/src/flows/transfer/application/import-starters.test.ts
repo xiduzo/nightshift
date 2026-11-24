@@ -47,10 +47,11 @@ describe("importStarters", () => {
 				projectId: "project",
 			}),
 		).toEqual({ imported: rest, skipped: [first] });
-		expect(ports.flows.stored.get("project")?.[first]).toEqual({
+		expect((await ports.flows.flows("project"))[first]).toMatchObject({
 			json: mine,
-			revision: "save",
 		});
+		const kept = await ports.flows.revisions("project", first);
+		expect(kept.map(({ kind }) => kind)).toEqual(["save"]);
 	});
 
 	test("a project of another Space is not found", async () => {

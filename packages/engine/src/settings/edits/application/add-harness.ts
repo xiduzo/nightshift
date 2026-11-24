@@ -1,9 +1,11 @@
 import type { HarnessName } from "@nightshift/flows";
 import type { Actor } from "../../../contract";
+import type { SettingsStore } from "../../settings";
 import { addHarness as addHarnessStep } from "../domain/profile-edits";
-import type { EditedSettings } from "./ports";
 
-export type AddHarnessPorts = { settings: EditedSettings };
+export type AddHarnessPorts = {
+	settings: Pick<SettingsStore, "current" | "save">;
+};
 
 /** Adds a built-in harness. Nothing changes when it is added already. */
 export const addHarness =

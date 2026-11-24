@@ -1,14 +1,15 @@
 import type { Actor } from "../../../contract";
+import type { ProjectFlows } from "../../store";
 import { flowNotFound, type RevisionKind } from "../../store";
 import { flowHistory, type RevisionItem } from "../domain/revisions";
-import type { Names, SavedFlows, SpaceProjects } from "./ports";
+import type { Names, SpaceProjects } from "./ports";
 
 /** One revision of a flow, as a Person lists it. */
 export type FlowRevisionItem = RevisionItem<RevisionKind>;
 
 export type ListFlowRevisionsPorts = {
 	projects: SpaceProjects;
-	flows: Pick<SavedFlows, "flows" | "revisions">;
+	flows: Pick<ProjectFlows, "flows" | "revisions">;
 	names: Names;
 };
 

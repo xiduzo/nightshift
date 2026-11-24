@@ -1,13 +1,11 @@
 import type { HarnessName } from "@nightshift/flows";
+import type { CliToolStore } from "../cli-tools";
+import type { ConnectionStore } from "../connections";
+import type { ProfileStore } from "../profiles";
+import type { SettingsStore } from "../settings";
 import { addHarness } from "./application/add-harness";
 import { listFoundPrograms } from "./application/list-found-programs";
-import type {
-	EditedCliTools,
-	EditedConnections,
-	EditedProfiles,
-	EditedSettings,
-	Programs,
-} from "./application/ports";
+import type { Programs } from "./application/ports";
 import { removeCliTool } from "./application/remove-cli-tool";
 import { removeConnection } from "./application/remove-connection";
 import { removeHarness } from "./application/remove-harness";
@@ -35,10 +33,10 @@ export type Edits = {
  * root of device-config gives them.
  */
 export function wireEdits(deps: {
-	settings: EditedSettings;
-	profiles: EditedProfiles;
-	connections: EditedConnections;
-	cliTools: EditedCliTools;
+	settings: Pick<SettingsStore, "current" | "save">;
+	profiles: Pick<ProfileStore, "get" | "byName" | "list" | "save">;
+	connections: Pick<ConnectionStore, "get" | "save" | "remove">;
+	cliTools: Pick<CliToolStore, "get" | "list" | "save" | "remove">;
 	programs: Programs;
 	/** What a person calls each built-in harness. */
 	labels: Readonly<Record<HarnessName, string>>;
