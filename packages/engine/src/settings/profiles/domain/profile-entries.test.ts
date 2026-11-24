@@ -34,13 +34,12 @@ describe("profile entries", () => {
 		]);
 	});
 
-	test("a run finds a profile by its id, else by its name", () => {
+	test("a run finds a profile by its id, never by its name", () => {
 		const profiles = readProfiles([
 			["p-1", { name: "night", description: "x", settings, updatedAt: 1 }],
 		]);
 		expect(settingsFor(profiles, "p-1")).toEqual(settings);
-		expect(settingsFor(profiles, "night")).toEqual(settings);
-		expect(settingsFor(profiles, "day")).toBeNull();
+		expect(settingsFor(profiles, "night")).toBeNull();
 	});
 
 	test("a Person picks an Agent Profile with its permission mode", () => {

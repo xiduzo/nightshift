@@ -38,7 +38,7 @@ async function laptopDocument() {
 	await document.change(() => {
 		document.facts.set("name", "Laptop");
 		document.facts.set("platform", "darwin");
-		document.facts.set("secrets", ["OLD_NAME", { name: "GH_TOKEN", setAt: 5 }]);
+		document.facts.set("secrets", [{ name: "GH_TOKEN", setAt: 5 }]);
 		document.facts.set("checkedAt", 7);
 	});
 	return { other, update: Y.encodeStateAsUpdate(document.doc), document };
@@ -75,10 +75,7 @@ describe("device copies", () => {
 					permissionMode: "acceptEdits",
 				},
 			],
-			secrets: [
-				{ name: "GH_TOKEN", setAt: 5 },
-				{ name: "OLD_NAME", setAt: null },
-			],
+			secrets: [{ name: "GH_TOKEN", setAt: 5 }],
 			checkedAt: 7,
 		});
 		await copies.documents.close();

@@ -56,11 +56,11 @@ export type SecretList = {
 	personal: "available" | "unavailable";
 };
 
-/** A saved secret as the document's facts hold it: an older document holds bare names. */
-export const savedSecretSchema = z.union([
-	z.string().transform((name) => ({ name, setAt: null })),
-	z.object({ name: z.string(), setAt: z.number().nullable() }),
-]);
+/** A saved secret as the document's facts hold it. */
+export const savedSecretSchema = z.object({
+	name: z.string(),
+	setAt: z.number().nullable(),
+});
 
 /** The environment: the fallback of every `${NAME}`. */
 export type SecretEnvironment = Readonly<Record<string, string | undefined>>;

@@ -28,7 +28,7 @@ export type ProfileStore = {
 	 * profile of that name is found by it. Only this Device's own profiles:
 	 * never another Device's of the same name (ADR 3).
 	 */
-	settingsFor(ref: string): ProfileSettings | null;
+	settingsFor(id: string): ProfileSettings | null;
 	/** Adds a profile, or replaces the one of `id`. A rename keeps the id. */
 	save(input: Profile, id?: string): Promise<ProfileView>;
 	remove(id: string): Promise<void>;
@@ -66,7 +66,7 @@ export function wireProfiles(deps: {
 		list,
 		get: (id) => saved.read().get(id) ?? null,
 		byName: (name) => list().find((p) => p.name === name) ?? null,
-		settingsFor: (ref) => settingsFor(saved.read(), ref),
+		settingsFor: (id) => settingsFor(saved.read(), id),
 		save: (profile, id) =>
 			write(id === undefined ? { profile } : { profile, id }),
 		remove: (id) => remove(NIGHT_SHIFT, { id }),

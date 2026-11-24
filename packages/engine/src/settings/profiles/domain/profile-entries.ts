@@ -13,8 +13,8 @@ import type { DeviceProfile } from "../../../contract";
  * Profile (a decider and its model), defined once on this Device (the
  * Agents page) and kept in its Device document. A profile's id never
  * changes. Its name is a label that a rename changes. Agent nodes, and
- * Decisions and Values decided by a model, name a profile by that label
- * for now; a run resolves it when it starts.
+ * Decisions and Values decided by a model, name a profile by its Device
+ * and its id. A run resolves it when it starts.
  */
 
 export type ProfileView = Profile & { id: string; updatedAt: number };
@@ -27,22 +27,15 @@ export type ProfileEntry = {
 	updatedAt: number;
 };
 
-/**
- * A profile as the Device document holds it, under its id. An entry saved
- * before profiles had ids has no `name`: its key is its name and its id.
- */
+/** A profile as the Device document holds it, under its id. */
 const entrySchema = z.object({
-	name: z.string().optional(),
+	name: z.string(),
 	description: z.string().nullable(),
 	settings: z.unknown(),
 	updatedAt: z.number(),
 });
 
-/**
- * A new profile's id, from a random value. The hyphen keeps it apart from
- * every name (`nameSchema`), so it never equals the id of an entry saved
- * before ids.
- */
+/** A new profile's id, from a random value. */
 export function profileIdOf(random: string): string {
 	return `p-${random}`;
 }
@@ -61,7 +54,7 @@ export function readProfiles(
 		out.set(id, {
 			...parsed.data,
 			id,
-			name: entry.data.name ?? id,
+			name: entry.data.name,
 			...(entry.data.description
 				? { description: entry.data.description }
 				: {}),
@@ -82,22 +75,15 @@ export function profilesInOrder(
 
 /**
  * What a run resolves a node with, or null when there is no such profile.
- * A flow names a profile by its id. A Walker of an older Night Shift asks
- * by the name: an old profile's id is its name, and a newer profile of
- * that name is found by it. Only this Device's own profiles: never
- * another Device's of the same name (ADR 3).
+ * A flow names a profile by its id. Only this Device's own profiles: never
+ * another Device's (ADR 3).
  */
 export function settingsFor(
 	profiles: ReadonlyMap<string, ProfileView>,
-	ref: string,
+	id: string,
 ): ProfileSettings | null {
-	// An id never equals a name (`profileIdOf`): the two never mix up.
-	const found =
-		profiles.get(ref) ??
-		profilesInOrder(profiles).find((p) => p.name === ref) ??
-		null;
-	if (!found) return null;
-	return settingsOf(found);
+	const found = profiles.get(id);
+	return found ? settingsOf(found) : null;
 }
 
 /** A profile's settings: what a run takes from it. */

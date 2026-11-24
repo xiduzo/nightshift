@@ -165,7 +165,7 @@ describe("profiles at the start", () => {
 				),
 			}),
 		).rejects.toThrow(
-			"The flow uses planner on test (plan), but test has no such profile. Pick another profile.",
+			"The flow uses a profile on test (plan) that test no longer has. Pick another profile.",
 		);
 		expect(await engine.listRuns()).toEqual([]);
 		expect(harness.calls).toHaveLength(0);
@@ -256,7 +256,7 @@ describe("model profiles", () => {
 			flow: flowOf([triage()]),
 		});
 		await expect(started).rejects.toThrow(
-			"The profile small uses the address http://openjev:8080 (triage). Nothing answers there. Start the server, or change the address in Settings.",
+			"A profile uses the address http://openjev:8080 (triage). Nothing answers there. Start the server, or change the address in Settings.",
 		);
 		expect(await engine.listRuns()).toEqual([]);
 		expect(decider.calls).toHaveLength(0);
@@ -338,22 +338,19 @@ describe("createProfileStore", () => {
 		expect(again.get(id)?.description).toBe("Builds.");
 		expect(again.byName("builder")?.id).toBe(id);
 		expect(again.settingsFor(id)).toEqual(builder);
-		// A Walker of an older Night Shift asks by the name.
-		expect(again.settingsFor("builder")).toEqual(builder);
-		expect(again.settingsFor("nobody")).toBeNull();
 		await again.remove(id);
 		expect(again.settingsFor(id)).toBeNull();
-		expect(again.settingsFor("builder")).toBeNull();
 		const third = createProfileStore({
 			document: await sandbox.openDocument(),
 		});
 		expect(third.list()).toEqual([]);
 	});
 
-	test("a profile saved before ids reads with its name as its id, and keeps that id on a rename", async () => {
+	test("a profile whose id is also its name keeps that id on a rename", async () => {
 		const document = await sandbox.openDocument();
 		await document.change(() => {
 			document.profiles.set("builder", {
+				name: "builder",
 				description: "Builds.",
 				settings: builder,
 				updatedAt: 1,

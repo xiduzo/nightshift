@@ -166,6 +166,7 @@ describe("Offers by profile id", () => {
 		const document = await sandbox.openDocument();
 		await document.change(() => {
 			document.profiles.set("coder", {
+				name: "coder",
 				description: null,
 				settings: coderSettings,
 				updatedAt: 1,

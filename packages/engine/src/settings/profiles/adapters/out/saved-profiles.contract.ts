@@ -75,13 +75,9 @@ export function savedProfilesContract(
 			expect([...under.saved.read().keys()]).toEqual(["p-2"]);
 		});
 
-		test("an entry from before ids reads with its key as its name", async () => {
-			const { name: _name, ...old } = agent;
-			await under.put("night", old);
-			expect(under.saved.read().get("night")?.name).toBe("night");
-		});
-
-		test("an entry this version cannot read is left out", async () => {
+		test("an entry this version cannot read is left out, one without a name too", async () => {
+			const { name: _name, ...nameless } = agent;
+			await under.put("night", nameless);
 			await under.put("p-x", { description: null, updatedAt: "soon" });
 			await under.put("p-y", {
 				...agent,

@@ -42,14 +42,11 @@ describe("the Device document holds names and times only", () => {
 		expect(document.facts.get("secretsUsedAt")).toEqual({});
 	});
 
-	test("an older document's bare names read with no time", async () => {
+	test("an item that is not a name with its time is left out", async () => {
 		const document = await deviceDocument();
 		await document.change(() => {
 			document.facts.set("secrets", ["OLD", { name: "NEW", setAt: 4 }, 7]);
 		});
-		expect([...yjsSecretFacts(document).saved()]).toEqual([
-			["OLD", null],
-			["NEW", 4],
-		]);
+		expect([...yjsSecretFacts(document).saved()]).toEqual([["NEW", 4]]);
 	});
 });

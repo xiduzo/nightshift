@@ -52,7 +52,7 @@ export type DeviceFacts = {
 	programs: string[];
 	/**
 	 * The secrets saved in its keychain, and when each was last set (null:
-	 * not known). Never their values. An older document holds bare names.
+	 * not known). Never their values.
 	 */
 	secrets: { name: string; setAt: number | null }[];
 	/**

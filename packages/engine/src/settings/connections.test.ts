@@ -389,37 +389,6 @@ describe("when a secret was set and used", () => {
 		});
 	});
 
-	test("an older document's bare names still read, with no time; the next save keeps them", async () => {
-		const document = await sandbox.openDocument();
-		await document.change(() => {
-			document.facts.set("secrets", [
-				"OLD_TOKEN",
-				42,
-				{ name: "NEWER", setAt: 7 },
-			]);
-		});
-		const store = createConnectionStore({
-			document,
-			env: {},
-			secrets: memorySecrets({ OLD_TOKEN: "old" }).backend,
-			now: testClock().now,
-		});
-		expect(
-			(await listed(store)).map((s) => [s.name, s.saved, s.setAt]),
-		).toEqual([
-			["NEWER", true, 7],
-			["OLD_TOKEN", true, null],
-		]);
-		expect(await store.secret("OLD_TOKEN")).toBe("old");
-
-		await store.setSecret("ADDED", "a");
-		expect(document.facts.get("secrets")).toEqual([
-			{ name: "ADDED", setAt: 1_000_000 },
-			{ name: "NEWER", setAt: 7 },
-			{ name: "OLD_TOKEN", setAt: null },
-		]);
-	});
-
 	test("each kind of use records the names it read; listing and masking do not", async () => {
 		const { store, clock } = await timedStore({
 			TEAM: "night",

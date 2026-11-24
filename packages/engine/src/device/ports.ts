@@ -54,7 +54,7 @@ export type DeviceCliToolLookup = {
 
 /** What the Device reads of this computer's Agent Profiles. */
 export type DeviceProfilesPort = {
-	settingsFor(ref: string): ProfileSettings | null;
+	settingsFor(id: string): ProfileSettings | null;
 };
 
 /** Project readiness steps the Device checks before it adds a worktree. */

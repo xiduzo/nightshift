@@ -553,7 +553,7 @@ describe("the devices runtime across a reload", () => {
 		const projectId = await projectOnBoth();
 		// B offers "coder" to A's Space, one session at a time, and a
 		// colleague of A's owner is a Member there.
-		await createProfileStore({ document }).save({
+		const { id: coder } = await createProfileStore({ document }).save({
 			name: "coder",
 			harness: "claude-code",
 			model: "sonnet",
@@ -563,7 +563,7 @@ describe("the devices runtime across a reload", () => {
 		});
 		await setDeviceOffer(document, {
 			spaceId: a.spaceId,
-			profile: "coder",
+			profile: coder,
 			permissionCap: "acceptEdits",
 			sessionCap: 1,
 			offeredAt: 1,
@@ -571,10 +571,11 @@ describe("the devices runtime across a reload", () => {
 		const space = await paired.documents.open(a.spaceId);
 		space.doc.transact(() => {
 			space.members.set("colleague", { name: "Colleague", role: "member" });
-			space.offers.set(`${b.deviceId}/coder`, {
+			space.offers.set(`${b.deviceId}/${coder}`, {
 				deviceId: b.deviceId,
 				deviceName: "B",
-				profile: "coder",
+				profile: coder,
+				profileName: "coder",
 				permissionCap: "acceptEdits",
 				sessionCap: 1,
 				offeredAt: 1,
@@ -596,7 +597,7 @@ describe("the devices runtime across a reload", () => {
 							input: {
 								cwd: worktreeLocation(b.repoPath, run.slice(0, 8)).worktreePath,
 								prompt: "Work.",
-								offered: { profile: "coder" },
+								offered: { profile: coder },
 							},
 						},
 					},
