@@ -7,7 +7,7 @@ import {
 } from "@nightshift/flows";
 import { Badge } from "@nightshift/ui/components/badge";
 import type { ReactNode } from "react";
-import { InspectorSection } from "../form";
+import { InspectorSection, withOptional } from "../form";
 import { OptionsEditor } from "./options-editor";
 
 /** What a node's list is called, as its section title. */
@@ -68,6 +68,10 @@ export function NodeOptionsField<T extends OptionNode>({
 	const options = nodeOptions(node);
 	const change = (edit: (options: NodeOption[]) => NodeOption[]) =>
 		onChange((current) => withOptions(current, edit(nodeOptions(current))));
+	const changeOne = (index: number, edit: (option: NodeOption) => NodeOption) =>
+		change((list) =>
+			list.map((option, at) => (at === index ? edit(option) : option)),
+		);
 
 	return (
 		<InspectorSection
@@ -92,50 +96,28 @@ export function NodeOptionsField<T extends OptionNode>({
 				onRename={onRenameOutcome}
 				onRemove={onRemoveOutcome}
 				onDescribe={(index, description) =>
-					change((list) =>
-						list.map((option, at) => {
-							if (at !== index) return option;
-							const { description: _, ...rest } = option;
-							return description === undefined
-								? rest
-								: { ...rest, description };
-						}),
+					changeOne(index, (option) =>
+						withOptional(option, "description", description),
 					)
 				}
 				onRule={
 					rules
 						? (index, when) =>
-								change((list) =>
-									list.map((option, at) => {
-										if (at !== index) return option;
-										const { when: _, ...rest } = option;
-										return when === undefined ? rest : { ...rest, when };
-									}),
-								)
+								changeOne(index, (option) => withOptional(option, "when", when))
 						: undefined
 				}
 				onImpact={
 					impacts
 						? (index, impact) =>
-								change((list) =>
-									list.map((option, at) => {
-										if (at !== index) return option;
-										const { impact: _, ...rest } = option;
-										return impact === undefined ? rest : { ...rest, impact };
-									}),
+								changeOne(index, (option) =>
+									withOptional(option, "impact", impact),
 								)
 						: undefined
 				}
 				rulePlaceholder={rulePlaceholder}
 				onCode={onCode}
 				onColor={(index, color) =>
-					change((list) =>
-						list.map((option, at) => {
-							if (at !== index) return option;
-							const { color: _, ...rest } = option;
-							return color === undefined ? rest : { ...rest, color };
-						}),
-					)
+					changeOne(index, (option) => withOptional(option, "color", color))
 				}
 				onAdd={(option) => change((list) => [...list, option])}
 				addControl={addControl}

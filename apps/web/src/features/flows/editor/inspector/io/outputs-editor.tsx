@@ -18,6 +18,7 @@ import {
 import { PlusIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { InferredShape, OutputSchemaField } from "../data-shape";
+import { withOptional } from "../form";
 import { TemplateField } from "../template";
 import { type Change, move, NameInput, RowButtons } from "./io-rows";
 
@@ -189,8 +190,12 @@ export function OutputsEditor({
 									autoComplete="off"
 									onChange={(event) => {
 										const description = event.target.value;
-										update(index, ({ description: _, ...rest }) =>
-											description === "" ? rest : { ...rest, description },
+										update(index, (current) =>
+											withOptional(
+												current,
+												"description",
+												description || undefined,
+											),
 										);
 									}}
 								/>

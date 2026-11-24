@@ -21,7 +21,7 @@ import { PlusIcon, XIcon } from "lucide-react";
 import { useId } from "react";
 
 import { SetSuggest } from "../../../assistant";
-import { Field, InspectorSection, Note } from "../form";
+import { Field, InspectorSection, Note, withOptional } from "../form";
 import { TemplateField } from "../template";
 
 type Source = "value" | "expression";
@@ -285,8 +285,8 @@ function WriteRow({
 						const on = (value as string[]).filter((name) =>
 							outcomes.includes(name),
 						);
-						onChange(({ on: _, ...rest }) =>
-							on.length > 0 ? { ...rest, on } : rest,
+						onChange((current) =>
+							withOptional(current, "on", on.length > 0 ? on : undefined),
 						);
 					}}
 				>

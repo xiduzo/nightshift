@@ -20,6 +20,7 @@ import {
 import { PlusIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { LargerTextarea } from "@/shared/larger-window";
+import { withOptional } from "../form";
 import { type Change, move, NameInput, RowButtons } from "./io-rows";
 
 /** Why an input cannot take a name, by what the name clashes with. */
@@ -378,8 +379,8 @@ function InputRow({
 						id={`${id}-required`}
 						checked={input.required === true}
 						onCheckedChange={(checked) =>
-							onUpdate(({ required: _, ...rest }) =>
-								checked ? { ...rest, required: true } : rest,
+							onUpdate((current) =>
+								withOptional(current, "required", checked ? true : undefined),
 							)
 						}
 					/>

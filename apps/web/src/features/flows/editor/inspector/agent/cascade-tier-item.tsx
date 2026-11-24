@@ -20,7 +20,7 @@ import {
 } from "@nightshift/ui/components/native-select";
 import { ArrowDownIcon, ArrowUpIcon, Trash2Icon } from "lucide-react";
 import { useId } from "react";
-import { Field, PositiveIntInput } from "../form";
+import { Field, NumberField } from "../form";
 import { KitOptions } from "../kits";
 import type { ModelTier } from "./cascade-tiers";
 import {
@@ -146,22 +146,17 @@ export function TierItem<N extends CascadeNode>({
 					onChange={onChange}
 				/>
 			)}
-			<Field
+			<NumberField
 				id={`${id}-tries`}
 				label="Tries"
 				optional
 				hint="How often this tier tries before the next one. Empty: once."
-			>
-				<PositiveIntInput
-					id={`${id}-tries`}
-					value={tier.tries}
-					placeholder="1"
-					describedBy={`${id}-tries-hint`}
-					onChange={(tries) => set("tries", tries)}
-				/>
-			</Field>
+				value={tier.tries}
+				placeholder="1"
+				onChange={(tries) => set("tries", tries)}
+			/>
 			{node.type === "decision" ? (
-				<Field
+				<NumberField
 					id={`${id}-confidence`}
 					label="Least confidence"
 					optional
@@ -171,16 +166,11 @@ export function TierItem<N extends CascadeNode>({
 							? "Use a number from 0 to 1, such as 0.8."
 							: null
 					}
-				>
-					<PositiveIntInput
-						id={`${id}-confidence`}
-						decimal
-						value={(tier as DecisionTier).minConfidence}
-						placeholder="0.8"
-						describedBy={`${id}-confidence-hint`}
-						onChange={(value) => set("minConfidence", value)}
-					/>
-				</Field>
+					decimal
+					value={(tier as DecisionTier).minConfidence}
+					placeholder="0.8"
+					onChange={(value) => set("minConfidence", value)}
+				/>
 			) : null}
 			{node.type === "value" ? (
 				<Field

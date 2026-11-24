@@ -12,10 +12,6 @@ import {
 	NativeSelect,
 	NativeSelectOption,
 } from "@nightshift/ui/components/native-select";
-import {
-	ToggleGroup,
-	ToggleGroupItem,
-} from "@nightshift/ui/components/toggle-group";
 import { useQuery } from "@tanstack/react-query";
 import { useId } from "react";
 import {
@@ -24,7 +20,15 @@ import {
 	spaceSecretQueries,
 } from "@/features/agents";
 import { SecretsField } from "./access";
-import { Field, InspectorSection, Note, PositiveIntInput } from "./form";
+import {
+	type Choice,
+	ChoiceField,
+	Field,
+	InspectorSection,
+	Note,
+	NumberField,
+	withOptional,
+} from "./form";
 import { TemplateField } from "./template";
 
 /** The value of the scope select for the whole run: a Section id is never empty. */
@@ -32,7 +36,7 @@ const WHOLE_RUN = "";
 
 type ReadyKind = "url" | "command";
 
-const READY_KINDS: { value: ReadyKind; label: string }[] = [
+const READY_KINDS: Choice<ReadyKind>[] = [
 	{ value: "url", label: "Address" },
 	{ value: "command", label: "Command" },
 ];
@@ -87,35 +91,17 @@ export function ServiceFields({
 					invalid={node.start.trim() === ""}
 					onChange={(start) => onChange((current) => ({ ...current, start }))}
 				/>
-				<Field id={`${id}-ready-kind`} label="Ready when">
-					<ToggleGroup
-						variant="outline"
-						size="sm"
-						spacing={0}
-						aria-label="Ready when"
-						className="w-full"
-						value={[readyKind]}
-						onValueChange={(value) => {
-							const kind = value[0] as ReadyKind | undefined;
-							if (!kind || kind === readyKind) return;
-							setReady(({ command: _, url: __, ...rest }) =>
-								kind === "url"
-									? { ...rest, url: "" }
-									: { ...rest, command: "" },
-							);
-						}}
-					>
-						{READY_KINDS.map((entry) => (
-							<ToggleGroupItem
-								key={entry.value}
-								value={entry.value}
-								className="flex-1 aria-pressed:bg-primary aria-pressed:text-primary-foreground"
-							>
-								{entry.label}
-							</ToggleGroupItem>
-						))}
-					</ToggleGroup>
-				</Field>
+				<ChoiceField
+					id={`${id}-ready-kind`}
+					label="Ready when"
+					value={readyKind}
+					choices={READY_KINDS}
+					onChange={(kind) =>
+						setReady(({ command: _, url: __, ...rest }) =>
+							kind === "url" ? { ...rest, url: "" } : { ...rest, command: "" },
+						)
+					}
+				/>
 				{readyKind === "url" ? (
 					<TemplateField
 						id={`${id}-ready-url`}
@@ -149,38 +135,31 @@ export function ServiceFields({
 						onChange={(command) => setReady((ready) => ({ ...ready, command }))}
 					/>
 				)}
-				<Field id={`${id}-every`} label="Check every (seconds)" optional>
-					<PositiveIntInput
-						id={`${id}-every`}
-						value={node.ready.everySeconds}
-						placeholder={String(DEFAULT_SERVICE_EVERY_SECONDS)}
-						onChange={(everySeconds) =>
-							setReady(({ everySeconds: _, ...ready }) =>
-								everySeconds === undefined ? ready : { ...ready, everySeconds },
-							)
-						}
-					/>
-				</Field>
-				<Field
+				<NumberField
+					id={`${id}-every`}
+					label="Check every (seconds)"
+					optional
+					value={node.ready.everySeconds}
+					placeholder={String(DEFAULT_SERVICE_EVERY_SECONDS)}
+					onChange={(everySeconds) =>
+						setReady((current) =>
+							withOptional(current, "everySeconds", everySeconds),
+						)
+					}
+				/>
+				<NumberField
 					id={`${id}-timeout`}
 					label="Give up after (minutes)"
 					optional
 					hint="The step ends failed when the service is not ready by then."
-				>
-					<PositiveIntInput
-						id={`${id}-timeout`}
-						value={node.ready.timeoutMinutes}
-						placeholder={String(DEFAULT_SERVICE_TIMEOUT_MINUTES)}
-						describedBy={`${id}-timeout-hint`}
-						onChange={(timeoutMinutes) =>
-							setReady(({ timeoutMinutes: _, ...ready }) =>
-								timeoutMinutes === undefined
-									? ready
-									: { ...ready, timeoutMinutes },
-							)
-						}
-					/>
-				</Field>
+					value={node.ready.timeoutMinutes}
+					placeholder={String(DEFAULT_SERVICE_TIMEOUT_MINUTES)}
+					onChange={(timeoutMinutes) =>
+						setReady((current) =>
+							withOptional(current, "timeoutMinutes", timeoutMinutes),
+						)
+					}
+				/>
 				<TemplateField
 					id={`${id}-stop`}
 					label="Stop (optional)"
@@ -191,8 +170,12 @@ export function ServiceFields({
 					placeholder="docker compose down"
 					language="bash"
 					onChange={(stop) =>
-						onChange(({ stop: _, ...current }) =>
-							stop.trim() === "" ? current : { ...current, stop },
+						onChange((current) =>
+							withOptional(
+								current,
+								"stop",
+								stop.trim() === "" ? undefined : stop,
+							),
 						)
 					}
 				/>
@@ -207,10 +190,12 @@ export function ServiceFields({
 						aria-describedby={`${id}-scope-hint`}
 						onChange={(event) => {
 							const value = event.target.value;
-							onChange(({ scope: _, ...current }) =>
-								value === WHOLE_RUN
-									? current
-									: { ...current, scope: { section: value } },
+							onChange((current) =>
+								withOptional(
+									current,
+									"scope",
+									value === WHOLE_RUN ? undefined : { section: value },
+								),
 							);
 						}}
 					>
@@ -252,8 +237,12 @@ export function ServiceFields({
 					secrets={secrets}
 					projectSecrets={[...(projectSecrets ?? []), ...(spaceSecrets ?? [])]}
 					onChange={(names) =>
-						onChange(({ secrets: _, ...rest }) =>
-							names.length > 0 ? { ...rest, secrets: names } : rest,
+						onChange((current) =>
+							withOptional(
+								current,
+								"secrets",
+								names.length > 0 ? names : undefined,
+							),
 						)
 					}
 				/>

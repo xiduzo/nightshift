@@ -19,13 +19,12 @@ import {
 	ToolsField,
 } from "../access";
 import { OutputSchemaField } from "../data-shape";
-import { Field, InspectorSection, Note } from "../form";
+import { Field, InspectorSection, Note, withOptional } from "../form";
 import { useProfile } from "./agent-fields";
 
 /** The node with these CLI tools: no `clis` field when there are none. */
 function withClis(node: AgentNode, clis: string[]): AgentNode {
-	const { clis: _, ...rest } = node;
-	return clis.length > 0 ? { ...rest, clis } : rest;
+	return withOptional(node, "clis", clis.length > 0 ? clis : undefined);
 }
 
 /** The node's knowledge choice, as the select shows it. */

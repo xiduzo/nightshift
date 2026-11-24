@@ -3,7 +3,7 @@ import {
 	NativeSelect,
 	NativeSelectOption,
 } from "@nightshift/ui/components/native-select";
-import { Field, PositiveIntInput } from "../form";
+import { Field, NumberField } from "../form";
 
 /** The choices of the person tier of an Agent or a Subflow. */
 const RETRY_CHOICES = [
@@ -41,29 +41,24 @@ export function PersonDeadline<N extends CascadeNode>({
 	const deadline = tier.deadline;
 	return (
 		<div className="grid grid-cols-2 gap-3">
-			<Field
+			<NumberField
 				id={`${id}-minutes`}
 				label="Choose after (min)"
 				optional
 				hint="When you do not answer in time, Night Shift chooses for you."
-			>
-				<PositiveIntInput
-					id={`${id}-minutes`}
-					value={deadline?.minutes}
-					placeholder="None"
-					describedBy={`${id}-minutes-hint`}
-					onChange={(minutes) =>
-						onChange(
-							minutes === undefined
-								? undefined
-								: {
-										minutes,
-										choose: deadline?.choose ?? choices[0]?.name ?? "stop",
-									},
-						)
-					}
-				/>
-			</Field>
+				value={deadline?.minutes}
+				placeholder="None"
+				onChange={(minutes) =>
+					onChange(
+						minutes === undefined
+							? undefined
+							: {
+									minutes,
+									choose: deadline?.choose ?? choices[0]?.name ?? "stop",
+								},
+					)
+				}
+			/>
 			<Field id={`${id}-choose`} label="Then choose">
 				<NativeSelect
 					id={`${id}-choose`}

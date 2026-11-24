@@ -32,6 +32,7 @@ import { Switch } from "@nightshift/ui/components/switch";
 import { PlusIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { OutputSchemaField } from "../data-shape";
+import { withOptional } from "../form";
 import { TemplateField } from "../template";
 import { type Change, move, NameInput, RowButtons } from "./io-rows";
 import { type KeptFlow, KeptValue } from "./kept-value";
@@ -277,8 +278,8 @@ function VariableRow({
 					className="mt-0.5"
 					aria-describedby={`${id}-keep-hint`}
 					onCheckedChange={(on) =>
-						onUpdate(({ keep: _, ...rest }) =>
-							on ? { ...rest, keep: "project" } : rest,
+						onUpdate((current) =>
+							withOptional(current, "keep", on ? "project" : undefined),
 						)
 					}
 				/>
@@ -304,9 +305,7 @@ function VariableRow({
 					output={variable.schema}
 					description="Every value must fit this shape. A step that writes a value that does not fit fails."
 					onChange={(schema) =>
-						onUpdate(({ schema: _, ...rest }) =>
-							schema === undefined ? rest : { ...rest, schema },
-						)
+						onUpdate((current) => withOptional(current, "schema", schema))
 					}
 				/>
 			) : null}

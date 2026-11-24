@@ -5,24 +5,20 @@ import {
 	isPersonTier,
 	withDecidedBy,
 } from "@nightshift/flows";
-import {
-	FieldContent,
-	FieldDescription,
-	FieldLabel,
-	Field as ShadcnField,
-} from "@nightshift/ui/components/field";
-import { Switch } from "@nightshift/ui/components/switch";
-import {
-	ToggleGroup,
-	ToggleGroupItem,
-} from "@nightshift/ui/components/toggle-group";
 import { useQuery } from "@tanstack/react-query";
 import { useId } from "react";
 import { settingsQueries } from "@/features/settings";
 import { OutcomesSuggest, RulesSuggest } from "../../assistant";
 import { DECIDED_BY_ICON } from "../../canvas";
 import { CascadeSection, ModelSettings } from "./agent";
-import { Field, InspectorSection, Note } from "./form";
+import {
+	type Choice,
+	ChoiceField,
+	InspectorSection,
+	Note,
+	SwitchField,
+	withOptional,
+} from "./form";
 import {
 	GateBriefSection,
 	GateDeadlineSection,
@@ -34,13 +30,10 @@ import { NodeOptionsField } from "./outcomes";
 import { TemplateField } from "./template";
 
 /** Who decides, in the order the toggle shows them. */
-const DECIDED_BY: {
-	by: DecisionNode["by"];
-	label: string;
-}[] = [
-	{ by: "person", label: "You" },
-	{ by: "rule", label: "A rule" },
-	{ by: "model", label: "A model" },
+const DECIDED_BY: Choice<DecisionNode["by"]>[] = [
+	{ value: "person", label: "You", icon: <DECIDED_BY_ICON.person /> },
+	{ value: "rule", label: "A rule", icon: <DECIDED_BY_ICON.rule /> },
+	{ value: "model", label: "A model", icon: <DECIDED_BY_ICON.model /> },
 ];
 
 /**
@@ -103,7 +96,7 @@ export function DecisionFields({
 	return (
 		<>
 			<InspectorSection title="Decision">
-				<Field
+				<ChoiceField
 					id={`${id}-by`}
 					label="Decided by"
 					hint={
@@ -113,38 +106,14 @@ export function DecisionFields({
 								? "A rule reads the values of earlier nodes and inputs. It uses no model and costs nothing."
 								: "A small model reads the prompt and picks an option."
 					}
-				>
-					<ToggleGroup
-						variant="outline"
-						size="sm"
-						spacing={0}
-						aria-label="Decided by"
-						className="w-full"
-						value={[by]}
-						onValueChange={(value) => {
-							const next = value[0] as DecisionNode["by"] | undefined;
-							if (next) {
-								onChange((current) =>
-									withDecidedBy(current, next, settings.data?.values),
-								);
-							}
-						}}
-					>
-						{DECIDED_BY.map((entry) => {
-							const Icon = DECIDED_BY_ICON[entry.by];
-							return (
-								<ToggleGroupItem
-									key={entry.by}
-									value={entry.by}
-									className="flex-1 aria-pressed:bg-primary aria-pressed:text-primary-foreground"
-								>
-									<Icon />
-									{entry.label}
-								</ToggleGroupItem>
-							);
-						})}
-					</ToggleGroup>
-				</Field>
+					value={by}
+					choices={DECIDED_BY}
+					onChange={(next) =>
+						onChange((current) =>
+							withDecidedBy(current, next, settings.data?.values),
+						)
+					}
+				/>
 				{by === "person" ? (
 					<GateTitleField
 						id={`${id}-title`}
@@ -152,9 +121,7 @@ export function DecisionFields({
 						nodeId={node.id}
 						title={node.title}
 						onChange={(title) =>
-							onChange(({ title: _, ...current }) =>
-								title === undefined ? current : { ...current, title },
-							)
+							onChange((current) => withOptional(current, "title", title))
 						}
 					/>
 				) : null}
@@ -176,30 +143,17 @@ export function DecisionFields({
 					}
 				/>
 				{by === "person" ? (
-					<ShadcnField orientation="horizontal" className="items-start">
-						<Switch
-							id={`${id}-lock-screen`}
-							checked={node.lockScreen === true}
-							className="mt-0.5"
-							aria-describedby={`${id}-lock-screen-hint`}
-							onCheckedChange={(on) =>
-								onChange(({ lockScreen: _, ...current }) =>
-									on ? { ...current, lockScreen: true } : current,
-								)
-							}
-						/>
-						<FieldContent>
-							<FieldLabel htmlFor={`${id}-lock-screen`}>
-								Can be answered from the lock screen
-							</FieldLabel>
-							<FieldDescription
-								id={`${id}-lock-screen-hint`}
-								className="text-xs"
-							>
-								{lockScreenHint(node)}
-							</FieldDescription>
-						</FieldContent>
-					</ShadcnField>
+					<SwitchField
+						id={`${id}-lock-screen`}
+						label="Can be answered from the lock screen"
+						description={lockScreenHint(node)}
+						checked={node.lockScreen === true}
+						onChange={(on) =>
+							onChange((current) =>
+								withOptional(current, "lockScreen", on ? true : undefined),
+							)
+						}
+					/>
 				) : null}
 			</InspectorSection>
 

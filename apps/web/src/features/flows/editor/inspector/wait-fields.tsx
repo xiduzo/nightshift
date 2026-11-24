@@ -9,7 +9,13 @@ import { useId, useRef } from "react";
 import { CommandSuggest } from "../../assistant";
 import { WAIT_KINDS } from "../draft";
 import { useCommandToolField } from "./access";
-import { Field, InspectorSection, Note, PositiveIntInput } from "./form";
+import {
+	Field,
+	InspectorSection,
+	Note,
+	NumberField,
+	withOptional,
+} from "./form";
 import { NodeOptionsField } from "./outcomes";
 import { TemplateField } from "./template";
 import { NamedTemplates } from "./web-request-fields";
@@ -92,21 +98,16 @@ export function WaitFields({
 				</Field>
 
 				{until.kind === "duration" ? (
-					<Field
+					<NumberField
 						id={`${id}-minutes`}
 						label="Minutes"
 						hint="A whole number above 0."
-					>
-						<PositiveIntInput
-							id={`${id}-minutes`}
-							value={until.minutes}
-							placeholder="15"
-							describedBy={`${id}-minutes-hint`}
-							onChange={(minutes) =>
-								setUntil({ ...until, minutes: minutes ?? 0 })
-							}
-						/>
-					</Field>
+						value={until.minutes}
+						placeholder="15"
+						onChange={(minutes) =>
+							setUntil({ ...until, minutes: minutes ?? 0 })
+						}
+					/>
 				) : null}
 
 				{until.kind === "time" ? (
@@ -158,16 +159,15 @@ export function WaitFields({
 							invalid={until.url.trim() === ""}
 							onChange={(url) => setUntil({ ...until, url })}
 						/>
-						<Field id={`${id}-url-every`} label="Every (minutes)">
-							<PositiveIntInput
-								id={`${id}-url-every`}
-								value={until.everyMinutes}
-								placeholder="5"
-								onChange={(everyMinutes) =>
-									setUntil({ ...until, everyMinutes: everyMinutes ?? 0 })
-								}
-							/>
-						</Field>
+						<NumberField
+							id={`${id}-url-every`}
+							label="Every (minutes)"
+							value={until.everyMinutes}
+							placeholder="5"
+							onChange={(everyMinutes) =>
+								setUntil({ ...until, everyMinutes: everyMinutes ?? 0 })
+							}
+						/>
 						<NamedTemplates
 							flow={flow}
 							nodeId={node.id}
@@ -177,11 +177,12 @@ export function WaitFields({
 							valuePlaceholder="Bearer ${API_TOKEN}"
 							values={until.headers ?? {}}
 							onChange={(headers) => {
-								const { headers: _, ...rest } = until;
 								setUntil(
-									Object.keys(headers).length === 0
-										? rest
-										: { ...rest, headers },
+									withOptional(
+										until,
+										"headers",
+										Object.keys(headers).length === 0 ? undefined : headers,
+									),
 								);
 							}}
 						/>
@@ -304,8 +305,9 @@ function SignalFields({
 				placeholder="{{pr}}"
 				multiline={false}
 				onChange={(key) => {
-					const { key: _, ...rest } = signal;
-					onChange(key.trim() === "" ? rest : { ...rest, key });
+					onChange(
+						withOptional(signal, "key", key.trim() === "" ? undefined : key),
+					);
 				}}
 			/>
 		</>
@@ -344,21 +346,16 @@ function CommandFields({
 				action={<CommandSuggest node={node} />}
 				onChange={(text) => onChange({ ...command, command: text })}
 			/>
-			<Field
+			<NumberField
 				id={`${id}-every`}
 				label="Try every (minutes)"
 				hint="The timeout below must be longer."
-			>
-				<PositiveIntInput
-					id={`${id}-every`}
-					value={command.everyMinutes}
-					placeholder="5"
-					describedBy={`${id}-every-hint`}
-					onChange={(everyMinutes) =>
-						onChange({ ...command, everyMinutes: everyMinutes ?? 0 })
-					}
-				/>
-			</Field>
+				value={command.everyMinutes}
+				placeholder="5"
+				onChange={(everyMinutes) =>
+					onChange({ ...command, everyMinutes: everyMinutes ?? 0 })
+				}
+			/>
 		</>
 	);
 }

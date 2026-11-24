@@ -19,20 +19,30 @@ import {
 	NativeSelect,
 	NativeSelectOption,
 } from "@nightshift/ui/components/native-select";
-import {
-	ToggleGroup,
-	ToggleGroupItem,
-} from "@nightshift/ui/components/toggle-group";
 import { PlusIcon, XIcon } from "lucide-react";
 import { type ReactNode, useId, useState } from "react";
 import { DataShapeSection } from "./data-shape";
-import { Field, InspectorSection, Note, PositiveIntInput } from "./form";
+import {
+	type Choice,
+	ChoiceField,
+	Field,
+	InspectorSection,
+	Note,
+	PositiveIntInput,
+	withOptional,
+} from "./form";
 import { TemplateField } from "./template";
 
 type WebRequestBody = NonNullable<WebRequestNode["body"]>;
 type BodyKind = WebRequestBody["kind"] | "none";
 
-const BODY_KINDS: { value: BodyKind; label: string }[] = [
+/** Where the URL comes from. */
+const SEND_TO = [
+	{ value: "url", label: "A URL" },
+	{ value: "secret", label: "A secret" },
+] as const;
+
+const BODY_KINDS: Choice<BodyKind>[] = [
 	{ value: "none", label: "None" },
 	{ value: "json", label: "JSON" },
 	{ value: "text", label: "Text" },
@@ -54,9 +64,6 @@ function emptyBody(kind: WebRequestBody["kind"]): WebRequestBody {
 const MB = 1024 * 1024;
 
 /** A toggle item that fills its share and shows when it is on. */
-const PRESSED =
-	"flex-1 aria-pressed:bg-primary aria-pressed:text-primary-foreground";
-
 export function WebRequestFields({
 	flow,
 	node,
@@ -92,33 +99,19 @@ export function WebRequestFields({
 					</NativeSelect>
 				</Field>
 
-				<Field id={`${id}-where`} label="Send to">
-					<ToggleGroup
-						variant="outline"
-						size="sm"
-						spacing={0}
-						aria-label="Send to"
-						className="w-full"
-						value={[fromSecret ? "secret" : "url"]}
-						onValueChange={(value) => {
-							const next = value[0];
-							if (next === undefined) return;
-							onChange((current) => {
-								const { url: _, urlSecret: __, ...rest } = current;
-								return next === "secret"
-									? { ...rest, urlSecret: "" }
-									: { ...rest, url: "" };
-							});
-						}}
-					>
-						<ToggleGroupItem value="url" className={PRESSED}>
-							A URL
-						</ToggleGroupItem>
-						<ToggleGroupItem value="secret" className={PRESSED}>
-							A secret
-						</ToggleGroupItem>
-					</ToggleGroup>
-				</Field>
+				<ChoiceField
+					id={`${id}-where`}
+					label="Send to"
+					value={fromSecret ? "secret" : "url"}
+					choices={SEND_TO}
+					onChange={(next) =>
+						onChange(({ url: _, urlSecret: __, ...rest }) =>
+							next === "secret"
+								? { ...rest, urlSecret: "" }
+								: { ...rest, url: "" },
+						)
+					}
+				/>
 
 				{fromSecret ? (
 					<TemplateField
@@ -178,7 +171,7 @@ export function WebRequestFields({
 				/>
 
 				{noBody && body === undefined ? null : (
-					<Field
+					<ChoiceField
 						id={`${id}-body`}
 						label="Body"
 						error={
@@ -186,36 +179,18 @@ export function WebRequestFields({
 								? `A ${node.method} request sends no body. Use POST, or pick None.`
 								: null
 						}
-					>
-						<ToggleGroup
-							variant="outline"
-							size="sm"
-							spacing={0}
-							aria-label="Body"
-							className="w-full"
-							value={[body?.kind ?? "none"]}
-							onValueChange={(value) => {
-								const next = value[0] as BodyKind | undefined;
-								if (next === undefined) return;
-								onChange((current) => {
-									const { body: _, ...rest } = current;
-									return next === "none"
-										? rest
-										: { ...rest, body: emptyBody(next) };
-								});
-							}}
-						>
-							{BODY_KINDS.map((kind) => (
-								<ToggleGroupItem
-									key={kind.value}
-									value={kind.value}
-									className={PRESSED}
-								>
-									{kind.label}
-								</ToggleGroupItem>
-							))}
-						</ToggleGroup>
-					</Field>
+						value={body?.kind ?? "none"}
+						choices={BODY_KINDS}
+						onChange={(next) =>
+							onChange((current) =>
+								withOptional(
+									current,
+									"body",
+									next === "none" ? undefined : emptyBody(next),
+								),
+							)
+						}
+					/>
 				)}
 
 				{body?.kind === "json" ? (
@@ -267,13 +242,13 @@ export function WebRequestFields({
 									const contentType = event.target.value;
 									onChange((current) => {
 										if (current.body?.kind !== "text") return current;
-										const { contentType: _, ...rest } = current.body;
 										return {
 											...current,
-											body:
-												contentType.trim() === ""
-													? rest
-													: { ...rest, contentType },
+											body: withOptional(
+												current.body,
+												"contentType",
+												contentType.trim() === "" ? undefined : contentType,
+											),
 										};
 									});
 								}}
@@ -323,12 +298,13 @@ export function WebRequestFields({
 						value={node.timeoutSeconds}
 						placeholder={String(DEFAULT_WEB_REQUEST_TIMEOUT_SECONDS)}
 						onChange={(timeoutSeconds) =>
-							onChange((current) => {
-								const { timeoutSeconds: _, ...rest } = current;
-								return timeoutSeconds === undefined
-									? rest
-									: { ...rest, timeoutSeconds: Math.min(timeoutSeconds, 600) };
-							})
+							onChange((current) =>
+								withOptional(
+									current,
+									"timeoutSeconds",
+									timeoutSeconds && Math.min(timeoutSeconds, 600),
+								),
+							)
 						}
 					/>
 				</Field>
@@ -347,15 +323,13 @@ export function WebRequestFields({
 						}
 						placeholder={String(DEFAULT_WEB_REQUEST_MAX_BYTES / MB)}
 						onChange={(megabytes) =>
-							onChange((current) => {
-								const { maxBytes: _, ...rest } = current;
-								return megabytes === undefined
-									? rest
-									: {
-											...rest,
-											maxBytes: Math.min(megabytes * MB, MAX_WEB_REQUEST_BYTES),
-										};
-							})
+							onChange((current) =>
+								withOptional(
+									current,
+									"maxBytes",
+									megabytes && Math.min(megabytes * MB, MAX_WEB_REQUEST_BYTES),
+								),
+							)
 						}
 					/>
 				</Field>

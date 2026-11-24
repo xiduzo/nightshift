@@ -16,7 +16,13 @@ import {
 } from "@nightshift/ui/components/native-select";
 import { useId } from "react";
 import { OutputSchemaField } from "./data-shape";
-import { Field, InspectorSection, Note, PositiveIntInput } from "./form";
+import {
+	Field,
+	InspectorSection,
+	Note,
+	NumberField,
+	withOptional,
+} from "./form";
 import { TemplateField } from "./template";
 
 const MB = 1024 * 1024;
@@ -127,8 +133,12 @@ export function ConvertFields({
 							aria-describedby={`${id}-delimiter-hint`}
 							onChange={(event) => {
 								const delimiter = event.target.value;
-								onChange(({ delimiter: _, ...current }) =>
-									delimiter === "" ? current : { ...current, delimiter },
+								onChange((current) =>
+									withOptional(
+										current,
+										"delimiter",
+										delimiter === "" ? undefined : delimiter,
+									),
 								);
 							}}
 						/>
@@ -172,33 +182,27 @@ export function ConvertFields({
 				tab="setup"
 				defaultOpen={node.maxBytes !== undefined}
 			>
-				<Field
+				<NumberField
 					id={`${id}-size`}
 					label="Size limit in MB"
 					optional
 					hint={`The step fails when the value is bigger. At most ${MAX_CONVERT_BYTES / MB} MB.`}
-				>
-					<PositiveIntInput
-						id={`${id}-size`}
-						value={
-							node.maxBytes === undefined
-								? undefined
-								: Math.max(1, Math.round(node.maxBytes / MB))
-						}
-						placeholder={String(DEFAULT_CONVERT_MAX_BYTES / MB)}
-						describedBy={`${id}-size-hint`}
-						onChange={(megabytes) =>
-							onChange(({ maxBytes: _, ...current }) =>
-								megabytes === undefined
-									? current
-									: {
-											...current,
-											maxBytes: Math.min(megabytes * MB, MAX_CONVERT_BYTES),
-										},
-							)
-						}
-					/>
-				</Field>
+					value={
+						node.maxBytes === undefined
+							? undefined
+							: Math.max(1, Math.round(node.maxBytes / MB))
+					}
+					placeholder={String(DEFAULT_CONVERT_MAX_BYTES / MB)}
+					onChange={(megabytes) =>
+						onChange((current) =>
+							withOptional(
+								current,
+								"maxBytes",
+								megabytes && Math.min(megabytes * MB, MAX_CONVERT_BYTES),
+							),
+						)
+					}
+				/>
 			</InspectorSection>
 		</>
 	);

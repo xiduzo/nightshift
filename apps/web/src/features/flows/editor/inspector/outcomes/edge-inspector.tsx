@@ -27,7 +27,7 @@ import {
 	outcomeStyle,
 	pairKey,
 } from "../../../canvas";
-import { Field, InspectorSection, PositiveIntInput } from "../form";
+import { Field, InspectorSection, NumberField } from "../form";
 
 /** An outcome as a small outline Badge in its own colour. */
 export function OutcomePill({
@@ -179,7 +179,7 @@ export function EdgeInspector({
 					</NativeSelect>
 				</Field>
 
-				<Field
+				<NumberField
 					id={`${id}-max`}
 					label="Max times taken"
 					optional={!loopsBack}
@@ -188,15 +188,10 @@ export function EdgeInspector({
 							? "This edge is in a loop. Give one edge of each loop a max, or the flow cannot run."
 							: "After this many times, the run takes the next edge on this outcome, or fails."
 					}
-				>
-					<PositiveIntInput
-						id={`${id}-max`}
-						value={edge.max}
-						placeholder="No limit"
-						describedBy={`${id}-max-hint`}
-						onChange={(max) => onChange((current) => ({ ...current, max }))}
-					/>
-				</Field>
+					value={edge.max}
+					placeholder="No limit"
+					onChange={(max) => onChange((current) => ({ ...current, max }))}
+				/>
 			</InspectorSection>
 		</div>
 	);

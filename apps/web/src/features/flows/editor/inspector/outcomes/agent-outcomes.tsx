@@ -6,21 +6,17 @@ import {
 	nodeOutcomes,
 } from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
-import {
-	ToggleGroup,
-	ToggleGroupItem,
-} from "@nightshift/ui/components/toggle-group";
 import { RouteIcon } from "lucide-react";
 import { OutcomesSuggest } from "../../../assistant";
 import { DECIDED_BY_ICON } from "../../../canvas";
-import { Field, InspectorSection, Note } from "../form";
+import { ChoiceField, InspectorSection, Note, withOptional } from "../form";
 import { OutcomePill } from "./edge-inspector";
 import { NodeOptionsField } from "./node-options-field";
 
 /** What an Agent does when it needs input, in the order the toggle shows them. */
 const ON_NEEDS_INPUT = [
-	{ value: "edge", label: "Take an edge", icon: RouteIcon },
-	{ value: "person", label: "Ask a person", icon: DECIDED_BY_ICON.person },
+	{ value: "edge", label: "Take an edge", icon: <RouteIcon /> },
+	{ value: "person", label: "Ask a person", icon: <DECIDED_BY_ICON.person /> },
 ] as const;
 
 /**
@@ -50,7 +46,7 @@ export function AgentOutcomeSection({
 	const asks = node.ask === "person";
 	const onNeedsInput = asks ? "person" : "edge";
 	const lead = (
-		<Field
+		<ChoiceField
 			id={`${id}-ask`}
 			label="When it needs input"
 			hint={
@@ -58,35 +54,19 @@ export function AgentOutcomeSection({
 					? "Night Shift asks you the questions of the agent. The agent continues with your answer. Stop makes the step fail."
 					: "The run takes the needs input edge."
 			}
-		>
-			<ToggleGroup
-				variant="outline"
-				size="sm"
-				spacing={0}
-				aria-label="When it needs input"
-				aria-describedby={`${id}-ask-hint`}
-				className="w-full"
-				value={[onNeedsInput]}
-				onValueChange={(value) => {
-					const next = value[0] as "edge" | "person" | undefined;
-					if (!next || next === onNeedsInput) return;
-					onChange(({ ask: _, ...rest }) =>
-						next === "person" ? { ...rest, ask: "person" } : rest,
-					);
-				}}
-			>
-				{ON_NEEDS_INPUT.map((entry) => (
-					<ToggleGroupItem
-						key={entry.value}
-						value={entry.value}
-						className="flex-1 aria-pressed:bg-primary aria-pressed:text-primary-foreground"
-					>
-						<entry.icon />
-						{entry.label}
-					</ToggleGroupItem>
-				))}
-			</ToggleGroup>
-		</Field>
+			describedBy={`${id}-ask-hint`}
+			value={onNeedsInput}
+			choices={ON_NEEDS_INPUT}
+			onChange={(next) =>
+				onChange((current) =>
+					withOptional(
+						current,
+						"ask",
+						next === "person" ? "person" : undefined,
+					),
+				)
+			}
+		/>
 	);
 	const reads = (
 		<Note>

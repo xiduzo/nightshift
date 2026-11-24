@@ -9,20 +9,22 @@ import {
 	NativeSelect,
 	NativeSelectOption,
 } from "@nightshift/ui/components/native-select";
-import {
-	ToggleGroup,
-	ToggleGroupItem,
-} from "@nightshift/ui/components/toggle-group";
 import { useId } from "react";
-import { Field, InspectorSection, Note } from "./form";
+import {
+	type Choice,
+	ChoiceField,
+	Field,
+	InspectorSection,
+	Note,
+} from "./form";
 import { MemorySection } from "./results";
 import { TemplateField } from "./template";
 
 type Watch = "list" | "value";
 
-const WATCH: { watch: Watch; label: string }[] = [
-	{ watch: "list", label: "A list" },
-	{ watch: "value", label: "A value" },
+const WATCH: Choice<Watch>[] = [
+	{ value: "list", label: "A list" },
+	{ value: "value", label: "A value" },
 ];
 
 /** The node as it watches a list, or a value: the fields of the other one go. */
@@ -86,34 +88,14 @@ export function SinceLastRunFields({
 	return (
 		<>
 			<InspectorSection title="Since last run">
-				<Field
+				<ChoiceField
 					id={`${id}-watch`}
 					label="Watch"
 					hint="A list finds new and changed items. A value finds a change, such as a price that passes a limit."
-				>
-					<ToggleGroup
-						variant="outline"
-						size="sm"
-						spacing={0}
-						aria-label="Watch"
-						className="w-full"
-						value={[watch]}
-						onValueChange={(value) => {
-							const next = value[0] as Watch | undefined;
-							if (next) onChange((current) => withWatch(current, next));
-						}}
-					>
-						{WATCH.map((entry) => (
-							<ToggleGroupItem
-								key={entry.watch}
-								value={entry.watch}
-								className="flex-1 aria-pressed:bg-primary aria-pressed:text-primary-foreground"
-							>
-								{entry.label}
-							</ToggleGroupItem>
-						))}
-					</ToggleGroup>
-				</Field>
+					value={watch}
+					choices={WATCH}
+					onChange={(next) => onChange((current) => withWatch(current, next))}
+				/>
 				{watch === "list" ? (
 					<>
 						<TemplateField

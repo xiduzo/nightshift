@@ -7,19 +7,15 @@ import {
 } from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
 import {
-	FieldContent,
 	FieldDescription,
-	FieldLabel,
 	FieldLegend,
 	FieldSet,
-	Field as ShadcnField,
 } from "@nightshift/ui/components/field";
 import { Input } from "@nightshift/ui/components/input";
 import {
 	NativeSelect,
 	NativeSelectOption,
 } from "@nightshift/ui/components/native-select";
-import { Switch } from "@nightshift/ui/components/switch";
 import { PlusIcon, TriangleAlertIcon } from "lucide-react";
 import { useId, useRef } from "react";
 import { CommandSuggest } from "../../../assistant";
@@ -27,7 +23,14 @@ import { SOURCE_KINDS } from "../../draft";
 import { useProjectFolder } from "../../project";
 import { useCommandToolField } from "../access";
 import { CascadeSection } from "../agent";
-import { Field, InspectorSection, Note, PositiveIntInput } from "../form";
+import {
+	Field,
+	InspectorSection,
+	Note,
+	NumberField,
+	SwitchField,
+	withOptional,
+} from "../form";
 import { OptionsEditor } from "../outcomes";
 import { TemplateField } from "../template";
 import {
@@ -78,27 +81,21 @@ export function CallFields({
 					onPick={(name) => onChange((current) => ({ ...current, flow: name }))}
 				/>
 
-				<ShadcnField orientation="horizontal" className="items-start">
-					<Switch
-						id={`${id}-each`}
-						checked={each !== undefined}
-						className="mt-0.5"
-						aria-describedby={`${id}-each-hint`}
-						onCheckedChange={(on) => {
-							if (on === (each !== undefined)) return;
-							if (!on) lastEach.current = each;
-							onSetEach(on ? (lastEach.current ?? defaultEach()) : undefined);
-						}}
-					/>
-					<FieldContent>
-						<FieldLabel htmlFor={`${id}-each`}>Run once per item</FieldLabel>
-						<FieldDescription id={`${id}-each-hint`} className="text-xs">
-							{each
-								? "The flow runs for each item in a list. This node ends with done, halted, or stopped."
-								: "The flow runs one time. This node ends with pass, fail, or stopped."}
-						</FieldDescription>
-					</FieldContent>
-				</ShadcnField>
+				<SwitchField
+					id={`${id}-each`}
+					label="Run once per item"
+					description={
+						each
+							? "The flow runs for each item in a list. This node ends with done, halted, or stopped."
+							: "The flow runs one time. This node ends with pass, fail, or stopped."
+					}
+					checked={each !== undefined}
+					onChange={(on) => {
+						if (on === (each !== undefined)) return;
+						if (!on) lastEach.current = each;
+						onSetEach(on ? (lastEach.current ?? defaultEach()) : undefined);
+					}}
+				/>
 
 				{each ? null : (
 					<>
@@ -283,24 +280,17 @@ function EachFields({
 					}
 				/>
 
-				<Field
+				<NumberField
 					id={`${id}-max`}
 					label="Max items"
 					optional
 					hint="Night Shift starts no more items than this."
-				>
-					<PositiveIntInput
-						id={`${id}-max`}
-						value={each.maxItems}
-						placeholder="No limit"
-						describedBy={`${id}-max-hint`}
-						onChange={(maxItems) =>
-							changeEach(({ maxItems: _, ...current }) =>
-								maxItems === undefined ? current : { ...current, maxItems },
-							)
-						}
-					/>
-				</Field>
+					value={each.maxItems}
+					placeholder="No limit"
+					onChange={(maxItems) =>
+						changeEach((current) => withOptional(current, "maxItems", maxItems))
+					}
+				/>
 
 				<Note>
 					Ends with <span className="text-foreground">done</span> when no item

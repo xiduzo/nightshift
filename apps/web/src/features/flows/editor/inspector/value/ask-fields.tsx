@@ -9,27 +9,29 @@ import {
 	type ValueNode,
 } from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
-import {
-	FieldContent,
-	FieldDescription,
-	FieldLabel,
-	Field as ShadcnField,
-} from "@nightshift/ui/components/field";
 import { Input } from "@nightshift/ui/components/input";
 import {
 	NativeSelect,
 	NativeSelectOption,
 } from "@nightshift/ui/components/native-select";
-import { Switch } from "@nightshift/ui/components/switch";
 import { Textarea } from "@nightshift/ui/components/textarea";
-import {
-	ToggleGroup,
-	ToggleGroupItem,
-} from "@nightshift/ui/components/toggle-group";
 import { PlusIcon, Trash2Icon } from "lucide-react";
 import { useId, useState } from "react";
-import { Field, InspectorSection, PositiveIntInput } from "../form";
+import {
+	ChoiceField,
+	ChoiceToggle,
+	Field,
+	InspectorSection,
+	NumberField,
+	SwitchField,
+	withOptional,
+} from "../form";
 import { TemplateField } from "../template";
+
+const ATTACHMENT_KINDS = [
+	{ value: "path", label: "File" },
+	{ value: "url", label: "Link" },
+] as const;
 
 type Change = (change: (node: ValueNode) => ValueNode) => void;
 
@@ -38,18 +40,6 @@ function choiceFields(node: ValueNode): string[] {
 	return askFields(node.output)
 		.map((field) => field.name)
 		.filter((name) => choicesFieldProblem(node.output, name) === null);
-}
-
-/** The node without one of its optional fields, or with it set. */
-function withField<K extends "choices" | "attachments" | "deadline">(
-	node: ValueNode,
-	key: K,
-	value: ValueNode[K] | undefined,
-): ValueNode {
-	const next: ValueNode = { ...node };
-	if (value === undefined) delete next[key];
-	else next[key] = value;
-	return next;
 }
 
 export function AskFields({
@@ -85,32 +75,22 @@ function ChoicesSection({
 	const fields = choiceFields(node);
 	const known = choices !== undefined && fields.includes(choices.field);
 	const set = (next: ValueNode["choices"]) =>
-		onChange((current) => withField(current, "choices", next));
+		onChange((current) => withOptional(current, "choices", next));
 	return (
 		<InspectorSection
 			title="Choices from the run"
 			tab="setup"
 			defaultOpen={choices !== undefined}
 		>
-			<ShadcnField orientation="horizontal" className="items-start">
-				<Switch
-					id={`${id}-on`}
-					checked={choices !== undefined}
-					className="mt-0.5"
-					aria-describedby={`${id}-on-hint`}
-					onCheckedChange={(on) =>
-						set(on ? { from: "", field: fields[0] ?? "" } : undefined)
-					}
-				/>
-				<FieldContent>
-					<FieldLabel htmlFor={`${id}-on`}>
-						Take the choices from the run
-					</FieldLabel>
-					<FieldDescription id={`${id}-on-hint`} className="text-xs">
-						An earlier node makes the list. The person picks from it.
-					</FieldDescription>
-				</FieldContent>
-			</ShadcnField>
+			<SwitchField
+				id={`${id}-on`}
+				label="Take the choices from the run"
+				description="An earlier node makes the list. The person picks from it."
+				checked={choices !== undefined}
+				onChange={(on) =>
+					set(on ? { from: "", field: fields[0] ?? "" } : undefined)
+				}
+			/>
 			{choices ? (
 				<>
 					<TemplateField
@@ -176,7 +156,7 @@ function AttachmentsSection({
 	const list = node.attachments ?? [];
 	const set = (next: AttachmentSource[]) =>
 		onChange((current) =>
-			withField(current, "attachments", next.length > 0 ? next : undefined),
+			withOptional(current, "attachments", next.length > 0 ? next : undefined),
 		);
 	const update = (index: number, next: AttachmentSource) =>
 		set(list.map((one, at) => (at === index ? next : one)));
@@ -196,33 +176,20 @@ function AttachmentsSection({
 						className="flex flex-col gap-2 rounded-lg border p-2"
 					>
 						<div className="flex items-center gap-2">
-							<ToggleGroup
-								variant="outline"
-								size="sm"
-								spacing={0}
-								aria-label={`Kind of attachment ${index + 1}`}
+							<ChoiceToggle
+								label={`Kind of attachment ${index + 1}`}
 								className="flex-1"
-								value={[kind]}
-								onValueChange={(next) => {
+								value={kind}
+								choices={ATTACHMENT_KINDS}
+								onChange={(next) => {
 									const label = attachment.label;
 									const own = label === undefined ? {} : { label };
-									if (next[0] === "url") update(index, { ...own, url: "" });
-									if (next[0] === "path") update(index, { ...own, path: "" });
+									update(
+										index,
+										next === "url" ? { ...own, url: "" } : { ...own, path: "" },
+									);
 								}}
-							>
-								<ToggleGroupItem
-									value="path"
-									className="flex-1 aria-pressed:bg-primary aria-pressed:text-primary-foreground"
-								>
-									File
-								</ToggleGroupItem>
-								<ToggleGroupItem
-									value="url"
-									className="flex-1 aria-pressed:bg-primary aria-pressed:text-primary-foreground"
-								>
-									Link
-								</ToggleGroupItem>
-							</ToggleGroup>
+							/>
 							<Button
 								type="button"
 								variant="ghost"
@@ -265,11 +232,14 @@ function AttachmentsSection({
 								id={`${rowId}-label`}
 								value={attachment.label ?? ""}
 								onChange={(event) => {
-									const { label: _, ...rest } = attachment;
 									const text = event.target.value;
 									update(
 										index,
-										text.trim() === "" ? rest : { ...rest, label: text },
+										withOptional(
+											attachment,
+											"label",
+											text.trim() === "" ? undefined : text,
+										),
 									);
 								}}
 							/>
@@ -290,6 +260,11 @@ function AttachmentsSection({
 		</InspectorSection>
 	);
 }
+
+const DEADLINE_KINDS = [
+	{ value: "time", label: "At a time" },
+	{ value: "minutes", label: "After minutes" },
+] as const;
 
 /** The deadline with `at` or `minutes` as its time, the other one gone. */
 function withTime(
@@ -320,10 +295,10 @@ function AskDeadlineSection({
 	const [invalid, setInvalid] = useState(false);
 	const set = (next: AskDeadline | undefined) =>
 		onChange((current) => {
-			const updated = withField(current, "deadline", next);
-			if (next !== undefined) return updated;
-			const { default: _, ...rest } = updated;
-			return rest;
+			const updated = withOptional(current, "deadline", next);
+			return next === undefined
+				? withOptional(updated, "default", undefined)
+				: updated;
 		});
 	const kind = deadline?.at !== undefined ? "time" : "minutes";
 	return (
@@ -332,52 +307,24 @@ function AskDeadlineSection({
 			tab="setup"
 			defaultOpen={deadline !== undefined}
 		>
-			<ShadcnField orientation="horizontal" className="items-start">
-				<Switch
-					id={`${id}-on`}
-					checked={deadline !== undefined}
-					className="mt-0.5"
-					aria-describedby={`${id}-on-hint`}
-					onCheckedChange={(on) => set(on ? { at: "07:00" } : undefined)}
-				/>
-				<FieldContent>
-					<FieldLabel htmlFor={`${id}-on`}>
-						Stop waiting at a deadline
-					</FieldLabel>
-					<FieldDescription id={`${id}-on-hint`} className="text-xs">
-						When nobody answers in time, Night Shift takes the default.
-					</FieldDescription>
-				</FieldContent>
-			</ShadcnField>
+			<SwitchField
+				id={`${id}-on`}
+				label="Stop waiting at a deadline"
+				description="When nobody answers in time, Night Shift takes the default."
+				checked={deadline !== undefined}
+				onChange={(on) => set(on ? { at: "07:00" } : undefined)}
+			/>
 			{deadline ? (
 				<>
-					<Field id={`${id}-kind`} label="Deadline">
-						<ToggleGroup
-							variant="outline"
-							size="sm"
-							spacing={0}
-							aria-label="Deadline"
-							className="w-full"
-							value={[kind]}
-							onValueChange={(value) => {
-								if (value[0] === "time") set(withTime({ at: "07:00" }));
-								if (value[0] === "minutes") set(withTime({ minutes: 60 }));
-							}}
-						>
-							<ToggleGroupItem
-								value="time"
-								className="flex-1 aria-pressed:bg-primary aria-pressed:text-primary-foreground"
-							>
-								At a time
-							</ToggleGroupItem>
-							<ToggleGroupItem
-								value="minutes"
-								className="flex-1 aria-pressed:bg-primary aria-pressed:text-primary-foreground"
-							>
-								After minutes
-							</ToggleGroupItem>
-						</ToggleGroup>
-					</Field>
+					<ChoiceField
+						id={`${id}-kind`}
+						label="Deadline"
+						value={kind}
+						choices={DEADLINE_KINDS}
+						onChange={(next) =>
+							set(withTime(next === "time" ? { at: "07:00" } : { minutes: 60 }))
+						}
+					/>
 					{kind === "time" ? (
 						<TemplateField
 							id={`${id}-at`}
@@ -392,17 +339,13 @@ function AskDeadlineSection({
 							onChange={(at) => set(withTime({ at }))}
 						/>
 					) : (
-						<Field
+						<NumberField
 							id={`${id}-minutes`}
 							label="Minutes after the question opens"
-						>
-							<PositiveIntInput
-								id={`${id}-minutes`}
-								value={deadline.minutes}
-								placeholder="60"
-								onChange={(minutes) => set(withTime({ minutes }))}
-							/>
-						</Field>
+							value={deadline.minutes}
+							placeholder="60"
+							onChange={(minutes) => set(withTime({ minutes }))}
+						/>
 					)}
 					<Field
 						id={`${id}-default`}
@@ -429,7 +372,9 @@ function AskDeadlineSection({
 								setText(next);
 								if (next.trim() === "") {
 									setInvalid(false);
-									onChange(({ default: _, ...rest }) => rest);
+									onChange((current) =>
+										withOptional(current, "default", undefined),
+									);
 									return;
 								}
 								try {

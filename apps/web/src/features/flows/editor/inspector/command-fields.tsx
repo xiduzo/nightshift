@@ -20,10 +20,6 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@nightshift/ui/components/dropdown-menu";
-import {
-	ToggleGroup,
-	ToggleGroupItem,
-} from "@nightshift/ui/components/toggle-group";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronDownIcon, PlusIcon } from "lucide-react";
 import { useId } from "react";
@@ -35,12 +31,18 @@ import {
 import { CommandSuggest } from "../../assistant";
 import { SecretsField, useCommandToolField } from "./access";
 import { DataShapeSection } from "./data-shape";
-import { Field, InspectorSection, Note } from "./form";
+import {
+	type Choice,
+	ChoiceField,
+	InspectorSection,
+	Note,
+	withOptional,
+} from "./form";
 import { NodeOptionsField } from "./outcomes";
 import { TemplateField } from "./template";
 
 /** What a Command node keeps of its output, in the order the toggle shows them. */
-const COMMAND_OUTPUTS: { value: CommandNode["stdout"]; label: string }[] = [
+const COMMAND_OUTPUTS: Choice<CommandNode["stdout"]>[] = [
 	{ value: "text", label: "Text" },
 	{ value: "json", label: "JSON" },
 ];
@@ -129,7 +131,7 @@ export function CommandFields({
 					}
 					action={<CommandSuggest node={node} />}
 				/>
-				<Field
+				<ChoiceField
 					id={`${id}-stdout`}
 					label="What it prints"
 					hint={
@@ -151,31 +153,11 @@ export function CommandFields({
 							</>
 						)
 					}
-				>
-					<ToggleGroup
-						variant="outline"
-						size="sm"
-						spacing={0}
-						aria-label="What it prints"
-						aria-describedby={`${id}-stdout-hint`}
-						className="w-full"
-						value={[node.stdout]}
-						onValueChange={(value) => {
-							const stdout = value[0] as CommandNode["stdout"] | undefined;
-							if (stdout) onChange((current) => ({ ...current, stdout }));
-						}}
-					>
-						{COMMAND_OUTPUTS.map((entry) => (
-							<ToggleGroupItem
-								key={entry.value}
-								value={entry.value}
-								className="flex-1 aria-pressed:bg-primary aria-pressed:text-primary-foreground"
-							>
-								{entry.label}
-							</ToggleGroupItem>
-						))}
-					</ToggleGroup>
-				</Field>
+					describedBy={`${id}-stdout-hint`}
+					value={node.stdout}
+					choices={COMMAND_OUTPUTS}
+					onChange={(stdout) => onChange((current) => ({ ...current, stdout }))}
+				/>
 			</InspectorSection>
 
 			<DataShapeSection node={node} onChange={onChange} />
@@ -197,8 +179,12 @@ export function CommandFields({
 					secrets={secrets}
 					projectSecrets={[...(projectSecrets ?? []), ...(spaceSecrets ?? [])]}
 					onChange={(names) =>
-						onChange(({ secrets: _, ...rest }) =>
-							names.length > 0 ? { ...rest, secrets: names } : rest,
+						onChange((current) =>
+							withOptional(
+								current,
+								"secrets",
+								names.length > 0 ? names : undefined,
+							),
 						)
 					}
 				/>
@@ -219,8 +205,7 @@ export function CommandFields({
 							current,
 							commandExits(current).map((exit, at) => {
 								if (at !== index) return exit;
-								const { code: _, ...rest } = exit;
-								return code === undefined ? rest : { ...rest, code };
+								return withOptional(exit, "code", code);
 							}),
 						),
 					)

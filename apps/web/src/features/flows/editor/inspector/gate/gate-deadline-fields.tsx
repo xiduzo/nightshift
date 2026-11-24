@@ -1,23 +1,24 @@
 /** A Gate's deadline: when Night Shift stops waiting, and what it picks then. */
 import type { DecisionNode, Flow, GateDeadline } from "@nightshift/flows";
 import {
-	FieldContent,
-	FieldDescription,
-	FieldLabel,
-	Field as ShadcnField,
-} from "@nightshift/ui/components/field";
-import {
 	NativeSelect,
 	NativeSelectOption,
 } from "@nightshift/ui/components/native-select";
-import { Switch } from "@nightshift/ui/components/switch";
-import {
-	ToggleGroup,
-	ToggleGroupItem,
-} from "@nightshift/ui/components/toggle-group";
 import { useId } from "react";
-import { Field, InspectorSection, PositiveIntInput } from "../form";
+import {
+	ChoiceField,
+	Field,
+	InspectorSection,
+	NumberField,
+	SwitchField,
+	withOptional,
+} from "../form";
 import { TemplateField } from "../template";
+
+const DEADLINE_KINDS = [
+	{ value: "time", label: "At a time" },
+	{ value: "minutes", label: "After minutes" },
+] as const;
 
 /** A new deadline: 07:00, taking the last option (often the safe one). */
 function newDeadline(node: DecisionNode): GateDeadline {
@@ -46,9 +47,7 @@ export function GateDeadlineSection({
 	const id = useId();
 	const { deadline } = node;
 	const set = (next: GateDeadline | undefined) =>
-		onChange(({ deadline: _, ...current }) =>
-			next ? { ...current, deadline: next } : current,
-		);
+		onChange((current) => withOptional(current, "deadline", next));
 	const kind = deadline?.at !== undefined ? "time" : "minutes";
 	const chosen = node.options.some((o) => o.name === deadline?.choose);
 
@@ -58,54 +57,29 @@ export function GateDeadlineSection({
 			tab="setup"
 			defaultOpen={deadline !== undefined}
 		>
-			<ShadcnField orientation="horizontal" className="items-start">
-				<Switch
-					id={`${id}-on`}
-					checked={deadline !== undefined}
-					className="mt-0.5"
-					aria-describedby={`${id}-on-hint`}
-					onCheckedChange={(on) => set(on ? newDeadline(node) : undefined)}
-				/>
-				<FieldContent>
-					<FieldLabel htmlFor={`${id}-on`}>
-						Stop waiting at a deadline
-					</FieldLabel>
-					<FieldDescription id={`${id}-on-hint`} className="text-xs">
-						When nobody answers in time, Night Shift picks an option for you.
-					</FieldDescription>
-				</FieldContent>
-			</ShadcnField>
+			<SwitchField
+				id={`${id}-on`}
+				label="Stop waiting at a deadline"
+				description="When nobody answers in time, Night Shift picks an option for you."
+				checked={deadline !== undefined}
+				onChange={(on) => set(on ? newDeadline(node) : undefined)}
+			/>
 			{deadline ? (
 				<>
-					<Field id={`${id}-kind`} label="Deadline">
-						<ToggleGroup
-							variant="outline"
-							size="sm"
-							spacing={0}
-							aria-label="Deadline"
-							className="w-full"
-							value={[kind]}
-							onValueChange={(value) => {
-								const next = value[0];
-								if (next === "time") set(withTime(deadline, { at: "07:00" }));
-								if (next === "minutes")
-									set(withTime(deadline, { minutes: 60 }));
-							}}
-						>
-							<ToggleGroupItem
-								value="time"
-								className="flex-1 aria-pressed:bg-primary aria-pressed:text-primary-foreground"
-							>
-								At a time
-							</ToggleGroupItem>
-							<ToggleGroupItem
-								value="minutes"
-								className="flex-1 aria-pressed:bg-primary aria-pressed:text-primary-foreground"
-							>
-								After minutes
-							</ToggleGroupItem>
-						</ToggleGroup>
-					</Field>
+					<ChoiceField
+						id={`${id}-kind`}
+						label="Deadline"
+						value={kind}
+						choices={DEADLINE_KINDS}
+						onChange={(next) =>
+							set(
+								withTime(
+									deadline,
+									next === "time" ? { at: "07:00" } : { minutes: 60 },
+								),
+							)
+						}
+					/>
 					{kind === "time" ? (
 						<TemplateField
 							id={`${id}-at`}
@@ -120,19 +94,14 @@ export function GateDeadlineSection({
 							onChange={(at) => set(withTime(deadline, { at }))}
 						/>
 					) : (
-						<Field
+						<NumberField
 							id={`${id}-minutes`}
 							label="Minutes after the Gate opens"
 							hint="A whole number above 0."
-						>
-							<PositiveIntInput
-								id={`${id}-minutes`}
-								value={deadline.minutes}
-								placeholder="60"
-								describedBy={`${id}-minutes-hint`}
-								onChange={(minutes) => set(withTime(deadline, { minutes }))}
-							/>
-						</Field>
+							value={deadline.minutes}
+							placeholder="60"
+							onChange={(minutes) => set(withTime(deadline, { minutes }))}
+						/>
 					)}
 					<Field
 						id={`${id}-choose`}

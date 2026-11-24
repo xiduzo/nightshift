@@ -32,12 +32,7 @@ import {
 	withDevice,
 } from "./devices";
 import { EndFields } from "./end-fields";
-import {
-	Field,
-	InspectorSection,
-	InspectorTabs,
-	PositiveIntInput,
-} from "./form";
+import { InspectorSection, InspectorTabs, NumberField } from "./form";
 import { JoinFields } from "./join-fields";
 import { LeaseFields } from "./lease-fields";
 import {
@@ -412,65 +407,50 @@ export function NodeInspector({
 								(node.idleMinutes !== undefined || node.maxTurns !== undefined))
 						}
 					>
-						<Field
+						<NumberField
 							id={`${id}-timeout`}
 							label="Timeout in minutes"
 							optional
 							hint="The step fails when one visit runs longer."
-						>
-							<PositiveIntInput
-								id={`${id}-timeout`}
-								value={node.timeoutMinutes}
-								placeholder="No limit"
-								describedBy={`${id}-timeout-hint`}
-								onChange={(timeoutMinutes) =>
-									onChange((current) => ({ ...current, timeoutMinutes }))
-								}
-							/>
-						</Field>
+							value={node.timeoutMinutes}
+							placeholder="No limit"
+							onChange={(timeoutMinutes) =>
+								onChange((current) => ({ ...current, timeoutMinutes }))
+							}
+						/>
 						{node.type === "agent" ? (
-							<Field
+							<NumberField
 								id={`${id}-idle`}
 								label="Idle timeout in minutes"
 								optional
 								hint="The step fails when the agent does nothing for this long."
-							>
-								<PositiveIntInput
-									id={`${id}-idle`}
-									value={node.idleMinutes}
-									placeholder="From the run policy"
-									describedBy={`${id}-idle-hint`}
-									onChange={(idleMinutes) =>
-										onChange((current) =>
-											current.type === "agent"
-												? { ...current, idleMinutes }
-												: current,
-										)
-									}
-								/>
-							</Field>
+								value={node.idleMinutes}
+								placeholder="From the run policy"
+								onChange={(idleMinutes) =>
+									onChange((current) =>
+										current.type === "agent"
+											? { ...current, idleMinutes }
+											: current,
+									)
+								}
+							/>
 						) : null}
 						{node.type === "agent" ? (
-							<Field
+							<NumberField
 								id={`${id}-max-turns`}
 								label="Max turns"
 								optional
 								hint="A turn is one reply of the agent. The step fails after this many."
-							>
-								<PositiveIntInput
-									id={`${id}-max-turns`}
-									value={node.maxTurns}
-									placeholder="From the run policy"
-									describedBy={`${id}-max-turns-hint`}
-									onChange={(maxTurns) =>
-										onChange((current) =>
-											current.type === "agent"
-												? { ...current, maxTurns }
-												: current,
-										)
-									}
-								/>
-							</Field>
+								value={node.maxTurns}
+								placeholder="From the run policy"
+								onChange={(maxTurns) =>
+									onChange((current) =>
+										current.type === "agent"
+											? { ...current, maxTurns }
+											: current,
+									)
+								}
+							/>
 						) : null}
 					</InspectorSection>
 				)}

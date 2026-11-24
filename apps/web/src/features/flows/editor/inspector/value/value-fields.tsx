@@ -5,26 +5,29 @@ import {
 	withOutputSchema,
 	withValueBy,
 } from "@nightshift/flows";
-import {
-	ToggleGroup,
-	ToggleGroupItem,
-} from "@nightshift/ui/components/toggle-group";
 import { useId } from "react";
 import { LargerTextarea } from "@/shared/larger-window";
 import { ExpressionSuggest } from "../../../assistant";
 import { VALUE_BY_ICON } from "../../../canvas";
 import { CascadeSection, ModelSettings } from "../agent";
 import { OutputSchemaField } from "../data-shape";
-import { Field, InspectorSection, Note } from "../form";
+import {
+	type Choice,
+	ChoiceField,
+	Field,
+	InspectorSection,
+	Note,
+	withOptional,
+} from "../form";
 import { GateBriefSection, GateTitleField, withBrief } from "../gate";
 import { TemplateField } from "../template";
 import { AskFields } from "./ask-fields";
 import { ValuePresetMenu } from "./value-presets";
 
-const VALUE_BY: { by: ValueNode["by"]; label: string }[] = [
-	{ by: "rule", label: "A rule" },
-	{ by: "model", label: "A model" },
-	{ by: "person", label: "A person" },
+const VALUE_BY: Choice<ValueNode["by"]>[] = [
+	{ value: "rule", label: "A rule", icon: <VALUE_BY_ICON.rule /> },
+	{ value: "model", label: "A model", icon: <VALUE_BY_ICON.model /> },
+	{ value: "person", label: "A person", icon: <VALUE_BY_ICON.person /> },
 ];
 
 /** What each maker does, under the toggle. */
@@ -63,34 +66,14 @@ export function ValueFields({
 	return (
 		<>
 			<InspectorSection title="Value">
-				<Field id={`${id}-by`} label="Made by" hint={MADE_BY_HINT[by]}>
-					<ToggleGroup
-						variant="outline"
-						size="sm"
-						spacing={0}
-						aria-label="Made by"
-						className="w-full"
-						value={[by]}
-						onValueChange={(value) => {
-							const next = value[0] as ValueNode["by"] | undefined;
-							if (next) onChange((current) => withValueBy(current, next));
-						}}
-					>
-						{VALUE_BY.map((entry) => {
-							const Icon = VALUE_BY_ICON[entry.by];
-							return (
-								<ToggleGroupItem
-									key={entry.by}
-									value={entry.by}
-									className="flex-1 aria-pressed:bg-primary aria-pressed:text-primary-foreground"
-								>
-									<Icon />
-									{entry.label}
-								</ToggleGroupItem>
-							);
-						})}
-					</ToggleGroup>
-				</Field>
+				<ChoiceField
+					id={`${id}-by`}
+					label="Made by"
+					hint={MADE_BY_HINT[by]}
+					value={by}
+					choices={VALUE_BY}
+					onChange={(next) => onChange((current) => withValueBy(current, next))}
+				/>
 				{by === "rule" ? (
 					<Field
 						id={`${id}-expression`}
@@ -136,9 +119,7 @@ export function ValueFields({
 								nodeId={node.id}
 								title={node.title}
 								onChange={(title) =>
-									onChange(({ title: _, ...current }) =>
-										title === undefined ? current : { ...current, title },
-									)
+									onChange((current) => withOptional(current, "title", title))
 								}
 							/>
 						) : null}

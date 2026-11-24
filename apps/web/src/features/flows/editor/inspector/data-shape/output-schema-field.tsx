@@ -21,17 +21,13 @@ import {
 	ItemDescription,
 	ItemTitle,
 } from "@nightshift/ui/components/item";
-import {
-	ToggleGroup,
-	ToggleGroupItem,
-} from "@nightshift/ui/components/toggle-group";
 import { CheckIcon, PencilIcon } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { LargerTextarea } from "@/shared/larger-window";
 
 import { OutputSuggest } from "../../../assistant";
 
-import { Note } from "../form";
+import { ChoiceToggle, Note } from "../form";
 import { FieldsEditor, KindSelect, ShapeDetails } from "./schema-builder";
 
 type Schema = Record<string, unknown>;
@@ -266,34 +262,22 @@ export function OutputSchemaField({
 				)}
 			</FieldLabel>
 			{unconfirmed ? <InferredShape onConfirm={onConfirm} /> : null}
-			<ToggleGroup
-				variant="outline"
-				size="sm"
-				spacing={0}
-				aria-label="Edit the output data as"
-				className="w-full"
-				value={[mode]}
-				onValueChange={(value) => {
-					const next = value[0] as Mode | undefined;
-					if (!next) return;
+			<ChoiceToggle
+				label="Edit the output data as"
+				value={mode}
+				choices={[
+					{
+						value: "fields",
+						label: "Fields",
+						disabled: mode === "json" && !textShape,
+					},
+					{ value: "json", label: "JSON" },
+				]}
+				onChange={(next) => {
 					if (next === "fields" && textShape) setShape(textShape);
 					setMode(next);
 				}}
-			>
-				<ToggleGroupItem
-					value="fields"
-					disabled={mode === "json" && !textShape}
-					className="flex-1 aria-pressed:bg-primary aria-pressed:text-primary-foreground"
-				>
-					Fields
-				</ToggleGroupItem>
-				<ToggleGroupItem
-					value="json"
-					className="flex-1 aria-pressed:bg-primary aria-pressed:text-primary-foreground"
-				>
-					JSON
-				</ToggleGroupItem>
-			</ToggleGroup>
+			/>
 
 			{mode === "fields" ? (
 				<fieldset

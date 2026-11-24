@@ -11,18 +11,17 @@ import {
 	type PersonTier,
 } from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
-import {
-	FieldContent,
-	FieldDescription,
-	FieldLabel,
-	Field as ShadcnField,
-} from "@nightshift/ui/components/field";
 import { Input } from "@nightshift/ui/components/input";
 import { ItemGroup } from "@nightshift/ui/components/item";
-import { Switch } from "@nightshift/ui/components/switch";
 import { PlusIcon, Trash2Icon } from "lucide-react";
 import { useId } from "react";
-import { Field, InspectorSection, Note } from "../form";
+import {
+	Field,
+	InspectorSection,
+	Note,
+	SwitchField,
+	withOptional,
+} from "../form";
 import { GateBriefSection, withBrief } from "../gate";
 import { PersonDeadline } from "./cascade-person-deadline";
 import { TierItem } from "./cascade-tier-item";
@@ -149,36 +148,28 @@ export function CascadeSection<N extends CascadeNode>({
 					Add tier
 				</Button>
 
-				<ShadcnField orientation="horizontal" className="items-start">
-					<Switch
-						id={`${id}-person`}
-						checked={person !== undefined}
-						className="mt-0.5"
-						aria-describedby={`${id}-person-hint`}
-						onCheckedChange={(on) =>
-							change((all) =>
-								on
-									? [
-											...all.filter((tier) => !isPersonTier(tier)),
-											{ person: true },
-										]
-									: all.filter((tier) => !isPersonTier(tier)),
-							)
-						}
-					/>
-					<FieldContent>
-						<FieldLabel htmlFor={`${id}-person`}>
-							Ask me when no tier holds
-						</FieldLabel>
-						<FieldDescription id={`${id}-person-hint`} className="text-xs">
-							{node.type === "decision"
-								? "A Gate shows what each tier picked. You pick the option."
-								: node.type === "value"
-									? "A form shows what each try did, filled in with the best answer. You correct it and send it."
-									: "A Gate shows what each try did. You can try once more on the last tier, with a note, or stop."}
-						</FieldDescription>
-					</FieldContent>
-				</ShadcnField>
+				<SwitchField
+					id={`${id}-person`}
+					label="Ask me when no tier holds"
+					description={
+						node.type === "decision"
+							? "A Gate shows what each tier picked. You pick the option."
+							: node.type === "value"
+								? "A form shows what each try did, filled in with the best answer. You correct it and send it."
+								: "A Gate shows what each try did. You can try once more on the last tier, with a note, or stop."
+					}
+					checked={person !== undefined}
+					onChange={(on) =>
+						change((all) =>
+							on
+								? [
+										...all.filter((tier) => !isPersonTier(tier)),
+										{ person: true },
+									]
+								: all.filter((tier) => !isPersonTier(tier)),
+						)
+					}
+				/>
 				{person ? (
 					<PersonDeadline
 						id={`${id}-deadline`}
@@ -188,8 +179,7 @@ export function CascadeSection<N extends CascadeNode>({
 							change((all) =>
 								all.map((tier) => {
 									if (!isPersonTier(tier)) return tier;
-									const { deadline: _old, ...rest } = tier;
-									return deadline ? { ...rest, deadline } : rest;
+									return withOptional(tier, "deadline", deadline);
 								}),
 							)
 						}

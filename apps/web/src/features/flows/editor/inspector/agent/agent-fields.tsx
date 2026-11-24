@@ -17,10 +17,6 @@ import {
 	NativeSelectOption,
 } from "@nightshift/ui/components/native-select";
 import {
-	ToggleGroup,
-	ToggleGroupItem,
-} from "@nightshift/ui/components/toggle-group";
-import {
 	ChevronDownIcon,
 	SlashSquareIcon,
 	TextIcon,
@@ -40,7 +36,13 @@ import {
 } from "@/features/agents";
 import type { Effort, PermissionMode } from "@/shared/api";
 import { SkillCombobox } from "../access";
-import { Field, InspectorSection, Note } from "../form";
+import {
+	ChoiceField,
+	Field,
+	InspectorSection,
+	Note,
+	withOptional,
+} from "../form";
 import { AgentOutcomeSection } from "../outcomes";
 import { TemplateField } from "../template";
 import { CascadeSection } from "./cascade-fields";
@@ -110,8 +112,8 @@ export function useProfile(projectId: string, node: AgentNode) {
 
 /** How an Agent node gets its task, in the order the toggle shows them. */
 const TASK_KINDS = [
-	{ value: "prompt", label: "Prompt", icon: TextIcon },
-	{ value: "skill", label: "Skill", icon: SlashSquareIcon },
+	{ value: "prompt", label: "Prompt", icon: <TextIcon /> },
+	{ value: "skill", label: "Skill", icon: <SlashSquareIcon /> },
 ] as const;
 
 export function AgentFields({
@@ -371,10 +373,9 @@ export function AgentFields({
 						fallbacks={node.fallbacks}
 						choices={choices}
 						onChange={(fallbacks) =>
-							onChange(({ fallbacks: _old, ...current }) => ({
-								...current,
-								...(fallbacks ? { fallbacks } : {}),
-							}))
+							onChange((current) =>
+								withOptional(current, "fallbacks", fallbacks),
+							)
 						}
 					/>
 				) : null}
@@ -439,7 +440,7 @@ export function AgentFields({
 			</InspectorSection>
 
 			<InspectorSection title="Task">
-				<Field
+				<ChoiceField
 					id={`${id}-task`}
 					label="The agent gets"
 					hint={
@@ -447,36 +448,15 @@ export function AgentFields({
 							? "A prompt that you write."
 							: `A skill that ${harness.label} already has, with optional arguments.`
 					}
-				>
-					<ToggleGroup
-						variant="outline"
-						size="sm"
-						spacing={0}
-						aria-label="The agent gets"
-						aria-describedby={`${id}-task-hint`}
-						className="w-full"
-						value={[taskKind]}
-						onValueChange={(value) => {
-							const next = value[0] as "prompt" | "skill" | undefined;
-							if (!next) return;
-							setTaskKind(next);
-							if (next === "prompt") {
-								onChange(({ skill: _, ...rest }) => rest);
-							}
-						}}
-					>
-						{TASK_KINDS.map((entry) => (
-							<ToggleGroupItem
-								key={entry.value}
-								value={entry.value}
-								className="flex-1 aria-pressed:bg-primary aria-pressed:text-primary-foreground"
-							>
-								<entry.icon />
-								{entry.label}
-							</ToggleGroupItem>
-						))}
-					</ToggleGroup>
-				</Field>
+					describedBy={`${id}-task-hint`}
+					value={taskKind}
+					choices={TASK_KINDS}
+					onChange={(next) => {
+						setTaskKind(next);
+						if (next === "prompt")
+							onChange((current) => withOptional(current, "skill", undefined));
+					}}
+				/>
 
 				{taskKind === "prompt" ? (
 					<TemplateField
@@ -513,8 +493,8 @@ export function AgentFields({
 								describedBy={`${id}-skill-hint`}
 								onChange={(value) => {
 									const skill = value.replace(/^\//, "").trim();
-									onChange(({ skill: _, ...rest }) =>
-										skill ? { ...rest, skill } : rest,
+									onChange((current) =>
+										withOptional(current, "skill", skill || undefined),
 									);
 								}}
 							/>

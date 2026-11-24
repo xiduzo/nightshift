@@ -14,7 +14,7 @@ import { useId } from "react";
 import { PanelHeader } from "@/shared/panel";
 import { DescriptionSuggest, InputsSuggest } from "../../assistant";
 import { FlowDevicesField } from "./devices";
-import { Field, InspectorSection, Note, PositiveIntInput } from "./form";
+import { Field, InspectorSection, Note, NumberField } from "./form";
 import { InputsEditor, OutputsEditor, VariablesEditor } from "./io";
 
 /** An amount in dollars with its cents: "2.50". */
@@ -226,19 +226,19 @@ export function FlowInspector({
 				{POLICY_FIELDS.map(({ key, label, hint, whole, format = String }) => {
 					const fallback = (policyDefaults ?? DEFAULT_POLICY)[key];
 					return (
-						<Field key={key} id={`${id}-${key}`} label={label} hint={hint}>
-							<PositiveIntInput
-								id={`${id}-${key}`}
-								decimal={!whole}
-								format={format}
-								value={flow.policy?.[key]}
-								placeholder={`${fallback === undefined || fallback === null ? "No limit" : format(fallback)} (${policyDefaults ? "from Settings" : "default"})`}
-								describedBy={`${id}-${key}-hint`}
-								onChange={(value) =>
-									onChange((current) => setPolicyValue(current, key, value))
-								}
-							/>
-						</Field>
+						<NumberField
+							key={key}
+							id={`${id}-${key}`}
+							label={label}
+							hint={hint}
+							decimal={!whole}
+							format={format}
+							value={flow.policy?.[key]}
+							placeholder={`${fallback === undefined || fallback === null ? "No limit" : format(fallback)} (${policyDefaults ? "from Settings" : "default"})`}
+							onChange={(value) =>
+								onChange((current) => setPolicyValue(current, key, value))
+							}
+						/>
 					);
 				})}
 				<Field

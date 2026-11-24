@@ -11,7 +11,13 @@ import {
 	NativeSelectOption,
 } from "@nightshift/ui/components/native-select";
 import { useId } from "react";
-import { Field, InspectorSection, Note, PositiveIntInput } from "./form";
+import {
+	Field,
+	InspectorSection,
+	Note,
+	NumberField,
+	withOptional,
+} from "./form";
 import { TemplateField } from "./template";
 
 /** The value of the scope select for the whole run: a Section id is never empty. */
@@ -46,24 +52,19 @@ export function LeaseFields({
 				invalid={node.name.trim() === ""}
 				onChange={(name) => onChange((current) => ({ ...current, name }))}
 			/>
-			<Field
+			<NumberField
 				id={`${id}-wait`}
 				label="Wait for a busy lease (minutes)"
 				optional
 				hint="Empty: the node ends busy at once when another run holds the lease."
-			>
-				<PositiveIntInput
-					id={`${id}-wait`}
-					value={node.waitMinutes || undefined}
-					placeholder="0"
-					describedBy={`${id}-wait-hint`}
-					onChange={(waitMinutes) =>
-						onChange(({ waitMinutes: _, ...current }) =>
-							waitMinutes === undefined ? current : { ...current, waitMinutes },
-						)
-					}
-				/>
-			</Field>
+				value={node.waitMinutes || undefined}
+				placeholder="0"
+				onChange={(waitMinutes) =>
+					onChange((current) =>
+						withOptional(current, "waitMinutes", waitMinutes),
+					)
+				}
+			/>
 			<Field
 				id={`${id}-scope`}
 				label="Hold it until"
@@ -75,10 +76,12 @@ export function LeaseFields({
 					aria-describedby={`${id}-scope-hint`}
 					onChange={(event) => {
 						const value = event.target.value;
-						onChange(({ scope: _, ...current }) =>
-							value === WHOLE_RUN
-								? current
-								: { ...current, scope: { section: value } },
+						onChange((current) =>
+							withOptional(
+								current,
+								"scope",
+								value === WHOLE_RUN ? undefined : { section: value },
+							),
 						);
 					}}
 				>
@@ -97,27 +100,24 @@ export function LeaseFields({
 					) : null}
 				</NativeSelect>
 			</Field>
-			<Field
+			<NumberField
 				id={`${id}-ttl`}
 				label="Free it after a computer is gone for (minutes)"
 				optional
 				hint="When the computer that runs the run is gone this long, another run can take the lease."
-			>
-				<PositiveIntInput
-					id={`${id}-ttl`}
-					value={node.ttlMinutes}
-					placeholder={String(DEFAULT_LEASE_TTL_MINUTES)}
-					describedBy={`${id}-ttl-hint`}
-					onChange={(ttlMinutes) =>
-						onChange(({ ttlMinutes: _, ...current }) =>
-							ttlMinutes === undefined
-								? current
-								: // The run renews the lease every minute: 2 is the least.
-									{ ...current, ttlMinutes: Math.max(2, ttlMinutes) },
-						)
-					}
-				/>
-			</Field>
+				value={node.ttlMinutes}
+				placeholder={String(DEFAULT_LEASE_TTL_MINUTES)}
+				onChange={(ttlMinutes) =>
+					// The run renews the lease every minute: 2 is the least.
+					onChange((current) =>
+						withOptional(
+							current,
+							"ttlMinutes",
+							ttlMinutes && Math.max(2, ttlMinutes),
+						),
+					)
+				}
+			/>
 			<Note>
 				Draw a <code>busy</code> edge, for example to an End node with nothing
 				to do. Without one, a busy lease fails the run. <code>holder</code> and{" "}

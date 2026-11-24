@@ -23,7 +23,7 @@ import {
 import { Switch } from "@nightshift/ui/components/switch";
 import { useId, useState } from "react";
 import type { InspectorTab } from "../form";
-import { Field, InspectorSection } from "../form";
+import { Field, InspectorSection, withOptional } from "../form";
 import { TemplateField } from "../template";
 
 /** The names the inbox gives the urgencies. */
@@ -336,11 +336,13 @@ function RecommendFields({
 					onChange={(next) =>
 						onChange((current) => {
 							if (!current.recommend) return current;
-							const { reason: _, ...rest } = current.recommend;
-							const reason = text(next);
 							return {
 								...current,
-								recommend: reason === undefined ? rest : { ...rest, reason },
+								recommend: withOptional(
+									current.recommend,
+									"reason",
+									text(next),
+								),
 							};
 						})
 					}
