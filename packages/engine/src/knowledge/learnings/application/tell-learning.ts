@@ -29,7 +29,6 @@ export type TellLearningPorts = {
 
 /** The note a person wrote, who wrote it, and the note that waits it replaces. */
 export type TellLearning = {
-	actor: Actor;
 	spaceId: string;
 	projectId: string;
 	note: string;
@@ -48,14 +47,10 @@ export type TellLearning = {
  */
 export const tellLearning =
 	(ports: TellLearningPorts) =>
-	async ({
-		actor,
-		spaceId,
-		projectId,
-		note,
-		by,
-		replaces,
-	}: TellLearning): Promise<void> => {
+	async (
+		actor: Actor,
+		{ spaceId, projectId, note, by, replaces }: TellLearning,
+	): Promise<void> => {
 		await ports.access.openSpace(actor, { spaceId, need: CHANGES_KNOWLEDGE });
 		if (learningNotes([note]).length === 0) throw emptyNote();
 		if (replaces && !proposedLearningOf(replaces.id)) throw learningGone();

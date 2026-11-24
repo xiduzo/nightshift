@@ -10,4 +10,4 @@ export {
 	learningNode,
 	questionNode,
 } from "./domain/map";
-export { wireMap } from "./wire";
+export { type KnowledgeMaps, wireMap } from "./wire";

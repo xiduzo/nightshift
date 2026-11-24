@@ -105,7 +105,7 @@ describe("a step's start", () => {
 			files: { writeIndex: indexFolder, openView },
 			reader: { read: async () => null },
 			learnings: {
-				async *keepReported(events) {
+				async *keepReported({ events }) {
 					yield* events;
 				},
 			},

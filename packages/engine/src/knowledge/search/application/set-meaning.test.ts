@@ -26,12 +26,7 @@ describe("setMeaning", () => {
 			access: inMemoryAccess(),
 			documents,
 			meaning: async () => turnedOff,
-		})({
-			actor: NIGHT_SHIFT,
-			spaceId: "space-1",
-			projectId: "p1",
-			on: false,
-		});
+		})(NIGHT_SHIFT, { spaceId: "space-1", projectId: "p1", on: false });
 		expect((await documents.open("p1")).meaningOn()).toBe(false);
 		expect((await documents.open("p2")).meaningOn()).toBe(true);
 		expect(status).toEqual(turnedOff);
@@ -47,8 +42,7 @@ describe("setMeaning", () => {
 			await ports.access.whoMay(
 				"space-1",
 				(actor) =>
-					setMeaning(ports)({
-						actor,
+					setMeaning(ports)(actor, {
 						spaceId: "space-1",
 						projectId: "p1",
 						on: false,

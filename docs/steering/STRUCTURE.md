@@ -450,6 +450,8 @@ Only `adapters/out/` touches the outside. `domain/` and `application/` import no
 - A request of a person: `(ports) => (actor, request)`.
 - The clock or a public webhook: `(ports) => (request)`.
 
+The actor is never a property of the request. `scripts/rings/decides.ts` fails a use case whose request type has an `actor`, in its own file. A wire gives a use case as it is, so the caller writes the request once.
+
 ```ts
 export type AnswerGatePorts = { gates: OpenGates; walkers: Walkers; members: SpaceMembers; clock: Clock };
 export const answerGate =

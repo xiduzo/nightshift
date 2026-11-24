@@ -125,7 +125,11 @@ describe("the page reader (ADR 39)", () => {
 			secret: "CRAWL_KEY",
 		} as const;
 		expect(
-			await a.knowledge.setReader(NIGHT_SHIFT, "space-1", "p1", chosen),
+			await a.knowledge.setReader(NIGHT_SHIFT, {
+				spaceId: "space-1",
+				projectId: "p1",
+				setting: chosen,
+			}),
 		).toEqual(chosen);
 		applyUpdate(
 			(await b.persisted("p1")).doc,
@@ -133,9 +137,13 @@ describe("the page reader (ADR 39)", () => {
 		);
 		expect((await b.knowledge.listing("p1")).reader).toEqual(chosen);
 		await expect(
-			a.knowledge.setReader(NIGHT_SHIFT, "space-1", "p1", {
-				kind: "jina",
-				address: "ftp://reader.example.com",
+			a.knowledge.setReader(NIGHT_SHIFT, {
+				spaceId: "space-1",
+				projectId: "p1",
+				setting: {
+					kind: "jina",
+					address: "ftp://reader.example.com",
+				},
 			}),
 		).rejects.toThrow();
 
@@ -159,8 +167,12 @@ describe("the page reader (ADR 39)", () => {
 		expect(ended.status).toBe(410);
 
 		// Back to Night Shift's own: the document holds no value for it.
-		await a.knowledge.setReader(NIGHT_SHIFT, "space-1", "p1", {
-			kind: "nightshift",
+		await a.knowledge.setReader(NIGHT_SHIFT, {
+			spaceId: "space-1",
+			projectId: "p1",
+			setting: {
+				kind: "nightshift",
+			},
 		});
 		expect((await a.persisted("p1")).doc.getMap("settings").has("reader")).toBe(
 			false,
@@ -645,7 +657,7 @@ describe("the learnings of a run", () => {
 		await exchange(a, b);
 
 		// B has no folder copy of them yet: the document and the Host's archive list them.
-		const waiting = await b.knowledge.learnings(["p1"]);
+		const waiting = await b.knowledge.learnings({ projectIds: ["p1"] });
 		expect(
 			waiting.map((w) => [w.id, w.runId, w.stepId, w.notes]).sort(),
 		).toEqual([
@@ -656,43 +668,39 @@ describe("the learnings of a run", () => {
 			waiting[1]?.proposedAt ?? 0,
 		);
 
-		await b.knowledge.settleLearning(
-			NIGHT_SHIFT,
-			"space-1",
-			"p1",
-			"run-1.s1.md",
-			"keep",
-		);
-		await b.knowledge.settleLearning(
-			NIGHT_SHIFT,
-			"space-1",
-			"p1",
-			"run-1.s2.md",
-			"delete",
-		);
+		await b.knowledge.settleLearning(NIGHT_SHIFT, {
+			spaceId: "space-1",
+			projectId: "p1",
+			id: "run-1.s1.md",
+			decision: "keep",
+		});
+		await b.knowledge.settleLearning(NIGHT_SHIFT, {
+			spaceId: "space-1",
+			projectId: "p1",
+			id: "run-1.s2.md",
+			decision: "delete",
+		});
 		await expect(
-			b.knowledge.settleLearning(
-				NIGHT_SHIFT,
-				"space-1",
-				"p1",
-				"run-1.s2.md",
-				"keep",
-			),
+			b.knowledge.settleLearning(NIGHT_SHIFT, {
+				spaceId: "space-1",
+				projectId: "p1",
+				id: "run-1.s2.md",
+				decision: "keep",
+			}),
 		).rejects.toThrow("This learning no longer waits.");
 		await expect(
-			b.knowledge.settleLearning(
-				NIGHT_SHIFT,
-				"space-1",
-				"p1",
-				"../x.md",
-				"keep",
-			),
+			b.knowledge.settleLearning(NIGHT_SHIFT, {
+				spaceId: "space-1",
+				projectId: "p1",
+				id: "../x.md",
+				decision: "keep",
+			}),
 		).rejects.toThrow("This learning no longer waits.");
-		expect(await b.knowledge.learnings(["p1"])).toEqual([]);
+		expect(await b.knowledge.learnings({ projectIds: ["p1"] })).toEqual([]);
 
 		// A gets the change as a Link brings it: the kept notes are what agents read.
 		await exchange(a, b);
-		expect(await a.knowledge.learnings(["p1"])).toEqual([]);
+		expect(await a.knowledge.learnings({ projectIds: ["p1"] })).toEqual([]);
 		await a.knowledge.listing("p1");
 		expect(await readProposals(a.dir)).toEqual([]);
 		const kept = await readFile(
@@ -816,8 +824,10 @@ describe("the question set", () => {
 		const a = await device(host);
 		const b = await device(host);
 		await a.put("wiki/deploy.md", "# Deploy\n");
-		expect((await a.knowledge.questions("p1")).set).toEqual([]);
-		const set = await a.knowledge.markQuestion(NIGHT_SHIFT, "space-1", "p1", {
+		expect((await a.knowledge.questions({ projectId: "p1" })).set).toEqual([]);
+		const set = await a.knowledge.markQuestion(NIGHT_SHIFT, {
+			spaceId: "space-1",
+			projectId: "p1",
 			query: "  How do we  deploy? ",
 			answers: ["wiki/deploy.md", "learnings/proposed/run-1.md", "evals/x"],
 			by: "ann",
@@ -845,12 +855,16 @@ describe("the question set", () => {
 			(await b.persisted("p1")).doc,
 			encodeStateAsUpdate((await a.persisted("p1")).doc),
 		);
-		expect((await b.knowledge.questions("p1")).set.map((q) => q.query)).toEqual(
-			["How do we  deploy?"],
-		);
+		expect(
+			(await b.knowledge.questions({ projectId: "p1" })).set.map(
+				(q) => q.query,
+			),
+		).toEqual(["How do we  deploy?"]);
 		// The same words, written another way, are the same question: no files takes it out.
 		expect(
-			await b.knowledge.markQuestion(NIGHT_SHIFT, "space-1", "p1", {
+			await b.knowledge.markQuestion(NIGHT_SHIFT, {
+				spaceId: "space-1",
+				projectId: "p1",
 				query: "how do we deploy?",
 				answers: [],
 				by: "bob",
@@ -862,18 +876,20 @@ describe("the question set", () => {
 		const a = await device(memoryHost());
 		await a.put("wiki/deploy.md", "# Deploy\n");
 		await a.knowledge.search("p1", "deploy", { agent: true });
-		const asked = await a.knowledge.questions("p1");
+		const asked = await a.knowledge.questions({ projectId: "p1" });
 		expect(asked.set).toEqual([]);
 		expect(asked.asked).toMatchObject([
 			{ query: "deploy", times: 1, runId: null, answers: null },
 		]);
 
-		await a.knowledge.markQuestion(NIGHT_SHIFT, "space-1", "p1", {
+		await a.knowledge.markQuestion(NIGHT_SHIFT, {
+			spaceId: "space-1",
+			projectId: "p1",
 			query: "Deploy",
 			answers: ["wiki/deploy.md"],
 			by: "ann",
 		});
-		const marked = await a.knowledge.questions("p1", { limit: 1 });
+		const marked = await a.knowledge.questions({ projectId: "p1", limit: 1 });
 		// The same words, written another way, are the same question.
 		expect(marked.asked[0]?.answers).toEqual(["wiki/deploy.md"]);
 		expect(marked.set).toHaveLength(1);
@@ -882,7 +898,9 @@ describe("the question set", () => {
 	test("runs against the search by words while search by meaning is not there", async () => {
 		const a = await device(memoryHost());
 		await a.put("wiki/deploy.md", "# Deploy\n");
-		await a.knowledge.markQuestion(NIGHT_SHIFT, "space-1", "p1", {
+		await a.knowledge.markQuestion(NIGHT_SHIFT, {
+			spaceId: "space-1",
+			projectId: "p1",
 			query: "deploy",
 			answers: ["wiki/deploy.md"],
 			by: "ann",
@@ -991,16 +1009,14 @@ describe("the learnings that wait", () => {
 		await writeFile(join(other, "run-2.s1.md"), "- Two.\n");
 		await a.knowledge.listing("p2");
 		expect(
-			(await a.knowledge.learnings(["p1", "p2"])).map((learning) => [
-				learning.projectId,
-				learning.id,
-				learning.notes,
-			]),
+			(await a.knowledge.learnings({ projectIds: ["p1", "p2"] })).map(
+				(learning) => [learning.projectId, learning.id, learning.notes],
+			),
 		).toEqual([
 			["p2", "run-2.s1.md", ["Two."]],
 			["p1", "run-1.s1.md", ["One."]],
 		]);
-		expect(await a.knowledge.learnings([])).toEqual([]);
+		expect(await a.knowledge.learnings({ projectIds: [] })).toEqual([]);
 	});
 });
 
@@ -1067,21 +1083,19 @@ describe("what waits changes, and the open screens hear", () => {
 		await (await stepProposes(a, "s2", ["Delete me."])).done();
 		a.told.length = 0;
 
-		await a.knowledge.settleLearning(
-			NIGHT_SHIFT,
-			"space-1",
-			"p1",
-			"run-1.s1.md",
-			"keep",
-		);
+		await a.knowledge.settleLearning(NIGHT_SHIFT, {
+			spaceId: "space-1",
+			projectId: "p1",
+			id: "run-1.s1.md",
+			decision: "keep",
+		});
 		expect(a.told).toEqual([a.heard]);
-		await a.knowledge.settleLearning(
-			NIGHT_SHIFT,
-			"space-1",
-			"p1",
-			"run-1.s2.md",
-			"delete",
-		);
+		await a.knowledge.settleLearning(NIGHT_SHIFT, {
+			spaceId: "space-1",
+			projectId: "p1",
+			id: "run-1.s2.md",
+			decision: "delete",
+		});
 		expect(a.told).toEqual([a.heard, a.heard]);
 		expect((await a.knowledge.listing("p1")).proposed).toBe(0);
 	});
@@ -1091,22 +1105,20 @@ describe("what waits changes, and the open screens hear", () => {
 		await (await stepProposes(a, "s1", ["Use bun."])).done();
 		a.told.length = 0;
 		await expect(
-			a.knowledge.settleLearning(
-				NIGHT_SHIFT,
-				"space-1",
-				"p1",
-				"../x.md",
-				"keep",
-			),
+			a.knowledge.settleLearning(NIGHT_SHIFT, {
+				spaceId: "space-1",
+				projectId: "p1",
+				id: "../x.md",
+				decision: "keep",
+			}),
 		).rejects.toThrow("This learning no longer waits.");
 		await expect(
-			a.knowledge.settleLearning(
-				NIGHT_SHIFT,
-				"space-1",
-				"p1",
-				"gone.md",
-				"keep",
-			),
+			a.knowledge.settleLearning(NIGHT_SHIFT, {
+				spaceId: "space-1",
+				projectId: "p1",
+				id: "gone.md",
+				decision: "keep",
+			}),
 		).rejects.toThrow("This learning no longer waits.");
 		expect(a.told).toEqual([]);
 	});
@@ -1145,13 +1157,12 @@ describe("what waits changes, and the open screens hear", () => {
 		await b.knowledge.listing("p1");
 		expect(b.told).toEqual([b.heard]);
 
-		await a.knowledge.settleLearning(
-			NIGHT_SHIFT,
-			"space-1",
-			"p1",
-			"run-1.s1.md",
-			"delete",
-		);
+		await a.knowledge.settleLearning(NIGHT_SHIFT, {
+			spaceId: "space-1",
+			projectId: "p1",
+			id: "run-1.s1.md",
+			decision: "delete",
+		});
 		await exchange(a, b);
 		await b.knowledge.listing("p1");
 		expect(b.told).toEqual([b.heard, b.heard]);
@@ -1229,7 +1240,13 @@ describe("search by meaning", () => {
 		const b = await device(host, { meaning });
 		await a.put("wiki/deploy.md", "# Deploy\n");
 		expect(
-			(await a.knowledge.setMeaning(NIGHT_SHIFT, "space-1", "p1", false)).state,
+			(
+				await a.knowledge.setMeaning(NIGHT_SHIFT, {
+					spaceId: "space-1",
+					projectId: "p1",
+					on: false,
+				})
+			).state,
 		).toBe("turned-off");
 		applyUpdate(
 			(await b.persisted("p1")).doc,
@@ -1237,7 +1254,13 @@ describe("search by meaning", () => {
 		);
 		expect((await b.knowledge.meaning("p1")).state).toBe("turned-off");
 		expect(
-			(await a.knowledge.setMeaning(NIGHT_SHIFT, "space-1", "p1", true)).state,
+			(
+				await a.knowledge.setMeaning(NIGHT_SHIFT, {
+					spaceId: "space-1",
+					projectId: "p1",
+					on: true,
+				})
+			).state,
 		).not.toBe("turned-off");
 	});
 

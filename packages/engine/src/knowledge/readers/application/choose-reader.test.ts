@@ -14,8 +14,7 @@ describe("chooseReader", () => {
 		const documents = inMemoryKnowledgeDocuments();
 		const setting = { kind: "jina", secret: "TEAM_JINA" } as const;
 		expect(
-			await chooseReader({ access: inMemoryAccess(), documents })({
-				actor: NIGHT_SHIFT,
+			await chooseReader({ access: inMemoryAccess(), documents })(NIGHT_SHIFT, {
 				spaceId: "space-1",
 				projectId: "p1",
 				setting,
@@ -34,8 +33,7 @@ describe("chooseReader", () => {
 			await ports.access.whoMay(
 				"space-1",
 				(actor) =>
-					chooseReader(ports)({
-						actor,
+					chooseReader(ports)(actor, {
 						spaceId: "space-1",
 						projectId: "p1",
 						setting: { kind: "jina", secret: "TEAM_JINA" },

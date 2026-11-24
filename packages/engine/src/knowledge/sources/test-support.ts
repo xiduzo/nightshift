@@ -10,7 +10,7 @@ export function knowledgeSources<Run extends SourceRun>(deps: {
 		listing(projectId: string): Promise<KnowledgeListing>;
 		removeFolder(projectId: string, folder: string): Promise<number>;
 	};
-	readerReady(projectId: string): Promise<boolean>;
+	readerReady(): Promise<boolean>;
 	device: { id: string; name: string };
 }) {
 	return wireSources({

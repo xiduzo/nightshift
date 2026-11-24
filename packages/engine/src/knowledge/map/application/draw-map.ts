@@ -26,7 +26,8 @@ export type DrawMap = { projectId: string };
  * It reads the cheap parts at once: what the Space lists, the index's
  * stamp, the questions, the learnings that wait here and the words people
  * marked. Only when one of them changed does it read the index and draw
- * again. Drawing never asks the Host, nor any model.
+ * again. Drawing never asks the Host, nor any model. A file the index does
+ * not have stays on the Map, alone.
  *
  * It checks no role: the `Knowledge` door has no actor yet (E-doors adds it).
  */
@@ -36,8 +37,8 @@ export const drawMap =
 		const [listed, stamp, asked, waiting, marked] = await Promise.all([
 			ports.documents.open(projectId).then((document) => document.entries()),
 			ports.index.mapStamp(projectId),
-			ports.asked.asked(projectId),
-			ports.learnings.waiting(projectId, { onlyHere: true }),
+			ports.asked.asked({ projectId }),
+			ports.learnings.waiting({ projectId, onlyHere: true }),
 			ports.notTopics.read(projectId).then(parseNotTopics),
 		]);
 		const spaceFiles = [...listed.keys()].filter(isReadable);

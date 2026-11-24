@@ -195,9 +195,10 @@ function given(
 			withUses(
 				runId === undefined
 					? events
-					: ports.learnings.keepReported(events, projectId, {
-							runId,
-							...(stepId !== undefined ? { stepId } : {}),
+					: ports.learnings.keepReported({
+							events,
+							projectId,
+							step: { runId, ...(stepId !== undefined ? { stepId } : {}) },
 						}),
 				uses,
 			),

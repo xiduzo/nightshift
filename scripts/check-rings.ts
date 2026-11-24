@@ -85,6 +85,7 @@
  *      - It is no forward: a body of one port call, whose arguments are the
  *        request, its fields, or an object or a list of those.
  *      - It reads its `Actor`. No parameter has the name `_actor`.
+ *      - Its actor is an argument: no request has a property `actor`.
  *      - Its test has an `expect` of more than a `typeof`.
  *      - It declares no port: no type with a function, that a member of
  *        its ports names. A function written in the ports themselves (a

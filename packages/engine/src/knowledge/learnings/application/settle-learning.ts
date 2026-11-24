@@ -18,7 +18,6 @@ export type SettleLearningPorts = {
 
 /** One step's proposed learnings, by the name of its file, and what a person decided. */
 export type SettleLearning = {
-	actor: Actor;
 	spaceId: string;
 	projectId: string;
 	id: string;
@@ -26,23 +25,21 @@ export type SettleLearning = {
 };
 
 /**
- * Keeps or deletes one step's proposed learnings: keep adds the file to
- * `learnings/accepted/`, and both take it out of `learnings/proposed/`. It
- * holds the folder as a step does, so the change goes to the Space when it
- * ends. Refuses a name that is no proposed learning, one that no longer
+ * Keeps or deletes one step's proposed learnings, as the review of learnings
+ * (`kit:knowledge/review-learnings`) does: keep adds the file to
+ * `learnings/accepted/`, where agents read it, and both take it out of
+ * `learnings/proposed/`. It holds the folder as a step does, so the change
+ * goes to the Space when it ends, and the open screens hear of it. Refuses a name that is no proposed learning, one that no longer
  * waits, and one whose content cannot be fetched now.
  *
  * Refuses a Person who may not change knowledge (`access.openSpace`).
  */
 export const settleLearning =
 	(ports: SettleLearningPorts) =>
-	async ({
-		actor,
-		spaceId,
-		projectId,
-		id,
-		decision,
-	}: SettleLearning): Promise<void> => {
+	async (
+		actor: Actor,
+		{ spaceId, projectId, id, decision }: SettleLearning,
+	): Promise<void> => {
 		await ports.access.openSpace(actor, { spaceId, need: CHANGES_KNOWLEDGE });
 		if (!proposedLearningOf(id)) throw learningGone();
 		const hold = await ports.holds.startStep(projectId);

@@ -22,8 +22,7 @@ describe("settleLearning", () => {
 	test("keep adds the file to the accepted learnings and takes it out of the proposed ones, in a hold", async () => {
 		const ports = inMemoryLearningsPorts();
 		ports.folder.put("p1", PROPOSED, TEXT);
-		await settleLearning(ports)({
-			actor: NIGHT_SHIFT,
+		await settleLearning(ports)(NIGHT_SHIFT, {
 			spaceId: "space-1",
 			projectId: "p1",
 			id: "run-1.s1.md",
@@ -39,8 +38,7 @@ describe("settleLearning", () => {
 	test("delete keeps nothing", async () => {
 		const ports = inMemoryLearningsPorts();
 		ports.folder.put("p1", PROPOSED, TEXT);
-		await settleLearning(ports)({
-			actor: NIGHT_SHIFT,
+		await settleLearning(ports)(NIGHT_SHIFT, {
 			spaceId: "space-1",
 			projectId: "p1",
 			id: "run-1.s1.md",
@@ -52,8 +50,7 @@ describe("settleLearning", () => {
 	test("refuses a name that is no proposed learning, before it holds the folder", async () => {
 		const ports = inMemoryLearningsPorts();
 		const refusal = await refusalOf(
-			settleLearning(ports)({
-				actor: NIGHT_SHIFT,
+			settleLearning(ports)(NIGHT_SHIFT, {
 				spaceId: "space-1",
 				projectId: "p1",
 				id: "../x.md",
@@ -71,8 +68,7 @@ describe("settleLearning", () => {
 		const ports = inMemoryLearningsPorts();
 		await ports.sync.publish("p1", PROPOSED, TEXT, 1, "nowhere");
 		const refusal = await refusalOf(
-			settleLearning(ports)({
-				actor: NIGHT_SHIFT,
+			settleLearning(ports)(NIGHT_SHIFT, {
 				spaceId: "space-1",
 				projectId: "p1",
 				id: "run-1.s1.md",
@@ -82,8 +78,7 @@ describe("settleLearning", () => {
 		expect((refusal as Refusal).kind).toBe("unavailable");
 		expect(ports.sync.holds).toEqual(["hold p1", "done p1"]);
 		const gone = await refusalOf(
-			settleLearning(ports)({
-				actor: NIGHT_SHIFT,
+			settleLearning(ports)(NIGHT_SHIFT, {
 				spaceId: "space-1",
 				projectId: "p1",
 				id: "run-2.s1.md",
@@ -100,8 +95,7 @@ describe("settleLearning", () => {
 			await ports.access.whoMay(
 				"space-1",
 				(actor) =>
-					settleLearning(ports)({
-						actor,
+					settleLearning(ports)(actor, {
 						spaceId: "space-1",
 						projectId: "p1",
 						id: "run-1.s1.md",

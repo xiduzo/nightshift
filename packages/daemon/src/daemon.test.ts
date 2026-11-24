@@ -173,9 +173,7 @@ describe("the daemon, wired in one process", () => {
 		const turnOff = (personId: string) =>
 			knowledge.setMeaning(
 				{ personId, door: "command" },
-				space.id,
-				"p1",
-				false,
+				{ spaceId: space.id, projectId: "p1", on: false },
 			);
 		await processDatabase(daemon.info.databaseUrl)
 			.insert(projectTable)

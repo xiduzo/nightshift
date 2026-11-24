@@ -13,8 +13,7 @@ describe("markQuestion", () => {
 		const mark = markQuestion(ports);
 		ports.setNow(5);
 		expect(
-			await mark({
-				actor: NIGHT_SHIFT,
+			await mark(NIGHT_SHIFT, {
 				spaceId: "space-1",
 				projectId: "p1",
 				query: " rollback ",
@@ -33,8 +32,7 @@ describe("markQuestion", () => {
 			parseQuestions(ports.questions.files.get("p1") ?? null),
 		).toHaveLength(1);
 		expect(
-			await mark({
-				actor: NIGHT_SHIFT,
+			await mark(NIGHT_SHIFT, {
 				spaceId: "space-1",
 				projectId: "p1",
 				query: "Rollback",
@@ -56,8 +54,7 @@ describe("markQuestion", () => {
 		ports.questions.write = async () => {
 			throw failure;
 		};
-		const error = await markQuestion(ports)({
-			actor: NIGHT_SHIFT,
+		const error = await markQuestion(ports)(NIGHT_SHIFT, {
 			spaceId: "space-1",
 			projectId: "p1",
 			query: "q",
@@ -74,8 +71,7 @@ describe("markQuestion", () => {
 			await ports.access.whoMay(
 				"space-1",
 				(actor) =>
-					markQuestion(ports)({
-						actor,
+					markQuestion(ports)(actor, {
 						spaceId: "space-1",
 						projectId: "p1",
 						query: "q",

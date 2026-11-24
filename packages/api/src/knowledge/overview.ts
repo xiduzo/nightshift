@@ -34,7 +34,7 @@ export const knowledgeOverview = {
 			const can = { save, remove, startRuns, ...rightsOf(context) };
 			const view = await context.knowledge
 				.sources(context.space)
-				.list(input.projectId, can);
+				.list({ projectId: input.projectId, can });
 			return { ...view, can };
 		}),
 	/**
@@ -49,6 +49,9 @@ export const knowledgeOverview = {
 		})
 		.output(output(z.array(reviewTaskSchema)))
 		.handler(({ context, input }) =>
-			context.knowledge.review(input.projectId, context.space),
+			context.knowledge.review({
+				projectId: input.projectId,
+				space: context.space,
+			}),
 		),
 };

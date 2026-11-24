@@ -5,5 +5,5 @@
  */
 
 export type { SourcesSpace } from "./application/ports";
-export type { KnowledgeSync, SourceRun } from "./domain/syncs";
-export { type KnowledgeSources, type Sources, wireSources } from "./wire";
+export type { KnowledgeSync } from "./domain/syncs";
+export { type Sources, wireSources } from "./wire";

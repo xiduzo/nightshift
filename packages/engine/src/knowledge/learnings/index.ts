@@ -9,14 +9,10 @@ export type {
 	LearningsNotifications,
 } from "./application/ports";
 export type {
-	NotePerson,
 	ProjectLearning,
 	WaitingLearning,
-	WaitingNote,
 } from "./domain/waiting";
 export {
-	type FollowRunsDeps,
 	type Learnings,
-	type RunLearnings,
 	wireLearnings,
 } from "./wire";

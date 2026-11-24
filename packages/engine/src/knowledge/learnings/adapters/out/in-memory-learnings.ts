@@ -5,7 +5,6 @@ import { keepReportedLearnings } from "../../application/keep-reported-learnings
 import { listProjectLearnings } from "../../application/list-project-learnings";
 import { listWaitingLearnings } from "../../application/list-waiting-learnings";
 import { proposeLearnings } from "../../application/propose-learnings";
-import type { Learnings } from "../../wire";
 import { inMemoryLearningsPorts } from "./in-memory-neighbours";
 
 /**
@@ -25,12 +24,6 @@ export function inMemoryLearnings(
 	const keepReported = keepReportedLearnings({
 		propose: proposeLearnings(ports),
 	});
-	const bound = {
-		waiting: (projectId, options) => waiting({ projectId, ...options }),
-		ofProjects: (projectIds) => ofProjects({ projectIds }),
-		count: (projectId) => count({ projectId }),
-		keepReported: (events, projectId, step) =>
-			keepReported({ events, projectId, step }),
-	} satisfies Partial<Learnings>;
+	const bound = { waiting, ofProjects, count, keepReported };
 	return { ...ports, ...bound };
 }

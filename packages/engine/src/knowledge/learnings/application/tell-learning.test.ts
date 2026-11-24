@@ -22,8 +22,7 @@ const refusalOf = (work: Promise<unknown>) =>
 describe("tellLearning", () => {
 	test("a told note goes to the person's own file, with who told it and when", async () => {
 		const ports = inMemoryLearningsPorts();
-		await tellLearning(ports)({
-			actor: NIGHT_SHIFT,
+		await tellLearning(ports)(NIGHT_SHIFT, {
 			spaceId: "space-1",
 			projectId: "p1",
 			note: "Ask Bo.",
@@ -38,8 +37,7 @@ describe("tellLearning", () => {
 	test("refuses an empty note before it holds the folder", async () => {
 		const ports = inMemoryLearningsPorts();
 		const refusal = await refusalOf(
-			tellLearning(ports)({
-				actor: NIGHT_SHIFT,
+			tellLearning(ports)(NIGHT_SHIFT, {
 				spaceId: "space-1",
 				projectId: "p1",
 				note: "  ",
@@ -59,8 +57,7 @@ describe("tellLearning", () => {
 			formatLearnings(["One."], { runId: "run-1", isNew: true }),
 		);
 		const replaces = { id: "run-1.s1.md", index: 0, note: "One." };
-		await tellLearning(ports)({
-			actor: NIGHT_SHIFT,
+		await tellLearning(ports)(NIGHT_SHIFT, {
 			spaceId: "space-1",
 			projectId: "p1",
 			note: "One, better.",
@@ -70,8 +67,7 @@ describe("tellLearning", () => {
 		expect(ports.folder.read("p1", TOLD)).toContain("- One, better.");
 		expect(ports.folder.read("p1", PROPOSED)).toBeUndefined();
 		const refusal = await refusalOf(
-			tellLearning(ports)({
-				actor: NIGHT_SHIFT,
+			tellLearning(ports)(NIGHT_SHIFT, {
 				spaceId: "space-1",
 				projectId: "p1",
 				note: "Again.",
@@ -89,8 +85,7 @@ describe("tellLearning", () => {
 			await ports.access.whoMay(
 				"space-1",
 				(actor) =>
-					tellLearning(ports)({
-						actor,
+					tellLearning(ports)(actor, {
 						spaceId: "space-1",
 						projectId: "p1",
 						note: "Ask Bo.",

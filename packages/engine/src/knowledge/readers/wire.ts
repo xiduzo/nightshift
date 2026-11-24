@@ -1,7 +1,6 @@
-import { PAGE_READER_ENV, type PageReaderSetting } from "@nightshift/flows";
+import { PAGE_READER_ENV } from "@nightshift/flows";
 import { now } from "@nightshift/time";
 import type { Access } from "../../access";
-import type { Actor } from "../../contract";
 import type { AddressRules } from "../../web-access";
 import type { KnowledgeDocuments } from "../sync";
 import { openReaderRoute } from "./adapters/in/reader-endpoint";
@@ -13,7 +12,7 @@ import { checkReaderReady } from "./application/check-reader-ready";
 import { chooseReader } from "./application/choose-reader";
 import { lookAtLinks } from "./application/look-at-links";
 import { openStepReader } from "./application/open-step-reader";
-import { createLookMemo, type LinkLook } from "./domain/link-look";
+import { createLookMemo } from "./domain/link-look";
 import type { ReaderSecret } from "./domain/reader-choice";
 
 /**
@@ -54,25 +53,15 @@ export type PageReaders = {
 		secret: ReaderSecret,
 	): Promise<{ env: Record<string, string>; close(): Promise<void> }>;
 	/** The quick look at each link, in their order, with the project's reader (`lookAtLinks`). */
-	look(
-		actor: Actor,
-		spaceId: string,
-		projectId: string,
-		urls: readonly string[],
-	): Promise<LinkLook[]>;
+	look: ReturnType<typeof lookAtLinks>;
 	/**
 	 * The secret of the project's reader is saved where this computer finds
 	 * it outside a run. Always true for Night Shift's own reader, which has
 	 * no key (`checkReaderReady`).
 	 */
-	ready(projectId: string): Promise<boolean>;
+	ready: ReturnType<typeof checkReaderReady>;
 	/** Chooses the page reader of the project, for every Device of its Space. Returns it (`chooseReader`). */
-	choose(
-		actor: Actor,
-		spaceId: string,
-		projectId: string,
-		setting: PageReaderSetting,
-	): Promise<PageReaderSetting>;
+	choose: ReturnType<typeof chooseReader>;
 	/** Writes the marks that wait. */
 	close(): Promise<void>;
 };
@@ -111,11 +100,9 @@ export function wireReaders(deps: ReadersDeps): PageReaders {
 				},
 			};
 		},
-		look: (actor, spaceId, projectId, urls) =>
-			look({ actor, spaceId, projectId, urls }),
-		ready: (projectId) => ready({ projectId }),
-		choose: (actor, spaceId, projectId, setting) =>
-			choose({ actor, spaceId, projectId, setting }),
+		look,
+		ready,
+		choose,
 		close: () => marks.flush(),
 	};
 }

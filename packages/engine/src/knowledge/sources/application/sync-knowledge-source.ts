@@ -13,7 +13,6 @@ export type SyncKnowledgeSourcePorts<Run extends SourceRun> = {
 
 /** The source to sync, by its flow's name, and who starts its run. */
 export type SyncKnowledgeSource = {
-	actor: Actor;
 	spaceId: string;
 	projectId: string;
 	name: string;
@@ -30,13 +29,10 @@ export type SyncKnowledgeSource = {
  */
 export const syncKnowledgeSource =
 	<Run extends SourceRun>(ports: SyncKnowledgeSourcePorts<Run>) =>
-	async ({
-		actor,
-		spaceId,
-		projectId,
-		name,
-		startedBy,
-	}: SyncKnowledgeSource): Promise<Run> => {
+	async (
+		actor: Actor,
+		{ spaceId, projectId, name, startedBy }: SyncKnowledgeSource,
+	): Promise<Run> => {
 		await ports.access.openSpace(actor, { spaceId, need: CHANGES_KNOWLEDGE });
 		sourceNamed(await ports.space.flows.map(projectId), name);
 		return ports.space.startRun({ projectId, flowName: name, startedBy });

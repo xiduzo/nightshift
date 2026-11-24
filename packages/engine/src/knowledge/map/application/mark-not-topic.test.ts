@@ -13,8 +13,7 @@ describe("markNotTopic", () => {
 		const mark = markNotTopic(ports);
 		ports.setNow(5);
 		expect(
-			await mark({
-				actor: NIGHT_SHIFT,
+			await mark(NIGHT_SHIFT, {
 				spaceId: "space-1",
 				projectId: "p1",
 				word: "deploy",
@@ -24,8 +23,7 @@ describe("markNotTopic", () => {
 		).toEqual(["deploy"]);
 		ports.setNow(6);
 		expect(
-			await mark({
-				actor: NIGHT_SHIFT,
+			await mark(NIGHT_SHIFT, {
 				spaceId: "space-1",
 				projectId: "p1",
 				word: "  Night   shift ",
@@ -38,8 +36,7 @@ describe("markNotTopic", () => {
 			{ word: "deploy", markedAt: 5, by: "ada" },
 		]);
 		expect(
-			await mark({
-				actor: NIGHT_SHIFT,
+			await mark(NIGHT_SHIFT, {
 				spaceId: "space-1",
 				projectId: "p1",
 				word: "DEPLOY",
@@ -63,8 +60,7 @@ describe("markNotTopic", () => {
 		ports.notTopics.write = async () => {
 			throw failure;
 		};
-		const refusal = await markNotTopic(ports)({
-			actor: NIGHT_SHIFT,
+		const refusal = await markNotTopic(ports)(NIGHT_SHIFT, {
 			spaceId: "space-1",
 			projectId: "p1",
 			word: "deploy",
@@ -81,8 +77,7 @@ describe("markNotTopic", () => {
 			await ports.access.whoMay(
 				"space-1",
 				(actor) =>
-					markNotTopic(ports)({
-						actor,
+					markNotTopic(ports)(actor, {
 						spaceId: "space-1",
 						projectId: "p1",
 						word: "deploy",

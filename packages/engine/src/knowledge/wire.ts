@@ -4,11 +4,9 @@ import {
 	useHit,
 } from "@nightshift/agents/knowledge";
 import type { Database } from "@nightshift/db";
-import type { PageReaderSetting } from "@nightshift/flows";
 import type { Access } from "../access";
 import type { SpaceArchive } from "../archive";
 import type {
-	Actor,
 	CommandKnowledge,
 	KnowledgeRequest,
 	SessionKnowledge,
@@ -19,23 +17,13 @@ import { createRunLog, knowledgeUseEvent } from "../log";
 import type { UsageNotes } from "../usage";
 import { type KnowledgeListing, type KnowledgeText, wireFiles } from "./files";
 import {
-	type FollowRunsDeps,
+	type Learnings,
 	type LearningsNotifications,
-	type NotePerson,
-	type ProjectLearning,
-	type RunLearnings,
-	type WaitingNote,
 	wireLearnings,
 } from "./learnings";
-import { type KnowledgeMap, wireMap } from "./map";
-import { type LinkLook, type ReaderSecret, wireReaders } from "./readers";
-import type {
-	KnowledgeQuestion,
-	KnowledgeQuestions,
-	KnowledgeUseReport,
-	ReviewTask,
-} from "./review";
-import { wireReview } from "./review";
+import { type KnowledgeMaps, wireMap } from "./map";
+import { type PageReaders, type ReaderSecret, wireReaders } from "./readers";
+import { type KnowledgeReview, wireReview } from "./review";
 import {
 	isMarkdown,
 	type KnowledgeEvaluation,
@@ -43,15 +31,10 @@ import {
 	type KnowledgeMeaning,
 	type KnowledgeMeaningStatus,
 	markdownHeadings,
-	setMeaning as setProjectMeaning,
+	setMeaning,
 	wireSearch,
 } from "./search";
-import {
-	type KnowledgeSources,
-	type SourceRun,
-	type SourcesSpace,
-	wireSources,
-} from "./sources";
+import { type Sources, wireSources } from "./sources";
 import { wireSteps } from "./steps";
 import {
 	type KnowledgeFolderLocks,
@@ -110,175 +93,37 @@ export type Knowledge = {
 	/** Whether search by meaning works; starts vector prep when behind. */
 	meaning(projectId: string): Promise<KnowledgeMeaningStatus>;
 	/** Turns search by meaning on or off for the project. Returns status. */
-	setMeaning(
-		actor: Actor,
-		spaceId: string,
-		projectId: string,
-		on: boolean,
-	): Promise<KnowledgeMeaningStatus>;
+	setMeaning: ReturnType<typeof setMeaning>;
 	/** The question set against each way to search on this computer. */
 	evaluate(projectId: string): Promise<KnowledgeEvaluation>;
 
 	// The page readers.
-	/**
-	 * The quick look at links a person tells, before anything is saved: what
-	 * each one is, by the project's page reader (ADR 39), in their order.
-	 */
-	look(
-		actor: Actor,
-		spaceId: string,
-		projectId: string,
-		urls: readonly string[],
-	): Promise<LinkLook[]>;
-	/** Chooses the page reader of the project (ADR 39), for every Device of its Space. Returns it. */
-	setReader(
-		actor: Actor,
-		spaceId: string,
-		projectId: string,
-		setting: PageReaderSetting,
-	): Promise<PageReaderSetting>;
+	look: PageReaders["look"];
+	setReader: PageReaders["choose"];
 
 	// The learnings.
-	/**
-	 * The learnings agents proposed that wait for a person in these
-	 * projects, newest first. Each is one step's proposed learnings.
-	 */
-	learnings(projectIds: readonly string[]): Promise<ProjectLearning[]>;
-	/**
-	 * Keeps or deletes one step's proposed learnings, as the review of learnings
-	 * (`kit:knowledge/review-learnings`) does: keep adds them to
-	 * `learnings/accepted/`, where agents read them, and both take them
-	 * out of `learnings/proposed/`. It holds the folder as a step does,
-	 * so the change goes to the Space when it ends, and the open screens
-	 * hear of it. Refuses a proposed learning that no longer waits, and one whose
-	 * content cannot be fetched now.
-	 */
-	settleLearning(
-		actor: Actor,
-		spaceId: string,
-		projectId: string,
-		id: string,
-		decision: "keep" | "delete",
-	): Promise<void>;
-	/**
-	 * Keeps or deletes one note of a learning that waits, not the whole
-	 * step's: a kept note goes to `learnings/accepted/` with who kept it and
-	 * when. The proposed file loses the note, and goes when none is left.
-	 * It holds the folder as `settleLearning` does, and refuses what it
-	 * refuses, and a note that no longer waits.
-	 */
-	settleNote(
-		actor: Actor,
-		spaceId: string,
-		projectId: string,
-		note: WaitingNote,
-		decision: "keep" | "delete",
-		by: NotePerson,
-	): Promise<void>;
-	/**
-	 * Keeps a note a person wrote, with who told it and when, in their own
-	 * file of `learnings/accepted/`: agents read it. With `replaces`, it
-	 * takes the place of a note that waits. It holds the folder as
-	 * `settleLearning` does.
-	 */
-	tellLearning(
-		actor: Actor,
-		spaceId: string,
-		projectId: string,
-		note: string,
-		by: NotePerson,
-		replaces?: WaitingNote,
-	): Promise<void>;
-	/**
-	 * Proposes what Night Shift learned from a run that ended, in the run's
-	 * own file in `learnings/proposed/`. It waits for a person as a step's
-	 * learnings do. No note: nothing is written.
-	 */
-	proposeFromRun(
-		projectId: string,
-		runId: string,
-		notes: readonly string[],
-	): Promise<void>;
-	/** The notes the project has on this computer, waiting and kept: what not to propose again. */
-	knownLearnings(projectId: string): Promise<string[]>;
-	/**
-	 * Whether Night Shift proposes learnings from the runs of the project
-	 * that ended (ADR 37): on unless a person turned it off.
-	 */
-	learnsFromRuns(projectId: string): Promise<boolean>;
-	/** Turns the learnings from runs on or off for the project, for every Device of its Space. */
-	setLearnsFromRuns(
-		actor: Actor,
-		spaceId: string,
-		projectId: string,
-		on: boolean,
-	): Promise<void>;
-	/**
-	 * The look back at the runs this computer walks (ADR 37): when one ends
-	 * with a signal, the Learner proposes what to learn, one look at a time.
-	 */
-	followRuns(deps: FollowRunsDeps): RunLearnings;
+	learnings: Learnings["ofProjects"];
+	settleLearning: Learnings["settle"];
+	settleNote: Learnings["settleNote"];
+	tellLearning: Learnings["tell"];
+	proposeFromRun: Learnings["proposeFromRun"];
+	knownLearnings: Learnings["known"];
+	learnsFromRuns: Learnings["learnsFromRuns"];
+	setLearnsFromRuns: Learnings["setLearnsFromRuns"];
+	followRuns: Learnings["followRuns"];
 
 	// The sources, the Map and the review.
-	/**
-	 * What waits for a person on the Knowledge page, in the order a person
-	 * meets it: sources that need a look, learnings, questions that found
-	 * nothing and files no run used. In `space` as the person who asks sees it.
-	 * It holds no folder. Only a learning whose content is not here yet asks
-	 * the Host.
-	 */
-	review<Run extends SourceRun>(
-		projectId: string,
-		space: SourcesSpace<Run>,
-	): Promise<ReviewTask[]>;
-	/**
-	 * The questions agents asked, newest first (at most `limit`), with the
-	 * files a person marked as the answer, and the question set as the
-	 * Space has it: the folder is brought in step first, as for a step.
-	 */
-	questions(
-		projectId: string,
-		options?: { limit?: number },
-	): Promise<KnowledgeQuestions>;
-	/**
-	 * Marks the files that answer a question an agent asked, or with no
-	 * files (or none an agent reads) takes it out of the set. The set goes
-	 * to the Space as a step's changes do. Returns the set.
-	 */
-	markQuestion(
-		actor: Actor,
-		spaceId: string,
-		projectId: string,
-		mark: { query: string; answers: readonly string[]; by: string | null },
-	): Promise<KnowledgeQuestion[]>;
-	/**
-	 * The Map: the files, the topics they share, the files close in meaning,
-	 * the questions that found them and the learnings that name their
-	 * topics. It draws what this computer's search index holds: drawing never
-	 * asks the Host, nor any model. A file the index does not have stays on
-	 * the Map, alone.
-	 */
-	map(projectId: string): Promise<KnowledgeMap>;
-	/**
-	 * Marks a word as not a topic, so no Map of the Space shows it, or puts
-	 * it back. The list goes to the Space as a step's changes do. Returns the
-	 * list.
-	 */
-	markNotTopic(
-		actor: Actor,
-		spaceId: string,
-		projectId: string,
-		mark: { word: string; notTopic: boolean; by: string | null },
-	): Promise<string[]>;
-	/** How often agents found and read each file, when a run last used it, and which files no run used lately. */
-	use(projectId: string): Promise<KnowledgeUseReport>;
+	review: KnowledgeReview["review"];
+	questions: KnowledgeReview["questions"];
+	markQuestion: KnowledgeReview["markQuestion"];
+	map: KnowledgeMaps["map"];
+	markNotTopic: KnowledgeMaps["markNotTopic"];
+	use: KnowledgeReview["use"];
 	/**
 	 * The project's sources, in `space` as the person who asks sees it.
 	 * What the person may do comes with each change (`SourceRights`).
 	 */
-	sources<Run extends SourceRun>(
-		space: SourcesSpace<Run>,
-	): KnowledgeSources<Run>;
+	sources: Sources["sourcesIn"];
 
 	// The steps and the end.
 	/**
@@ -503,14 +348,16 @@ export function wireKnowledge(deps: KnowledgeDeps): Knowledge {
 			return hits;
 		},
 		meaning: search.meaning,
-		setMeaning: (actor, spaceId, projectId, on) =>
-			setProjectMeaning({
-				access: deps.access,
-				documents,
-				meaning: (id) => search.meaning(id),
-			})({ actor, spaceId, projectId, on }),
+		setMeaning: setMeaning({
+			access: deps.access,
+			documents,
+			meaning: search.meaning,
+		}),
 		async evaluate(projectId) {
-			return search.evaluate(projectId, await review.questionSet(projectId));
+			return search.evaluate(
+				projectId,
+				await review.questionSet({ projectId }),
+			);
 		},
 		// The page readers.
 		look: readers.look,

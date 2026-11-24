@@ -20,7 +20,6 @@ export type MarkNotTopicPorts = {
 
 /** The word, whether it is not a topic, and who marks it. */
 export type MarkNotTopic = {
-	actor: Actor;
 	spaceId: string;
 	projectId: string;
 	word: string;
@@ -37,12 +36,10 @@ export type MarkNotTopic = {
  */
 export const markNotTopic =
 	(ports: MarkNotTopicPorts) =>
-	async ({
-		actor,
-		spaceId,
-		projectId,
-		...mark
-	}: MarkNotTopic): Promise<string[]> => {
+	async (
+		actor: Actor,
+		{ spaceId, projectId, ...mark }: MarkNotTopic,
+	): Promise<string[]> => {
 		await ports.access.openSpace(actor, { spaceId, need: CHANGES_KNOWLEDGE });
 		const hold = await ports.holds.startStep(projectId);
 		try {

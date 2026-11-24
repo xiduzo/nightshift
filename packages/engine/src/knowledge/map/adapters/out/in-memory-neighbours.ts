@@ -18,7 +18,7 @@ import { inMemoryNotTopicsFile } from "./in-memory-not-topics-file";
 export function inMemoryAskedQuestions() {
 	const twin = {
 		askedIn: new Map<string, MapQuestion[]>(),
-		async asked(projectId: string) {
+		async asked({ projectId }: { projectId: string }) {
 			return twin.askedIn.get(projectId) ?? [];
 		},
 	};

@@ -93,7 +93,7 @@ async function device(meaning?: KnowledgeMeaning) {
 			told.length = 0;
 		},
 		read: async () => {
-			const list = await built.knowledge.learnings(["p1"]);
+			const list = await built.knowledge.learnings({ projectIds: ["p1"] });
 			return new Map(list.map((learning) => [learning.id, learning]));
 		},
 	};
@@ -237,7 +237,7 @@ describe("a page's read", () => {
 
 		a.knowledge.close();
 		const later = a.restarted(meaning);
-		const list = await later.knowledge.learnings(["p1"]);
+		const list = await later.knowledge.learnings({ projectIds: ["p1"] });
 		expect(list.some((learning) => learning.nearTo)).toBe(true);
 		await Bun.sleep(20);
 		expect(embeddings.embedded).toBe(embedded);
@@ -251,13 +251,12 @@ describe("a page's read", () => {
 		await waitFor(() => a.told.length > 0, { label: "the vectors" });
 		expect(embeddings.embedded).toBe(1);
 
-		await a.knowledge.settleLearning(
-			NIGHT_SHIFT,
-			"space-1",
-			"p1",
-			"run-1.s1.md",
-			"keep",
-		);
+		await a.knowledge.settleLearning(NIGHT_SHIFT, {
+			spaceId: "space-1",
+			projectId: "p1",
+			id: "run-1.s1.md",
+			decision: "keep",
+		});
 		await a.publish({ "learnings/proposed/run-2.s1.md": `- ${VEHICLE}\n` });
 		await a.read();
 		await waitFor(() => embeddings.embedded === 2, { label: "the new note" });
@@ -293,7 +292,7 @@ describe("a page's read", () => {
 		const { meaning, embeddings } = fakeMeaning();
 		const a = await device(meaning);
 		await a.publish({ "learnings/proposed/run-1.s1.md": `- ${CAR}\n` });
-		await a.knowledge.map("p1");
+		await a.knowledge.map({ projectId: "p1" });
 		await Bun.sleep(20);
 		expect(embeddings.embedded).toBe(0);
 	});
@@ -354,7 +353,11 @@ describe("when the notes cannot be compared, the list is as it was", () => {
 		const { meaning, embeddings } = fakeMeaning();
 		const a = await device(meaning);
 		await a.publish(notes);
-		await a.knowledge.setMeaning(NIGHT_SHIFT, "space-1", "p1", false);
+		await a.knowledge.setMeaning(NIGHT_SHIFT, {
+			spaceId: "space-1",
+			projectId: "p1",
+			on: false,
+		});
 		await expectPlain(a, embeddings);
 	});
 });
@@ -393,11 +396,11 @@ describe("vectors from before", () => {
 		const other = fakeMeaning({ model: "other" });
 		const later = a.restarted(other.meaning);
 		a.told.length = 0;
-		const first = await later.knowledge.learnings(["p1"]);
+		const first = await later.knowledge.learnings({ projectIds: ["p1"] });
 		expect(first.some((learning) => learning.nearTo)).toBe(false);
 		await waitFor(() => a.told.length > 0, { label: "the new vectors" });
 		expect(other.embeddings.embedded).toBe(2);
-		const again = await later.knowledge.learnings(["p1"]);
+		const again = await later.knowledge.learnings({ projectIds: ["p1"] });
 		expect(again.every((learning) => learning.nearTo)).toBe(true);
 	});
 });

@@ -22,7 +22,6 @@ export type MarkQuestionPorts = {
 
 /** The question, the files that answer it, and who marks it. */
 export type MarkQuestion = {
-	actor: Actor;
 	spaceId: string;
 	projectId: string;
 	query: string;
@@ -40,12 +39,10 @@ export type MarkQuestion = {
  */
 export const markQuestion =
 	(ports: MarkQuestionPorts) =>
-	async ({
-		actor,
-		spaceId,
-		projectId,
-		...mark
-	}: MarkQuestion): Promise<KnowledgeQuestion[]> => {
+	async (
+		actor: Actor,
+		{ spaceId, projectId, ...mark }: MarkQuestion,
+	): Promise<KnowledgeQuestion[]> => {
 		await ports.access.openSpace(actor, { spaceId, need: CHANGES_KNOWLEDGE });
 		const hold = await ports.holds.startStep(projectId);
 		try {

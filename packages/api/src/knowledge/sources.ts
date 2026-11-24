@@ -53,15 +53,12 @@ export const knowledgeSources = {
 		)
 		.handler(({ context, input }) => {
 			const { projectId, ...source } = input;
-			return context.knowledge
-				.sources(context.space)
-				.save(
-					context.actor,
-					context.spaceId,
-					projectId,
-					source,
-					rightsOf(context),
-				);
+			return context.knowledge.sources(context.space).save(context.actor, {
+				...source,
+				spaceId: context.spaceId,
+				projectId,
+				may: rightsOf(context),
+			});
 		}),
 	/**
 	 * Removes a source the page added: its flow and its schedules, and with
@@ -79,16 +76,13 @@ export const knowledgeSources = {
 		})
 		.output(output(z.object({ removedFiles: z.number() })))
 		.handler(({ context, input }) =>
-			context.knowledge
-				.sources(context.space)
-				.remove(
-					context.actor,
-					context.spaceId,
-					input.projectId,
-					input.name,
-					{ files: input.removeFiles },
-					rightsOf(context),
-				),
+			context.knowledge.sources(context.space).remove(context.actor, {
+				spaceId: context.spaceId,
+				projectId: input.projectId,
+				name: input.name,
+				files: input.removeFiles,
+				may: rightsOf(context),
+			}),
 		),
 	/**
 	 * Syncs a source the page added now: a run of its flow. A folder
@@ -101,15 +95,12 @@ export const knowledgeSources = {
 		})
 		.output(output(runSummarySchema))
 		.handler(({ context, input }) =>
-			context.knowledge
-				.sources(context.space)
-				.sync(
-					context.actor,
-					context.spaceId,
-					input.projectId,
-					input.name,
-					context.session.user.id,
-				),
+			context.knowledge.sources(context.space).sync(context.actor, {
+				spaceId: context.spaceId,
+				projectId: input.projectId,
+				name: input.name,
+				startedBy: context.session.user.id,
+			}),
 		),
 	/**
 	 * Chooses the page reader of the project, on every computer of its Space
@@ -127,12 +118,11 @@ export const knowledgeSources = {
 		})
 		.output(output(pageReaderSettingSchema))
 		.handler(({ context, input }) =>
-			context.knowledge.setReader(
-				context.actor,
-				context.spaceId,
-				input.projectId,
-				input.reader,
-			),
+			context.knowledge.setReader(context.actor, {
+				spaceId: context.spaceId,
+				projectId: input.projectId,
+				setting: input.reader,
+			}),
 		),
 	/**
 	 * The quick look at links a person tells, before anything is saved: what
@@ -151,11 +141,10 @@ export const knowledgeSources = {
 		})
 		.output(output(z.array(linkLookSchema)))
 		.handler(({ context, input }) =>
-			context.knowledge.look(
-				context.actor,
-				context.spaceId,
-				input.projectId,
-				input.urls,
-			),
+			context.knowledge.look(context.actor, {
+				spaceId: context.spaceId,
+				projectId: input.projectId,
+				urls: input.urls,
+			}),
 		),
 };

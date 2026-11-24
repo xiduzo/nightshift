@@ -197,18 +197,58 @@ function holdsFunction(type: ts.Node): boolean {
 	return found;
 }
 
-/**
- * The ports a use case file declares itself: each type of the file that a
- * member of the use case's first argument names, and that holds a function.
- */
-function ownPorts(path: string, useCase: FunctionNode): string[] {
-	const declared = new Map<string, ts.Node>();
+/** The types a file declares, by name. */
+function declaredTypes(
+	path: string,
+): Map<string, ts.TypeAliasDeclaration | ts.InterfaceDeclaration> {
+	const declared = new Map<
+		string,
+		ts.TypeAliasDeclaration | ts.InterfaceDeclaration
+	>();
 	for (const statement of treeOf(path).statements)
 		if (
 			ts.isTypeAliasDeclaration(statement) ||
 			ts.isInterfaceDeclaration(statement)
 		)
 			declared.set(statement.name.text, statement);
+	return declared;
+}
+
+/** A request of the use case has the property `actor`: in its type there, or in a type of the same file. */
+function requestHasActor(path: string, useCase: FunctionNode): boolean {
+	const declared = declaredTypes(path);
+	const seen = new Set<string>();
+	const has = (type: ts.Node | undefined): boolean => {
+		if (!type) return false;
+		if (ts.isTypeAliasDeclaration(type)) return has(type.type);
+		if (ts.isTypeLiteralNode(type) || ts.isInterfaceDeclaration(type))
+			return type.members.some((member) => member.name?.getText() === "actor");
+		if (ts.isIntersectionTypeNode(type)) return type.types.some(has);
+		if (!ts.isTypeReferenceNode(type)) return false;
+		const name = type.typeName.getText();
+		if (seen.has(name)) return false;
+		seen.add(name);
+		return has(declared.get(name));
+	};
+	let found = false;
+	eachNode(useCase, (node) => {
+		if (
+			ts.isParameter(node) &&
+			node !== useCase.parameters[0] &&
+			"body" in node.parent &&
+			has(node.type)
+		)
+			found = true;
+	});
+	return found;
+}
+
+/**
+ * The ports a use case file declares itself: each type of the file that a
+ * member of the use case's first argument names, and that holds a function.
+ */
+function ownPorts(path: string, useCase: FunctionNode): string[] {
+	const declared = declaredTypes(path);
 	const found = new Set<string>();
 	const seen = new Set<string>();
 	const visit = (node: ts.Node, member: boolean): void => {
@@ -231,7 +271,14 @@ function ownPorts(path: string, useCase: FunctionNode): string[] {
 
 /** What breaks a rule of ADR 41: the rule, as the debt list names it, and the file. */
 export type Offence = {
-	rule: "forward" | "actor" | "empty-test" | "port" | "suite" | "twin";
+	rule:
+		| "forward"
+		| "actor"
+		| "request"
+		| "empty-test"
+		| "port"
+		| "suite"
+		| "twin";
 	file: string;
 	message: string;
 };
@@ -253,6 +300,12 @@ export function decisionOffences(root: string, slice: Slice): Offence[] {
 				rule: "actor",
 				file,
 				message: `${file}: takes the actor (${actor}) and does not read it. Ask who may act, or take no actor.`,
+			});
+		if (requestHasActor(path, fn))
+			offences.push({
+				rule: "request",
+				file,
+				message: `${file}: has the actor in its request. The actor is an argument of its own, before the request (P3).`,
 			});
 		for (const port of ownPorts(path, fn))
 			offences.push({

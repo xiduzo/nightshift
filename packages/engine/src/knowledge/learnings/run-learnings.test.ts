@@ -182,7 +182,9 @@ describe("learnings from runs that ended", () => {
 		// It waits for a person, as the Review page lists it: the run's, no step.
 		const waiting = await waitFor(
 			async () => {
-				const list = await knowledge.knowledge.learnings([projectId]);
+				const list = await knowledge.knowledge.learnings({
+					projectIds: [projectId],
+				});
 				return list.length > 0 ? list : null;
 			},
 			{ label: "a learning that waits" },
@@ -196,7 +198,7 @@ describe("learnings from runs that ended", () => {
 			},
 		]);
 		// The next look back reads it, so the Learner does not propose it again.
-		expect(await knowledge.knowledge.knownLearnings(projectId)).toEqual([
+		expect(await knowledge.knowledge.knownLearnings({ projectId })).toEqual([
 			"Release only from Monday to Thursday.",
 		]);
 	});

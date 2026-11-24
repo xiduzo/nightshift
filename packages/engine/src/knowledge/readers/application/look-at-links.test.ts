@@ -35,8 +35,7 @@ describe("lookAtLinks", () => {
 			words: 1,
 		});
 		ports.services.local.put(`${SITE}/docs/refunds`, page("Refund policy"));
-		const [section, article, refused] = await lookAtLinks(ports)({
-			actor: NIGHT_SHIFT,
+		const [section, article, refused] = await lookAtLinks(ports)(NIGHT_SHIFT, {
 			spaceId: "space-1",
 			projectId: "p1",
 			urls: [`${SITE}/docs/`, `${SITE}/docs/refunds`, `${SITE}/docs/private/x`],
@@ -72,8 +71,7 @@ describe("lookAtLinks", () => {
 			`${SITE}/docs/refunds`,
 			page("Refund policy", [`${SITE}/docs/shipping`, `${SITE}/blog/x`]),
 		);
-		const [one] = await lookAtLinks(ports)({
-			actor: NIGHT_SHIFT,
+		const [one] = await lookAtLinks(ports)(NIGHT_SHIFT, {
 			spaceId: "space-1",
 			projectId: "p1",
 			urls: [`${SITE}/docs/refunds`],
@@ -94,8 +92,7 @@ describe("lookAtLinks", () => {
 		await (await ports.documents.open("p1")).setReader({ kind: "firecrawl" });
 		ports.services.firecrawl.mapTo([`${SITE}/docs/a`, `${SITE}/docs/b`]);
 		ports.services.local.put(`${SITE}/docs/a`, page("A"));
-		const [one] = await lookAtLinks(ports)({
-			actor: NIGHT_SHIFT,
+		const [one] = await lookAtLinks(ports)(NIGHT_SHIFT, {
 			spaceId: "space-1",
 			projectId: "p1",
 			urls: [`${SITE}/docs/a`],
@@ -136,8 +133,7 @@ describe("lookAtLinks", () => {
 			status: "signin",
 			reason: "The page asks you to sign in first.",
 		});
-		const looks = await lookAtLinks(ports)({
-			actor: NIGHT_SHIFT,
+		const looks = await lookAtLinks(ports)(NIGHT_SHIFT, {
 			spaceId: "space-1",
 			projectId: "p1",
 			urls: [
@@ -183,8 +179,7 @@ describe("lookAtLinks", () => {
 	test("a page that did not answer is a failed look", async () => {
 		const ports = inMemoryReadersPorts();
 		ports.services.see(`${SITE}/slow`, null);
-		const [one] = await lookAtLinks(ports)({
-			actor: NIGHT_SHIFT,
+		const [one] = await lookAtLinks(ports)(NIGHT_SHIFT, {
 			spaceId: "space-1",
 			projectId: "p1",
 			urls: [`${SITE}/slow`],
@@ -203,8 +198,7 @@ describe("lookAtLinks", () => {
 			reason: "The page shows its text only in a browser.",
 		});
 		ports.services.jina.put(target, page("The app"));
-		const [own] = await lookAtLinks(ports)({
-			actor: NIGHT_SHIFT,
+		const [own] = await lookAtLinks(ports)(NIGHT_SHIFT, {
 			spaceId: "space-1",
 			projectId: "p1",
 			urls: [target],
@@ -214,8 +208,7 @@ describe("lookAtLinks", () => {
 			kind: "jina",
 			address: "https://jina.example/",
 		});
-		const [jina] = await lookAtLinks(ports)({
-			actor: NIGHT_SHIFT,
+		const [jina] = await lookAtLinks(ports)(NIGHT_SHIFT, {
 			spaceId: "space-1",
 			projectId: "p1",
 			urls: [target],
@@ -239,7 +232,7 @@ describe("lookAtLinks", () => {
 				asked.push(name);
 				return "fc-1";
 			},
-		})({ actor: NIGHT_SHIFT, spaceId: "space-1", projectId: "p1", urls: [] });
+		})(NIGHT_SHIFT, { spaceId: "space-1", projectId: "p1", urls: [] });
 		expect(asked).toEqual(["CRAWL_KEY"]);
 		expect(ports.services.made).toEqual([
 			{ kind: "firecrawl", address: "https://api.firecrawl.dev", key: "fc-1" },
@@ -256,23 +249,20 @@ describe("lookAtLinks", () => {
 			status: "failed",
 			reason: "The site answered with an error (500).",
 		});
-		await look({
-			actor: NIGHT_SHIFT,
+		await look(NIGHT_SHIFT, {
 			spaceId: "space-1",
 			projectId: "p1",
 			urls: [url, broken],
 		});
 		ports.services.local.put(url, page("A again"));
 		ports.clock.at += 4 * 60_000;
-		const [kept] = await look({
-			actor: NIGHT_SHIFT,
+		const [kept] = await look(NIGHT_SHIFT, {
 			spaceId: "space-1",
 			projectId: "p1",
 			urls: [url],
 		});
 		expect(kept).toMatchObject({ title: "A" });
-		await look({
-			actor: NIGHT_SHIFT,
+		await look(NIGHT_SHIFT, {
 			spaceId: "space-1",
 			projectId: "p1",
 			urls: [broken],
@@ -281,8 +271,7 @@ describe("lookAtLinks", () => {
 			ports.services.looked.filter((one) => one.url === broken),
 		).toHaveLength(2);
 		ports.clock.at += 60_000;
-		const [fresh] = await look({
-			actor: NIGHT_SHIFT,
+		const [fresh] = await look(NIGHT_SHIFT, {
 			spaceId: "space-1",
 			projectId: "p1",
 			urls: [url],
@@ -297,8 +286,7 @@ describe("lookAtLinks", () => {
 		for (const [index, url] of urls.entries()) {
 			ports.services.local.put(url, page(`Page ${index}`));
 		}
-		const looks = await lookAtLinks(ports)({
-			actor: NIGHT_SHIFT,
+		const looks = await lookAtLinks(ports)(NIGHT_SHIFT, {
 			spaceId: "space-1",
 			projectId: "p1",
 			urls,
@@ -312,8 +300,7 @@ describe("lookAtLinks", () => {
 		const ports = inMemoryReadersPorts();
 		expect(
 			await ports.access.whoMay("space-1", (actor) =>
-				lookAtLinks(ports)({
-					actor,
+				lookAtLinks(ports)(actor, {
 					spaceId: "space-1",
 					projectId: "p1",
 					urls: [],

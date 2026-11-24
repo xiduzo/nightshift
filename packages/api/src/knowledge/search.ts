@@ -61,11 +61,10 @@ export const knowledgeSearch = {
 		})
 		.output(output(knowledgeMeaningSchema))
 		.handler(({ context, input }) =>
-			context.knowledge.setMeaning(
-				context.actor,
-				context.spaceId,
-				input.projectId,
-				input.on,
-			),
+			context.knowledge.setMeaning(context.actor, {
+				spaceId: context.spaceId,
+				projectId: input.projectId,
+				on: input.on,
+			}),
 		),
 };

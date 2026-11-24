@@ -132,6 +132,40 @@ describe("a use case that takes the Actor reads it", () => {
 		});
 });
 
+describe("the actor is no field of the request", () => {
+	for (const [types, parameters, red] of [
+		["", "{ actor }: { actor: string; id: string }", true],
+		["type Ask = { actor: string };", "{ actor }: Ask", true],
+		["interface Ask { actor: string }", "request: Ask", true],
+		[
+			"type By = { actor: string }; type Ask = By & { id: string };",
+			"request: Ask",
+			true,
+		],
+		["type Ask = { id: string };", "actor: string, request: Ask", false],
+		// The type of a port's method is no parameter of a use case.
+		[
+			"type Ask = { actor: string };",
+			"request: { id: string }, ask: (request: Ask) => boolean",
+			false,
+		],
+	] as const)
+		test(`${red ? "fails" : "passes"}: ${types} ${parameters}`, async () => {
+			expect(
+				await ofUseCase([
+					types,
+					`export const listSchedules = (ports: any) => (${parameters}) => [ports${parameters.startsWith("actor") ? ", actor" : ""}];`,
+				]),
+			).toEqual(
+				red
+					? [
+							`${USE_CASE}: has the actor in its request. The actor is an argument of its own, before the request (P3).`,
+						]
+					: [],
+			);
+		});
+});
+
 describe("a use-case test asserts an outcome", () => {
 	const lines = ["export const listSchedules = (ports: any) => [ports];"];
 	const ofTest = (text: string, debt?: string) =>
