@@ -19,12 +19,9 @@ export const ydoc = sqliteTable("ydoc", {
 });
 
 /*
- * Read-only since the Device document: `setting`, `connection`, `cli_tool`,
- * `agent_profile` and `secret` are imported into it once, on the first
- * start of the version that added `ydoc`, and never written again. SQL
- * cannot write a Yjs document, so a migration cannot move the rows itself:
- * a later migration drops these tables, once every install has started
- * this version.
+ * Nothing reads or writes the tables below: `setting`, `connection`,
+ * `cli_tool`, `agent_profile` and `secret`. The Device document replaced
+ * them. An install may still have rows in them.
  */
 
 /**

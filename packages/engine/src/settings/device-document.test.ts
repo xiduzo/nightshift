@@ -9,11 +9,9 @@ import {
 	setting,
 	ydoc,
 } from "@nightshift/db/schema";
-import { asDate } from "@nightshift/time";
 import * as Y from "yjs";
 import { inMemoryAccess } from "../access/adapters/out/in-memory-access";
 import { inMemoryComputer } from "../access/computer/adapters/out/in-memory-computer";
-import { NIGHT_SHIFT } from "../contract";
 import {
 	type DeviceDocument,
 	deviceDocumentName,
@@ -69,14 +67,11 @@ function stores(document: DeviceDocument) {
 	};
 }
 
-/** When the older rows' secret was last set. */
-const SECRET_SET_AT = 1_700_000_000_000;
-
 /** `${NAME}`: a reference to a secret. */
 const ref = (name: string) => `\${${name}}`;
 
-/** The rows a Replica from before the Device document has. */
-async function seedOlderRows() {
+/** Rows in the tables the Device document replaced. */
+async function seedReplacedRows() {
 	await sandbox.db.insert(setting).values([
 		{ key: "maxConcurrentRuns", value: "4" },
 		{ key: "claudeBin", value: JSON.stringify("/opt/claude") },
@@ -103,9 +98,7 @@ async function seedOlderRows() {
 			connections: ["tracker"],
 		}),
 	});
-	await sandbox.db
-		.insert(secret)
-		.values({ name: "TRACKER_TOKEN", updatedAt: asDate(SECRET_SET_AT) });
+	await sandbox.db.insert(secret).values({ name: "TRACKER_TOKEN" });
 }
 
 describe("the Device document", () => {
@@ -117,41 +110,54 @@ describe("the Device document", () => {
 		expect(rows.map((r) => r.name)).toEqual([document.name]);
 	});
 
-	test("imports the rows of the tables it replaces on its first start", async () => {
-		await seedOlderRows();
-		const s = stores(await sandbox.openDocument());
+	test("a new install's document records its Device", async () => {
+		const document = await sandbox.openDocument();
+		expect(document.doc.getMap("meta").toJSON()).toEqual({
+			deviceId: sandbox.deviceId,
+		});
+		const s = stores(document);
+		expect(s.settings.current().maxConcurrentRuns).toBe(2);
 
-		expect(s.settings.current().maxConcurrentRuns).toBe(4);
-		expect(s.settings.current().claudeBin).toBe("/opt/claude");
-		expect(s.connections.get("tracker")).toMatchObject({
-			description: "Issues",
-			variables: [{ name: "TRACKER_TOKEN", source: "keychain" }],
+		const again = await sandbox.openDocument();
+		expect(again.doc.getMap("meta").toJSON()).toEqual({
+			deviceId: sandbox.deviceId,
 		});
-		expect(s.cliTools.get("gh")?.description).toBe("GitHub");
-		expect(s.profiles.settingsFor("builder")).toMatchObject({
-			model: "opus",
-			clis: ["gh"],
-			connections: ["tracker"],
-		});
-		expect(s.profiles.get("builder")?.description).toBe("Builds.");
-		// A secret saved before keeps when it was set.
-		expect((await s.connections.secrets(NIGHT_SHIFT)).secrets).toMatchObject([
-			{ name: "TRACKER_TOKEN", saved: true, setAt: SECRET_SET_AT },
-		]);
 	});
 
-	test("imports once: a later start keeps what changed since", async () => {
-		await seedOlderRows();
-		const first = stores(await sandbox.openDocument());
-		await first.profiles.remove("builder");
-		await first.cliTools.save({ name: "jq" });
-		await first.settings.save({ maxConcurrentRuns: null });
+	test("a document whose import was done opens with the same configuration", async () => {
+		const document = await sandbox.openDocument();
+		await document.change(() => {
+			document.doc.getMap("meta").set("importedAt", 1);
+			document.settings.set("maxConcurrentRuns", 4);
+			document.cliTools.set("gh", { description: "GitHub", updatedAt: 1 });
+		});
+		const before = document.doc.toJSON();
+		// The rows the import read are dead: they change nothing.
+		await seedReplacedRows();
 
-		// The old rows are still there, and are not read again.
-		const again = stores(await sandbox.openDocument());
-		expect(again.profiles.list()).toEqual([]);
-		expect([...again.cliTools.names()].sort()).toEqual(["gh", "jq"]);
-		expect(again.settings.current().maxConcurrentRuns).toBe(2);
+		const again = await sandbox.openDocument();
+		expect(again.doc.toJSON()).toEqual(before);
+		const s = stores(again);
+		expect(s.settings.current().maxConcurrentRuns).toBe(4);
+		expect([...s.cliTools.names()]).toEqual(["gh"]);
+	});
+
+	test("rows of the replaced tables are not read, and stay", async () => {
+		await seedReplacedRows();
+		const s = stores(await sandbox.openDocument());
+		expect(s.settings.current().maxConcurrentRuns).toBe(2);
+		expect(s.profiles.list()).toEqual([]);
+		expect(s.connections.list()).toEqual([]);
+		expect([...s.cliTools.names()]).toEqual([]);
+		for (const [table, count] of [
+			[setting, 2],
+			[connection, 1],
+			[cliTool, 1],
+			[agentProfile, 1],
+			[secret, 1],
+		] as const) {
+			expect(await sandbox.db.$count(table)).toBe(count);
+		}
 	});
 
 	test("every store's change lasts across a restart", async () => {

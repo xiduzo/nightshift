@@ -1,13 +1,6 @@
 import type { Database } from "@nightshift/db";
-import {
-	agentProfile,
-	cliTool,
-	clone,
-	connection,
-	secret,
-	setting,
-} from "@nightshift/db/schema";
-import { instant, now } from "@nightshift/time";
+import { clone } from "@nightshift/db/schema";
+import { now } from "@nightshift/time";
 import { eq } from "drizzle-orm";
 import type * as Y from "yjs";
 import {
@@ -79,10 +72,8 @@ export function deviceDocumentName(deviceId: string): string {
 }
 
 /**
- * Opens this computer's Device document from the Replica. On the first
- * start of a Replica without one, the rows of the tables it replaces
- * (`agent_profile`, `cli_tool`, `connection`, `setting`, `secret`) are
- * imported into it, once: the document records that it did.
+ * Opens this computer's Device document from the Replica. A document of a
+ * new install records its Device's id.
  */
 export async function openDeviceDocument(options: {
 	db: Database;
@@ -105,76 +96,12 @@ export async function openDeviceDocument(options: {
 	};
 
 	const meta = doc.getMap("meta");
-	if (meta.get("importedAt") === undefined) {
-		const legacy = await readLegacyRows(db);
+	if (meta.get("deviceId") === undefined) {
 		await document.change(() => {
 			meta.set("deviceId", deviceId);
-			meta.set("importedAt", now());
-			for (const [key, value] of legacy.settings)
-				document.settings.set(key, value);
-			for (const [key, value] of legacy.connections)
-				document.connections.set(key, value);
-			for (const [key, value] of legacy.cliTools)
-				document.cliTools.set(key, value);
-			for (const [key, value] of legacy.profiles)
-				document.profiles.set(key, value);
-			if (legacy.secrets.length > 0)
-				document.facts.set("secrets", legacy.secrets);
 		});
 	}
 	return document;
-}
-
-/**
- * The rows of the tables the document replaced, as document entries.
- * JSON that does not parse is left out; JSON that parses is copied as is,
- * and the stores check it when they read it.
- */
-async function readLegacyRows(db: Database) {
-	const settings: [string, unknown][] = [];
-	for (const row of await db.select().from(setting)) {
-		const value = safeJson(row.value);
-		if (value !== undefined) settings.push([row.key, value]);
-	}
-	const connections: [string, unknown][] = [];
-	for (const row of await db.select().from(connection)) {
-		const server = safeJson(row.server);
-		if (server === undefined) continue;
-		connections.push([
-			row.name,
-			{
-				description: row.description,
-				server,
-				updatedAt: instant(row.updatedAt),
-			},
-		]);
-	}
-	const cliTools: [string, unknown][] = (await db.select().from(cliTool)).map(
-		(row) => [
-			row.name,
-			{ description: row.description, updatedAt: instant(row.updatedAt) },
-		],
-	);
-	const profiles: [string, unknown][] = [];
-	for (const row of await db.select().from(agentProfile)) {
-		const parsed = safeJson(row.settings);
-		if (parsed === undefined) continue;
-		profiles.push([
-			row.name,
-			{
-				description: row.description,
-				settings: parsed,
-				updatedAt: instant(row.updatedAt),
-			},
-		]);
-	}
-	const secrets = (
-		await db
-			.select({ name: secret.name, updatedAt: secret.updatedAt })
-			.from(secret)
-			.orderBy(secret.name)
-	).map((row) => ({ name: row.name, setAt: instant(row.updatedAt) }));
-	return { settings, connections, cliTools, profiles, secrets };
 }
 
 /** Sets the facts that changed. Facts are the Owner's: only it calls this. */
@@ -224,14 +151,6 @@ export async function refreshDeviceFacts(options: {
 		clones,
 		checkedAt: now(),
 	});
-}
-
-function safeJson(text: string): unknown {
-	try {
-		return JSON.parse(text);
-	} catch {
-		return undefined;
-	}
 }
 
 /**

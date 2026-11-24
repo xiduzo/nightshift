@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
-import { connection } from "@nightshift/db/schema";
 import { NIGHT_SHIFT, type PersonActor, type StepRun } from "../contract";
 import {
 	type PersonalSecrets,
@@ -187,12 +186,20 @@ describe("connections", () => {
 		]);
 	});
 
-	test("skips a row of an older version whose server no longer parses", async () => {
-		await sandbox.db.insert(connection).values([
-			{ name: "broken", server: "{not json" },
-			{ name: "wrong", server: JSON.stringify({ neither: true }) },
-			{ name: "fine", server: JSON.stringify({ command: "ok" }) },
-		]);
+	test("skips an entry of the document whose server does not parse", async () => {
+		const document = await sandbox.openDocument();
+		await document.change(() => {
+			for (const [name, server] of [
+				["broken", "{not json"],
+				["wrong", { neither: true }],
+				["fine", { command: "ok" }],
+			] as const)
+				document.connections.set(name, {
+					description: null,
+					server,
+					updatedAt: 1,
+				});
+		});
 		const { store } = await makeStore();
 		expect(store.list().map((c) => c.name)).toEqual(["fine"]);
 		expect(store.get("fine")?.server).toEqual({

@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { setting } from "@nightshift/db/schema";
 import { inMemoryComputer } from "../access/computer/adapters/out/in-memory-computer";
 import type { DeviceDocument } from "../documents";
 import { createSandbox, type Sandbox } from "../testing/test-support";
@@ -110,15 +109,19 @@ describe("save", () => {
 });
 
 describe("load", () => {
-	test("ignores unknown keys and saved values that no longer parse, from the rows of an older version", async () => {
-		await sandbox.db.insert(setting).values([
-			{ key: "retiredSetting", value: "true" },
-			{ key: "constructor", value: "{}" },
-			{ key: "maxConcurrentRuns", value: "not json" },
-			{ key: "maxStepsPerRun", value: "0" },
-			{ key: "agentModel", value: JSON.stringify("opus") },
-		]);
-		const s = await store({ NIGHTSHIFT_MAX_STEPS_PER_RUN: "900" });
+	test("ignores unknown keys and saved values that do not parse", async () => {
+		const document = await sandbox.openDocument();
+		await document.change(() => {
+			for (const [key, value] of [
+				["retiredSetting", true],
+				["constructor", {}],
+				["maxConcurrentRuns", "five"],
+				["maxStepsPerRun", 0],
+				["agentModel", "opus"],
+			] as const)
+				document.settings.set(key, value);
+		});
+		const s = await store({ NIGHTSHIFT_MAX_STEPS_PER_RUN: "900" }, document);
 		expect(s.current().maxConcurrentRuns).toBe(2);
 		expect(s.view().fields.maxConcurrentRuns.source).toBe("default");
 		expect(s.current().maxStepsPerRun).toBe(900);
@@ -134,17 +137,6 @@ describe("load", () => {
 		const b = await store({}, document);
 		await a.save({ maxConcurrentRuns: 5 });
 		expect(b.current().maxConcurrentRuns).toBe(5);
-	});
-
-	test("ignores a value in the document that no longer parses", async () => {
-		const document = await sandbox.openDocument();
-		await document.change(() => {
-			document.settings.set("maxConcurrentRuns", "five");
-			document.settings.set("agentModel", "opus");
-		});
-		const s = await store({}, document);
-		expect(s.view().fields.maxConcurrentRuns.source).toBe("default");
-		expect(s.current().agentModel).toBe("opus");
 	});
 });
 

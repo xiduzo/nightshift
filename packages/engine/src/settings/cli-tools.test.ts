@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { agentProfile } from "@nightshift/db/schema";
 import { inMemoryComputer } from "../access/computer/adapters/out/in-memory-computer";
 import { createSandbox, type Sandbox } from "../testing/test-support";
 import { wireCliTools as createCliToolStore } from "./cli-tools";
@@ -126,19 +125,23 @@ describe("createCliToolStore", () => {
 
 describe("profiles saved with the GitHub tool set", () => {
 	test("read as profiles with the CLI tool gh", async () => {
-		await sandbox.db.insert(agentProfile).values({
-			name: "builder",
-			settings: JSON.stringify({
-				harness: "claude-code",
-				model: "sonnet",
-				permissionMode: "auto",
-				tools: ["github"],
-				connections: [],
-			}),
+		const document = await sandbox.openDocument();
+		await document.change(() => {
+			document.profiles.set("builder", {
+				description: null,
+				settings: {
+					harness: "claude-code",
+					model: "sonnet",
+					permissionMode: "auto",
+					tools: ["github"],
+					connections: [],
+				},
+				updatedAt: 1,
+			});
 		});
 		const profiles = createProfileStore({
 			computerAccess: inMemoryComputer(),
-			document: await sandbox.openDocument(),
+			document,
 		});
 		await profiles.load();
 		expect(profiles.settingsFor("builder")).toMatchObject({ clis: ["gh"] });
