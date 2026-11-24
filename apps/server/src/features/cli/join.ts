@@ -1,8 +1,7 @@
-import type { AppRouterClient } from "@nightshift/api";
-import { DEFAULT_PORT } from "@nightshift/daemon";
 import { formatTime } from "@nightshift/time";
-import { createORPCClient } from "@orpc/client";
-import { RPCLink } from "@orpc/client/fetch";
+
+import { BadArguments, keep, readArgs, turnOn } from "./args";
+import { agrees, daemonCommand, defaultDaemonUrl } from "./command";
 import { previewLines, resultLines } from "./merge-words";
 
 /**
@@ -19,146 +18,138 @@ import { previewLines, resultLines } from "./merge-words";
  * the Host: for a Host without a screen (a server, a container).
  */
 
-/** Night Shift on this computer: plain http on the loopback, also when it serves https:// to others. */
-export function defaultDaemonUrl(
-	env: Record<string, string | undefined> = process.env,
-): string {
-	return (
-		env.NIGHTSHIFT_DAEMON_URL ?? `http://localhost:${env.PORT || DEFAULT_PORT}`
-	);
+function joinOptions(argv: readonly string[]) {
+	const options: { url: string; role: "home" | "guest"; daemon: string } = {
+		url: "",
+		role: "home",
+		daemon: defaultDaemonUrl(),
+	};
+	const usage = () => {
+		throw new BadArguments();
+	};
+	readArgs(argv, {
+		flags: {
+			"--guest": () => {
+				options.role = "guest";
+			},
+			"--help": usage,
+			"-h": usage,
+		},
+		values: {
+			"--daemon": keep(options, "daemon"),
+		},
+		other: (arg) => {
+			options.url = arg;
+		},
+	});
+	if (!options.url) throw new BadArguments();
+	return options;
 }
 
-/** The procedures of Night Shift on this computer, once it answers. Exits when it does not. */
-export async function daemonClient(daemon: string): Promise<AppRouterClient> {
-	const client: AppRouterClient = createORPCClient(
-		new RPCLink({ url: `${daemon.replace(/\/$/, "")}/rpc` }),
-	);
-	try {
-		await client.healthCheck();
-	} catch {
-		console.error(
-			`Night Shift does not run on this computer (${daemon}). Start it first.`,
-		);
-		process.exit(1);
-	}
-	return client;
-}
-
-function parseJoin(argv: string[]) {
-	const args = [...argv];
-	let url: string | null = null;
-	let role: "home" | "guest" = "home";
-	let daemon = defaultDaemonUrl();
-	while (args.length > 0) {
-		const arg = args.shift() as string;
-		if (arg === "--guest") role = "guest";
-		else if (arg === "--daemon") daemon = args.shift() ?? daemon;
-		else if (arg === "--help" || arg === "-h") return null;
-		else url = arg;
-	}
-	return url ? { url, role, daemon } : null;
-}
-
-export async function joinCommand(argv: string[], program: string) {
-	const options = parseJoin(argv);
-	if (!options) {
-		console.log(
-			`Usage: ${program} <host-address> [--guest] [--daemon <address>]\nExample: ${program} https://studio.example.com`,
-		);
-		process.exit(2);
-	}
-	const client = await daemonClient(options.daemon);
-
-	const stop = new AbortController();
-	process.once("SIGINT", () => stop.abort());
-	try {
-		const progress = await client.devices.join(
-			{ url: options.url, role: options.role },
-			{ signal: stop.signal },
-		);
-		let hostName = "your home Host";
-		for await (const step of progress) {
-			if (step.kind === "code") {
-				const code = `${step.userCode.slice(0, 4)}-${step.userCode.slice(4)}`;
-				console.log(
-					[
-						"",
-						"To pair this computer, open Night Shift on the Host, go to Devices, choose Pair a device, and enter this code:",
-						"",
-						`    ${code}`,
-						...(step.verificationUriComplete
-							? ["", `Or open ${step.verificationUriComplete}`]
-							: []),
-						"",
-						"On a Host without a screen, run this on the Host instead:",
-						`    nightshift pair ${code}`,
-						...(step.fingerprint
-							? [
-									"",
-									"The Host uses its own certificate. Check that its Devices page shows this fingerprint:",
-									`    ${step.fingerprint}`,
-								]
-							: []),
-						"",
-						`The code works until ${formatTime(step.expiresAt)}. Waiting for the Host…`,
-					].join("\n"),
-				);
-			} else if (step.kind === "merge-preview") {
-				hostName = step.preview.host.name;
-				console.log(`\n${previewLines(step.preview).join("\n")}`);
-			} else if (step.kind === "merged") {
-				console.log(`\n${resultLines(step.result, hostName).join("\n")}`);
-			} else if (step.kind === "merge-skipped") {
-				console.log(
-					`\nYour Personal was not merged: ${step.reason}\nMerge it later from the Devices page of Night Shift.`,
-				);
-			} else {
-				hostName = step.hostName;
-				console.log(
-					`\nPaired with ${step.hostName} as ${step.role === "home" ? "its home Host" : "a guest Host"}. This computer stays connected to it.`,
-				);
-				if (step.restart) {
+export const joinCommand = daemonCommand({
+	name: "join",
+	help: "  nightshift join <host-address> [--guest]  Pair this computer with a Host.",
+	usage: (program) =>
+		`Usage: ${program} <host-address> [--guest] [--daemon <address>]\nExample: ${program} https://studio.example.com`,
+	options: joinOptions,
+	run: async (client, { url, role }) => {
+		const stop = new AbortController();
+		process.once("SIGINT", () => stop.abort());
+		try {
+			const progress = await client.devices.join(
+				{ url, role },
+				{ signal: stop.signal },
+			);
+			let hostName = "your home Host";
+			for await (const step of progress) {
+				if (step.kind === "code") {
+					const code = `${step.userCode.slice(0, 4)}-${step.userCode.slice(4)}`;
 					console.log(
-						`${step.hostName} already knows this computer. Restart Night Shift to finish.`,
+						[
+							"",
+							"To pair this computer, open Night Shift on the Host, go to Devices, choose Pair a device, and enter this code:",
+							"",
+							`    ${code}`,
+							...(step.verificationUriComplete
+								? ["", `Or open ${step.verificationUriComplete}`]
+								: []),
+							"",
+							"On a Host without a screen, run this on the Host instead:",
+							`    nightshift pair ${code}`,
+							...(step.fingerprint
+								? [
+										"",
+										"The Host uses its own certificate. Check that its Devices page shows this fingerprint:",
+										`    ${step.fingerprint}`,
+									]
+								: []),
+							"",
+							`The code works until ${formatTime(step.expiresAt)}. Waiting for the Host…`,
+						].join("\n"),
 					);
-				}
-				if (step.role === "home" && step.hostAdmin === false) {
+				} else if (step.kind === "merge-preview") {
+					hostName = step.preview.host.name;
+					console.log(`\n${previewLines(step.preview).join("\n")}`);
+				} else if (step.kind === "merged") {
+					console.log(`\n${resultLines(step.result, hostName).join("\n")}`);
+				} else if (step.kind === "merge-skipped") {
 					console.log(
-						`You are not the Host admin of ${step.hostName}. Its Host admin can read your personal runs and their transcripts there.`,
+						`\nYour Personal was not merged: ${step.reason}\nMerge it later from the Devices page of Night Shift.`,
 					);
+				} else {
+					hostName = step.hostName;
+					console.log(
+						`\nPaired with ${step.hostName} as ${step.role === "home" ? "its home Host" : "a guest Host"}. This computer stays connected to it.`,
+					);
+					if (step.restart) {
+						console.log(
+							`${step.hostName} already knows this computer. Restart Night Shift to finish.`,
+						);
+					}
+					if (step.role === "home" && step.hostAdmin === false) {
+						console.log(
+							`You are not the Host admin of ${step.hostName}. Its Host admin can read your personal runs and their transcripts there.`,
+						);
+					}
 				}
 			}
+		} catch (error) {
+			if (stop.signal.aborted) {
+				console.error("\nPairing stopped.");
+				process.exit(130);
+			}
+			console.error(`\n${error instanceof Error ? error.message : error}`);
+			process.exit(1);
 		}
-	} catch (error) {
-		if (stop.signal.aborted) {
-			console.error("\nPairing stopped.");
-			process.exit(130);
-		}
-		console.error(`\n${error instanceof Error ? error.message : error}`);
-		process.exit(1);
-	}
+	},
+});
+
+function pairOptions(argv: readonly string[]) {
+	const options = { code: "", yes: false, daemon: defaultDaemonUrl() };
+	const allow = turnOn(options, "yes");
+	// Without a code, `--help` shows the usage as any mistake does.
+	const usage = () => {};
+	readArgs(argv, {
+		flags: { "--yes": allow, "-y": allow, "--help": usage, "-h": usage },
+		values: {
+			"--daemon": keep(options, "daemon"),
+		},
+		other: (arg) => {
+			options.code = arg;
+		},
+	});
+	if (!options.code) throw new BadArguments();
+	return options;
 }
 
-export async function pairCommand(argv: string[], program: string) {
-	const args = [...argv];
-	let code: string | null = null;
-	let yes = false;
-	let daemon = defaultDaemonUrl();
-	while (args.length > 0) {
-		const arg = args.shift() as string;
-		if (arg === "--yes" || arg === "-y") yes = true;
-		else if (arg === "--daemon") daemon = args.shift() ?? daemon;
-		else if (arg !== "--help" && arg !== "-h") code = arg;
-	}
-	if (!code) {
-		console.log(
-			`Usage: ${program} <code> [--yes] [--daemon <address>]\nRun it on the Host, with the code the other computer shows. Example: ${program} ABCD-EFGH`,
-		);
-		process.exit(2);
-	}
-	const userCode = code.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
-	const client = await daemonClient(daemon);
-	try {
+export const pairCommand = daemonCommand({
+	name: "pair",
+	help: "  nightshift pair <code> [--yes]            Allow a computer to pair with this Host.",
+	usage: (program) =>
+		`Usage: ${program} <code> [--yes] [--daemon <address>]\nRun it on the Host, with the code the other computer shows. Example: ${program} ABCD-EFGH`,
+	options: pairOptions,
+	run: async (client, { code, yes }) => {
+		const userCode = code.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
 		const review = await client.devices.review({ userCode });
 		if (review.status !== "pending") {
 			console.error("This code has an answer already.");
@@ -173,24 +164,19 @@ export async function pairCommand(argv: string[], program: string) {
 				`Allow it only when it shows this fingerprint:\n    ${review.fingerprint}`,
 			);
 		}
-		if (!yes) {
-			if (!process.stdin.isTTY) {
-				console.error("Add --yes to allow it without a question.");
-				process.exit(2);
-			}
-			if (!confirm("Allow it?")) {
-				await client.devices.deny({ userCode });
-				console.log("Declined.");
-				return;
-			}
+		const agreed = agrees(yes, {
+			question: "Allow it?",
+			needsYes: "Add --yes to allow it without a question.",
+		});
+		if (!agreed) {
+			await client.devices.deny({ userCode });
+			console.log("Declined.");
+			return;
 		}
 		await client.devices.approve({ userCode });
 		console.log(`Allowed. ${name} syncs with this computer now.`);
-	} catch (error) {
-		console.error(error instanceof Error ? error.message : error);
-		process.exit(1);
-	}
-}
+	},
+});
 
 /**
  * `nightshift admin --email <email>`: gives this computer's owner, the Host
@@ -199,36 +185,50 @@ export async function pairCommand(argv: string[], program: string) {
  * `docker exec`). The password comes from a prompt that does not show it,
  * or from standard input with `--password-stdin`.
  */
-export async function adminCommand(argv: string[], program: string) {
-	const args = [...argv];
-	let email: string | null = null;
-	let name: string | undefined;
-	let fromStdin = false;
-	let resetTwoFactor = false;
-	let daemon = defaultDaemonUrl();
-	while (args.length > 0) {
-		const arg = args.shift() as string;
-		if (arg === "--email") email = args.shift() ?? null;
-		else if (arg === "--name") name = args.shift();
-		else if (arg === "--password-stdin") fromStdin = true;
-		else if (arg === "--reset-two-factor") resetTwoFactor = true;
-		else if (arg === "--daemon") daemon = args.shift() ?? daemon;
-		else {
-			email = null;
-			break;
-		}
-	}
-	if (!email) {
-		console.log(
-			`Usage: ${program} --email <email> [--name <name>] [--password-stdin] [--reset-two-factor]\nRun it on the Host. It sets the email and password the Host admin signs in with from another computer.\n--reset-two-factor also turns two-factor sign-in off, for a lost authenticator app.`,
-		);
-		process.exit(2);
-	}
-	const client = await daemonClient(daemon);
-	const password = fromStdin
-		? (await Bun.stdin.text()).replace(/\r?\n$/, "")
-		: await hiddenPrompt("Password: ");
-	try {
+function adminOptions(argv: readonly string[]) {
+	const options: {
+		email: string;
+		name?: string;
+		fromStdin: boolean;
+		resetTwoFactor: boolean;
+		daemon: string;
+	} = {
+		email: "",
+		fromStdin: false,
+		resetTwoFactor: false,
+		daemon: defaultDaemonUrl(),
+	};
+	readArgs(argv, {
+		flags: {
+			"--password-stdin": turnOn(options, "fromStdin"),
+			"--reset-two-factor": turnOn(options, "resetTwoFactor"),
+		},
+		values: {
+			"--email": (value = "") => {
+				options.email = value;
+			},
+			"--name": (value) => {
+				options.name = value;
+			},
+			"--daemon": keep(options, "daemon"),
+		},
+	});
+	if (!options.email) throw new BadArguments();
+	return options;
+}
+
+export const adminCommand = daemonCommand({
+	name: "admin",
+	help: `  nightshift admin --email <email>          Set how the Host admin signs in from
+                                            another computer. --reset-two-factor
+                                            also turns two-factor sign-in off.`,
+	usage: (program) =>
+		`Usage: ${program} --email <email> [--name <name>] [--password-stdin] [--reset-two-factor]\nRun it on the Host. It sets the email and password the Host admin signs in with from another computer.\n--reset-two-factor also turns two-factor sign-in off, for a lost authenticator app.`,
+	options: adminOptions,
+	run: async (client, { email, name, fromStdin, resetTwoFactor }) => {
+		const password = fromStdin
+			? (await Bun.stdin.text()).replace(/\r?\n$/, "")
+			: await hiddenPrompt("Password: ");
 		const login = await client.account.setLogin({
 			email,
 			password,
@@ -242,11 +242,8 @@ export async function adminCommand(argv: string[], program: string) {
 		console.log(
 			`Done. Sign in as ${login.email}${address ? ` at ${address}/login` : ""}, then invite others from Members.`,
 		);
-	} catch (error) {
-		console.error(error instanceof Error ? error.message : error);
-		process.exit(1);
-	}
-}
+	},
+});
 
 /** Reads a line from the terminal without showing it. */
 async function hiddenPrompt(question: string): Promise<string> {

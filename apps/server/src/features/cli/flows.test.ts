@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { FLOW_VERSION } from "@nightshift/flows";
 
+import { BadArguments } from "./args";
 import {
 	type FlowsClient,
 	type FlowsIo,
@@ -45,9 +46,9 @@ describe("nightshift flows' arguments", () => {
 		expect(
 			flowsOptions(["import", "-", "--name", "fix"], env, "/w"),
 		).toMatchObject({ command: { action: "import", file: null, name: "fix" } });
-		expect(flowsOptions(["import"], env, "/w")).toEqual({
-			error: "Give the flow's name in --name to import from stdin.",
-		});
+		expect(() => flowsOptions(["import"], env, "/w")).toThrow(
+			new BadArguments("Give the flow's name in --name to import from stdin."),
+		);
 	});
 
 	test("an import takes its name from the file unless --name gives one", () => {
@@ -57,29 +58,32 @@ describe("nightshift flows' arguments", () => {
 	});
 
 	test("refuses a name that is no flow name", () => {
-		expect(flowsOptions(["get", "Fix It"], env, "/w")).toEqual({
-			error:
+		expect(() => flowsOptions(["get", "Fix It"], env, "/w")).toThrow(
+			new BadArguments(
 				'"Fix It" is not a flow name. Use lowercase letters, digits and -, starting with a letter or digit. Example: fix-issue.',
-		});
+			),
+		);
 	});
 
 	test("refuses what it does not know", () => {
-		expect(flowsOptions([], env, "/w")).toEqual({ error: "Give an action." });
-		expect(flowsOptions(["remove", "fix"], env, "/w")).toEqual({
-			error: "There is no action remove.",
-		});
-		expect(flowsOptions(["list", "--nope"], env, "/w")).toEqual({
-			error: "There is no option --nope.",
-		});
-		expect(flowsOptions(["get", "fix", "extra"], env, "/w")).toEqual({
-			error: "Too many arguments: extra.",
-		});
-		expect(flowsOptions(["revision", "fix"], env, "/w")).toEqual({
-			error: "Give the revision's id.",
-		});
-		expect(flowsOptions(["list", "--project"], env, "/w")).toEqual({
-			error: "--project needs a value.",
-		});
+		expect(() => flowsOptions([], env, "/w")).toThrow(
+			new BadArguments("Give an action."),
+		);
+		expect(() => flowsOptions(["remove", "fix"], env, "/w")).toThrow(
+			new BadArguments("There is no action remove."),
+		);
+		expect(() => flowsOptions(["list", "--nope"], env, "/w")).toThrow(
+			new BadArguments("There is no option --nope."),
+		);
+		expect(() => flowsOptions(["get", "fix", "extra"], env, "/w")).toThrow(
+			new BadArguments("Too many arguments: extra."),
+		);
+		expect(() => flowsOptions(["revision", "fix"], env, "/w")).toThrow(
+			new BadArguments("Give the revision's id."),
+		);
+		expect(() => flowsOptions(["list", "--project"], env, "/w")).toThrow(
+			new BadArguments("--project needs a value."),
+		);
 	});
 
 	test("an import takes a profile for each agent, or keeps the agents", () => {
@@ -112,22 +116,25 @@ describe("nightshift flows' arguments", () => {
 	});
 
 	test("refuses an agent choice it cannot read, or outside an import", () => {
-		expect(
+		expect(() =>
 			flowsOptions(["import", "fix.json", "--agent", "builder"], env, "/w"),
-		).toEqual({
-			error:
+		).toThrow(
+			new BadArguments(
 				'--agent needs an agent and a profile, for example claude-code:opus=reviewer. "builder" is not one.',
-		});
-		expect(
+			),
+		);
+		expect(() =>
 			flowsOptions(["list", "--agent", "claude-code:opus=a"], env, "/w"),
-		).toEqual({ error: "--agent and --keep-agents work with import only." });
-		expect(
+		).toThrow(
+			new BadArguments("--agent and --keep-agents work with import only."),
+		);
+		expect(() =>
 			flowsOptions(
 				["import", "f.json", "--keep-agents", "--agent", "claude-code:opus=a"],
 				env,
 				"/w",
 			),
-		).toEqual({ error: "Use --agent or --keep-agents, not both." });
+		).toThrow(new BadArguments("Use --agent or --keep-agents, not both."));
 	});
 });
 
@@ -156,7 +163,6 @@ const PROFILES = [
 /** `nightshift flows import fix.json` with these arguments, against a fake Night Shift. */
 async function importWith(args: string[], profiles: unknown[] = PROFILES) {
 	const options = flowsOptions(["import", "fix.json", ...args], {}, "/w");
-	if ("error" in options) throw new Error(options.error);
 	const imports: unknown[] = [];
 	const out: string[] = [];
 	const err: string[] = [];

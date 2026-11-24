@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { AppRouterClient } from "@nightshift/api";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
+import { BadArguments } from "./args";
 import { apiPort, mcpOptions } from "./mcp";
 
 describe("nightshift mcp", () => {
@@ -37,7 +38,7 @@ describe("nightshift mcp", () => {
 		expect(mcpOptions(["--project", "."], {}, process.cwd())?.project).toBe(
 			process.cwd(),
 		);
-		expect(mcpOptions(["--nope"], {}, "/")).toBeNull();
+		expect(() => mcpOptions(["--nope"], {}, "/")).toThrow(BadArguments);
 	});
 
 	test("list_runs marks a test run with its pinned and skipped nodes", async () => {

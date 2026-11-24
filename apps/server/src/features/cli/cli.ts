@@ -13,6 +13,8 @@ import {
 	webHandler,
 } from "@nightshift/daemon";
 
+import { BadArguments, needsValue, readArgs, required } from "./args";
+import { type Command, command } from "./command";
 import {
 	embedded,
 	embeddedPiAcp,
@@ -32,32 +34,39 @@ import { mergeCommand } from "./merge";
  * `bun src/cli.ts <command>`.
  */
 
-const HELP = `Night Shift
+/** The commands, in the order of the help. */
+const COMMANDS: Command[] = [
+	command({
+		name: "serve",
+		help: "  nightshift serve [options]                Run Night Shift on this computer.",
+		usage: help,
+		options: (argv) => serveOptions(argv, process.env),
+		run: serve,
+	}),
+	joinCommand,
+	pairCommand,
+	mergeCommand,
+	leaveCommand,
+	adminCommand,
+	mcpCommand,
+	flowsCommand,
+	healthCommand,
+	{
+		name: PI_ACP_COMMAND,
+		// The pi harness of the binary starts it (embeddedPiAcp).
+		help: null,
+		run: async () => {
+			const { runPiAcp } = await import("@nightshift/agents");
+			return runPiAcp();
+		},
+	},
+];
+
+function help(): string {
+	return `Night Shift
 
 Usage:
-  nightshift serve [options]                Run Night Shift on this computer.
-  nightshift join <host-address> [--guest]  Pair this computer with a Host.
-  nightshift pair <code> [--yes]            Allow a computer to pair with this Host.
-  nightshift merge [--dry-run] [--yes]      Merge the Personal of this computer into
-                                            the Personal of its home Host. It shows
-                                            what moves and asks first.
-  nightshift leave [--yes]                  Leave the home Host of this computer. The
-                                            Host keeps everything. This computer keeps
-                                            its own Personal. It asks first.
-  nightshift admin --email <email>          Set how the Host admin signs in from
-                                            another computer. --reset-two-factor
-                                            also turns two-factor sign-in off.
-  nightshift mcp [--project <project>]     Serve the flow tools to an agent in a terminal
-                                            (MCP on stdio). Night Shift must run here.
-                                            Claude Code: claude mcp add nightshift -- nightshift mcp
-  nightshift flows <action> [options]       Read and save the flows of a project:
-                                            list, get, save, export, import,
-                                            revisions, revision.
-                                            nightshift flows --help for the details.
-  nightshift health [--restart]             Exit code 0 when Night Shift runs here, else 1.
-                                            --restart stops a Night Shift that does not
-                                            respond, so that its service manager starts it
-                                            again. --data-dir as for serve.
+${COMMANDS.flatMap((each) => each.help ?? []).join("\n")}
 
 Options of serve (each has an environment variable too):
   --port <port>            The port. PORT, default ${DEFAULT_PORT}.
@@ -77,6 +86,7 @@ The auth secret is BETTER_AUTH_SECRET, else the file BETTER_AUTH_SECRET_FILE,
 else BETTER_AUTH_SECRET in NIGHTSHIFT_SECRETS_DIR or systemd's credentials,
 else one Night Shift makes once in the data folder.
 `;
+}
 
 export type ServeOptions = {
 	port: number;
@@ -95,26 +105,33 @@ export function serveOptions(
 	argv: string[],
 	env: Record<string, string | undefined>,
 ): ServeOptions {
-	const args = [...argv];
 	const set: Record<string, string> = {};
 	const addresses: string[] = [];
-	const value = (flag: string) => {
-		const next = args.shift();
-		if (!next) throw new Error(`${flag} needs a value.`);
-		return next;
-	};
-	while (args.length > 0) {
-		const flag = args.shift() as string;
-		if (flag === "--port") set.PORT = value(flag);
-		else if (flag === "--data-dir") set.NIGHTSHIFT_DATA_DIR = value(flag);
-		else if (flag === "--host-address") addresses.push(value(flag));
-		else if (flag === "--listen") set.NIGHTSHIFT_LISTEN = value(flag);
-		else if (flag === "--tls-port") set.NIGHTSHIFT_TLS_PORT = value(flag);
-		else if (flag === "--web") set.NIGHTSHIFT_WEB_DIR = value(flag);
-		else if (flag === "--require-two-factor") {
-			set.NIGHTSHIFT_REQUIRE_TWO_FACTOR = "on";
-		} else throw new Error(`There is no option ${flag}.`);
-	}
+	const value = (to: (value: string) => void) => required(to, needsValue);
+	const variable = (name: string) =>
+		value((text) => {
+			set[name] = text;
+		});
+	readArgs(argv, {
+		flags: {
+			"--require-two-factor": () => {
+				set.NIGHTSHIFT_REQUIRE_TWO_FACTOR = "on";
+			},
+		},
+		values: {
+			"--port": variable("PORT"),
+			"--data-dir": variable("NIGHTSHIFT_DATA_DIR"),
+			"--host-address": value((address) => {
+				addresses.push(address);
+			}),
+			"--listen": variable("NIGHTSHIFT_LISTEN"),
+			"--tls-port": variable("NIGHTSHIFT_TLS_PORT"),
+			"--web": variable("NIGHTSHIFT_WEB_DIR"),
+		},
+		other: (arg) => {
+			throw new BadArguments(`There is no option ${arg}.`);
+		},
+	});
 	if (addresses.length > 0) {
 		set.NIGHTSHIFT_HOST = "on";
 		set.NIGHTSHIFT_HOST_ADDRESSES = addresses.join(",");
@@ -139,16 +156,9 @@ export function serveOptions(
 	};
 }
 
-async function serve(argv: string[]) {
+async function serve(options: ServeOptions): Promise<undefined> {
 	// A service manager (systemd, Docker, launchd) starts it again.
 	guardProcess({ exitOnUncaughtException: true });
-	let options: ServeOptions;
-	try {
-		options = serveOptions(argv, process.env);
-	} catch (error) {
-		console.error(`${(error as Error).message}\n\n${HELP}`);
-		process.exit(2);
-	}
 	Object.assign(process.env, options.env);
 	// The UI is served here, so its address is this daemon's own.
 	const { dataDir } = prepareDaemonEnv({
@@ -217,39 +227,15 @@ async function daemonEnv(): Promise<DaemonEnv> {
 }
 
 export async function main(argv: string[]) {
-	const [command, ...rest] = argv;
-	switch (command) {
-		case "serve":
-			return serve(rest);
-		case "join":
-			return joinCommand(rest, "nightshift join");
-		case "pair":
-			return pairCommand(rest, "nightshift pair");
-		case "merge":
-			return mergeCommand(rest, "nightshift merge");
-		case "leave":
-			return leaveCommand(rest, "nightshift leave");
-		case "admin":
-			return adminCommand(rest, "nightshift admin");
-		case "health":
-			return healthCommand(rest, "nightshift health");
-		case "mcp":
-			return mcpCommand(rest, "nightshift mcp");
-		case "flows":
-			return flowsCommand(rest, "nightshift flows");
-		// Not in the help: the pi harness of the binary starts it (embeddedPiAcp).
-		case PI_ACP_COMMAND: {
-			const { runPiAcp } = await import("@nightshift/agents");
-			return runPiAcp();
-		}
-		case undefined:
-		case "help":
-		case "--help":
-		case "-h":
-			console.log(HELP);
-			return;
-		default:
-			console.error(`There is no command ${command}.\n\n${HELP}`);
-			process.exit(2);
+	const [name, ...rest] = argv;
+	if (name === undefined || ["help", "--help", "-h"].includes(name)) {
+		console.log(help());
+		return;
 	}
+	const named = COMMANDS.find((each) => each.name === name);
+	if (!named) {
+		console.error(`There is no command ${name}.\n\n${help()}`);
+		process.exit(2);
+	}
+	return named.run(rest, `nightshift ${name}`);
 }

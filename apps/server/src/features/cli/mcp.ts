@@ -1,5 +1,3 @@
-import { existsSync } from "node:fs";
-import { resolve } from "node:path";
 import {
 	KNOWLEDGE_TERMINAL_INSTRUCTION,
 	serveTools,
@@ -10,10 +8,10 @@ import {
 import type { AppRouterClient } from "@nightshift/api";
 import { chatRun } from "@nightshift/daemon";
 import { runReport } from "@nightshift/engine/run-status";
-import { createORPCClient, ORPCError } from "@orpc/client";
-import { RPCLink } from "@orpc/client/fetch";
+import { ORPCError } from "@orpc/client";
 
-import { defaultDaemonUrl } from "./join";
+import { projectArgument, readArgs, required } from "./args";
+import { command, defaultDaemonUrl, rpcClient } from "./command";
 
 /**
  * `nightshift mcp [--project <id, name or folder>]`: an MCP server on
@@ -48,27 +46,28 @@ export type McpOptions = {
 	folder: string;
 };
 
-/** `mcp`'s flags over the environment. Null: show the usage. */
+/** `mcp`'s flags over the environment. */
 export function mcpOptions(
 	argv: string[],
 	env: Record<string, string | undefined>,
 	cwd: string,
-): McpOptions | null {
-	const args = [...argv];
+): McpOptions {
 	let daemon = defaultDaemonUrl(env);
 	let ui: string | null = env.NIGHTSHIFT_UI_URL ?? null;
 	let project: string | null = null;
-	while (args.length > 0) {
-		const arg = args.shift() as string;
-		const value = args[0];
-		if (arg === "--daemon" && value) daemon = args.shift() as string;
-		else if (arg === "--ui" && value) ui = args.shift() as string;
-		else if (arg === "--project" && value) {
-			const named = args.shift() as string;
-			// A folder becomes absolute; an id or a name stays as it is.
-			project = existsSync(resolve(cwd, named)) ? resolve(cwd, named) : named;
-		} else return null;
-	}
+	readArgs(argv, {
+		values: {
+			"--daemon": required((value) => {
+				daemon = value;
+			}),
+			"--ui": required((value) => {
+				ui = value;
+			}),
+			"--project": required((value) => {
+				project = projectArgument(cwd, value);
+			}),
+		},
+	});
 	const base = (url: string) => url.replace(/\/+$/, "");
 	return {
 		daemon: base(daemon),
@@ -318,24 +317,25 @@ function costOf(run: {
 	};
 }
 
-export async function mcpCommand(argv: string[], program: string) {
-	const options = mcpOptions(argv, process.env, process.cwd());
-	if (!options) {
-		console.error(
-			`Usage: ${program} [--project <id, name or folder>] [--daemon <address>] [--ui <address>]\nServes Night Shift's flow and run tools to an agent in a terminal, over MCP on stdio.\nAdd it to Claude Code: claude mcp add nightshift -- ${program}`,
-		);
-		process.exit(2);
-	}
-	const client: AppRouterClient = createORPCClient(
-		new RPCLink({ url: `${options.daemon}/rpc` }),
-	);
-	const port = apiPort(client, options);
-	const scope = { project: options.project, folder: options.folder };
-	await serveTools(terminalTools(port, scope), {
-		name: "nightshift",
-		version: "1",
-		instructions: INSTRUCTIONS,
-		// The knowledge files, read as read_knowledge reads them.
-		resources: terminalResources(port, scope),
-	});
-}
+export const mcpCommand = command({
+	name: "mcp",
+	help: `  nightshift mcp [--project <project>]     Serve the flow tools to an agent in a terminal
+                                            (MCP on stdio). Night Shift must run here.
+                                            Claude Code: claude mcp add nightshift -- nightshift mcp`,
+	usage: (program) =>
+		`Usage: ${program} [--project <id, name or folder>] [--daemon <address>] [--ui <address>]\nServes Night Shift's flow and run tools to an agent in a terminal, over MCP on stdio.\nAdd it to Claude Code: claude mcp add nightshift -- ${program}`,
+	// On stdout an agent reads MCP only.
+	usageOn: "stderr",
+	options: (argv) => mcpOptions(argv, process.env, process.cwd()),
+	run: async (options) => {
+		const port = apiPort(rpcClient(options.daemon), options);
+		const scope = { project: options.project, folder: options.folder };
+		await serveTools(terminalTools(port, scope), {
+			name: "nightshift",
+			version: "1",
+			instructions: INSTRUCTIONS,
+			// The knowledge files, read as read_knowledge reads them.
+			resources: terminalResources(port, scope),
+		});
+	},
+});

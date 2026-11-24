@@ -1,4 +1,5 @@
-import { daemonClient, defaultDaemonUrl } from "./join";
+import { keep, readArgs, required, turnOn } from "./args";
+import { agrees, daemonCommand, defaultDaemonUrl } from "./command";
 import { previewLines, resultLines } from "./merge-words";
 
 /**
@@ -19,43 +20,43 @@ export type MergeOptions = {
 	daemon: string;
 };
 
-/** The options of `nightshift merge`, or null for its help. */
-export function parseMerge(
+/** The options of `nightshift merge`. */
+export function mergeOptions(
 	argv: readonly string[],
 	env: Record<string, string | undefined> = process.env,
-): MergeOptions | null {
-	const args = [...argv];
+): MergeOptions {
 	const options: MergeOptions = {
 		dryRun: false,
 		yes: false,
 		join: [],
 		daemon: defaultDaemonUrl(env),
 	};
-	while (args.length > 0) {
-		const arg = args.shift() as string;
-		if (arg === "--dry-run") options.dryRun = true;
-		else if (arg === "--yes" || arg === "-y") options.yes = true;
-		else if (arg === "--join") {
-			const project = args.shift();
-			if (!project) return null;
-			options.join.push(project);
-		} else if (arg === "--daemon")
-			options.daemon = args.shift() ?? options.daemon;
-		else return null;
-	}
+	const yes = turnOn(options, "yes");
+	readArgs(argv, {
+		flags: {
+			"--dry-run": turnOn(options, "dryRun"),
+			"--yes": yes,
+			"-y": yes,
+		},
+		values: {
+			"--join": required((project) => {
+				options.join.push(project);
+			}),
+			"--daemon": keep(options, "daemon"),
+		},
+	});
 	return options;
 }
 
-export async function mergeCommand(argv: string[], program: string) {
-	const options = parseMerge(argv);
-	if (!options) {
-		console.log(
-			`Usage: ${program} [--dry-run] [--join <project>]... [--yes] [--daemon <address>]\nMerges the Personal of this computer into the Personal of its home Host. It shows what moves and asks first.\n--dry-run only shows it. --join moves a project into the project with its repository in a shared Space.`,
-		);
-		process.exit(2);
-	}
-	const client = await daemonClient(options.daemon);
-	try {
+export const mergeCommand = daemonCommand({
+	name: "merge",
+	help: `  nightshift merge [--dry-run] [--yes]      Merge the Personal of this computer into
+                                            the Personal of its home Host. It shows
+                                            what moves and asks first.`,
+	usage: (program) =>
+		`Usage: ${program} [--dry-run] [--join <project>]... [--yes] [--daemon <address>]\nMerges the Personal of this computer into the Personal of its home Host. It shows what moves and asks first.\n--dry-run only shows it. --join moves a project into the project with its repository in a shared Space.`,
+	options: (argv) => mergeOptions(argv),
+	run: async (client, options) => {
 		const pending = await client.devices.merge.pending();
 		if (!pending.pending) {
 			console.log("There is nothing to merge: this computer has one Personal.");
@@ -83,20 +84,15 @@ export async function mergeCommand(argv: string[], program: string) {
 			);
 		}
 		if (options.dryRun) return;
-		if (!options.yes) {
-			if (!process.stdin.isTTY) {
-				console.error("Add --yes to merge without a question.");
-				process.exit(2);
-			}
-			if (!confirm("Merge Personal now?")) {
-				console.log("Nothing changed.");
-				return;
-			}
+		const agreed = agrees(options.yes, {
+			question: "Merge Personal now?",
+			needsYes: "Add --yes to merge without a question.",
+		});
+		if (!agreed) {
+			console.log("Nothing changed.");
+			return;
 		}
 		const result = await client.devices.merge.run({ join });
 		console.log(resultLines(result, preview.host.name).join("\n"));
-	} catch (error) {
-		console.error(error instanceof Error ? error.message : error);
-		process.exit(1);
-	}
-}
+	},
+});

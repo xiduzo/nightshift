@@ -1,7 +1,14 @@
-import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { flowNameSchema } from "@nightshift/flows";
-import { defaultDaemonUrl } from "./join";
+import {
+	BadArguments,
+	needsValue,
+	projectArgument,
+	readArgs,
+	required,
+	turnOn,
+} from "./args";
+import { defaultDaemonUrl } from "./command";
 
 /**
  * The arguments of `nightshift flows`: the usage text, the actions, and how
@@ -77,165 +84,157 @@ export type FlowsOptions = {
 const NAME_RULE =
 	"Use lowercase letters, digits and -, starting with a letter or digit. Example: fix-issue.";
 
-/** `flows`' arguments over the environment, or what is wrong with them. */
+/** The file an argument names, from the folder the command runs in. Null: stdin. */
+function fileOf(cwd: string, value: string | undefined): string | null {
+	return value === undefined || value === "-" ? null : resolve(cwd, value);
+}
+
+function flowName(value: string | undefined, what = "the flow's name"): string {
+	if (value === undefined) throw new BadArguments(`Give ${what}.`);
+	if (flowNameSchema.safeParse(value).success) return value;
+	throw new BadArguments(`"${value}" is not a flow name. ${NAME_RULE}`);
+}
+
+/** Refuses the arguments from `from` on. */
+function noMore(...from: (string | undefined)[]): void {
+	const rest = from.filter((value) => value !== undefined);
+	if (rest.length > 0) {
+		throw new BadArguments(`Too many arguments: ${rest.join(" ")}.`);
+	}
+}
+
+/** `flows`' arguments over the environment. Throws what is wrong with them. */
 export function flowsOptions(
 	argv: string[],
 	env: Record<string, string | undefined>,
 	cwd: string,
-): FlowsOptions | { error: string } {
-	const args = [...argv];
+): FlowsOptions {
 	const positional: string[] = [];
 	let project: string | null = null;
 	let daemon = defaultDaemonUrl(env);
-	let out: string | null = null;
-	let as: string | null = null;
-	let json = false;
-	const agents: AgentOverride[] = [];
-	let keepAgents = false;
-	while (args.length > 0) {
-		const arg = args.shift() as string;
-		const takes = ["--project", "--daemon", "--out", "--name", "--agent"];
-		if (takes.includes(arg)) {
-			const value = args.shift();
-			if (!value) return { error: `${arg} needs a value.` };
-			if (arg === "--project") {
-				// A folder becomes absolute; an id or a name stays as it is.
-				project = existsSync(resolve(cwd, value)) ? resolve(cwd, value) : value;
-			} else if (arg === "--daemon") daemon = value;
-			else if (arg === "--out") out = resolve(cwd, value);
-			else if (arg === "--agent") {
-				const override = agentOverride(value);
-				if (override === null) {
-					return {
-						error: `--agent needs an agent and a profile, for example claude-code:opus=reviewer. "${value}" is not one.`,
-					};
-				}
-				agents.push(override);
-			} else as = value;
-		} else if (arg === "--json") json = true;
-		else if (arg === "--keep-agents") keepAgents = true;
-		else if (arg.startsWith("--"))
-			return { error: `There is no option ${arg}.` };
-		else positional.push(arg);
-	}
-	const [action, first, second, ...extra] = positional;
-	const file = (value: string | undefined) =>
-		value === undefined || value === "-" ? null : resolve(cwd, value);
-	type Named = { name: string } | { error: string };
-	const flowName = (
-		value: string | undefined,
-		what = "the flow's name",
-	): Named => {
-		if (value === undefined) return { error: `Give ${what}.` };
-		return flowNameSchema.safeParse(value).success
-			? { name: value }
-			: { error: `"${value}" is not a flow name. ${NAME_RULE}` };
+	const given: Given = {
+		out: null,
+		as: null,
+		json: false,
+		agents: [],
+		keepAgents: false,
 	};
-	const unexpected = (
-		from: (string | undefined)[],
-	): { error: string } | null => {
-		const rest = from.filter((value) => value !== undefined);
-		return rest.length > 0
-			? { error: `Too many arguments: ${rest.join(" ")}.` }
-			: null;
-	};
-
-	if ((agents.length > 0 || keepAgents) && action !== "import") {
-		return { error: "--agent and --keep-agents work with import only." };
-	}
-	if (agents.length > 0 && keepAgents) {
-		return { error: "Use --agent or --keep-agents, not both." };
-	}
-
-	let command: FlowsAction | { error: string };
-	switch (action) {
-		case "list": {
-			command = unexpected([first, second, ...extra]) ?? { action, json };
-			break;
-		}
-		case "get":
-		case "export":
-		case "revisions": {
-			const named = flowName(first);
-			command =
-				"error" in named
-					? named
-					: (unexpected([second, ...extra]) ??
-						(action === "revisions"
-							? { action, name: named.name, json }
-							: { action, name: named.name, out }));
-			break;
-		}
-		case "save": {
-			const named = flowName(first);
-			command =
-				"error" in named
-					? named
-					: (unexpected(extra) ?? {
-							action,
-							name: named.name,
-							file: file(second),
-						});
-			break;
-		}
-		case "import": {
-			const from = file(first);
-			const named = as === null ? null : flowName(as, "the name in --name");
-			if (named && "error" in named) command = named;
-			else if (from === null && !named) {
-				command = {
-					error: "Give the flow's name in --name to import from stdin.",
-				};
-			} else {
-				command = unexpected([second, ...extra]) ?? {
-					action,
-					file: from,
-					name: named?.name ?? null,
-					agents,
-					keepAgents,
-				};
+	const value = (to: (value: string) => void) => required(to, needsValue);
+	readArgs(argv, {
+		flags: {
+			"--json": turnOn(given, "json"),
+			"--keep-agents": turnOn(given, "keepAgents"),
+		},
+		values: {
+			"--project": value((text) => {
+				project = projectArgument(cwd, text);
+			}),
+			"--daemon": value((text) => {
+				daemon = text;
+			}),
+			"--out": value((text) => {
+				given.out = resolve(cwd, text);
+			}),
+			"--name": value((text) => {
+				given.as = text;
+			}),
+			"--agent": value((text) => {
+				given.agents.push(agentOverride(text));
+			}),
+		},
+		other: (arg) => {
+			if (arg.startsWith("--")) {
+				throw new BadArguments(`There is no option ${arg}.`);
 			}
-			break;
-		}
-		case "revision": {
-			const named = flowName(first);
-			if ("error" in named) command = named;
-			else if (second === undefined)
-				command = { error: "Give the revision's id." };
-			else {
-				command = unexpected(extra) ?? {
-					action,
-					name: named.name,
-					revisionId: second,
-					out,
-				};
-			}
-			break;
-		}
-		case undefined:
-			command = { error: "Give an action." };
-			break;
-		default:
-			command = { error: `There is no action ${action}.` };
-	}
-	if ("error" in command) return command;
+			positional.push(arg);
+		},
+	});
 	return {
-		command,
+		command: actionOf(positional, given, cwd),
 		project,
 		daemon: daemon.replace(/\/+$/, ""),
 		folder: cwd,
 	};
 }
 
+/** The options of an action. */
+type Given = {
+	out: string | null;
+	/** `--name`. */
+	as: string | null;
+	json: boolean;
+	agents: AgentOverride[];
+	keepAgents: boolean;
+};
+
+function actionOf(
+	[action, first, second, ...extra]: string[],
+	{ out, as, json, agents, keepAgents }: Given,
+	cwd: string,
+): FlowsAction {
+	if ((agents.length > 0 || keepAgents) && action !== "import") {
+		throw new BadArguments("--agent and --keep-agents work with import only.");
+	}
+	if (agents.length > 0 && keepAgents) {
+		throw new BadArguments("Use --agent or --keep-agents, not both.");
+	}
+	switch (action) {
+		case "list":
+			noMore(first, second, ...extra);
+			return { action, json };
+		case "get":
+		case "export": {
+			const name = flowName(first);
+			noMore(second, ...extra);
+			return { action, name, out };
+		}
+		case "revisions": {
+			const name = flowName(first);
+			noMore(second, ...extra);
+			return { action, name, json };
+		}
+		case "save": {
+			const name = flowName(first);
+			noMore(...extra);
+			return { action, name, file: fileOf(cwd, second) };
+		}
+		case "import": {
+			const file = fileOf(cwd, first);
+			const name = as === null ? null : flowName(as, "the name in --name");
+			if (file === null && name === null) {
+				throw new BadArguments(
+					"Give the flow's name in --name to import from stdin.",
+				);
+			}
+			noMore(second, ...extra);
+			return { action, file, name, agents, keepAgents };
+		}
+		case "revision": {
+			const name = flowName(first);
+			if (second === undefined)
+				throw new BadArguments("Give the revision's id.");
+			noMore(...extra);
+			return { action, name, revisionId: second, out };
+		}
+		case undefined:
+			throw new BadArguments("Give an action.");
+		default:
+			throw new BadArguments(`There is no action ${action}.`);
+	}
+}
+
 /**
  * `claude-code:opus=reviewer` as the agent and the profile's name. The
  * last `=` splits them: a profile's name has none.
  */
-function agentOverride(value: string): AgentOverride | null {
+function agentOverride(value: string): AgentOverride {
 	const at = value.lastIndexOf("=");
 	const agent = value.slice(0, at).trim();
 	const profile = value.slice(at + 1).trim();
-	return at > 0 && agent.includes(":") && profile !== ""
-		? { agent, profile }
-		: null;
+	if (at > 0 && agent.includes(":") && profile !== "") {
+		return { agent, profile };
+	}
+	throw new BadArguments(
+		`--agent needs an agent and a profile, for example claude-code:opus=reviewer. "${value}" is not one.`,
+	);
 }

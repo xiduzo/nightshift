@@ -14,14 +14,13 @@ import {
 	prefilledProfile,
 } from "@nightshift/flows";
 import { iso } from "@nightshift/time";
-import { ORPCError } from "@orpc/client";
+import { daemonCommand } from "./command";
 import {
 	FLOWS_USAGE,
 	type FlowsAction,
 	type FlowsOptions,
 	flowsOptions,
 } from "./flows-options";
-import { daemonClient } from "./join";
 
 /**
  * `nightshift flows <action>`: read and save the flows of a project, for
@@ -342,32 +341,18 @@ export async function runFlows(
 	}
 }
 
-export async function flowsCommand(argv: string[], program: string) {
-	const usage = FLOWS_USAGE.replaceAll("nightshift flows", program);
-	if (
-		argv[0] === "help" ||
-		argv.some((arg) => arg === "--help" || arg === "-h")
-	) {
-		console.log(usage);
-		return;
-	}
-	const options = flowsOptions(argv, process.env, process.cwd());
-	if ("error" in options) {
-		console.error(`${options.error}\n\n${usage}`);
-		process.exit(2);
-	}
-	const client = await daemonClient(options.daemon);
-	try {
-		process.exitCode = await runFlows(options, client, processIo);
-	} catch (error) {
-		console.error(
-			error instanceof ORPCError || error instanceof Error
-				? error.message
-				: String(error),
-		);
-		process.exitCode = 1;
-	}
-}
+export const flowsCommand = daemonCommand({
+	name: "flows",
+	help: `  nightshift flows <action> [options]       Read and save the flows of a project:
+                                            list, get, save, export, import,
+                                            revisions, revision.
+                                            nightshift flows --help for the details.`,
+	usage: (program) => FLOWS_USAGE.replaceAll("nightshift flows", program),
+	asksUsage: (argv) =>
+		argv[0] === "help" || argv.some((arg) => arg === "--help" || arg === "-h"),
+	options: (argv) => flowsOptions(argv, process.env, process.cwd()),
+	run: (client, options) => runFlows(options, client, processIo),
+});
 
 /**
  * The file name that names an imported flow. A `flow.json` takes the name of

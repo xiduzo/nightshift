@@ -1,6 +1,7 @@
 import type { AppRouterClient } from "@nightshift/api";
 
-import { daemonClient, defaultDaemonUrl } from "./join";
+import { keep, readArgs, turnOn } from "./args";
+import { agrees, daemonCommand, defaultDaemonUrl } from "./command";
 
 /**
  * `nightshift leave [--yes]`: this computer leaves its home Host (ADR 1).
@@ -13,20 +14,19 @@ export type LeaveOptions = { yes: boolean; daemon: string };
 
 type LeaveResult = Awaited<ReturnType<AppRouterClient["devices"]["leave"]>>;
 
-/** The options of `nightshift leave`, or null for its help. */
-export function parseLeave(
+/** The options of `nightshift leave`. */
+export function leaveOptions(
 	argv: readonly string[],
 	env: Record<string, string | undefined> = process.env,
-): LeaveOptions | null {
-	const args = [...argv];
+): LeaveOptions {
 	const options: LeaveOptions = { yes: false, daemon: defaultDaemonUrl(env) };
-	while (args.length > 0) {
-		const arg = args.shift() as string;
-		if (arg === "--yes" || arg === "-y") options.yes = true;
-		else if (arg === "--daemon")
-			options.daemon = args.shift() ?? options.daemon;
-		else return null;
-	}
+	const yes = turnOn(options, "yes");
+	readArgs(argv, {
+		flags: { "--yes": yes, "-y": yes },
+		values: {
+			"--daemon": keep(options, "daemon"),
+		},
+	});
 	return options;
 }
 
@@ -79,16 +79,15 @@ export function leaveResultLines(result: LeaveResult): string[] {
 	return lines;
 }
 
-export async function leaveCommand(argv: string[], program: string) {
-	const options = parseLeave(argv);
-	if (!options) {
-		console.log(
-			`Usage: ${program} [--yes] [--daemon <address>]\nLeaves the home Host of this computer. The Host keeps everything. This computer keeps its own Personal. It asks first.`,
-		);
-		process.exit(2);
-	}
-	const client = await daemonClient(options.daemon);
-	try {
+export const leaveCommand = daemonCommand({
+	name: "leave",
+	help: `  nightshift leave [--yes]                  Leave the home Host of this computer. The
+                                            Host keeps everything. This computer keeps
+                                            its own Personal. It asks first.`,
+	usage: (program) =>
+		`Usage: ${program} [--yes] [--daemon <address>]\nLeaves the home Host of this computer. The Host keeps everything. This computer keeps its own Personal. It asks first.`,
+	options: (argv) => leaveOptions(argv),
+	run: async (client, { yes }) => {
 		const { thisComputer } = await client.devices.list();
 		const home = thisComputer?.hosts.find((host) => host.homeHost);
 		if (!home) {
@@ -96,20 +95,15 @@ export async function leaveCommand(argv: string[], program: string) {
 			return;
 		}
 		console.log(leaveQuestionLines(home.name).join("\n"));
-		if (!options.yes) {
-			if (!process.stdin.isTTY) {
-				console.error("Add --yes to leave without a question.");
-				process.exit(2);
-			}
-			if (!confirm(`Leave ${home.name} now?`)) {
-				console.log("Nothing changed.");
-				return;
-			}
+		const agreed = agrees(yes, {
+			question: `Leave ${home.name} now?`,
+			needsYes: "Add --yes to leave without a question.",
+		});
+		if (!agreed) {
+			console.log("Nothing changed.");
+			return;
 		}
 		const result = await client.devices.leave();
 		console.log(leaveResultLines(result).join("\n"));
-	} catch (error) {
-		console.error(error instanceof Error ? error.message : error);
-		process.exit(1);
-	}
-}
+	},
+});

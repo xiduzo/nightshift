@@ -4,4 +4,4 @@
  */
 import { joinCommand } from "./features/cli";
 
-await joinCommand(process.argv.slice(2), "bun run join");
+await joinCommand.run(process.argv.slice(2), "bun run join");

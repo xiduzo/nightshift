@@ -1,18 +1,19 @@
 import { describe, expect, test } from "bun:test";
 
-import { leaveQuestionLines, leaveResultLines, parseLeave } from "./leave";
+import { BadArguments } from "./args";
+import { leaveOptions, leaveQuestionLines, leaveResultLines } from "./leave";
 
 describe("nightshift leave", () => {
 	test("asks first, without flags", () => {
-		expect(parseLeave([], {})).toEqual({
+		expect(leaveOptions([], {})).toEqual({
 			yes: false,
 			daemon: "http://localhost:3000",
 		});
-		expect(parseLeave(["-y"], {})).toMatchObject({ yes: true });
+		expect(leaveOptions(["-y"], {})).toMatchObject({ yes: true });
 	});
 
 	test("an unknown flag shows the help", () => {
-		expect(parseLeave(["--force"], {})).toBeNull();
+		expect(() => leaveOptions(["--force"], {})).toThrow(BadArguments);
 	});
 
 	test("the question says that the Host keeps everything", () => {

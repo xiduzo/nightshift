@@ -1,11 +1,12 @@
 import { describe, expect, test } from "bun:test";
 
-import { parseMerge } from "./merge";
+import { BadArguments } from "./args";
+import { mergeOptions } from "./merge";
 import { previewLines, resultLines } from "./merge-words";
 
 describe("nightshift merge", () => {
 	test("asks first, without flags", () => {
-		expect(parseMerge([], {})).toEqual({
+		expect(mergeOptions([], {})).toEqual({
 			dryRun: false,
 			yes: false,
 			join: [],
@@ -15,13 +16,13 @@ describe("nightshift merge", () => {
 
 	test("--dry-run only shows, --join names projects for a shared Space", () => {
 		expect(
-			parseMerge(["--dry-run", "--join", "api", "--join", "web", "-y"], {}),
+			mergeOptions(["--dry-run", "--join", "api", "--join", "web", "-y"], {}),
 		).toMatchObject({ dryRun: true, yes: true, join: ["api", "web"] });
 	});
 
 	test("an unknown flag or a --join without a project shows the help", () => {
-		expect(parseMerge(["--force"], {})).toBeNull();
-		expect(parseMerge(["--join"], {})).toBeNull();
+		expect(() => mergeOptions(["--force"], {})).toThrow(BadArguments);
+		expect(() => mergeOptions(["--join"], {})).toThrow(BadArguments);
 	});
 
 	test("the preview says where each project goes", () => {
