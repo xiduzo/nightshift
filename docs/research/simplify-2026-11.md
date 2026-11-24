@@ -310,3 +310,18 @@ Each entry names its source. "Read" means found by reading and not reproduced.
   defaults. No such install was found on the one Mac that was counted.
 - A dev daemon that runs since before this change needs one restart.
 - All contract tests now start from `migratedDb()`.
+
+### Candidates 6 and 7, measured again (bb87d97ea)
+
+- 6 is dropped. A trial merge of the secrets saved 103 lines and no complexity, and broke the
+  limit of 25 files in a folder.
+- 7 is done for knowledge only. Of 183 wire lambdas, 145 only rename. `SpaceEngine`,
+  `Projects`, `ProjectFlows` and devices stay. The membership restructure is dropped.
+
+### T0, K7. One request shape for knowledge (dc4f15a32 to 2e93a9d9f)
+
+- A test for each swapped argument: 13 of 13 red. No wrong wiring.
+- 12 use cases hid the actor in the request. Now none does, and a check fails a new one.
+- 71 files, +989/-1,317. Engine code 178,566 to 178,255. A new field needs 3 edits, not 7.
+- Read only: `proposeFromRun`, `knownLearnings` and `learnsFromRuns` of `Knowledge` have no
+  caller outside engine/knowledge.
