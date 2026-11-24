@@ -25,10 +25,6 @@ import {
 	createHomeMembership,
 	type HomeMembership,
 } from "./application/create-home-membership";
-import { finishMembership } from "./application/finish-membership";
-import { leaveHost } from "./application/leave-host";
-import { mergePending } from "./application/merge-pending";
-import { mergePersonal } from "./application/merge-personal";
 import type {
 	Batches,
 	EngineKernel,
@@ -37,7 +33,6 @@ import type {
 	PersonalSpaces,
 	Wait,
 } from "./application/ports";
-import { previewMerge } from "./application/preview-merge";
 
 export type { HomeMembership };
 
@@ -134,13 +129,6 @@ export function wireMembership(
 		isNotPaired: (error) => error instanceof NotPairedError,
 	});
 	const finishing = new AbortController();
-	const bound = {
-		pending: mergePending(membership),
-		preview: previewMerge(membership),
-		merge: mergePersonal(membership),
-		leave: leaveHost(membership),
-		finish: finishMembership(membership),
-	};
-	startKeepFinishing(bound.finish.keepFinishing, finishing.signal);
+	startKeepFinishing(membership.keepFinishing, finishing.signal);
 	return { membership, finishing };
 }

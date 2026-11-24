@@ -23,7 +23,7 @@ import {
 } from "@nightshift/engine/testing";
 import { now } from "@nightshift/time";
 import type { Caller, HostClient, HostHello, WorkRelay } from "../contract";
-import { createHost, servedDocuments } from "../devices/host";
+import { servedDocuments, wireHost } from "../devices/host";
 import { createHostExchange, type HostExchange } from "../exchange";
 import {
 	type DeviceLinks,
@@ -145,7 +145,7 @@ export async function hostInMemory(
 		env: { NIGHTSHIFT_HOST: "on" },
 	});
 	await settings.load();
-	const asHost = createHost({
+	const asHost = wireHost({
 		auth: noAuth,
 		db: a.db,
 		registry: host.devices,

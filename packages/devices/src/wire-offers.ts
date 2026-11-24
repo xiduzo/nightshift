@@ -2,7 +2,6 @@ import { roleAllows } from "@nightshift/auth";
 import { memberRole } from "@nightshift/engine";
 import {
 	wireOffers as bindOffers,
-	createOffers,
 	deviceOffers,
 	offeredProfile,
 } from "./devices";
@@ -40,9 +39,7 @@ export function wireOffers(
 	engine: PeerEngine,
 ) {
 	const { self } = deps;
-	// Both barrel names stay imported: wireOffers is the wire, createOffers the alias.
-	const bind = bindOffers === createOffers ? bindOffers : createOffers;
-	return bind().createOffers({
+	return bindOffers().createOffers({
 		db: deps.db,
 		engine,
 		document: deps.document,

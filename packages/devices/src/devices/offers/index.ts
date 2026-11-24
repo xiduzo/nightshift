@@ -1,7 +1,7 @@
 /**
  * Offers: a profile of a Device made available to a Space, its caps, and
- * the rules that check it. `wireOffers` (also `createOffers`) builds the
- * owner's door, the Space publication, the admission and the schedule check.
+ * the rules that check it. `wireOffers` builds the owner's door, the Space
+ * publication, the admission and the schedule check.
  */
 
 export type { OfferAdmission } from "./application/admit-offered-call";
@@ -22,5 +22,4 @@ export {
 	type EngineOffers,
 	type Offers,
 	wireOffers,
-	wireOffers as createOffers,
 } from "./wire";

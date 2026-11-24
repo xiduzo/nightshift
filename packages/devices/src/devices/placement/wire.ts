@@ -13,11 +13,6 @@ import {
 	createPlacement,
 	type PlacementModule,
 } from "./application/create-placement";
-import { listDevicesFor } from "./application/list-devices-for";
-import { listPlacements } from "./application/list-placements";
-import { moveRunTo } from "./application/move-run-to";
-import { placeOnDevice } from "./application/place-on-device";
-import { planRun } from "./application/plan-run";
 import type { SpacePeople } from "./application/ports";
 
 function spacePeopleOf(db: Database): SpacePeople {
@@ -41,7 +36,7 @@ export function wirePlacement() {
 			deps: Omit<PlacementDeps, "spacePeople" | "engineFns"> & { db: Database },
 		): PlacementModule {
 			const { db, ...rest } = deps;
-			const placement = createPlacement({
+			return createPlacement({
 				...rest,
 				spacePeople: spacePeopleOf(db),
 				engineFns: {
@@ -52,12 +47,6 @@ export function wirePlacement() {
 					remoteDevice,
 				},
 			});
-			void planRun(placement);
-			void placeOnDevice(placement);
-			void moveRunTo(placement);
-			void listDevicesFor(placement);
-			void listPlacements(placement);
-			return placement;
 		},
 	};
 }

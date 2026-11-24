@@ -1,6 +1,5 @@
 export {
 	createDevices,
-	createHost,
 	type Devices,
 	type DevicesOverview,
 	type Host,
@@ -26,7 +25,6 @@ export type {
 	SpaceDeviceView,
 } from "./offers";
 export {
-	createOffers,
 	createOfferUse,
 	deviceOffers,
 	offeredProfile,
