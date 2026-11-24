@@ -4,7 +4,7 @@ import { tokenOf } from "../adapters/out/in-memory-session-reader";
 import { OPEN_HOST } from "../host-access";
 import { openAuthEndpoint } from "./open-auth-endpoint";
 
-/** The use case openAuthEndpoint, on in-memory adapters. The twin of `request.test.ts`. */
+/** The use case openAuthEndpoint, on in-memory adapters. */
 
 describe("openAuthEndpoint", () => {
 	test("a request from this computer gets the local cookie without a read of the session", async () => {

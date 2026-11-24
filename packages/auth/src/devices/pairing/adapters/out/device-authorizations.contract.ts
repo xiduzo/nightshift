@@ -59,6 +59,9 @@ export function deviceAuthorizationsContract(
 				clientId: DEVICE,
 			});
 			await port.approve(ada.headers, code.userCode);
+			expect(await port.poll({ ...poll, deviceId: "another-device" })).toEqual({
+				error: "invalid_grant",
+			});
 			await under.wait();
 			const answer = await port.poll(poll);
 			if (!("token" in answer)) throw new Error("no token");
@@ -77,10 +80,17 @@ export function deviceAuthorizationsContract(
 			expect(await refusalOf(port.approve(ada.headers, code.userCode))).toEqual(
 				{ kind: "invalid", message: "Enter the code first, then approve it." },
 			);
+			// Without a session: no Person, so nobody holds the code.
+			expect(
+				(await port.verify(new Headers(), code.userCode)).clientId,
+			).toBeNull();
 			await port.verify(ada.headers, code.userCode);
 			expect(
 				(await port.verify(mallory.headers, code.userCode)).clientId,
 			).toBeNull();
+			expect(
+				await refusalOf(port.approve(mallory.headers, code.userCode)),
+			).toEqual({ kind: "forbidden", message: NOT_YOURS });
 			expect(
 				await refusalOf(port.deny(mallory.headers, code.userCode)),
 			).toEqual({ kind: "forbidden", message: NOT_YOURS });

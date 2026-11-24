@@ -35,57 +35,6 @@ describe("a login for the Host admin of a Host without a screen", () => {
 		);
 	});
 
-	test("setting it again replaces the password", async () => {
-		const local = await testLocalPerson(sandbox.db);
-		const creds = { email: "ada@example.com", password: "first-password" };
-		await login.setLogin({ personId: local.userId, input: creds });
-		await login.setLogin({
-			personId: local.userId,
-			input: {
-				...creds,
-				password: "second-password",
-			},
-		});
-		await expect(
-			sandbox.signIn("ada@example.com", "first-password"),
-		).rejects.toThrow();
-		expect(
-			await sandbox.signIn("ada@example.com", "second-password"),
-		).toBeInstanceOf(Headers);
-	});
-
-	test("refuses another Person's email, a short password, and no email", async () => {
-		const local = await testLocalPerson(sandbox.db);
-		await sandbox.signUp("Bob");
-		await expect(
-			login.setLogin({
-				personId: local.userId,
-				input: {
-					email: "bob@example.com",
-					password: "a-long-password",
-				},
-			}),
-		).rejects.toThrow("Another Person here signs in with bob@example.com.");
-		await expect(
-			login.setLogin({
-				personId: local.userId,
-				input: {
-					email: "ada@example.com",
-					password: "short",
-				},
-			}),
-		).rejects.toThrow("at least 8 characters");
-		await expect(
-			login.setLogin({
-				personId: local.userId,
-				input: {
-					email: "ada",
-					password: "a-long-password",
-				},
-			}),
-		).rejects.toThrow("is not an email address");
-	});
-
 	test("--reset-two-factor: a new password signs in without the lost app", async () => {
 		const local = await testLocalPerson(sandbox.db);
 		const creds = { email: "ada@example.com", password: "a-long-password" };
@@ -105,6 +54,7 @@ describe("a login for the Host admin of a Host without a screen", () => {
 				resetTwoFactor: true,
 			},
 		});
+		await expect(sandbox.signIn(creds.email, creds.password)).rejects.toThrow();
 		const headers = await sandbox.signIn(creds.email, "a-new-password");
 		const session = await sandbox.auth.api.getSession({ headers });
 		expect(session?.user.twoFactorEnabled).toBe(false);

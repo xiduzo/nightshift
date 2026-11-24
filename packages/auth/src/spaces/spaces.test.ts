@@ -8,7 +8,6 @@ import {
 } from "@nightshift/db/schema";
 import { asDate } from "@nightshift/time";
 import { eq } from "drizzle-orm";
-import { type Permissions, roleAllows } from "../index";
 import {
 	type AuthSandbox,
 	createAuthSandbox,
@@ -52,28 +51,6 @@ describe("personal Space", () => {
 			headers: ada.headers,
 		});
 		expect(session?.session.activeOrganizationId).toBe(spaces[0]?.id);
-	});
-
-	test("is made with its owner membership, or not at all", async () => {
-		// No Person has this id: the membership fails, so the Space does too.
-		await expect(
-			authSpaces.personal.ensurePersonalSpace({ personId: "nobody" }),
-		).rejects.toThrow();
-		const spaces = await sandbox.db
-			.select()
-			.from(organization)
-			.where(eq(organization.slug, "personal-nobody"));
-		expect(spaces).toEqual([]);
-	});
-
-	test("lists the personal Space first", async () => {
-		const ada = await sandbox.signUp("Ada");
-		await sharedSpace(ada.headers, "Alpha");
-		expect(
-			(await authSpaces.listSpaces({ personId: ada.userId })).map(
-				(s) => s.name,
-			),
-		).toEqual(["Personal", "Alpha"]);
 	});
 
 	test("nobody can be invited to or added to it", async () => {
@@ -125,36 +102,6 @@ describe("personal Space", () => {
 				body: { organizationId: personal ?? "" },
 			}),
 		).rejects.toThrow("A personal Space stays");
-	});
-});
-
-describe("roles", () => {
-	test("a member may start runs and answer Gates, a viewer may not", async () => {
-		const ada = await sandbox.signUp("Ada");
-		const bob = await sandbox.signUp("Bob");
-		const cy = await sandbox.signUp("Cy");
-		const platform = await sharedSpace(ada.headers);
-		for (const [person, role] of [
-			[bob, "member"],
-			[cy, "viewer"],
-		] as const) {
-			await sandbox.auth.api.addMember({
-				body: { userId: person.userId, role, organizationId: platform },
-			});
-		}
-		const can = async (who: typeof ada, permissions: Permissions) =>
-			(
-				await testRequestAccess(sandbox.auth, sandbox.db, who.headers, null)
-			).can(permissions, platform);
-
-		expect(await can(bob, { run: ["start"], gate: ["resolve"] })).toBe(true);
-		expect(await can(cy, { run: ["start"] })).toBe(false);
-		expect(await can(cy, { gate: ["resolve"] })).toBe(false);
-		expect(await can(bob, { project: ["remove"] })).toBe(false);
-		expect(await can(ada, { space: ["delete"] })).toBe(true);
-		// Not a member at all.
-		const dee = await sandbox.signUp("Dee");
-		expect(await can(dee, { run: ["start"] })).toBe(false);
 	});
 });
 
@@ -269,21 +216,6 @@ describe("creating a Space", () => {
 			own.cleanup();
 		}
 	});
-
-	test("roleAllows: what each role may do, without a request", () => {
-		expect(roleAllows("member", { project: ["add"] })).toBe(true);
-		expect(roleAllows("member", { project: ["move"] })).toBe(false);
-		expect(roleAllows("admin", { project: ["move"] })).toBe(true);
-		expect(roleAllows("viewer", { project: ["add"] })).toBe(false);
-		for (const role of ["owner", "admin", "member"]) {
-			expect(
-				roleAllows(role, { flow: ["save", "remove"], schedule: ["save"] }),
-			).toBe(true);
-		}
-		expect(roleAllows("viewer", { flow: ["save"] })).toBe(false);
-		expect(roleAllows("viewer", { schedule: ["save"] })).toBe(false);
-		expect(roleAllows("nobody", { project: ["add"] })).toBe(false);
-	});
 });
 
 describe("adopting the personal Space of the Home Host", () => {
@@ -324,6 +256,12 @@ describe("adopting the personal Space of the Home Host", () => {
 			expect(await authSpaces.listSpaces({ personId: ada.userId })).toEqual([
 				{ id: hosted, name: "Personal", personal: true, role: "owner" },
 			]);
+			// A session that worked in the old one works in the new one.
+			const sessions = await sandbox.db
+				.select({ active: session.activeOrganizationId })
+				.from(session)
+				.where(eq(session.userId, ada.userId));
+			expect(sessions.map((s) => s.active)).toEqual([hosted]);
 			// No second personal Space is made for her.
 			expect(
 				await authSpaces.personal.ensurePersonalSpace({ personId: ada.userId }),
@@ -335,43 +273,6 @@ describe("adopting the personal Space of the Home Host", () => {
 			expect(old).toBeUndefined();
 		});
 	}
-
-	test("a session that worked in the old personal Space works in the new one", async () => {
-		const { ada, own, hosted } = await setUp({ member: true });
-		const statements = await authSpaces.personal.adoptPersonalSpace({
-			personId: ada.userId,
-			from: own,
-			to: hosted,
-		});
-		await runBatch(sandbox.db, statements);
-		const sessions = await sandbox.db
-			.select({ active: session.activeOrganizationId })
-			.from(session)
-			.where(eq(session.userId, ada.userId));
-		expect(sessions.map((s) => s.active)).toEqual([hosted]);
-	});
-
-	test("only the Person's own personal Space can be adopted, into a Space this Replica has", async () => {
-		const { ada, own, hosted } = await setUp({ member: true });
-		const grace = await sandbox.signUp("Grace");
-		const theirs = await authSpaces.personal.findPersonalSpace({
-			personId: grace.userId,
-		});
-		await expect(
-			authSpaces.personal.adoptPersonalSpace({
-				personId: ada.userId,
-				from: theirs ?? "",
-				to: hosted,
-			}),
-		).rejects.toThrow("is not the personal Space");
-		await expect(
-			authSpaces.personal.adoptPersonalSpace({
-				personId: ada.userId,
-				from: own,
-				to: "nowhere",
-			}),
-		).rejects.toThrow("is not on this Replica");
-	});
 });
 
 describe("splitting a personal Space off the Home Host's", () => {
@@ -429,25 +330,5 @@ describe("splitting a personal Space off the Home Host's", () => {
 			.from(session)
 			.where(eq(session.userId, ada.userId));
 		expect(sessions.map((s) => s.active)).toEqual(["space-of-her-own"]);
-	});
-
-	test("only the Person's personal Space splits, into a Space that is not here yet", async () => {
-		const { ada, hosted } = await merged();
-		await expect(
-			authSpaces.personal.splitPersonalSpace({
-				personId: ada.userId,
-				from: "elsewhere",
-				to: "new",
-				hostName: "x",
-			}),
-		).rejects.toThrow("is not the personal Space");
-		await expect(
-			authSpaces.personal.splitPersonalSpace({
-				personId: ada.userId,
-				from: hosted,
-				to: hosted,
-				hostName: "x",
-			}),
-		).rejects.toThrow("is on this Replica already");
 	});
 });

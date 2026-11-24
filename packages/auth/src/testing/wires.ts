@@ -7,10 +7,7 @@ import type { Auth } from "../auth";
 import { wireDeviceKeys } from "../devices/device-keys";
 import { wirePairing } from "../devices/pairing";
 import { wireSpaces } from "../spaces";
-import { UNOWNED as unownedDevice } from "../spaces/personal/domain/personal-space";
-
-/** This computer's Device with no owner yet (for `findLocalPerson`). */
-export const UNOWNED = unownedDevice;
+import { UNOWNED } from "../spaces/personal/domain/personal-space";
 
 /**
  * Bound auth wires for tests: the same composition roots production uses,
@@ -23,7 +20,7 @@ export function testSpaces(db: Database) {
 }
 
 export function testLocalPerson(db: Database) {
-	return testSpaces(db).personal.findLocalPerson({ self: unownedDevice });
+	return testSpaces(db).personal.findLocalPerson({ self: UNOWNED });
 }
 
 export function testAccess(auth: Auth, db: Database): Access {

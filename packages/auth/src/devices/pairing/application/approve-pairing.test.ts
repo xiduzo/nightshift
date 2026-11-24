@@ -4,7 +4,7 @@ import { approvePairing } from "./approve-pairing";
 import { reviewPairing } from "./review-pairing";
 import { startPairing } from "./start-pairing";
 
-/** The use case approvePairing, on in-memory adapters. The twins of `pairing.test.ts`. */
+/** The use case approvePairing, on in-memory adapters. */
 
 const ADA = new Headers({ "x-person": "ada" });
 const MALLORY = new Headers({ "x-person": "mallory" });

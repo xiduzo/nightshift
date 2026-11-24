@@ -4,7 +4,7 @@ import { denyPairing } from "./deny-pairing";
 import { reviewPairing } from "./review-pairing";
 import { startPairing } from "./start-pairing";
 
-/** The use case denyPairing, on in-memory adapters. The twin of `pairing.test.ts`. */
+/** The use case denyPairing, on in-memory adapters. */
 
 const ADA = new Headers({ "x-person": "ada" });
 const MALLORY = new Headers({ "x-person": "mallory" });

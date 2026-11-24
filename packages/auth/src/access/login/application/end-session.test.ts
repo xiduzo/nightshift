@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { inMemoryLoginPorts } from "../adapters/out/in-memory-neighbours";
 import { endSession } from "./end-session";
 
-/** The use case endSession, on in-memory adapters. The twin of `login.test.ts`. */
+/** The use case endSession, on in-memory adapters. */
 
 describe("endSession", () => {
 	test("signs that screen out, and only the Person's own", async () => {

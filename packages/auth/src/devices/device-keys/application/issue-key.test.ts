@@ -3,7 +3,7 @@ import { DAY_MS } from "@nightshift/time";
 import { inMemoryDeviceKeysPorts } from "../adapters/out/in-memory-neighbours";
 import { issueKey } from "./issue-key";
 
-/** The use case issueKey, on in-memory adapters. The twins of `pairing.test.ts`. */
+/** The use case issueKey, on in-memory adapters. */
 
 const B = { personId: "ada", deviceId: "device-b", deviceName: "MacBook" };
 

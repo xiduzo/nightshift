@@ -3,7 +3,7 @@ import { inMemoryPairingPorts } from "../adapters/out/in-memory-neighbours";
 import { reviewPairing } from "./review-pairing";
 import { startPairing } from "./start-pairing";
 
-/** The use case reviewPairing, on in-memory adapters. The twins of `pairing.test.ts`. */
+/** The use case reviewPairing, on in-memory adapters. */
 
 const ADA = new Headers({ "x-person": "ada" });
 const MALLORY = new Headers({ "x-person": "mallory" });

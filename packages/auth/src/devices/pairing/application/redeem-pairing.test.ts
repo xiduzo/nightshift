@@ -6,7 +6,7 @@ import { redeemPairing } from "./redeem-pairing";
 import { reviewPairing } from "./review-pairing";
 import { startPairing } from "./start-pairing";
 
-/** The use case redeemPairing, on in-memory adapters. The twins of `pairing.test.ts`. */
+/** The use case redeemPairing, on in-memory adapters. */
 
 const ADA = new Headers({ "x-person": "ada" });
 

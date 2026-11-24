@@ -5,6 +5,7 @@
  * entry. Auth's own tests that need more wires import `./wires` directly.
  */
 export { OPEN_HOST, TWO_FACTOR_REQUIRED } from "../access/host-access";
+export { UNOWNED } from "../spaces/personal/domain/personal-space";
 export { type AuthSandbox, createAuthSandbox } from "./sandbox";
 export { codeNow, secretOf, turnOnTwoFactor } from "./two-factor";
-export { testRequestAccess, testSpaces, UNOWNED } from "./wires";
+export { testRequestAccess, testSpaces } from "./wires";

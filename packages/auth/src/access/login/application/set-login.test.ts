@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { inMemoryLoginPorts } from "../adapters/out/in-memory-neighbours";
 import { setLogin } from "./set-login";
 
-/** The use case setLogin, on in-memory adapters. The twins of `login.test.ts`. */
+/** The use case setLogin, on in-memory adapters. */
 
 function ports() {
 	const all = inMemoryLoginPorts();

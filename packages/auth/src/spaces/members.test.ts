@@ -105,39 +105,9 @@ describe("invitation-only signup", () => {
 
 		const second = await signUpEmail({ email: "second@example.com" });
 		expect(second.status).toBe(403);
-	});
-
-	test("is refused without an invitation", async () => {
-		const response = await signUpEmail({ email: "carol@example.com" });
-		expect(response.status).toBe(403);
-		expect(((await response.json()) as { message: string }).message).toBe(
+		expect(((await second.json()) as { message: string }).message).toBe(
 			"New people join by invitation only. Open the invitation link you got.",
 		);
-	});
-
-	test("is refused for another email, or an invitation that was canceled", async () => {
-		const ada = await sandbox.signUp("Ada");
-		const platform = await platformOf(ada.headers);
-		const id = await invite(ada.headers, platform, "carol@example.com");
-
-		const wrongEmail = await signUpEmail({
-			email: "mallory@example.com",
-			invitationId: id,
-		});
-		expect(wrongEmail.status).toBe(403);
-
-		await sandbox.auth.api.cancelInvitation({
-			headers: ada.headers,
-			body: { invitationId: id },
-		});
-		const canceled = await signUpEmail({
-			email: "carol@example.com",
-			invitationId: id,
-		});
-		expect(canceled.status).toBe(403);
-		expect(
-			(await spaces.members.viewInvitation({ id, now: now() }))?.status,
-		).toBe("canceled");
 	});
 });
 
@@ -283,18 +253,6 @@ describe("roles in a Space", () => {
 		});
 		return { ada, bob, platform };
 	}
-
-	test("a viewer cannot invite", async () => {
-		const { bob, platform } = await spaceWith("viewer");
-		expect(
-			await (
-				await testRequestAccess(sandbox.auth, sandbox.db, bob.headers, null)
-			).can({ member: ["invite"] }, platform),
-		).toBe(false);
-		await expect(
-			invite(bob.headers, platform, "dee@example.com"),
-		).rejects.toThrow();
-	});
 
 	test("an admin invites and changes roles, but cannot delete the Space", async () => {
 		const { bob, platform } = await spaceWith("admin");

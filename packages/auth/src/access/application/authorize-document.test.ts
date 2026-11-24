@@ -4,8 +4,8 @@ import { inMemoryAccessPorts } from "../adapters/out/in-memory-neighbours";
 import { authorizeDocument } from "./authorize-document";
 
 /**
- * The use case authorizeDocument, on in-memory adapters. The twins of
- * `document-access.test.ts`: who may open which synced document.
+ * The use case authorizeDocument, on in-memory adapters: who may open
+ * which synced document. `document-access.test.ts` runs the wire.
  */
 
 /** This computer's own Device document. */
@@ -91,6 +91,12 @@ describe("a Space document", () => {
 		expect(await access("space:platform", { cookie: dee })).toBe(false);
 	});
 
+	test("this computer's Person is not a member of another Person's Space", async () => {
+		const { ports, access } = setUp();
+		platform(ports);
+		expect(await access("space:platform")).toBe(false);
+	});
+
 	test("a Device reads the Space documents of its owner's Spaces, and changes none", async () => {
 		const { ports, access } = setUp();
 		platform(ports);
@@ -102,12 +108,14 @@ describe("a Space document", () => {
 describe("flow and knowledge documents", () => {
 	test("a Device of a member changes them, a Device of a viewer only reads", async () => {
 		const { ports, access } = setUp();
-		const { bob } = platform(ports);
+		const { bob, cy, dee } = platform(ports);
 		for (const name of ["flows:shop", "knowledge:shop"]) {
 			expect(await access(name, { token: "nsd_bob" })).toBe("write");
 			expect(await access(name, { token: "nsd_cy" })).toBe("read");
 			expect(await access(name, { token: "nsd_dee" })).toBe(false);
 			expect(await access(name, { cookie: bob })).toBe("read");
+			expect(await access(name, { cookie: cy })).toBe("read");
+			expect(await access(name, { cookie: dee })).toBe(false);
 		}
 	});
 });
@@ -165,6 +173,40 @@ describe("Device keys", () => {
 		pairB(ports);
 		expect(await access(C, { token: KEY })).toBe("read");
 		expect(await access(OWN, { token: KEY })).toBe("read");
+	});
+
+	test("the owner's UI on the Host changes a document it keeps for a Device, and another Person does not", async () => {
+		const { ports, access } = setUp();
+		pairB(ports);
+		const dee = ports.sessionReader.signIn("dee");
+		expect(await access(B)).toBe("write");
+		expect(await access(B, { cookie: dee })).toBe(false);
+		// Kept for a Device of Dee: hers, and not this computer's owner's.
+		ports.documents.keptOwners.set(B, "dee");
+		expect(await access(B)).toBe(false);
+		expect(await access(B, { cookie: dee })).toBe("write");
+	});
+
+	test("another Person's Device document is refused, also to a key of another Person", async () => {
+		const { ports, access } = setUp();
+		pairB(ports);
+		ports.documents.deviceKeys.set("nsd_dee", {
+			deviceId: "device-d",
+			personId: "dee",
+			home: true,
+		});
+		for (const name of [B, C, OWN]) {
+			expect(await access(name, { token: "nsd_dee" })).toBe(false);
+		}
+		ports.documents.keptOwners.set(C, "dee");
+		expect(await access(C, { token: KEY })).toBe(false);
+		// A key of this Device, of a Person who does not own its document.
+		ports.documents.deviceKeys.set(KEY, {
+			deviceId: "device-b",
+			personId: "someone",
+			home: true,
+		});
+		expect(await access(B, { token: KEY })).toBe(false);
 	});
 
 	test("over a Guest Host a Device opens no Device document, not even its own", async () => {

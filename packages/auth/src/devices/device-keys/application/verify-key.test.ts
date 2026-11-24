@@ -4,7 +4,7 @@ import { inMemoryDeviceKeysPorts } from "../adapters/out/in-memory-neighbours";
 import { issueKey } from "./issue-key";
 import { verifyKey } from "./verify-key";
 
-/** The use case verifyKey, on in-memory adapters. The twins of `pairing.test.ts`. */
+/** The use case verifyKey, on in-memory adapters. */
 
 async function withKey() {
 	const ports = inMemoryDeviceKeysPorts();
