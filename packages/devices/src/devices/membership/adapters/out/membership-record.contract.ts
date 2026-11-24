@@ -79,9 +79,12 @@ export function membershipRecordContract(
 			await record.splits.paused("to", paused);
 			expect(await row()).toEqual(paused);
 			expect(await record.splits.ofHost("host")).toEqual([]);
+			await record.splits.forget("other");
+			expect(await row()).toEqual(paused);
 			await run(
 				record.splits.moved("to", { projects: ["p1"], runs: 0, unpinned: 1 }),
 			);
+			await record.splits.forget("to");
 			await record.splits.done("to");
 			expect((await record.splits.ofHost("host")).map((s) => s.paused)).toEqual(
 				[paused],
@@ -89,6 +92,24 @@ export function membershipRecordContract(
 			expect(await record.splits.ofHost("other")).toEqual([]);
 			await record.splits.paused("to", []);
 			expect(await row()).toEqual([]);
+			await record.splits.forget("to");
+			expect(await row()).toEqual([]);
+		});
+
+		test("a planned split can be forgotten", async () => {
+			const { record } = await make();
+			await record.splits.plan({
+				toSpace: "to",
+				fromSpace: "from",
+				hostId: "host",
+				hostName: "Studio",
+				personId: "ada",
+				hostPersonId: "ada-there",
+				backup: "/b",
+			});
+			await record.splits.forget("to");
+			expect(await record.unfinished()).toBeNull();
+			expect(await record.splits.of("from")).toBeNull();
 		});
 
 		test("a done merge goes on for the Projects it left", async () => {

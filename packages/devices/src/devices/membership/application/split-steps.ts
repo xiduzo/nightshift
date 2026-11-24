@@ -215,6 +215,20 @@ export function splitSteps(deps: SplitDeps & { record: MembershipRecord }) {
 		splitOff,
 
 		/**
+		 * Forgets a split that moved no row: the Host gave access back first,
+		 * and Personal stays there (ADR 1: one Personal per home Host). What it
+		 * paused is on again before the row goes. The copy of the database
+		 * stays.
+		 */
+		async forget(row: SplitRow): Promise<void> {
+			await paused.giveBack(row);
+			await rows.forget(row.toSpace);
+			console.warn(
+				`[devices] The split of ${row.fromSpace} into ${row.toSpace} is forgotten: its Host gave access back. The copy of the database: ${row.backup}${row.paused === null ? ". The schedules it paused, if any, stay paused." : ""}`,
+			);
+		},
+
+		/**
 		 * The Space that splits off when this computer leaves its home Host
 		 * now: its personal Space when a Host keeps it, else null.
 		 */

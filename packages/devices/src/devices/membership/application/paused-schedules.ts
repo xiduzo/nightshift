@@ -88,6 +88,14 @@ export function pausedSchedules(deps: PausedSchedulesDeps) {
 		pause: (schedule: Schedule): Schedule =>
 			schedule.enabled ? pausedForm(schedule) : schedule,
 
+		/** A split that moved no row is not to go on: what it paused is on again. */
+		giveBack: (row: SplitRow): Promise<void> =>
+			turnOn(
+				row.paused ?? [],
+				() => true,
+				(personId) => personId,
+			),
+
 		/**
 		 * This computer joined the Host again and the rows of `merge` moved: what
 		 * its splits off that Space paused is on again. A split from before the

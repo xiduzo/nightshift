@@ -83,6 +83,8 @@ export type MembershipRecord = {
 			toSpace: string,
 			schedules: readonly PausedSchedule[],
 		): Promise<void>;
+		/** A split that moved no row goes. One that moved its rows stays. */
+		forget(toSpace: string): Promise<void>;
 		/** The splits off a Space of that Host that are done, oldest first. */
 		ofHost(hostId: string): Promise<SplitRow[]>;
 		/**

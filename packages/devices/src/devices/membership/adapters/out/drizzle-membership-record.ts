@@ -195,6 +195,17 @@ export function drizzleMembershipRecord(db: Database): MembershipRecord {
 					.where(eq(spaceSplit.toSpace, toSpace));
 			},
 
+			async forget(toSpace) {
+				await db
+					.delete(spaceSplit)
+					.where(
+						and(
+							eq(spaceSplit.toSpace, toSpace),
+							eq(spaceSplit.state, "planned"),
+						),
+					);
+			},
+
 			async ofHost(hostId) {
 				const rows = await db
 					.select()

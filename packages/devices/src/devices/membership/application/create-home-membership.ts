@@ -77,11 +77,25 @@ export function createHomeMembership(deps: HomeMembershipDeps) {
 	}
 
 	/**
+	 * Forgets a split that moved no row when its Host gave access back to the
+	 * same Person: there is nothing to leave. One that moved its rows ends.
+	 */
+	async function forgetSplit(): Promise<void> {
+		const started = await record.unfinished();
+		if (started?.step !== "split" || started.row.state !== "planned") return;
+		const link = await deps.hostLinks.get(started.row.hostId);
+		if (link?.revokedAt !== null) return;
+		if (link.personId !== started.row.hostPersonId) return;
+		await splits.forget(started.row);
+	}
+
+	/**
 	 * Splits Personal off once this computer left its Host, or goes on
 	 * with a split that stopped. Without a split, a merge that never moved
 	 * a row ends when its Host is gone: it cannot go on without it.
 	 */
 	async function settle(): Promise<SplitResult | null> {
+		await forgetSplit();
 		const started = await record.unfinished();
 		const split = await splits.splitOff(
 			started?.step === "split" ? started.row : null,
@@ -218,6 +232,17 @@ export function createHomeMembership(deps: HomeMembershipDeps) {
 			}, "wait");
 		},
 
+		/**
+		 * A join saved the link of a Host, and it did not start yet: what an
+		 * earlier leave left ends first. Else the pauses of a split that does
+		 * not go on reach the Host with the flow documents.
+		 */
+		async beforeJoin(): Promise<void> {
+			await attempted("the leave of a Host goes on", () =>
+				exclusive(settle, "wait"),
+			);
+		},
+
 		async revoked(link: { role: HostRole }): Promise<SplitResult | null> {
 			if (link.role !== "home") return null;
 			await dropCopies();
@@ -230,10 +255,12 @@ export function createHomeMembership(deps: HomeMembershipDeps) {
 		 * - What a leave that stopped left here goes: the copies and the key of a
 		 *   Host without access. Not later: a join saves its new key first, then
 		 *   its link.
+		 * - A split that a join came before is forgotten.
 		 * - The schedules of a merge whose rows moved are on again before their
 		 *   documents sync.
 		 */
 		async beforeLinks(): Promise<void> {
+			await attempted("a split is not forgotten yet", forgetSplit);
 			await attempted("schedules of a merge stay paused", async () => {
 				const started = await record.unfinished();
 				if (started?.step === "merge" && started.row.state === "moved") {

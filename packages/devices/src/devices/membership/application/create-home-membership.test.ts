@@ -4,6 +4,7 @@ import {
 	HostDown,
 	inMemoryHome,
 	NotKnown,
+	schedule,
 } from "../adapters/out/in-memory-home";
 import { MERGE_WORDS, SPLIT_WORDS } from "../domain/words";
 import { createHomeMembership } from "./create-home-membership";
@@ -25,9 +26,9 @@ function setUp() {
 		});
 	}
 	/** What a join shows. */
-	async function steps(signal?: AbortSignal) {
+	async function steps(signal?: AbortSignal, hostId = "host") {
 		const seen: unknown[] = [];
-		for await (const step of membership.joined("host", signal)) seen.push(step);
+		for await (const step of membership.joined(hostId, signal)) seen.push(step);
 		return seen;
 	}
 	/** Lets `keepFinishing` run: a while, or until `done`. */
@@ -346,6 +347,41 @@ describe("when a Host removes this computer's access", () => {
 		expect(await membership.revoked({ role: "home" })).toBeNull();
 		expect(merges()).toEqual([]);
 		expect(world.personalSpaces.split).toEqual([]);
+	});
+});
+
+describe("a split that waits", () => {
+	/** A leave whose batch failed: the split is planned. */
+	async function waiting() {
+		const at = setUp();
+		const { world, membership } = at;
+		world.joined();
+		world.schedules.set("p1", [schedule("on", { person: "ada-there" })]);
+		world.sync();
+		world.batchFails = new Error("disk full");
+		await expect(membership.leave()).rejects.toThrow("disk full");
+		world.batchFails = null;
+		return at;
+	}
+	const joinAgain = (world: ReturnType<typeof setUp>["world"]) => {
+		world.hosts = world.hosts.map((h) => ({ ...h, revokedAt: null }));
+	};
+
+	test("is forgotten when the same Host gave access back, and its pauses never reach the Host", async () => {
+		const { world, membership, steps, finishing } = await waiting();
+		expect(world.schedules.get("p1")?.[0]?.enabled).toBe(false);
+
+		joinAgain(world);
+		await membership.beforeJoin();
+		world.sync();
+		expect(await steps()).toEqual([]);
+		await finishing();
+
+		expect(world.record.splitsRows).toEqual([]);
+		expect(await world.personalSpaces.personalId("ada")).toBe("theirs");
+		expect(world.hostSchedules.get("p1")).toEqual([
+			schedule("on", { person: "ada-there" }),
+		]);
 	});
 });
 

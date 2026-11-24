@@ -466,6 +466,102 @@ describe("leaving and joining the same Host again", () => {
 		expect(await syncedSchedules(projectId)).toEqual(paused);
 	});
 
+	/** A leave whose batch failed: the split is planned, and its pauses are made. */
+	async function plannedSplit() {
+		const { projectId, before } = await merged();
+		await revoke();
+		await expect(
+			splitter({
+				engine: beforeBatch(() => {
+					throw new Error("stop");
+				}),
+			}).revoked(home),
+		).rejects.toThrow("stop");
+		expect((await ownSchedules(projectId))[0]?.enabled).toBe(false);
+		return { projectId, before };
+	}
+
+	for (const step of ["beforeJoin", "beforeLinks"] as const) {
+		test(`a split that moved no row is forgotten when the Host gave access back (${step}): Personal stays there, and its schedules stay on`, async () => {
+			const { projectId, before } = await plannedSplit();
+			const backups = await readdir(join(b.dataDir, "backups"));
+
+			await joinAgain();
+			// Before the link starts: no document synced yet. A stop comes first.
+			const error = console.error;
+			console.error = () => {};
+			await membershipOf(undefined, {
+				engine: {
+					...paired.device,
+					flows: {
+						...paired.device.flows,
+						saveSchedules: () => Promise.reject(new Error("stop")),
+					},
+				} as MembershipTestDeps["engine"],
+			})
+				[step]()
+				.finally(() => {
+					console.error = error;
+				});
+			expect(await b.db.select().from(spaceSplit)).toHaveLength(1);
+			await membershipOf(undefined)[step]();
+			expect(await syncedSchedules(projectId)).toEqual(before);
+
+			const { link } = linkToA();
+			await ready(link);
+			const membership = membershipOf(link);
+			const steps = [];
+			for await (const seen of membership.joined(paired.hostId)) {
+				steps.push(seen);
+			}
+			expect(steps).toEqual([]);
+			const stop = new AbortController();
+			membership.keepFinishing(stop.signal, 20);
+			await Bun.sleep(200);
+			stop.abort();
+			expect(await personalSpaceId(b.db, localPerson)).toBe(a.spaceId);
+			expect(await b.db.select().from(spaceSplit)).toEqual([]);
+			expect(await readdir(join(b.dataDir, "backups"))).toEqual(backups);
+			expect(await syncedSchedules(projectId)).toEqual(before);
+		});
+	}
+
+	test("a split that moved no row goes on when the Host knows this computer as another Person now", async () => {
+		await plannedSplit();
+		await joinAgain();
+		await b.db.update(hostLinkTable).set({ personId: "somebody" });
+		await membershipOf(undefined).beforeJoin();
+		expect((await b.db.select().from(spaceSplit))[0]?.state).toBe("done");
+	});
+
+	test("a split that moved its rows ends also when the Host gave access back", async () => {
+		const { projectId, before } = await merged();
+		await revoke();
+		const error = console.error;
+		console.error = () => {};
+		await splitter({
+			spaces: { open: () => Promise.reject(new Error("stop")) },
+		})
+			.revoked(home)
+			.catch(() => {});
+		console.error = error;
+		expect((await b.db.select().from(spaceSplit))[0]?.state).toBe("moved");
+		await joinAgain();
+		await membershipOf(undefined).beforeJoin();
+		expect((await b.db.select().from(spaceSplit))[0]?.state).toBe("done");
+		await rejoined();
+		expect(await syncedSchedules(projectId)).toEqual(before);
+	});
+
+	test("a planned split with no record of its schedules is forgotten, and none is turned on", async () => {
+		const { projectId } = await plannedSplit();
+		await b.db.update(spaceSplit).set({ paused: null });
+		await joinAgain();
+		await membershipOf(undefined).beforeJoin();
+		expect(await b.db.select().from(spaceSplit)).toEqual([]);
+		expect((await ownSchedules(projectId))[0]?.enabled).toBe(false);
+	});
+
 	test("the record of another Host, or of another Person there, turns none on", async () => {
 		const { projectId } = await merged();
 		for (const other of [{ hostId: "other" }, { hostPersonId: "other" }]) {

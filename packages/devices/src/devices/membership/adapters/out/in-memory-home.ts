@@ -123,6 +123,8 @@ export function inMemoryHome() {
 		/** The Hosts this computer has a link to. */
 		linked: new Set(["host"]),
 		listed: [{ id: "theirs", name: "Personal on Studio", personal: true }],
+		/** The Host that lists them. */
+		listedBy: "host",
 		/** The Spaces a Host keeps. */
 		keptBy: new Map([["theirs", "host"]]),
 		projects: [moving("p1")] as Moving[],
@@ -331,7 +333,8 @@ export function inMemoryHome() {
 			},
 		},
 		hostSpaces: {
-			listed: async (hostId: string) => (hostId === "host" ? world.listed : []),
+			listed: async (hostId: string) =>
+				hostId === world.listedBy ? world.listed : [],
 			hostOf: async (spaceId: string) => world.keptBy.get(spaceId) ?? null,
 			async keeper(spaceId: string) {
 				const hostId = world.keptBy.get(spaceId);
