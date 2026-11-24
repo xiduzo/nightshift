@@ -45,10 +45,8 @@ export { isTimeZone, latestCronTime, nextCronTimes };
  * exists and runs, the cron line parses, the inputs fit the flow, a
  * schedule has a cron line or a webhook). Browser-safe.
  *
- * Version 1 → 2: `device` names the Device by its id instead of its name
- * (ADR 14). Version 2 → 3: a schedule has no `device`. Its runs always run
- * on the Replica that keeps the Space (ADR 15). The schema drops an old
- * `device`, so a save from an older list cannot bring it back.
+ * A schedule names no Device: its runs always run on the Replica that
+ * keeps the Space (ADR 15).
  */
 
 export const SCHEDULES_VERSION = 3;

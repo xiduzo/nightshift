@@ -7,7 +7,6 @@ import type { FlowDocument } from "../../../../documents";
 import { same } from "../../domain/flow-json";
 import {
 	applyOrder,
-	type FlowMaps,
 	keyedById,
 	mapsOf,
 	orderedKeys,
@@ -22,21 +21,9 @@ import {
 /** The key in `meta` of the format of the document's schedules. */
 const SCHEDULES_VERSION_KEY = "schedulesVersion";
 
-/** The format of the document's schedules: 1 when `meta` does not say. */
-function schedulesVersionOf(maps: FlowMaps): number {
-	const version = maps.meta.get(SCHEDULES_VERSION_KEY);
-	return typeof version === "number" ? version : 1;
-}
-
-/** Whether the document's schedules are of a format older than this Night Shift's. */
-export function olderSchedules(document: FlowDocument): boolean {
-	return schedulesVersionOf(mapsOf(document)) < SCHEDULES_VERSION;
-}
-
 /**
  * The schedules of the document that this Night Shift reads, in their
- * order, and whether it holds others. The schema drops a `device` of an
- * older format (ADR 15).
+ * order, and whether it holds others.
  */
 export function readSchedules(document: FlowDocument): {
 	schedules: Schedule[];
@@ -54,23 +41,8 @@ export function readSchedules(document: FlowDocument): {
 }
 
 /**
- * Brings the schedules of the document to the current format, once
- * (ADR 15: a schedule names no Device): reads them as `readSchedules`
- * does and saves them. A schedule this Night Shift does not read stays as
- * it is. Returns whether it changed the document.
- */
-export async function upgradeSchedules(
-	document: FlowDocument,
-): Promise<boolean> {
-	if (!olderSchedules(document)) return false;
-	await saveSchedules(document, readSchedules(document).schedules);
-	return true;
-}
-
-/**
  * Saves the schedules: only those that differ. One that this Night Shift
- * does not read stays. The document's schedules are of the current format
- * from then on: pass them as `readSchedules` reads them.
+ * does not read stays.
  */
 export async function saveSchedules(
 	document: FlowDocument,
@@ -78,7 +50,7 @@ export async function saveSchedules(
 ): Promise<void> {
 	const maps = mapsOf(document);
 	await document.current.change(() => {
-		if (schedulesVersionOf(maps) < SCHEDULES_VERSION) {
+		if (maps.meta.get(SCHEDULES_VERSION_KEY) !== SCHEDULES_VERSION) {
 			maps.meta.set(SCHEDULES_VERSION_KEY, SCHEDULES_VERSION);
 		}
 		const keyed = keyedById(schedules);

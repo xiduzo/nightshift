@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { project } from "@nightshift/db/schema";
-import type { Schedule } from "@nightshift/flows";
 import {
 	FLOW_VERSION,
 	type Flow,
@@ -27,7 +26,6 @@ import {
 	flowSources,
 } from "./store/adapters/out/yjs-flow-encoding";
 import { saveFlow } from "./store/adapters/out/yjs-flow-saves";
-import { upgradeSchedules } from "./store/adapters/out/yjs-schedules";
 
 /** A flow with two Agent nodes, `a` then `b`. */
 const twoNodes = (): Flow => {
@@ -579,85 +577,5 @@ describe("a flow of an older format (ADR 43)", () => {
 		await laptop.flows.remove(of, "build");
 		expect(await laptop.flows.flows(of)).toEqual({});
 		expect(flowRevisions(document, flowId)).toHaveLength(1);
-	});
-});
-
-describe("schedules from before ids (ADR 14)", () => {
-	const clock = { at: 1_000 };
-	let host: Replica;
-
-	beforeEach(async () => {
-		clock.at = 1_000;
-		host = await replica(clock);
-	});
-
-	afterEach(async () => {
-		await host.dispose();
-	});
-
-	/** Schedules as an older Night Shift saved them: no `schedulesVersion`, a `device`. */
-	async function storeVersion1(document: FlowDocument) {
-		const schedules = document.current.doc.getMap("schedules");
-		const order = document.current.doc.getArray<string>("scheduleOrder");
-		await document.current.change(() => {
-			for (const [id, extra] of [
-				["mac", { device: "MacBook" }],
-				["twin", { device: "LE2316" }],
-				["ada", { device: "studio", person: "ada" }],
-				["bob", { device: "studio", person: "bob" }],
-				["anywhere", {}],
-			] as const) {
-				schedules.set(id, {
-					id,
-					flow: "build",
-					inputs: {},
-					cron: "0 22 * * *",
-					enabled: true,
-					...extra,
-				});
-				order.push([id]);
-			}
-		});
-	}
-
-	const devices = (list: { schedules: object[] }) =>
-		list.schedules.filter((schedule) => "device" in schedule);
-
-	test("a read drops the device of an older schedule, and keeps its Person", async () => {
-		await storeVersion1(await host.document());
-		const read = await host.flows.schedules(of, { validate: false });
-		expect(devices(read)).toEqual([]);
-		expect(read.schedules.find((s) => s.id === "ada")?.person).toBe("ada");
-		const { issues } = await host.flows.schedules(of);
-		expect(issues.filter((i) => i.message.includes("device"))).toEqual([]);
-	});
-
-	test("upgrade drops the devices once", async () => {
-		const document = await host.document();
-		await storeVersion1(document);
-		expect(await upgradeSchedules(document)).toBe(true);
-		expect(await upgradeSchedules(document)).toBe(false);
-		expect(document.current.doc.getMap("meta").get("schedulesVersion")).toBe(3);
-		expect(
-			document.current.doc.getMap("schedules").get("mac"),
-		).not.toHaveProperty("device");
-	});
-
-	test("a save of an older list, with names, stores no device", async () => {
-		const document = await host.document();
-		await host.flows.saveSchedules(of, [
-			{
-				id: "stale",
-				flow: "build",
-				inputs: {},
-				cron: "0 22 * * *",
-				enabled: true,
-				device: "LE2316",
-			} as Schedule,
-		]);
-		expect(
-			devices(await host.flows.schedules(of, { validate: false })),
-		).toEqual([]);
-		expect(document.current.doc.getMap("schedules").size).toBe(1);
 	});
 });

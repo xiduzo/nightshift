@@ -9,10 +9,10 @@ import {
 } from "./flow-merge";
 
 describe("a merge of flow documents", () => {
-	test("a schedule follows its flow's new name and its Person's id, and drops a Device", () => {
+	test("a schedule follows its flow's new name and its Person's id", () => {
 		expect(
 			mergedSchedule(
-				{ id: "s", flow: "build", person: "ada", device: "laptop" },
+				{ id: "s", flow: "build", person: "ada" },
 				{ build: "build-2" },
 				{ ada: "ada-there" },
 			),

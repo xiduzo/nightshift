@@ -97,8 +97,7 @@ export function sameFlow(a: FlowSource | undefined, b: FlowSource | undefined) {
 
 /**
  * A schedule of the source as the destination takes it: its flow by its
- * new name, its Person by their id there. A `device` of an older format
- * stays behind (ADR 15).
+ * new name, its Person by their id there.
  */
 export function mergedSchedule(
 	raw: unknown,
@@ -106,13 +105,11 @@ export function mergedSchedule(
 	persons: Readonly<Record<string, string>>,
 ): unknown {
 	if (!isRecord(raw)) return raw;
-	// A schedule of an older format names a Device. No schedule does now.
-	const { device: _device, ...schedule } = raw;
-	const flow = schedule.flow;
+	const flow = raw.flow;
 	const renamed =
 		typeof flow === "string" && Object.hasOwn(flows, flow)
-			? { ...schedule, flow: flows[flow] }
-			: schedule;
+			? { ...raw, flow: flows[flow] }
+			: raw;
 	return withPerson(renamed, "person", persons);
 }
 

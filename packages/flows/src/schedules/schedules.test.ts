@@ -85,7 +85,7 @@ describe("scheduleSchema", () => {
 		});
 	});
 
-	test("a schedule drops a device, so an older save cannot bring one back", () => {
+	test("a schedule names no device: the schema drops one", () => {
 		const parsed = scheduleSchema.parse(
 			schedule({ device: "LE2316" } as Partial<Schedule>),
 		);
