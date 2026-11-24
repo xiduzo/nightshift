@@ -92,6 +92,12 @@ Each entry names its source. "Read" means found by reading and not reproduced.
   downstream breaks.
 - CI becomes a requirement on main. A type check runs before a push, and a check resolves
   every relative import.
+- Old runs and flow revisions are rewritten once, not deleted. The old readers go after that.
+- Nobody reads or copies the database of the Host for this series. The rewrite must be safe
+  without a count there.
+- The databases and folders from before October stay on disk. Only the code that names them goes.
+- A use case decides (ADR 41). Its three new lists are allowed: ignored actors, forwards and
+  empty tests. They only get shorter. This is an exception to "never add a line".
 
 ### A0 and F4a, landed on `arch/forward`
 
@@ -136,3 +142,12 @@ Each entry names its source. "Read" means found by reading and not reproduced.
   not. 216 cases pay this. The journal, the FTS tables and the seed rows are not checked yet.
 - Nine use-case tests assert only that a function exists. Four of them sit beside 1,526
   lines in devices placement and membership. Tests in other places were not checked.
+
+### F4b. Older tests of auth, devices and notifications (a504e9f5e, e0f674680, c349ef8a5)
+
+- Cases in source: auth 263 to 220, devices 769 to 726, notifications 275 to 274. Lines:
+  +732/-2,522. No production code changed. Four test facades with old names are gone.
+- 177 mutants: 171 red at once, 6 green. Five were gaps, now closed. One is equivalent.
+- Kept whole: placement, merge, split, admission, offers and work. Their ring tests prove
+  too little, so these suites are the only integration proof.
+- The whole devices suite did not run in the lane. The check of the combined tip runs it.
