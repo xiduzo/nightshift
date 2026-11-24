@@ -39,10 +39,19 @@ describe("saveSecret", () => {
 		await expect(
 			save(NIGHT_SHIFT, { name: "TOKEN", value: "" }),
 		).rejects.toThrow("A secret needs a value.");
-		await expect(
-			save(NIGHT_SHIFT, { name: "not a name", value: "x" }),
-		).rejects.toThrow();
+		for (const name of [
+			"not a name",
+			"1STARTS_WITH_DIGIT",
+			"has-dash",
+			"",
+			`A${"x".repeat(128)}`,
+		]) {
+			await expect(save(NIGHT_SHIFT, { name, value: "x" })).rejects.toThrow();
+		}
 		expect(ports.computer.values.size).toBe(0);
+		expect(ports.facts.writes).toEqual([]);
+		await save(NIGHT_SHIFT, { name: "_my_token_2", value: "x" });
+		expect(ports.computer.values.has("_my_token_2")).toBe(true);
 	});
 
 	test("refuses a Personal save while the Personal secrets cannot be reached", async () => {

@@ -48,4 +48,13 @@ describe("listSecretValues", () => {
 			"[secrets] the Project secrets were not read:",
 		]);
 	});
+
+	test("under an Offer, no Personal value", async () => {
+		const { ports, values } = wired();
+		ports.computer.values.set("SAVED", "v-saved");
+		ports.facts.saved().set("SAVED", 1);
+		ports.personalTwin.secrets.set("MINE", { value: "v-mine", setAt: 1 });
+		expect(await values({ use: { underOffer: true } })).toEqual(["v-saved"]);
+		expect(ports.personalTwin.calls).toEqual([]);
+	});
 });

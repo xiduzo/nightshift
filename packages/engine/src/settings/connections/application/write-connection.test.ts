@@ -13,7 +13,7 @@ describe("writeConnection", () => {
 		});
 		const connection = await write({
 			name: "linear",
-			description: "",
+			description: "   ",
 			server: { url: "https://mcp.example.com", headers: { A: "${TOKEN}" } },
 		});
 		expect(connection).toEqual({
@@ -39,7 +39,10 @@ describe("writeConnection", () => {
 			now: () => 1,
 		});
 		await expect(
-			write({ name: "", server: { url: "https://mcp.example.com" } }),
+			write({ name: "Bad Name", server: { url: "https://mcp.example.com" } }),
+		).rejects.toThrow();
+		await expect(
+			write({ name: "nourl", server: { url: "not a url" } }),
 		).rejects.toThrow();
 		expect(saved.writes).toEqual([]);
 	});

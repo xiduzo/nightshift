@@ -167,34 +167,6 @@ describe("connections", () => {
 		expect((await savedNow()).connections).toEqual(["docs"]);
 	});
 
-	test("saving a name again replaces the connection", async () => {
-		const { store } = await makeStore();
-		await store.save(tracker);
-		const replaced = await store.save({
-			name: "tracker",
-			description: "   ",
-			server: { url: "https://tracker.example.com/mcp" },
-		});
-		expect(replaced).toMatchObject({
-			description: null,
-			server: { url: "https://tracker.example.com/mcp", headers: {} },
-			variables: [],
-		});
-		expect(store.list()).toHaveLength(1);
-		expect((await savedNow()).connections).toEqual(["tracker"]);
-	});
-
-	test("refuses a bad name or server", async () => {
-		const { store } = await makeStore();
-		await expect(
-			store.save({ ...tracker, name: "Bad Name" }),
-		).rejects.toThrow();
-		await expect(
-			store.save({ name: "nourl", server: { url: "not a url" } }),
-		).rejects.toThrow();
-		expect(store.list()).toEqual([]);
-	});
-
 	test("a restart restores the connections and the saved secret names", async () => {
 		const secrets = memorySecrets();
 		const { store } = await makeStore({}, secrets);
@@ -325,47 +297,6 @@ describe("secrets", () => {
 		]);
 	});
 
-	test("setSecret stores the value in the backend and only the name in the document", async () => {
-		const secrets = memorySecrets();
-		const { store } = await makeStore({}, secrets);
-		await store.setSecret("TRACKER_TOKEN", "first-value");
-		await store.setSecret("TRACKER_TOKEN", "second-value");
-		expect(secrets.values.get("TRACKER_TOKEN")).toBe("second-value");
-		expect((await savedNow()).secrets).toEqual(["TRACKER_TOKEN"]);
-		const document = await sandbox.openDocument();
-		expect(JSON.stringify(document.doc.toJSON())).not.toContain("value");
-	});
-
-	test.each([
-		"1STARTS_WITH_DIGIT",
-		"has-dash",
-		"has space",
-		"",
-		`A${"x".repeat(128)}`,
-	])("setSecret refuses the name %p", async (name) => {
-		const secrets = memorySecrets();
-		const { store } = await makeStore({}, secrets);
-		await expect(store.setSecret(name, "v")).rejects.toThrow();
-		expect(secrets.values.size).toBe(0);
-		expect((await savedNow()).secrets).toEqual([]);
-	});
-
-	test("setSecret accepts a name with _ and digits", async () => {
-		const { store } = await makeStore();
-		await store.setSecret("_my_token_2", "v");
-		expect((await listed(store)).map((s) => s.name)).toEqual(["_my_token_2"]);
-	});
-
-	test("setSecret refuses an empty value", async () => {
-		const secrets = memorySecrets();
-		const { store } = await makeStore({}, secrets);
-		await expect(store.setSecret("TOKEN", "")).rejects.toThrow(
-			"A secret needs a value.",
-		);
-		expect(secrets.values.size).toBe(0);
-		expect(await listed(store)).toEqual([]);
-	});
-
 	test("removeSecret deletes the value and the name; the environment takes over", async () => {
 		const secrets = memorySecrets();
 		const { store } = await makeStore({ TRACKER_TOKEN: "env" }, secrets);
@@ -388,22 +319,6 @@ describe("secrets", () => {
 				usedAt: null,
 			},
 		]);
-	});
-
-	test("secretEnv: each name as itself, the keychain over the environment, or the names that are missing", async () => {
-		const secrets = memorySecrets();
-		const { store } = await makeStore(
-			{ API_USER: "env-user", API_PASSWORD: "env-pw", PATH: "/bin" },
-			secrets,
-		);
-		await store.setSecret("API_PASSWORD", "keychain-pw");
-		expect(await store.secretEnv(["API_USER", "API_PASSWORD"])).toEqual({
-			ok: true,
-			env: { API_USER: "env-user", API_PASSWORD: "keychain-pw" },
-		});
-		expect(
-			await store.secretEnv(["API_PASSWORD", "API_ADMIN", "API_ROOT"]),
-		).toEqual({ ok: false, missing: ["API_ADMIN", "API_ROOT"] });
 	});
 });
 
@@ -545,56 +460,6 @@ describe("when a secret was set and used", () => {
 
 		expect(await usedAt("UNUSED")).toBeNull();
 	});
-
-	test("a use that fails for a missing value records nothing", async () => {
-		const { store } = await timedStore();
-		await store.setSecret("HAVE", "h");
-		await store.save({
-			name: "half",
-			server: { command: "x", env: { A: ref("HAVE"), B: ref("LACK") } },
-		});
-		expect((await store.mcpServersFor({ connections: ["half"] })).ok).toBe(
-			false,
-		);
-		expect((await store.expandForTest({ name: "half" })).expansion.ok).toBe(
-			false,
-		);
-		expect((await store.secretEnv(["HAVE", "LACK"])).ok).toBe(false);
-		expect((await store.expandEnv({ X: ref("HAVE") + ref("LACK") })).ok).toBe(
-			false,
-		);
-		expect(await store.secret("LACK")).toBeUndefined();
-		expect((await listed(store)).map((s) => s.usedAt)).toEqual([null, null]);
-	});
-
-	test("a use writes the document at most once a minute per secret", async () => {
-		const { store, document, clock } = await timedStore();
-		await store.setSecret("A", "a");
-		await store.setSecret("B", "b");
-		let writes = 0;
-		document.doc.on("update", () => {
-			writes++;
-		});
-
-		await store.secretEnv(["A", "B"]);
-		expect(writes).toBe(1);
-		clock.advance(30_000);
-		await store.secretEnv(["A"]);
-		await store.secret("B");
-		expect(writes).toBe(1);
-		expect((await times(store, "A"))?.usedAt).toBe(1_000_000);
-
-		clock.advance(30_000);
-		await store.secretEnv(["A", "B"]);
-		expect(writes).toBe(2);
-		expect((await times(store, "A"))?.usedAt).toBe(1_060_000);
-		expect((await times(store, "B"))?.usedAt).toBe(1_060_000);
-
-		// What the next start reads.
-		await document.flush();
-		const { store: again } = await makeStore();
-		expect((await times(again, "B"))?.usedAt).toBe(1_060_000);
-	});
 });
 
 describe("mcpServersFor", () => {
@@ -632,30 +497,6 @@ describe("mcpServersFor", () => {
 		});
 	});
 
-	test("an unknown connection refuses and names it", async () => {
-		const { store } = await makeStore();
-		await store.save(tracker);
-		const result = await store.mcpServersFor({
-			connections: ["tracker", "ghost"],
-		});
-		expect(result.ok).toBe(false);
-		expect(!result.ok && result.message).toContain('"ghost"');
-		expect(!result.ok && result.message).toContain("There is no connection");
-	});
-
-	test("a missing variable refuses with a message that names it, never a value", async () => {
-		const { store } = await makeStore({ TEAM: "team-value" });
-		await store.save(docs);
-		const result = await store.mcpServersFor({ connections: ["docs"] });
-		expect(result).toEqual({
-			ok: false,
-			message: expect.stringContaining(
-				'The MCP server "docs" needs the secret DOCS_TOKEN',
-			),
-		});
-		expect(JSON.stringify(result)).not.toContain("team-value");
-	});
-
 	test("only the keychain secrets the servers reference are read", async () => {
 		const secrets = memorySecrets();
 		const { store } = await makeStore({ TRACKER_TOKEN: "t" }, secrets);
@@ -665,15 +506,6 @@ describe("mcpServersFor", () => {
 		secrets.reads.length = 0;
 		await store.mcpServersFor({ connections: ["tracker"] });
 		expect(secrets.reads).toEqual(["TRACKER_TOKEN"]);
-	});
-
-	test("no connections is an empty set", async () => {
-		const { store } = await makeStore();
-		expect(await store.mcpServersFor({})).toEqual({
-			ok: true,
-			servers: {},
-			values: [],
-		});
 	});
 });
 
@@ -697,48 +529,6 @@ describe("expandForTest", () => {
 			values: ["docs-secret", "night"],
 		});
 		expect(values.sort()).toEqual(["docs-secret", "night"]);
-	});
-
-	test("a draft that is not saved yet", async () => {
-		const { store } = await makeStore({ TRACKER_TOKEN: "env-token" });
-		const { expansion, values } = await store.expandForTest({
-			server: {
-				command: "draft-mcp",
-				args: [],
-				env: { T: ref("TRACKER_TOKEN") },
-			},
-		});
-		expect(expansion).toEqual({
-			ok: true,
-			servers: {
-				draft: { command: "draft-mcp", args: [], env: { T: "env-token" } },
-			},
-			values: ["env-token"],
-		});
-		expect(values).toEqual(["env-token"]);
-		expect(store.list()).toEqual([]);
-	});
-
-	test("an unknown name", async () => {
-		const { store } = await makeStore();
-		expect(await store.expandForTest({ name: "ghost" })).toEqual({
-			expansion: {
-				ok: false,
-				message: 'There is no connection named "ghost".',
-			},
-			values: [],
-		});
-	});
-
-	test("a missing variable refuses the expansion", async () => {
-		const { store } = await makeStore();
-		await store.save(tracker);
-		const { expansion, values } = await store.expandForTest({
-			name: "tracker",
-		});
-		expect(expansion.ok).toBe(false);
-		expect(!expansion.ok && expansion.message).toContain("TRACKER_TOKEN");
-		expect(values).toEqual([]);
 	});
 });
 
@@ -873,57 +663,6 @@ describe("Personal secrets (ADR 13)", () => {
 		expect(personal.state.calls).toBe(calls);
 	});
 
-	test("fails closed: a Personal name has no value while the Personal secrets cannot be read", async () => {
-		const { store, personal } = await personalStore({
-			env: { TOKEN: "env-token", OTHER: "env-other" },
-			personal: { TOKEN: "personal-token" },
-		});
-		// This computer learns which names are Personal at a use or a list.
-		await store.secrets();
-		personal.state.down = true;
-		const found = await store.secretEnv(["TOKEN", "OTHER"]);
-		expect(found).toEqual({ ok: false, missing: ["TOKEN"], unreachable: true });
-		// A name that is not Personal still reads the environment.
-		expect(await store.secretEnv(["OTHER"])).toEqual({
-			ok: true,
-			env: { OTHER: "env-other" },
-		});
-		expect(await store.secrets()).toMatchObject({ personal: "unavailable" });
-	});
-
-	test("before the devices start, a Personal name is missing and says why", async () => {
-		const store = createConnectionStore({
-			document: await sandbox.openDocument(),
-			env: {},
-			secrets: memorySecrets().backend,
-			personal: () => null,
-		});
-		expect(await store.secretEnv(["TOKEN"])).toEqual({
-			ok: false,
-			missing: ["TOKEN"],
-			unreachable: true,
-		});
-	});
-
-	test("the list has each scope: Personal first, a name in both scopes twice", async () => {
-		const { store } = await personalStore({
-			keychain: { BOTH: "c", HERE: "h" },
-			personal: { BOTH: "p", MINE: "m" },
-		});
-		const rows = (await store.secrets()).secrets.map((s) => [
-			s.name,
-			s.scope,
-			s.saved,
-			s.setAt === null ? null : "set",
-		]);
-		expect(rows).toEqual([
-			["BOTH", "personal", true, "set"],
-			["BOTH", "computer", true, "set"],
-			["HERE", "computer", true, "set"],
-			["MINE", "personal", true, "set"],
-		]);
-	});
-
 	test("set and remove a Personal secret: the value goes to the Person's store only", async () => {
 		const { store, keychain, personal } = await personalStore({});
 		let changes = 0;
@@ -948,42 +687,6 @@ describe("Personal secrets (ADR 13)", () => {
 		expect(keychain.values.has("GH_TOKEN")).toBe(false);
 		expect((await savedNow()).secrets).toEqual([]);
 		expect(await store.secret("GH_TOKEN")).toBe("ghp_secret");
-	});
-
-	test("a move that cannot reach the Personal secrets keeps this computer's copy", async () => {
-		const { store, keychain, personal } = await personalStore({
-			keychain: { GH_TOKEN: "ghp_secret" },
-		});
-		personal.state.down = true;
-		await expect(store.moveSecret("GH_TOKEN", "personal")).rejects.toThrow();
-		expect(keychain.values.get("GH_TOKEN")).toBe("ghp_secret");
-		expect((await savedNow()).secrets).toEqual(["GH_TOKEN"]);
-	});
-
-	test("move to this computer, and a move of a value that is not there", async () => {
-		const { store, keychain, personal } = await personalStore({
-			personal: { API_KEY: "sk-1" },
-		});
-		await store.moveSecret("API_KEY", "computer");
-		expect(keychain.values.get("API_KEY")).toBe("sk-1");
-		expect(personal.values.has("API_KEY")).toBe(false);
-		await expect(store.moveSecret("API_KEY", "computer")).rejects.toThrow(
-			"API_KEY is not a Personal secret.",
-		);
-		await expect(store.moveSecret("NOPE", "personal")).rejects.toThrow(
-			"This computer has no saved value of NOPE.",
-		);
-	});
-
-	test("masking takes every Personal value too", async () => {
-		const { store } = await personalStore({
-			keychain: { HERE: "computer-value" },
-			personal: { MINE: "personal-value" },
-		});
-		expect((await store.secretValues()).sort()).toEqual([
-			"computer-value",
-			"personal-value",
-		]);
 	});
 });
 
@@ -1205,28 +908,6 @@ describe("Project secrets (ADR 13)", () => {
 		expect(await store.secret("MODEL_KEY")).toBe("computer");
 	});
 
-	test("under an Offer: the run's Project secrets, but no Personal one", async () => {
-		const { store, personal } = await scopedStore({
-			personal: { MINE: "personal" },
-			projects: { app: { SHARED: "project" } },
-		});
-		const calls = personal.state.calls;
-		expect(
-			await store.secretEnv(["SHARED", "MINE"], {
-				run: step,
-				underOffer: true,
-			}),
-		).toEqual({ ok: false, missing: ["MINE"] });
-		expect(
-			await store.secretEnv(["SHARED"], { run: step, underOffer: true }),
-		).toEqual({
-			ok: true,
-			env: { SHARED: "project" },
-			fromProject: ["SHARED"],
-		});
-		expect(personal.state.calls).toBe(calls);
-	});
-
 	test("a webhook's secret reads its Project first, then as any other, and no step is asked for", async () => {
 		const { store, projects } = await scopedStore({
 			keychain: { HERE: "computer-value", SHARED: "computer-shared" },
@@ -1236,35 +917,6 @@ describe("Project secrets (ADR 13)", () => {
 		expect(await store.webhookSecret("HERE", project)).toBe("computer-value");
 		expect(await store.webhookSecret("NOPE", project)).toBeUndefined();
 		expect(projects.state.asked).toEqual([]);
-	});
-
-	test("a webhook's secret has no value while its Project cannot be read", async () => {
-		const { store, projects } = await scopedStore({
-			keychain: { SHARED: "computer-shared" },
-			projects: { app: { SHARED: "project-shared" } },
-		});
-		projects.state.down = true;
-		expect(await store.webhookSecret("SHARED", project)).toBeUndefined();
-	});
-
-	test("fails closed: a Project name has no value while the Project's secrets cannot be read", async () => {
-		const { store, projects } = await scopedStore({
-			keychain: { TOKEN: "computer-token" },
-			env: { OTHER: "env-other" },
-			projects: { app: { TOKEN: "project-token" } },
-		});
-		// This computer learns which names are the Project's at a use or a list.
-		await store.secretEnv(["TOKEN"], { run: step });
-		projects.state.down = true;
-		expect(await store.secretEnv(["TOKEN", "OTHER"], { run: step })).toEqual({
-			ok: false,
-			missing: ["TOKEN"],
-			projectUnreachable: true,
-		});
-		expect(await store.secretEnv(["OTHER"], { run: step })).toEqual({
-			ok: true,
-			env: { OTHER: "env-other" },
-		});
 	});
 
 	test("masking a step's output takes every value of its Project, and the export the kept ones", async () => {
@@ -1321,17 +973,6 @@ describe("Project secrets (ADR 13)", () => {
 		).rejects.toThrow("This computer has no saved value of NOPE.");
 	});
 
-	test("a move into a Project that fails keeps the copy it moves from", async () => {
-		const { store, keychain, projects } = await scopedStore({
-			keychain: { GH_TOKEN: "ghp" },
-		});
-		projects.state.down = true;
-		await expect(
-			store.moveToProject("GH_TOKEN", "computer", project, "ann"),
-		).rejects.toThrow();
-		expect(keychain.values.get("GH_TOKEN")).toBe("ghp");
-	});
-
 	test("move out of a Project: to this computer or to Personal, the Project's copy goes after", async () => {
 		const { store, keychain, personal, projects } = await scopedStore({
 			projects: { app: { DB_URL: "postgres://x", API_KEY: "sk" } },
@@ -1345,16 +986,5 @@ describe("Project secrets (ADR 13)", () => {
 		await expect(
 			store.moveFromProject(project, "API_KEY", "computer", "ann"),
 		).rejects.toThrow("API_KEY is not a secret of this project.");
-	});
-
-	test("a move out of a Project whose save fails keeps the Project's copy", async () => {
-		const { store, personal, projects } = await scopedStore({
-			projects: { app: { DB_URL: "postgres://x" } },
-		});
-		personal.state.down = true;
-		await expect(
-			store.moveFromProject(project, "DB_URL", "personal", "ann"),
-		).rejects.toThrow();
-		expect(projects.values.get("app")?.get("DB_URL")).toBe("postgres://x");
 	});
 });

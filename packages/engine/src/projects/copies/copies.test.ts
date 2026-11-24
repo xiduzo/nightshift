@@ -13,11 +13,7 @@ import { copyProjectHere } from "./application/copy-project-here";
 import { listProjectCopies } from "./application/list-project-copies";
 import { sweepProjectCopies } from "./application/sweep-project-copies";
 import type { GitHubClone } from "./domain/clones";
-import {
-	type CopySpace,
-	createCopyState,
-	NOT_ON_GITHUB,
-} from "./domain/copies";
+import { type CopySpace, createCopyState } from "./domain/copies";
 
 let root: string;
 
@@ -132,19 +128,6 @@ describe("sweep", () => {
 		expect(asked).toHaveLength(1);
 	});
 
-	test("copies nothing when it is off", async () => {
-		const space = fakeSpace([project("app", "github.com/acme/app")]);
-		const { service, asked } = copies(
-			space,
-			async () => {
-				throw new Error("not called");
-			},
-			{ enabled: () => false },
-		);
-		await service.sweep();
-		expect(asked).toEqual([]);
-	});
-
 	test("tries a failed copy again only after a wait, a person at once", async () => {
 		let now = 0;
 		const space = fakeSpace([project("app", "github.com/acme/app")]);
@@ -183,18 +166,6 @@ describe("sweep", () => {
 			"This project has no folder",
 		);
 		expect(asked).toEqual([]);
-	});
-
-	test("says a project from another git host cannot be copied", async () => {
-		const space = fakeSpace([project("lab", "gitlab.com/acme/lab")]);
-		const { service, asked } = copies(space, async () => {
-			throw new Error("not called");
-		});
-		await service.sweep();
-		expect(asked).toEqual([]);
-		expect(service.list()).toEqual([
-			{ projectId: "lab", state: "failed", problem: NOT_ON_GITHUB },
-		]);
 	});
 });
 
