@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { inMemoryHome, moving, schedule } from "../adapters/out/in-memory-home";
+import { runInMemory } from "../adapters/out/in-memory-neighbours";
 import { SPLIT_WORDS } from "../domain/words";
 import { splitSteps } from "./split-steps";
 
@@ -107,6 +108,48 @@ describe("what comes along", () => {
 		expect(await steps.of("theirs")).toEqual(result);
 		expect(await steps.of("another")).toBeNull();
 		expect(row()).toMatchObject({ hostId: "host", hostPersonId: "ada-there" });
+	});
+
+	test("the flows that wait for the Host merge before the batch that ends their merge, again after a stop", async () => {
+		const { world, steps, row } = setUp();
+		const waiting = { fromSpace: "own", hostId: "host", personId: "ada" };
+		await world.record.merges.plan({ ...waiting, joined: [], backup: "/b" });
+		await world.record.merges.mapped("own", {
+			toSpace: "theirs",
+			projectMap: {
+				p1: { spaceId: "theirs", projectId: "p1" },
+				old: { spaceId: "theirs", projectId: "new" },
+				shared: { spaceId: "team", projectId: "team-project" },
+			},
+			personMap: { ada: "ada-there" },
+		});
+		runInMemory(world.record.merges.moved("own"));
+		world.batchFails = new Error("disk full");
+		await expect(steps.splitOff(null)).rejects.toThrow("disk full");
+		const merged = [
+			{ from: "old", to: "new", persons: {} },
+			{ from: "shared", to: "team-project", persons: {} },
+		];
+		expect(world.merged).toEqual(merged);
+		expect(world.record.mergesRows).toHaveLength(1);
+
+		world.batchFails = null;
+		await steps.splitOff(row());
+		expect(world.merged).toEqual([...merged, ...merged]);
+		expect(world.record.mergesRows).toEqual([]);
+	});
+
+	test("the flows of a merge that moved no row, or that is done, stay", async () => {
+		for (const state of ["planned", "mapped", "pushed"] as const) {
+			const { world, steps } = setUp();
+			await merged(world, "theirs", "ada-there");
+			const [merge] = world.record.mergesRows;
+			if (!merge) throw new Error("No merge.");
+			merge.state = state;
+			merge.projectMap = { old: { spaceId: "theirs", projectId: "new" } };
+			await steps.splitOff(null);
+			expect(world.merged).toEqual([]);
+		}
 	});
 
 	test("one batch makes the Space, names the Host's, ends a merge on its way and marks the split", async () => {

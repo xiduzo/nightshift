@@ -27,6 +27,7 @@ import type {
 
 export type SplitDeps = {
 	engine: Pick<Engine, "space" | "moveProjects"> & {
+		flows: Pick<Engine["flows"], "merge">;
 		hostSpaces: Pick<HostSpaces, "hostOf" | "keeper" | "named">;
 		projects: Pick<PeerProjects, "ofSpace">;
 	};
@@ -101,6 +102,22 @@ export function splitSteps(deps: SplitDeps & { record: MembershipRecord }) {
 			.map((p) => p.id);
 	}
 
+	/**
+	 * The flows of a merge whose rows moved, and whose flows still wait for
+	 * the Host: they merge here, without the Host's copies, before the batch
+	 * of the split ends that merge. Only its row says which Project each of
+	 * them goes to. Runs again safely. They stay this computer's own, and
+	 * the split pauses their schedules with the others.
+	 */
+	async function mergeWaitingFlows(): Promise<void> {
+		const merge = await merges.latest();
+		if (merge?.state !== "moved") return;
+		for (const [source, target] of Object.entries(merge.projectMap)) {
+			if (source === target.projectId) continue;
+			await engine.flows.merge(source, target.projectId, { persons: {} });
+		}
+	}
+
 	/** Goes on from the split's state, to its end. */
 	async function resume(row: SplitRow): Promise<SplitResult> {
 		const { fromSpace: from, toSpace: to } = row;
@@ -110,6 +127,7 @@ export function splitSteps(deps: SplitDeps & { record: MembershipRecord }) {
 		let unpinned = row.unpinned;
 
 		if (state === "planned") {
+			await mergeWaitingFlows();
 			const moved = await engine.moveProjects({
 				from,
 				plan: async () => {

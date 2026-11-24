@@ -7,6 +7,7 @@ import {
 	hostLink as hostLinkTable,
 	hostSpace,
 	keptVariable,
+	member,
 	organization,
 	runCommand,
 	run as runTable,
@@ -26,6 +27,7 @@ import {
 import type { Flow } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
+import { asDate } from "@nightshift/time";
 import { ORPCError } from "@orpc/client";
 import { eq } from "drizzle-orm";
 import type { HostClient } from "../../contract";
@@ -454,6 +456,132 @@ describe("leaving the home Host keeps a copy", () => {
 		locked = false;
 		await membership.forgetLeft();
 		expect(deleted).toEqual([paired.hostId]);
+	});
+
+	describe("flows that still wait for the Host", () => {
+		/** B's project joined A's of the same remote; its flows wait for A's copy. */
+		async function waiting(joined = false) {
+			const remote = "https://github.com/acme/app.git";
+			const repo = async (sandbox: Sandbox, name: string) => {
+				const path = join(sandbox.root, name);
+				await mkdir(path, { recursive: true });
+				await mustGit(path, ["init", "-q", "-b", "main"]);
+				await mustGit(path, ["remote", "add", "origin", remote]);
+				return path;
+			};
+			let into = a.spaceId;
+			if (joined) {
+				into = "team";
+				await a.db.insert(organization).values({
+					id: into,
+					name: "Team",
+					slug: "team",
+					createdAt: asDate(),
+				});
+				await a.db.insert(member).values({
+					id: "in-team",
+					organizationId: into,
+					userId: paired.personId,
+					role: "owner",
+					createdAt: asDate(),
+				});
+			}
+			const onA = await paired.host
+				.space(into, NIGHT_SHIFT)
+				.addProject({ repoPath: await repo(a, "app") });
+			const space = paired.device.space(b.spaceId, NIGHT_SHIFT);
+			const added = await space.addProject({ repoPath: await repo(b, "app") });
+			await seedFlows(space, added.id, { hello: quickFlow }, [
+				{
+					id: "nightly",
+					flow: "hello",
+					inputs: {},
+					cron: "0 22 * * *",
+					enabled: true,
+				},
+			]);
+			const { link } = linkToA();
+			await ready(link);
+			const waits: Link = { ...link, inStep: async () => false };
+			if (joined) {
+				// The Host's copies of the shared Space's rows.
+				await paired.projectOnDevice(onA.id);
+			}
+			await expect(
+				membershipOf(waits).merge({ join: joined ? [added.id] : [] }),
+			).rejects.toBeInstanceOf(Refusal);
+			expect((await b.db.select().from(spaceMerge))[0]?.state).toBe("moved");
+			return { onA, source: added.id, link: waits };
+		}
+		const flowsIn = async (projectId: string) =>
+			Object.keys(
+				await createProjectFlows({
+					documents: paired.flows,
+					project: async () => ({ spaceId: "" }),
+					deviceId: b.deviceId,
+				}).flows(projectId),
+			);
+
+		test("come along when this computer leaves, with their schedules paused", async () => {
+			const { onA, link } = await waiting();
+			const result = await membershipOf(link).leave();
+			const own = paired.device.space(
+				result.split?.spaceId as string,
+				NIGHT_SHIFT,
+			);
+			expect((await own.flows.list(onA.id)).map((f) => f.name)).toEqual([
+				"hello",
+			]);
+			const { schedules } = await own.listSchedules(onA.id);
+			expect(schedules.map((s) => [s.id, s.enabled])).toEqual([
+				["nightly", false],
+			]);
+		});
+
+		test("come along after a stop between their merge and the batch, once", async () => {
+			const { onA, source, link } = await waiting();
+			await revoke();
+			await expect(
+				splitter({
+					engine: beforeBatch(() => {
+						throw new Error("stop");
+					}),
+				}).revoked(home),
+			).rejects.toThrow("stop");
+			expect(await b.db.select().from(spaceMerge)).toHaveLength(1);
+			const split = await membershipOf(link).revoked(home);
+			const own = paired.device.space(split?.spaceId as string, NIGHT_SHIFT);
+			expect((await own.flows.list(onA.id)).map((f) => f.name)).toEqual([
+				"hello",
+			]);
+			expect((await own.listSchedules(onA.id)).schedules).toHaveLength(1);
+			// Nothing of the source goes.
+			expect(await flowsIn(source)).toEqual(["hello"]);
+		});
+
+		test("stay with their project of a shared Space", async () => {
+			const { onA, link } = await waiting(true);
+			await membershipOf(link).leave();
+			expect(await flowsIn(onA.id)).toEqual(["hello"]);
+		});
+
+		test("that do not merge hold the split: nothing of the merge is forgotten", async () => {
+			const { link } = await waiting();
+			await revoke();
+			const engine = {
+				...paired.device,
+				flows: {
+					...paired.device.flows,
+					merge: () => Promise.reject(new Error("unreadable")),
+				},
+			} as MembershipTestDeps["engine"];
+			await expect(
+				membershipOf(link, { engine }).revoked(home),
+			).rejects.toThrow("unreadable");
+			expect(await b.db.select().from(spaceMerge)).toHaveLength(1);
+			expect((await b.db.select().from(spaceSplit))[0]?.state).toBe("planned");
+			expect(await personalSpaceId(b.db, localPerson)).toBe(a.spaceId);
+		});
 	});
 
 	test("a project without a folder comes along: every Device has it", async () => {
