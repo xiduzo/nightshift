@@ -47,7 +47,8 @@ export const ROLE_REFUSAL: AccessRefusal = {
 	allowed: false,
 	code: "FORBIDDEN",
 	status: 403,
-	message: "Your role in this Space does not allow this.",
+	message:
+		"Your role in this Space does not allow this. Ask an owner or admin of the Space to change your role.",
 };
 
 /**

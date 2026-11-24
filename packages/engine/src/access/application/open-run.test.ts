@@ -77,7 +77,7 @@ describe("openRun", () => {
 		expect(refused).toBeInstanceOf(ports.RoleRefusal);
 		expect((refused as Refusal).kind).toBe("forbidden");
 		expect((refused as Refusal).message).toBe(
-			"Your role in this Space does not allow this.",
+			"Your role in this Space does not allow this. Ask an owner or admin of the Space to change your role.",
 		);
 	});
 

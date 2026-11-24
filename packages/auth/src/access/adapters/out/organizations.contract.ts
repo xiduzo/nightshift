@@ -142,7 +142,8 @@ export function organizationsContract(
 				),
 			).toEqual({
 				kind: "forbidden",
-				message: "Your role in this Space does not allow this.",
+				message:
+					"Your role in this Space does not allow this. Ask an owner or admin of the Space to change your role.",
 			});
 			await under.organizations.setRole(ada.headers, {
 				memberId,

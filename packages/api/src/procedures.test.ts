@@ -1359,7 +1359,8 @@ describe("sessions", () => {
 			).toEqual({
 				code: "FORBIDDEN",
 				defined: false,
-				message: "Your role in this Space does not allow this.",
+				message:
+					"Your role in this Space does not allow this. Ask an owner or admin of the Space to change your role.",
 			});
 		}
 		expect(seen()).toEqual([]);
@@ -1915,7 +1916,8 @@ describe("a run opened by its id", () => {
 		).toEqual({
 			code: "FORBIDDEN",
 			defined: true,
-			message: "Your role in this Space does not allow this.",
+			message:
+				"Your role in this Space does not allow this. Ask an owner or admin of the Space to change your role.",
 		});
 		expect(seen()).toEqual([{ space: spaceId, method: "runs.get" }]);
 	});

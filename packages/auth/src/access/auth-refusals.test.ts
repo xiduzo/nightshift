@@ -35,7 +35,8 @@ describe("what Better Auth refuses", () => {
 		});
 		expect(refusalOf(error)).toMatchObject({
 			kind: "forbidden",
-			message: "Your role in this Space does not allow this.",
+			message:
+				"Your role in this Space does not allow this. Ask an owner or admin of the Space to change your role.",
 		});
 	});
 
