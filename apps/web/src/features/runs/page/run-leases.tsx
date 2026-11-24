@@ -24,9 +24,8 @@ import {
 import { useMutation } from "@tanstack/react-query";
 import { HourglassIcon, LockIcon, LockOpenIcon } from "lucide-react";
 import { useState } from "react";
-import { toast } from "sonner";
-
 import { orpc, type RunDetail } from "@/shared/api";
+import { toastFailure } from "@/shared/failure";
 import { formatRelative } from "@/shared/format";
 import { LocalTime } from "@/shared/time";
 import { runMutations } from "../queries";
@@ -43,8 +42,7 @@ export function RunLeases({ run }: { run: RunDetail }) {
 	const release = useMutation(
 		runMutations.releaseLease({
 			onSuccess: (_, { runId }) => runActed(runId),
-			onError: (error) =>
-				toast.error(`Could not release the lease: ${error.message}`),
+			onError: toastFailure("Could not release the lease"),
 		}),
 	);
 	if (run.leases.length === 0) return null;

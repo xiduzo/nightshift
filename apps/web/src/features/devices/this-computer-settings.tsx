@@ -43,6 +43,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 import { spaceQueries } from "@/features/spaces";
 import type { ThisComputer } from "@/shared/api";
+import { toastFailure } from "@/shared/failure";
 import { formatDateTime } from "@/shared/format";
 import { LargerTextarea } from "@/shared/larger-window";
 import { PageSection } from "@/shared/page";
@@ -218,7 +219,7 @@ function HostSettings({ computer }: { computer: ThisComputer }) {
 			onSuccess: (data) => {
 				queryClient.setQueryData(settingsQueries.get().queryKey, data);
 			},
-			onError: (error) => toast.error(`Not saved: ${error.message}`),
+			onError: toastFailure("Not saved"),
 		}),
 	);
 

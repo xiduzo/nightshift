@@ -28,7 +28,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { XIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { ErrorAlert } from "@/shared/failure";
+import { ErrorAlert, toastFailure } from "@/shared/failure";
 import { formatRelative } from "@/shared/format";
 import { LocalTime } from "@/shared/time";
 import { KnowledgeSection, useKnowledge } from "../layout";
@@ -211,8 +211,7 @@ function Answer({
 					input.answers.length > 0 ? "Question marked" : "Mark removed",
 				);
 			},
-			onError: (error) =>
-				toast.error(`The mark was not saved: ${error.message}`),
+			onError: toastFailure("The mark was not saved"),
 		}),
 	);
 	if (answers && answers.length > 0) {

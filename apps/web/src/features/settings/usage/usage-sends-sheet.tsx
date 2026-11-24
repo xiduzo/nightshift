@@ -33,6 +33,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { CircleAlertIcon } from "lucide-react";
 import { useId } from "react";
 import { toast } from "sonner";
+import { toastFailure } from "@/shared/failure";
 import { usageMutations, usageQueries } from "../queries";
 
 /** Opens "What Night Shift sends". */
@@ -72,7 +73,7 @@ export function UsageSendsSheet({
 		onSuccess: () => {
 			toast.success("This computer has a new anonymous id.");
 		},
-		onError: (error) => toast.error(`Not reset: ${error.message}`),
+		onError: toastFailure("Not reset"),
 	});
 
 	return (

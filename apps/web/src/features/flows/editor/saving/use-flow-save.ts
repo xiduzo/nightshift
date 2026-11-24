@@ -6,6 +6,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useCallback } from "react";
 import { toast } from "sonner";
 import { useMayChange } from "@/features/projects";
+import { toastFailure } from "@/shared/failure";
 import { saveFile } from "../../move";
 import { flowMutations, flowQueries } from "../../queries";
 import type { EditingSession } from "../session";
@@ -35,7 +36,7 @@ export function useFlowSave({
 	const mayChange = useMayChange();
 	const saveFlow = useMutation(
 		flowMutations.save({
-			onError: (error) => toast.error(`Could not save: ${error.message}`),
+			onError: toastFailure("Could not save"),
 		}),
 	);
 

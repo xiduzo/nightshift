@@ -38,6 +38,7 @@ import type {
 	SettingsView,
 } from "@/shared/api";
 import { DetailSection, DetailShell } from "@/shared/detail";
+import { toastFailure } from "@/shared/failure";
 import type { BuiltInHarnessName } from "../catalog";
 import { MonoTile } from "../connections";
 import { harnessMutations } from "../queries";
@@ -63,7 +64,7 @@ export function HarnessDetail({
 				toast.success(`Removed ${harness.label}`);
 				onRemoved();
 			},
-			onError: (error) => toast.error(`Not removed: ${error.message}`),
+			onError: toastFailure("Not removed"),
 		}),
 	);
 	const tool = toolFor(harness.name as CheckTarget);
@@ -208,7 +209,7 @@ export function HarnessPicker({
 				onOpenChange(false);
 				onAdded(input.harness as HarnessRowName);
 			},
-			onError: (error) => toast.error(`Not added: ${error.message}`),
+			onError: toastFailure("Not added"),
 		}),
 	);
 	return (

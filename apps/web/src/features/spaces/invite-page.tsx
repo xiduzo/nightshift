@@ -21,10 +21,10 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { MailXIcon } from "lucide-react";
 import { toast } from "sonner";
-
 import { AccountForm } from "@/features/access";
 import type { InvitationView } from "@/shared/api";
 import { authClient } from "@/shared/api";
+import { toastFailure } from "@/shared/failure";
 import { spaceMutations, spaceQueries } from "./queries";
 import { roleLabel } from "./roles";
 import { useSpaceChanged } from "./space-tabs";
@@ -75,7 +75,7 @@ function PendingInvitation({ invitation }: { invitation: InvitationView }) {
 				await spaceChanged();
 				await navigate({ to: "/" });
 			},
-			onError: (error) => toast.error(`Not joined: ${error.message}`),
+			onError: toastFailure("Not joined"),
 		}),
 	);
 	// A refusal shows as a toast (`onError`).

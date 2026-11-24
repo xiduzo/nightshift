@@ -42,6 +42,7 @@ import { ShareIcon, TriangleAlertIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
 import type { PermissionMode } from "@/shared/api";
+import { toastFailure } from "@/shared/failure";
 import { PERMISSION_MODES } from "../catalog";
 import { offerMutations, offerQueries } from "../queries";
 
@@ -267,7 +268,7 @@ export function WithdrawOfferDialog({
 				);
 				onOpenChange(false);
 			},
-			onError: (error) => toast.error(`Not withdrawn: ${error.message}`),
+			onError: toastFailure("Not withdrawn"),
 		}),
 	);
 	return (

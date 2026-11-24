@@ -24,13 +24,13 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { CircleAlertIcon, CircleCheckIcon, PlusIcon } from "lucide-react";
 import { Fragment, useState } from "react";
-import { toast } from "sonner";
 import { useMayChange } from "@/features/projects";
 import type {
 	AgentSetupStatus,
 	DeciderSetupStatus,
 	HarnessRowName,
 } from "@/shared/api";
+import { toastFailure } from "@/shared/failure";
 import { itemOf } from "../agents-selection";
 import { deciderSetupMutations, deciderSetupQueries } from "../queries";
 import { CheckStep } from "./check-step";
@@ -319,7 +319,7 @@ function DeciderBody({
 	const cancel = useMutation(
 		deciderSetupMutations.cancel({
 			onSuccess: put,
-			onError: (error) => toast.error(`Not stopped: ${error.message}`),
+			onError: toastFailure("Not stopped"),
 		}),
 	);
 	const acting = [install, local, typesafe];

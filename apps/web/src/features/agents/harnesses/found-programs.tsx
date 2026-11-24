@@ -6,6 +6,7 @@ import { PlusIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { toast } from "sonner";
 import type { CheckTarget, FoundProgram } from "@/shared/api";
+import { toastFailure } from "@/shared/failure";
 import type { Selection } from "../agents-selection";
 import { CheckBadge } from "../connections";
 import { programMutations, programQueries } from "../queries";
@@ -36,7 +37,7 @@ export function useFoundPrograms(
 					onSetUp({ kind: "cli", name: made.name });
 				}
 			},
-			onError: (error) => toast.error(`Not added: ${error.message}`),
+			onError: toastFailure("Not added"),
 		}),
 	);
 

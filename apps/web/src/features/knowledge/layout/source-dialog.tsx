@@ -49,6 +49,7 @@ import { useId, useState } from "react";
 import { toast } from "sonner";
 import { FlowInputFields } from "@/features/flows";
 import { useHasFolder } from "@/features/projects";
+import { toastFailure } from "@/shared/failure";
 import { knowledgeMutations } from "../queries";
 
 const EVERY_DAY = [0, 1, 2, 3, 4, 5, 6];
@@ -255,7 +256,7 @@ function SourceForm({
 				}
 				void syncNowAfterSave(name);
 			},
-			onError: (error) => toast.error(`Could not save: ${error.message}`),
+			onError: toastFailure("Could not save"),
 		}),
 	);
 

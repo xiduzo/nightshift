@@ -53,7 +53,7 @@ import { toast } from "sonner";
 import type { CliTool } from "@/shared/api";
 import { CodeView } from "@/shared/code";
 import { DetailSection, DetailShell } from "@/shared/detail";
-import { ErrorAlert } from "@/shared/failure";
+import { ErrorAlert, toastFailure } from "@/shared/failure";
 import { CheckBadge, FactList, UsedBySection } from "../connections";
 import { checkState } from "../harnesses";
 import { cliToolMutations, cliToolQueries } from "../queries";
@@ -112,7 +112,7 @@ export function CliToolDetail({
 				toast.success(`Removed ${tool.name}`);
 				onRemoved();
 			},
-			onError: (error) => toast.error(`Not removed: ${error.message}`),
+			onError: toastFailure("Not removed"),
 		}),
 	);
 

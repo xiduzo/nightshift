@@ -51,6 +51,7 @@ import type {
 	ProfileRow,
 } from "@/shared/api";
 import { DetailSection, DetailShell } from "@/shared/detail";
+import { toastFailure } from "@/shared/failure";
 import { LargerTextarea } from "@/shared/larger-window";
 import { EFFORTS, harnessInfo, PERMISSION_MODES } from "../catalog";
 import { KindBadge } from "../connections";
@@ -160,7 +161,7 @@ export function ProfileDetail({
 				toast.success(`Deleted ${profile?.name}`);
 				onDeleted();
 			},
-			onError: (error) => toast.error(`Not deleted: ${error.message}`),
+			onError: toastFailure("Not deleted"),
 		}),
 	);
 

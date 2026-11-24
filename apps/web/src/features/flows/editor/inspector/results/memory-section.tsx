@@ -1,4 +1,5 @@
 /** The Memory section of a node: what it remembers between runs of the flow, and Forget what it saw. */
+
 import {
 	type CallNode,
 	MAX_MEMORY_KEYS,
@@ -18,6 +19,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { RotateCcwIcon } from "lucide-react";
 import { toast } from "sonner";
 import { useMayChange } from "@/features/projects";
+import { toastFailure } from "@/shared/failure";
 import { formatRelative } from "@/shared/format";
 import { flowMutations, flowQueries } from "../../../queries";
 import { InspectorSection, Note } from "../form";
@@ -53,7 +55,7 @@ export function MemorySection({
 			onSuccess: () => {
 				toast.success("Forgotten. The next run is a first run.");
 			},
-			onError: (error) => toast.error(`Could not forget: ${error.message}`),
+			onError: toastFailure("Could not forget"),
 		}),
 	);
 	const rows = memoryOfNode(memory.data ?? [], node);

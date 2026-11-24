@@ -1,9 +1,11 @@
 /** "Reset to defaults" for one table of the settings that new work starts with. */
+
 import { Button } from "@nightshift/ui/components/button";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import { RotateCcwIcon } from "lucide-react";
 import { toast } from "sonner";
 import type { SettingsView } from "@/shared/api";
+import { toastFailure } from "@/shared/failure";
 import { type SettingKey, type SettingsPatch, useSaveSettings } from "../form";
 
 /**
@@ -42,12 +44,11 @@ export function ResetDefaults({
 									label: "Undo",
 									onClick: () =>
 										reset.mutate(before, {
-											onError: (error) =>
-												toast.error(`Not undone: ${error.message}`),
+											onError: toastFailure("Not undone"),
 										}),
 								},
 							}),
-						onError: (error) => toast.error(`Not reset: ${error.message}`),
+						onError: toastFailure("Not reset"),
 					},
 				);
 			}}

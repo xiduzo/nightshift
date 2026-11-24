@@ -21,6 +21,7 @@ import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { FlowAgentsStep, useFlowAgents } from "@/features/agents";
 import { useMayChange } from "@/features/projects";
+import { toastFailure } from "@/shared/failure";
 import { flowMutations } from "../queries";
 
 /** A file the person chose, before Night Shift saves it. */
@@ -71,7 +72,7 @@ export function ImportFlowButton({ projectId }: { projectId: string }) {
 					toast.success(`Imported ${saved.name}`, { action: open });
 				}
 			},
-			onError: (error) => toast.error(`Could not import: ${error.message}`),
+			onError: toastFailure("Could not import"),
 		}),
 	);
 

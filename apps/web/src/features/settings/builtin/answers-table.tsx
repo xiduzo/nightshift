@@ -5,6 +5,7 @@
  * chat. Its list holds your agents and your models together, and a row
  * offers only what can answer for it.
  */
+
 import type { AssistantAgent } from "@nightshift/flows";
 import { Badge } from "@nightshift/ui/components/badge";
 import {
@@ -27,8 +28,8 @@ import {
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CircleAlertIcon, CircleCheckIcon } from "lucide-react";
 import type { ReactNode } from "react";
-import { toast } from "sonner";
 import { deciderQueries, profileQueries } from "@/features/agents";
+import { toastFailure } from "@/shared/failure";
 import { type SettingsPatch, useSaveSettings } from "../form";
 import { builtinQueries } from "../queries";
 import { deciderValue, profileValue } from "./builtin-answer";
@@ -66,7 +67,7 @@ export function useSaveNow() {
 	const save = useSaveSettings();
 	return (patch: SettingsPatch) =>
 		save.mutate(patch, {
-			onError: (error) => toast.error(`Not saved: ${error.message}`),
+			onError: toastFailure("Not saved"),
 			onSuccess: () =>
 				void queryClient.invalidateQueries({
 					queryKey: builtinQueries.status().queryKey,

@@ -42,7 +42,7 @@ import {
 import { Fragment, useState } from "react";
 import { toast } from "sonner";
 import type { NotificationScreen } from "@/shared/api";
-import { ErrorAlert } from "@/shared/failure";
+import { ErrorAlert, toastFailure } from "@/shared/failure";
 import { formatRelative } from "@/shared/format";
 import { PageSection } from "@/shared/page";
 import { LocalTime } from "@/shared/time";
@@ -84,7 +84,7 @@ export function ScreensCard() {
 							: "It is removed",
 				);
 			},
-			onError: (error) => toast.error(`Not removed: ${error.message}`),
+			onError: toastFailure("Not removed"),
 		}),
 	);
 

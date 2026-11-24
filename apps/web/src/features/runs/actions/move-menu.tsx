@@ -10,9 +10,9 @@ import {
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ArrowRightLeftIcon, MonitorIcon } from "lucide-react";
 import { toast } from "sonner";
-
 import type { RunDetail } from "@/shared/api";
 import { orpc } from "@/shared/api";
+import { toastFailure } from "@/shared/failure";
 import { runMutations, runQueries } from "../queries";
 import { ActionText } from "./action-text";
 
@@ -37,7 +37,7 @@ export function useMoveRun(run: RunDetail, now: RunNow) {
 				toast.success(`${to?.name ?? "The device"} continues the run.`);
 				runActed(input.runId);
 			},
-			onError: (error) => toast.error(`Could not move: ${error.message}`),
+			onError: toastFailure("Could not move"),
 		}),
 	);
 	return {

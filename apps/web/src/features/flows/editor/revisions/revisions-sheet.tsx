@@ -41,6 +41,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { useMayChange } from "@/features/projects";
 import type { FlowRevisionItem } from "@/shared/api";
+import { toastFailure } from "@/shared/failure";
 import { formatDateTime } from "@/shared/format";
 import { LocalTime } from "@/shared/time";
 import { summaryLabels } from "../../chat";
@@ -345,7 +346,7 @@ function RestoreDialog({
 				toast.success(`Restored the revision of ${when}`);
 				onClose();
 			},
-			onError: (error) => toast.error(`Could not restore: ${error.message}`),
+			onError: toastFailure("Could not restore"),
 		}),
 	);
 

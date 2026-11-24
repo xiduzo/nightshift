@@ -53,6 +53,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { orpc, type ProjectSecretRow } from "@/shared/api";
 import { DataTable, dataTableColumns } from "@/shared/data-table";
+import { toastFailure } from "@/shared/failure";
 import { useNow } from "@/shared/format";
 import { PageSection } from "@/shared/page";
 import type { SharedSecretActions } from "../queries";
@@ -218,7 +219,7 @@ export function SharedSecrets({
 			toast.success(`Moved ${name} to ${SCOPE[to].label}`);
 			refresh();
 		},
-		onError: (error) => toast.error(`Not moved: ${error.message}`),
+		onError: toastFailure("Not moved"),
 	});
 
 	if (list.error) {
@@ -383,7 +384,7 @@ function RemoveSharedSecretDialog({
 			onDone();
 			onOpenChange(false);
 		},
-		onError: (error) => toast.error(`Not removed: ${error.message}`),
+		onError: toastFailure("Not removed"),
 	});
 	const flows = secret?.flows ?? [];
 	const tools = secret?.tools ?? [];

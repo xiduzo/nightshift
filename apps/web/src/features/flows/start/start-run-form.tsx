@@ -46,6 +46,7 @@ import { toast } from "sonner";
 import { useHasFolder } from "@/features/projects";
 import { runMutations, runQueries } from "@/features/runs/flows-port";
 import { orpc } from "@/shared/api";
+import { toastFailure } from "@/shared/failure";
 import {
 	dayWord,
 	formatDayTime,
@@ -160,7 +161,7 @@ export function StartRunForm({
 				}
 				open();
 			},
-			onError: (error) => toast.error(`Could not start: ${error.message}`),
+			onError: toastFailure("Could not start"),
 		}),
 	);
 

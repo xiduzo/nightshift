@@ -31,6 +31,7 @@ import { Fragment, type ReactNode, useId, useState } from "react";
 import { toast } from "sonner";
 import type { RunDetail, StepSummary } from "@/shared/api";
 import { orpc } from "@/shared/api";
+import { toastFailure } from "@/shared/failure";
 import { formatCountdown, formatTime, useNow } from "@/shared/format";
 import { LocalTime } from "@/shared/time";
 import { ResumeComposer } from "../actions";
@@ -229,7 +230,7 @@ function SignalButton({ runId, name }: { runId: string; name: string }) {
 				toast.success(`Sent ${name}. The flow continues.`);
 				runActed(runId);
 			},
-			onError: (error) => toast.error(`Could not send: ${error.message}`),
+			onError: toastFailure("Could not send"),
 		}),
 	);
 	return (
@@ -254,7 +255,7 @@ function WakeButton({ runId }: { runId: string }) {
 	const wake = useMutation(
 		runMutations.resume({
 			onSuccess: () => runActed(runId),
-			onError: (error) => toast.error(`Could not wake: ${error.message}`),
+			onError: toastFailure("Could not wake"),
 		}),
 	);
 	return (

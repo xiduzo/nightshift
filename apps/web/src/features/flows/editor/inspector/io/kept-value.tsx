@@ -1,10 +1,12 @@
 /** The value a kept variable carries to the next run, with a way to reset it. */
+
 import { Button } from "@nightshift/ui/components/button";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { RotateCcwIcon } from "lucide-react";
 import { toast } from "sonner";
 import { useMayChange } from "@/features/projects";
+import { toastFailure } from "@/shared/failure";
 import { flowMutations, flowQueries } from "../../../queries";
 
 /** Which flow's kept values the editor shows: the saved flow file. */
@@ -39,7 +41,7 @@ export function KeptValue({
 			onSuccess: () => {
 				toast.success(`The next run starts ${name} from its initial value.`);
 			},
-			onError: (error) => toast.error(`Could not reset: ${error.message}`),
+			onError: toastFailure("Could not reset"),
 		}),
 	);
 

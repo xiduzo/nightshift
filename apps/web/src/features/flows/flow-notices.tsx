@@ -6,8 +6,8 @@ import {
 import { Button } from "@nightshift/ui/components/button";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { InfoIcon } from "lucide-react";
-import { toast } from "sonner";
 import { useMayChange } from "@/features/projects";
+import { toastFailure } from "@/shared/failure";
 import { flowMutations, flowQueries } from "./queries";
 
 /**
@@ -24,7 +24,7 @@ export function FlowNotices({ projectId }: { projectId: string }) {
 	});
 	const dismiss = useMutation(
 		flowMutations.dismissNotice({
-			onError: (error) => toast.error(`Could not dismiss: ${error.message}`),
+			onError: toastFailure("Could not dismiss"),
 		}),
 	);
 

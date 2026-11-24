@@ -60,8 +60,7 @@ import {
 	TriangleAlertIcon,
 } from "lucide-react";
 import { type ReactNode, useEffect, useId } from "react";
-import { toast } from "sonner";
-import { ErrorAlert } from "@/shared/failure";
+import { ErrorAlert, toastFailure } from "@/shared/failure";
 import { formatRelative } from "@/shared/format";
 import { fileNameOf } from "../files";
 import { KnowledgeSection, type Review, useKnowledge } from "../layout";
@@ -104,8 +103,7 @@ function LearnFromRuns() {
 	const id = useId();
 	const set = useMutation(
 		knowledgeMutations.setLearnsFromRuns({
-			onError: (error) =>
-				toast.error(`The change was not saved: ${error.message}`),
+			onError: toastFailure("The change was not saved"),
 		}),
 	);
 	const checked = set.isPending

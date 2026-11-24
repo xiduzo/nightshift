@@ -63,6 +63,7 @@ import type {
 	SpaceMember,
 	SpaceRole,
 } from "@/shared/api";
+import { toastFailure } from "@/shared/failure";
 import { formatDateTime } from "@/shared/format";
 import { PageHeading, PageSection, SiteHeader } from "@/shared/page";
 import { LocalTime } from "@/shared/time";
@@ -171,7 +172,7 @@ function MemberList({ overview }: { overview: MembersOverview }) {
 			onSuccess: () => {
 				toast.success("Role changed");
 			},
-			onError: (error) => toast.error(`Role not changed: ${error.message}`),
+			onError: toastFailure("Role not changed"),
 		}),
 	);
 	const remove = useMutation(
@@ -180,7 +181,7 @@ function MemberList({ overview }: { overview: MembersOverview }) {
 				toast.success(`${toRemove?.name ?? "The member"} left the Space`);
 				setToRemove(null);
 			},
-			onError: (error) => toast.error(`Not removed: ${error.message}`),
+			onError: toastFailure("Not removed"),
 		}),
 	);
 
@@ -327,7 +328,7 @@ function Invitations({
 			onSuccess: () => {
 				toast.success("Invitation canceled");
 			},
-			onError: (error) => toast.error(`Not canceled: ${error.message}`),
+			onError: toastFailure("Not canceled"),
 		}),
 	);
 	if (!overview.can.invite && overview.invitations.length === 0) return null;

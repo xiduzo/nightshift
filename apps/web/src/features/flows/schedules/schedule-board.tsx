@@ -44,6 +44,7 @@ import {
 import { useMayChange } from "@/features/projects";
 import { runQueries } from "@/features/runs/flows-port";
 import type { ScheduleSummary } from "@/shared/api";
+import { toastFailure } from "@/shared/failure";
 import { useNow } from "@/shared/format";
 import { flowQueries } from "../queries";
 import { scheduleMutations, scheduleQueries } from "./queries";
@@ -132,7 +133,7 @@ export function useScheduleBoard(
 					);
 				}
 			},
-			onError: (error) => toast.error(`Could not save: ${error.message}`),
+			onError: toastFailure("Could not save"),
 		}),
 	);
 

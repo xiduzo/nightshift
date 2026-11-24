@@ -41,7 +41,7 @@ import { useId, useState } from "react";
 import { toast } from "sonner";
 import { KeyValueRows, recordFrom, rowsFrom } from "@/features/agents";
 import type { SettingsView } from "@/shared/api";
-import { ErrorAlert } from "@/shared/failure";
+import { ErrorAlert, toastFailure } from "@/shared/failure";
 import { type SettingKey, useSaveSettings } from "../form";
 import { ollamaMutations, ollamaQueries } from "../queries";
 import {
@@ -330,7 +330,7 @@ function SearchState({ data }: { data: SettingsView }) {
 	const status = useOllamaStatus();
 	const pull = useMutation(
 		ollamaMutations.pull({
-			onError: (error) => toast.error(`Not downloaded: ${error.message}`),
+			onError: toastFailure("Not downloaded"),
 		}),
 	);
 	if (data.values.ollama === "off") {

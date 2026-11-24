@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { SettingsView } from "@/shared/api";
+import { toastFailure } from "@/shared/failure";
 import { settingsMutations, settingsQueries } from "../queries";
 
 export type Settings = SettingsView["values"];
@@ -138,7 +139,7 @@ function useUndoToast() {
 				onClick: () =>
 					undo.mutate(patch, {
 						onSuccess: () => toast.info("Change undone"),
-						onError: (error) => toast.error(`Not undone: ${error.message}`),
+						onError: toastFailure("Not undone"),
 					}),
 			},
 		});
@@ -320,8 +321,7 @@ export function useSettingsForm(
 					setDrafts({});
 					undoToast(`${title} reset to defaults`, undo);
 				},
-				onError: (resetError) =>
-					toast.error(`Not reset: ${resetError.message}`),
+				onError: toastFailure("Not reset"),
 			});
 		},
 	};

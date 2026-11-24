@@ -20,6 +20,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { BookOpenIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
+import { toastFailure } from "@/shared/failure";
 import { KnowledgeSection, useKnowledge } from "../layout";
 import { knowledgeMutations, knowledgeQueries } from "../queries";
 import { MeaningLine, useKnowledgeHits } from "../search";
@@ -185,8 +186,7 @@ export function KnowledgeOverviewPage() {
 						void navigate({ to: "/runs/$runId", params: { runId: run.id } }),
 				},
 			}),
-		onError: (error) =>
-			toast.error(`The agent did not start: ${error.message}`),
+		onError: toastFailure("The agent did not start"),
 	});
 
 	const asking = mode === "ask" && search.query !== "";

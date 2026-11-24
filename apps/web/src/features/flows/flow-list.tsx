@@ -52,6 +52,7 @@ import { toast } from "sonner";
 import { useMayChange } from "@/features/projects";
 import { settingsQueries } from "@/features/settings";
 import type { FlowListItem } from "@/shared/api";
+import { toastFailure } from "@/shared/failure";
 import { PageHeading } from "@/shared/page";
 
 import { chatSearch } from "./chat";
@@ -120,7 +121,7 @@ export function FlowList({ projectId }: { projectId: string }) {
 				toast.success(`Deleted ${input.name}`);
 				setToDelete(null);
 			},
-			onError: (error) => toast.error(`Could not delete: ${error.message}`),
+			onError: toastFailure("Could not delete"),
 		}),
 	);
 

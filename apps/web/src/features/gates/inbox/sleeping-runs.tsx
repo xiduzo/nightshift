@@ -18,9 +18,9 @@ import {
 import { useMutation } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { MoonIcon, SunriseIcon } from "lucide-react";
-import { toast } from "sonner";
 import type { RunSummary } from "@/shared/api";
 import { orpc } from "@/shared/api";
+import { toastFailure } from "@/shared/failure";
 import { formatCountdown, formatTime, useNow } from "@/shared/format";
 import { LocalTime } from "@/shared/time";
 import { runMutations } from "../queries";
@@ -50,7 +50,7 @@ export function SleepingRuns({
 	const wake = useMutation(
 		runMutations.resume({
 			onSuccess: (_, { runId }) => runActed(runId),
-			onError: (error) => toast.error(`Could not wake: ${error.message}`),
+			onError: toastFailure("Could not wake"),
 		}),
 	);
 

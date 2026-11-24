@@ -1,4 +1,5 @@
 /** A Model Profile on the Agents page: the decider and the model that Decisions and Values decided by a model use. */
+
 import type { DeciderName } from "@nightshift/flows";
 import { Alert, AlertDescription } from "@nightshift/ui/components/alert";
 import {
@@ -32,6 +33,7 @@ import { useEffect, useId, useState } from "react";
 import { toast } from "sonner";
 import type { ModelProfileRow, ProfileRow } from "@/shared/api";
 import { DetailSection, DetailShell } from "@/shared/detail";
+import { toastFailure } from "@/shared/failure";
 import { LargerTextarea } from "@/shared/larger-window";
 import { ProfileUsedIn } from "../profiles";
 import { deciderQueries, profileMutations } from "../queries";
@@ -131,7 +133,7 @@ export function ModelProfileDetail({
 				toast.success(`Deleted ${profile?.name}`);
 				onDeleted();
 			},
-			onError: (error) => toast.error(`Not deleted: ${error.message}`),
+			onError: toastFailure("Not deleted"),
 		}),
 	);
 

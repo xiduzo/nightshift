@@ -51,7 +51,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { loadElk } from "@/features/flows";
 import type { KnowledgeMap } from "@/shared/api";
-import { ErrorAlert } from "@/shared/failure";
+import { ErrorAlert, toastFailure } from "@/shared/failure";
 import { PanelHeader } from "@/shared/panel";
 import { KnowledgeSection, useKnowledge } from "../layout";
 import { knowledgeMutations, knowledgeQueries } from "../queries";
@@ -196,8 +196,7 @@ function useNotTopic(projectId: string) {
 					},
 				});
 			},
-			onError: (error) =>
-				toast.error(`The topics did not change: ${error.message}`),
+			onError: toastFailure("The topics did not change"),
 		}),
 	);
 	return {

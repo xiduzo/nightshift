@@ -31,7 +31,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { ChevronDownIcon, GaugeIcon, SparklesIcon } from "lucide-react";
 import { toast } from "sonner";
 import type { KnowledgeEvaluation } from "@/shared/api";
-import { ErrorAlert } from "@/shared/failure";
+import { ErrorAlert, toastFailure } from "@/shared/failure";
 import { formatRelative } from "@/shared/format";
 import { LocalTime } from "@/shared/time";
 import { knowledgeMutations, knowledgeQueries } from "../queries";
@@ -184,8 +184,7 @@ function Advice({
 						: "Search by meaning is off for this project",
 				);
 			},
-			onError: (error) =>
-				toast.error(`The change was not saved: ${error.message}`),
+			onError: toastFailure("The change was not saved"),
 		}),
 	);
 	const { words, both } = evaluation.modes;

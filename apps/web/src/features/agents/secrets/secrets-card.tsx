@@ -18,6 +18,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import type { SecretView } from "@/shared/api";
 import { DataTable } from "@/shared/data-table";
+import { toastFailure } from "@/shared/failure";
 import { useNow } from "@/shared/format";
 import { PageSection } from "@/shared/page";
 import { connectionMutations, spaceSecretMutations } from "../queries";
@@ -49,7 +50,7 @@ export function SecretsCard({
 			onSuccess: (_, { name, to }) => {
 				toast.success(`Moved ${name} to ${SCOPE[to].label}`);
 			},
-			onError: (error) => toast.error(`Not moved: ${error.message}`),
+			onError: toastFailure("Not moved"),
 		}),
 	);
 	const moveToSpace = useMutation(
@@ -57,7 +58,7 @@ export function SecretsCard({
 			onSuccess: (_, { name }) => {
 				toast.success(`Moved ${name} to this Space`);
 			},
-			onError: (error) => toast.error(`Not moved: ${error.message}`),
+			onError: toastFailure("Not moved"),
 		}),
 	);
 	const find = (ref: SecretRef | null) =>

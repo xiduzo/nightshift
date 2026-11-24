@@ -18,6 +18,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import type { Phone } from "@/shared/api";
 import { DetailSection, DetailShell } from "@/shared/detail";
+import { toastFailure } from "@/shared/failure";
 import { formatRelative, useNow } from "@/shared/format";
 import { LocalTime } from "@/shared/time";
 import { deviceMutations } from "./queries";
@@ -98,7 +99,7 @@ function SignOutDialog({
 				toast.success(`${phone.name} is signed out`);
 				onOpenChange(false);
 			},
-			onError: (error) => toast.error(`Not signed out: ${error.message}`),
+			onError: toastFailure("Not signed out"),
 		}),
 	);
 	return (

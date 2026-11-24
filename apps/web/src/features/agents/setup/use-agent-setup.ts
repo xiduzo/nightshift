@@ -1,4 +1,5 @@
 /** The setup of an agent and of a decider, as hooks: what each can do here, the actions, and what follows when a job ends. */
+
 import { useChanged } from "@nightshift/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef } from "react";
@@ -13,6 +14,7 @@ import {
 	type HarnessRowName,
 	orpc,
 } from "@/shared/api";
+import { toastFailure } from "@/shared/failure";
 import {
 	agentSetupMutations,
 	agentSetupQueries,
@@ -57,7 +59,7 @@ export function useAgentSetupActions() {
 		cancel: useMutation(
 			agentSetupMutations.cancel({
 				onSuccess: put,
-				onError: (error) => toast.error(`Not stopped: ${error.message}`),
+				onError: toastFailure("Not stopped"),
 			}),
 		),
 	};

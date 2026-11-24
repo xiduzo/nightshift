@@ -10,7 +10,7 @@ import { Progress } from "@nightshift/ui/components/progress";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { DownloadIcon } from "lucide-react";
-import { toast } from "sonner";
+import { toastFailure } from "@/shared/failure";
 import { ollamaMutations, ollamaQueries } from "../queries";
 
 /** How often the status is asked again while the model downloads. */
@@ -30,7 +30,7 @@ export function OllamaModelLine({ model }: { model: string }) {
 	});
 	const pull = useMutation(
 		ollamaMutations.pull({
-			onError: (error) => toast.error(`Not downloaded: ${error.message}`),
+			onError: toastFailure("Not downloaded"),
 		}),
 	);
 	const s = status.data;

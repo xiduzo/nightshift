@@ -26,7 +26,7 @@ import { useMutation } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { KeyRoundIcon } from "lucide-react";
 import { useId, useState } from "react";
-import { toast } from "sonner";
+import { toastFailure } from "@/shared/failure";
 import { useKnowledge } from "../layout";
 import { knowledgeMutations } from "../queries";
 
@@ -80,8 +80,7 @@ export function ReaderSetting() {
 	const set = useMutation(
 		knowledgeMutations.setReader({
 			onSuccess: (reader) => setDraft(draftOf(reader)),
-			onError: (error) =>
-				toast.error(`The page reader was not saved: ${error.message}`),
+			onError: toastFailure("The page reader was not saved"),
 		}),
 	);
 	const may = knowledge.can.startRuns;

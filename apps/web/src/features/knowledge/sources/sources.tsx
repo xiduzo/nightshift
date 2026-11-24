@@ -56,6 +56,7 @@ import { useId, useState } from "react";
 import { toast } from "sonner";
 import { flowQueries, StartRunDialog } from "@/features/flows";
 import type { Knowledge } from "@/shared/api";
+import { toastFailure } from "@/shared/failure";
 import { formatRelative, hoverTime } from "@/shared/format";
 import {
 	AddSourceButton,
@@ -366,8 +367,7 @@ export function SyncNowButton({
 					},
 				});
 			},
-			onError: (error) =>
-				toast.error(`The sync did not start: ${error.message}`),
+			onError: toastFailure("The sync did not start"),
 		}),
 	);
 	const syncing =
@@ -434,8 +434,7 @@ function RemoveSourceDialog({
 						: "Source removed",
 				);
 			},
-			onError: (error) =>
-				toast.error(`The source was not removed: ${error.message}`),
+			onError: toastFailure("The source was not removed"),
 		}),
 	);
 	return (

@@ -1,4 +1,5 @@
 /** The dialog that removes a secret of this computer or a Personal one. It names what uses the secret. */
+
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -13,6 +14,7 @@ import { Spinner } from "@nightshift/ui/components/spinner";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import type { SecretView } from "@/shared/api";
+import { toastFailure } from "@/shared/failure";
 import { connectionMutations } from "../queries";
 import {
 	flowNamesOf,
@@ -36,7 +38,7 @@ export function RemoveSecretDialog({
 				toast.success(`Removed ${target?.name}`);
 				onOpenChange(false);
 			},
-			onError: (error) => toast.error(`Not removed: ${error.message}`),
+			onError: toastFailure("Not removed"),
 		}),
 	);
 	const usedBy = secret ? [...secret.usedBy, ...secret.tools] : [];

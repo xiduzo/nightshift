@@ -38,6 +38,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import type { Connection } from "@/shared/api";
 import { DetailSection, DetailShell } from "@/shared/detail";
+import { toastFailure } from "@/shared/failure";
 import { connectionMutations } from "../queries";
 import { FactList, OffMachineNote, VariableBadge } from "./parts";
 import { McpTestOutcome } from "./test-result";
@@ -79,7 +80,7 @@ export function ToolDetail({
 				toast.success(`Removed ${connection.name}`);
 				onRemoved();
 			},
-			onError: (error) => toast.error(`Not removed: ${error.message}`),
+			onError: toastFailure("Not removed"),
 		}),
 	);
 

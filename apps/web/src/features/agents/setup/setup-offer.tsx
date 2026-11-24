@@ -2,8 +2,8 @@ import { Button } from "@nightshift/ui/components/button";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import { DownloadIcon, LogInIcon } from "lucide-react";
 import { useState } from "react";
-import { toast } from "sonner";
 import type { CheckTarget, CliCheck } from "@/shared/api";
+import { toastFailure } from "@/shared/failure";
 import { AgentSetupDialog } from "./agent-setup-dialog";
 import { setupOffer, setupStep } from "./setup-state";
 import { InstallConfirmDialog } from "./setup-steps";
@@ -47,8 +47,7 @@ export function AgentSetupButton({
 							{ harness },
 							{
 								onSuccess: () => setOpen(true),
-								onError: (error) =>
-									toast.error(`Sign-in did not start: ${error.message}`),
+								onError: toastFailure("Sign-in did not start"),
 							},
 						)
 					}

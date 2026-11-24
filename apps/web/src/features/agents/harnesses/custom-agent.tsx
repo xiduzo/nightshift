@@ -44,7 +44,7 @@ import { useId, useState } from "react";
 import { toast } from "sonner";
 import type { HarnessRow } from "@/shared/api";
 import { DetailSection, DetailShell } from "@/shared/detail";
-import { ErrorAlert } from "@/shared/failure";
+import { ErrorAlert, toastFailure } from "@/shared/failure";
 import { formatTime } from "@/shared/format";
 import { LocalTime } from "@/shared/time";
 import { FactList, OffMachineNote } from "../connections";
@@ -278,7 +278,7 @@ export function CustomAgentDetail({
 				toast.success(`Removed ${agent.label}`);
 				onRemoved();
 			},
-			onError: (error) => toast.error(`Not removed: ${error.message}`),
+			onError: toastFailure("Not removed"),
 		}),
 	);
 	const variables = Object.keys(agent.env);

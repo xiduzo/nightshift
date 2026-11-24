@@ -37,6 +37,7 @@ import { toast } from "sonner";
 import { permissionLabel, WithdrawOfferDialog } from "@/features/agents";
 import type { OfferView, RunSummary } from "@/shared/api";
 import { DetailSection, DetailShell } from "@/shared/detail";
+import { toastFailure } from "@/shared/failure";
 import { formatDateTime, formatRelative, useNow } from "@/shared/format";
 import { RunStatusBadge } from "@/shared/run-status";
 import { LocalTime } from "@/shared/time";
@@ -401,7 +402,7 @@ function RemoveAccessDialog({
 				toast.success(`${device.name} has no access now`);
 				onOpenChange(false);
 			},
-			onError: (error) => toast.error(`Not removed: ${error.message}`),
+			onError: toastFailure("Not removed"),
 		}),
 	);
 	return (
@@ -446,7 +447,7 @@ function RemoveComputerDialog({
 				toast.success(`${device.name} is removed`);
 				onOpenChange(false);
 			},
-			onError: (error) => toast.error(`Not removed: ${error.message}`),
+			onError: toastFailure("Not removed"),
 		}),
 	);
 	return (
