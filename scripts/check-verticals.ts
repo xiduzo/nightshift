@@ -58,6 +58,10 @@
  *     names, or that one of its scripts runs, counts as imported. A test
  *     is no importer: a file that only its test imports fails. The command
  *     runs this rule (`checkUnusedFiles`), not `checkWorkspace`
+ * (r) a relative or aliased import that names no file, in source and tests,
+ *     `import type` included. It covers every workspace, the three above
+ *     too. A file that git ignores counts: a tool writes it. The command
+ *     runs this rule (`checkUnresolvedImports`), not `checkWorkspace`
  * And across the workspaces it checks:
  * (m) a name on a package entry that no production file of another
  *     workspace imports. A test counts only for a `./testing` entry. A
@@ -105,6 +109,7 @@ import {
 	NESTING_DEBT,
 } from "./verticals/debt";
 import { entryProblems } from "./verticals/entries";
+import { checkUnresolvedImports } from "./verticals/unresolved-imports";
 import { checkUnusedFiles } from "./verticals/unused-files";
 import { checkWorkspace } from "./verticals/workspace";
 
@@ -310,7 +315,13 @@ if (import.meta.main) {
 	const root = join(import.meta.dir, "..");
 	const args = process.argv.slice(2);
 	const workspaces = args.length ? args : workspacesOf(root);
-	const problems = checkWorkspaces(root, workspaces);
+	const problems = [
+		...checkUnresolvedImports(
+			root,
+			args.length ? args : [...workspaces, ...NOT_CHECKED],
+		),
+		...checkWorkspaces(root, workspaces),
+	];
 	if (problems.length) {
 		console.error(
 			"Vertical check failed (docs/steering/STRUCTURE.md, sections 4 and 5):\n",
