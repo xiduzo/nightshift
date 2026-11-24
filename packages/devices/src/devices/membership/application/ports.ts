@@ -3,6 +3,7 @@ import type { DeviceCopies } from "@nightshift/engine/settings";
 import type {
 	MergeRow,
 	MergeTarget,
+	PausedSchedule,
 	SplitRow,
 	Unfinished,
 } from "../domain/membership-rows";
@@ -72,8 +73,18 @@ export type MembershipRecord = {
 		of(fromSpace: string): Promise<SplitRow | null>;
 		/** A new split, planned: its copy of the database is made. */
 		plan(
-			input: Omit<SplitRow, "state" | "projects" | "runs" | "unpinned">,
+			input: Omit<
+				SplitRow,
+				"state" | "projects" | "runs" | "unpinned" | "paused"
+			>,
 		): Promise<SplitRow>;
+		/** The schedules the split pauses, kept before the first one pauses. None: they are on again. */
+		paused(
+			toSpace: string,
+			schedules: readonly PausedSchedule[],
+		): Promise<void>;
+		/** The splits off a Space of that Host that are done, oldest first. */
+		ofHost(hostId: string): Promise<SplitRow[]>;
 		/**
 		 * The statements that mark the split moved: they go in the batch that
 		 * moves the rows.

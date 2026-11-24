@@ -11,6 +11,7 @@ import type { SplitResult, SplitState } from "../../../contract";
 import type { HostSpaces } from "../../../links";
 import type { SplitRow } from "../domain/membership-rows";
 import { NOT_DONE, SPLIT_WORDS } from "../domain/words";
+import { pausedSchedules } from "./paused-schedules";
 import type {
 	DatabaseCopy,
 	EngineKernel,
@@ -27,7 +28,7 @@ import type {
 
 export type SplitDeps = {
 	engine: Pick<Engine, "space" | "moveProjects"> & {
-		flows: Pick<Engine["flows"], "merge">;
+		flows: Pick<Engine["flows"], "merge" | "schedules" | "saveSchedules">;
 		hostSpaces: Pick<HostSpaces, "hostOf" | "keeper" | "named">;
 		projects: Pick<PeerProjects, "ofSpace">;
 	};
@@ -59,6 +60,7 @@ export function splitSteps(deps: SplitDeps & { record: MembershipRecord }) {
 	const now = deps.now ?? timeNow;
 	const rows = deps.record.splits;
 	const merges = deps.record.merges;
+	const paused = pausedSchedules(deps);
 
 	/**
 	 * The Person's personal Space when a Host keeps it and this computer
@@ -133,17 +135,14 @@ export function splitSteps(deps: SplitDeps & { record: MembershipRecord }) {
 				plan: async () => {
 					await noRunsNotDone(from);
 					const ids = await projectsHere(from);
+					await paused.keep(row, ids);
 					return {
 						projects: Object.fromEntries(
 							ids.map((id) => [id, { spaceId: to, projectId: id }]),
 						),
 						personMap: { [row.hostPersonId]: row.personId },
 						ownRunsOnly: true,
-						schedule: (schedule) => {
-							if (!schedule.enabled) return schedule;
-							const { person: _person, ...rest } = schedule;
-							return { ...rest, enabled: false };
-						},
+						schedule: paused.pause,
 					};
 				},
 				statements: async (done) =>

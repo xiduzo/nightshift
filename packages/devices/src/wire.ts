@@ -180,7 +180,7 @@ async function startNow(deps: DevicesDeps): Promise<DevicesRuntime> {
 	};
 	deps.kept.nightshiftDevices = handover;
 
-	await membership.forgetLeft();
+	await membership.beforeLinks();
 	await links.start();
 
 	const secrets = wireSecrets(deps, engine, {

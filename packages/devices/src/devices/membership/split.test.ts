@@ -15,7 +15,7 @@ import {
 	spaceSplit,
 	user,
 } from "@nightshift/db/schema";
-import { NIGHT_SHIFT } from "@nightshift/engine";
+import { createFlowDocuments, NIGHT_SHIFT } from "@nightshift/engine";
 import {
 	createProjectFlows,
 	createSandbox,
@@ -30,6 +30,7 @@ import { Refusal } from "@nightshift/refusal";
 import { asDate } from "@nightshift/time";
 import { ORPCError } from "@orpc/client";
 import { eq } from "drizzle-orm";
+import * as Y from "yjs";
 import type { HostClient } from "../../contract";
 import { createDeviceExchange } from "../../exchange";
 import { createHostLinks, type Link } from "../../links";
@@ -315,6 +316,169 @@ async function walkedByA(projectId: string) {
 /** B has no access to A any more, as its link marks it. */
 const revoke = () => createHostLinks(b.db).revoked(paired.hostId);
 
+/** B's and A's flow documents of the project in step, as the link syncs them: A's schedules then. */
+async function syncedSchedules(projectId: string) {
+	const onA = createFlowDocuments({ db: a.db });
+	const theirs = await onA.open(projectId);
+	const ours = await paired.flows.open(projectId);
+	for (const part of ["current", "history"] as const) {
+		Y.applyUpdate(theirs[part].doc, Y.encodeStateAsUpdate(ours[part].doc));
+		Y.applyUpdate(ours[part].doc, Y.encodeStateAsUpdate(theirs[part].doc));
+	}
+	await onA.flush();
+	const { schedules } = await createProjectFlows({
+		documents: onA,
+		project: async () => ({ spaceId: "" }),
+		deviceId: "a",
+	}).schedules(projectId, { validate: false });
+	await onA.flush();
+	return schedules;
+}
+
+/** A gave B access again, as a join saves it: before its documents sync. */
+async function joinAgain() {
+	const links = createHostLinks(b.db);
+	const left = await links.get(paired.hostId);
+	if (!left) throw new Error("No link.");
+	const { createdAt: _at, revokedAt: _gone, ...link } = left;
+	await links.save(link);
+}
+
+describe("leaving and joining the same Host again", () => {
+	/** B merged into A with its schedules on, in step with A, with a person on one. */
+	async function merged() {
+		const { projectId } = await mergedIntoA();
+		const flows = paired.device.flows;
+		const { schedules } = await flows.schedules(projectId, { validate: false });
+		const [nightly] = schedules;
+		if (!nightly) throw new Error("No schedule.");
+		const before = [
+			{ ...nightly, person: paired.personId },
+			{ ...nightly, id: "off", enabled: false },
+		];
+		await flows.saveSchedules(projectId, before);
+		expect(await syncedSchedules(projectId)).toEqual(before);
+		return { projectId, before };
+	}
+	/** The same merge on a join, with a link that answers. */
+	async function rejoined(extra: Partial<MembershipTestDeps> = {}) {
+		await joinAgain();
+		const { link } = linkToA();
+		await ready(link);
+		const membership = membershipOf(link, extra);
+		const steps = [];
+		for await (const step of membership.joined(paired.hostId)) {
+			steps.push(step.kind);
+		}
+		return { steps, membership };
+	}
+	const ownSchedules = async (projectId: string) =>
+		(await paired.device.flows.schedules(projectId, { validate: false }))
+			.schedules;
+
+	test("the schedules that the leave paused are on again on the Host, with their person", async () => {
+		const { projectId, before } = await merged();
+		await revoke();
+		expect((await splitter().revoked(home))?.unpinned).toBe(1);
+		expect((await ownSchedules(projectId)).map((s) => s.enabled)).toEqual([
+			false,
+			false,
+		]);
+
+		expect((await rejoined()).steps).toEqual(["merge-preview", "merged"]);
+
+		expect(await syncedSchedules(projectId)).toEqual(before);
+		// Once: a person who turns one off later keeps it off.
+		const off = before.map((s) => ({ ...s, enabled: false }));
+		await paired.device.flows.saveSchedules(projectId, off);
+		await revoke();
+		await splitter().revoked(home);
+		await rejoined();
+		expect(await syncedSchedules(projectId)).toEqual(off);
+	});
+
+	test("a schedule that a person changed while apart keeps the change, and so does one that a person removed", async () => {
+		const { projectId, before } = await merged();
+		await revoke();
+		await splitter().revoked(home);
+		const [nightly, off] = await ownSchedules(projectId);
+		if (!nightly || !off) throw new Error("No schedules.");
+		const changed = [{ ...nightly, cron: "0 5 * * *" }, off];
+		await paired.device.flows.saveSchedules(projectId, changed);
+		await rejoined();
+		expect(await syncedSchedules(projectId)).toEqual(changed);
+
+		await paired.device.flows.saveSchedules(projectId, before);
+		await revoke();
+		await splitter().revoked(home);
+		await paired.device.flows.saveSchedules(projectId, [off]);
+		await rejoined();
+		expect(await syncedSchedules(projectId)).toEqual([off]);
+	});
+
+	test("a stop between the batch and the schedules goes on to the same end", async () => {
+		const { projectId, before } = await merged();
+		await revoke();
+		await splitter().revoked(home);
+		const engine = {
+			...paired.device,
+			flows: {
+				...paired.device.flows,
+				saveSchedules: () => Promise.reject(new Error("stop")),
+			},
+		} as MembershipTestDeps["engine"];
+		const error = console.error;
+		console.error = () => {};
+		const { steps } = await rejoined({ engine }).finally(() => {
+			console.error = error;
+		});
+		expect(steps).toEqual(["merge-preview", "merge-skipped"]);
+		expect((await b.db.select().from(spaceMerge)).at(-1)?.state).toBe("moved");
+
+		// The next start, before the links: no document of it synced yet.
+		await membershipOf(undefined).beforeLinks();
+		expect(await syncedSchedules(projectId)).toEqual(before);
+	});
+
+	test("a stop of the batch of the leave pauses them once, and keeps what they were", async () => {
+		const { projectId, before } = await merged();
+		await revoke();
+		await expect(
+			splitter({
+				engine: beforeBatch(() => {
+					throw new Error("stop");
+				}),
+			}).revoked(home),
+		).rejects.toThrow("stop");
+		expect((await ownSchedules(projectId))[0]?.enabled).toBe(false);
+		await splitter().revoked(home);
+		await rejoined();
+		expect(await syncedSchedules(projectId)).toEqual(before);
+	});
+
+	test("a split from before this column leaves them as they are", async () => {
+		const { projectId } = await merged();
+		await revoke();
+		await splitter().revoked(home);
+		await b.db.update(spaceSplit).set({ paused: null });
+		const paused = await ownSchedules(projectId);
+		await rejoined();
+		expect(await syncedSchedules(projectId)).toEqual(paused);
+	});
+
+	test("the record of another Host, or of another Person there, turns none on", async () => {
+		const { projectId } = await merged();
+		for (const other of [{ hostId: "other" }, { hostPersonId: "other" }]) {
+			await revoke();
+			await splitter().revoked(home);
+			await b.db.update(spaceSplit).set(other);
+			const paused = await ownSchedules(projectId);
+			await rejoined();
+			expect(await syncedSchedules(projectId)).toEqual(paused);
+		}
+	});
+});
+
 describe("leaving the home Host keeps a copy", () => {
 	test("the author's shape: Personal is B's own again, with its project, flows, schedules, kept variables and runs", async () => {
 		const { projectId, runId } = await mergedIntoA();
@@ -454,7 +618,7 @@ describe("leaving the home Host keeps a copy", () => {
 		expect(added).toEqual([true]);
 
 		locked = false;
-		await membership.forgetLeft();
+		await membership.beforeLinks();
 		expect(deleted).toEqual([paired.hostId]);
 	});
 

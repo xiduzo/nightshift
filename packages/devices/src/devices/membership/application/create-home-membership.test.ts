@@ -228,21 +228,21 @@ describe("leaving", () => {
 		deps.keys.delete = async (...args) => {
 			deleted.push(args);
 		};
-		await membership.forgetLeft();
+		await membership.beforeLinks();
 		expect(deleted).toEqual([]);
 		expect(world.copies.kept).toEqual([]);
 
 		const guest = { ...world.hosts[0], hostId: "guest", role: "guest" };
 		world.hosts = [...world.hosts, guest as never];
 		world.revoke("guest");
-		await membership.forgetLeft();
+		await membership.beforeLinks();
 		// Only this install's own key: another one may share the store.
 		expect(deleted).toEqual([["guest", { ownOnly: true }]]);
 		expect(world.copies.kept).toEqual([]);
 
 		world.revoke();
 		deps.keys.delete = () => Promise.reject(new Error("locked"));
-		await quietly(() => membership.forgetLeft());
+		await quietly(() => membership.beforeLinks());
 		expect(world.copies.kept).toEqual([[]]);
 	});
 

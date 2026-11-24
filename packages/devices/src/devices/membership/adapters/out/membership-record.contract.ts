@@ -51,6 +51,46 @@ export function membershipRecordContract(
 			expect((await record.merges.latest())?.state).toBe("pushed");
 		});
 
+		test("a split keeps the schedules it pauses, and only a done split of that Host says so", async () => {
+			const { record, run } = await make();
+			await record.splits.plan({
+				toSpace: "to",
+				fromSpace: "from",
+				hostId: "host",
+				hostName: "Studio",
+				personId: "ada",
+				hostPersonId: "ada-there",
+				backup: "/b",
+			});
+			const row = async () => (await record.splits.of("from"))?.paused;
+			expect(await row()).toBeNull();
+			const paused = [
+				{
+					projectId: "p1",
+					schedule: {
+						id: "night",
+						flow: "f",
+						inputs: {},
+						cron: "0 6 * * *",
+						enabled: true,
+					},
+				},
+			];
+			await record.splits.paused("to", paused);
+			expect(await row()).toEqual(paused);
+			expect(await record.splits.ofHost("host")).toEqual([]);
+			await run(
+				record.splits.moved("to", { projects: ["p1"], runs: 0, unpinned: 1 }),
+			);
+			await record.splits.done("to");
+			expect((await record.splits.ofHost("host")).map((s) => s.paused)).toEqual(
+				[paused],
+			);
+			expect(await record.splits.ofHost("other")).toEqual([]);
+			await record.splits.paused("to", []);
+			expect(await row()).toEqual([]);
+		});
+
 		test("a done merge goes on for the Projects it left", async () => {
 			const { record, run } = await make();
 			const from = {

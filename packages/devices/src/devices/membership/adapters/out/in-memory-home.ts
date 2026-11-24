@@ -130,6 +130,8 @@ export function inMemoryHome() {
 		notes: new Map<string, string[]>(),
 		runs: [] as Run[],
 		schedules: new Map<string, Schedule[]>(),
+		/** The Host's copy of the schedules, as the documents last synced (`sync`). */
+		hostSchedules: new Map<string, Schedule[]>(),
 		answer: (input: PersonalMergeInput): PersonalMerge => ({
 			spaceId: "theirs",
 			projectMap: Object.fromEntries(input.projects.map((p) => [p.id, p.id])),
@@ -163,6 +165,20 @@ export function inMemoryHome() {
 			personalSpaces.existing.clear();
 			personalSpaces.existing.add("theirs");
 			world.projects = [moving("p1", { spaceId: "theirs" })];
+		},
+		/**
+		 * The documents sync with the Host, as a link with access does: those of
+		 * the Projects in a Space that the Host keeps. What this computer wrote
+		 * goes to the Host, a pause too.
+		 */
+		sync(hostId = "host") {
+			const link = world.hosts.find((h) => h.hostId === hostId);
+			if (!link || link.revokedAt !== null) return;
+			for (const p of world.projects) {
+				if (world.keptBy.get(p.spaceId) !== hostId) continue;
+				const schedules = world.schedules.get(p.id);
+				if (schedules) world.hostSchedules.set(p.id, schedules);
+			}
 		},
 		/** The Host's access removed, as the link marks it. */
 		revoke(hostId = "host") {
@@ -291,6 +307,9 @@ export function inMemoryHome() {
 			schedules: async (id: string) => ({
 				schedules: world.schedules.get(id) ?? [],
 			}),
+			async saveSchedules(id: string, schedules: Schedule[]) {
+				world.schedules.set(id, schedules);
+			},
 			async planMerge(...args: unknown[]) {
 				planned.push(args);
 				return { flows: { hello: "hello-2" } };

@@ -1,3 +1,4 @@
+import type { Schedule } from "@nightshift/flows";
 import type { MergeState, SplitState } from "../../../contract";
 
 /** Where a Project of this computer's own personal Space goes on the Host. */
@@ -22,6 +23,9 @@ export type MergeRow = {
 	updatedAt: number;
 };
 
+/** A schedule that a split paused, as it was before. */
+export type PausedSchedule = { projectId: string; schedule: Schedule };
+
 /** A split as its row keeps it. */
 export type SplitRow = {
 	toSpace: string;
@@ -34,6 +38,11 @@ export type SplitRow = {
 	/** The Projects that came along. Empty until `moved`. */
 	projects: string[];
 	runs: number;
+	/**
+	 * The schedules the split pauses, each as it was before. Null: a split
+	 * from before they were kept.
+	 */
+	paused: PausedSchedule[] | null;
 	/** How many schedules that named another Device are paused here now. */
 	unpinned: number;
 	backup: string;

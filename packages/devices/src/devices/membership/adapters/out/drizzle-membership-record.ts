@@ -2,7 +2,7 @@ import type { Database } from "@nightshift/db";
 import { spaceMerge, spaceSplit } from "@nightshift/db/schema";
 import type { RowBatch } from "@nightshift/engine";
 import { asDate, instant } from "@nightshift/time";
-import { asc, desc, eq, ne } from "drizzle-orm";
+import { and, asc, desc, eq, ne } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import type { MembershipRecord } from "../../application/ports";
 import type { MergeRow, SplitRow } from "../../domain/membership-rows";
@@ -41,6 +41,7 @@ function splitOf(row: typeof spaceSplit.$inferSelect): SplitRow {
 		projects: parse(row.projects, []),
 		runs: row.runs,
 		unpinned: row.unpinned,
+		paused: parse(row.paused, null),
 		backup: row.backup,
 	};
 }
@@ -185,6 +186,24 @@ export function drizzleMembershipRecord(db: Database): MembershipRecord {
 					.returning();
 				if (!row) throw new Error("The split was not recorded.");
 				return splitOf(row);
+			},
+
+			async paused(toSpace, schedules) {
+				await db
+					.update(spaceSplit)
+					.set({ paused: JSON.stringify(schedules), updatedAt: asDate() })
+					.where(eq(spaceSplit.toSpace, toSpace));
+			},
+
+			async ofHost(hostId) {
+				const rows = await db
+					.select()
+					.from(spaceSplit)
+					.where(
+						and(eq(spaceSplit.hostId, hostId), eq(spaceSplit.state, "done")),
+					)
+					.orderBy(asc(spaceSplit.createdAt));
+				return rows.map(splitOf);
 			},
 
 			moved(toSpace, input) {

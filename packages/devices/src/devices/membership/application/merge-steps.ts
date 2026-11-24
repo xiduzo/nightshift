@@ -25,6 +25,7 @@ import {
 	notDoneHeld,
 } from "../domain/words";
 import { lateProjects } from "./late-projects";
+import { pausedSchedules } from "./paused-schedules";
 import type {
 	DatabaseCopy,
 	EngineKernel,
@@ -263,6 +264,7 @@ export function mergeSteps(deps: MergeDeps & { record: MembershipRecord }) {
 		);
 	}
 
+	const paused = pausedSchedules(deps);
 	const late = lateProjects(deps, { checks, ask, targetsOf, changed, runsOf });
 
 	/** How many schedules of the project move to the Host. A removed project has none that fire. */
@@ -405,6 +407,8 @@ export function mergeSteps(deps: MergeDeps & { record: MembershipRecord }) {
 		}
 
 		if (state === "moved") {
+			// Before any wait: the documents of the moved Projects sync soon.
+			await paused.afterMerge({ ...row, toSpace: to, projectMap, personMap });
 			await finishMoved(row.hostId, from, projectMap, personMap);
 			await late.say(row);
 			if (await pushed(row.hostId, projectMap)) {
@@ -525,6 +529,9 @@ export function mergeSteps(deps: MergeDeps & { record: MembershipRecord }) {
 				blocked: checked.held === null ? null : checked.refusal.message,
 			};
 		},
+
+		/** Turns on what a leave paused, of a merge whose rows moved. Runs again safely. */
+		turnOnPaused: paused.afterMerge,
 
 		/** Moves the Projects that done merges left here: a merge of an older version did. */
 		async moveLate(): Promise<void> {

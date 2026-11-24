@@ -225,11 +225,21 @@ export function createHomeMembership(deps: HomeMembershipDeps) {
 		},
 
 		/**
-		 * What a leave that stopped left here goes: the copies and the key of a
-		 * Host without access. Only at start, before the links and before a
-		 * join: a join saves its new key first, then its link.
+		 * Once at start, before the links and before a join.
+		 *
+		 * - What a leave that stopped left here goes: the copies and the key of a
+		 *   Host without access. Not later: a join saves its new key first, then
+		 *   its link.
+		 * - The schedules of a merge whose rows moved are on again before their
+		 *   documents sync.
 		 */
-		async forgetLeft(): Promise<void> {
+		async beforeLinks(): Promise<void> {
+			await attempted("schedules of a merge stay paused", async () => {
+				const started = await record.unfinished();
+				if (started?.step === "merge" && started.row.state === "moved") {
+					await merges.turnOnPaused(started.row);
+				}
+			});
 			const left = (await deps.hostLinks.list()).filter(
 				(link) => link.revokedAt !== null,
 			);

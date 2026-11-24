@@ -119,9 +119,19 @@ export function inMemoryMembershipRecord(): MembershipRecord & {
 					projects: [],
 					runs: 0,
 					unpinned: 0,
+					paused: null,
 				};
 				splitsRows.push(row);
 				return { ...row };
+			},
+			async paused(toSpace, schedules) {
+				const row = splitsRows.find((s) => s.toSpace === toSpace);
+				if (row) row.paused = [...schedules];
+			},
+			async ofHost(hostId) {
+				return splitsRows
+					.filter((row) => row.hostId === hostId && row.state === "done")
+					.map((row) => ({ ...row }));
 			},
 			moved(toSpace, input) {
 				return inMemoryBatch(() => {
