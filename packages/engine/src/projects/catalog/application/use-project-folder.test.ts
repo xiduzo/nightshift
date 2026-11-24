@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { allowing } from "../../../access/adapters/out/in-memory-access";
 import type { Actor } from "../../../contract";
 import { NO_FOLDER, PROJECT_NOT_FOUND } from "../../keep";
 import { inMemoryCatalogPorts } from "../adapters/out/in-memory-neighbours";
@@ -123,5 +124,22 @@ describe("useProjectFolder", () => {
 			"This folder is the project lib already.",
 		);
 		await expect(use("s2")).rejects.toThrow(PROJECT_NOT_FOUND);
+	});
+
+	test("asks project:add: owners, admins and members may, and nobody else", async () => {
+		const ports = seeded();
+		ports.repos.add("/work/mine", "git@github.com:acme/app.git");
+		expect(
+			await ports.access.whoMay(
+				"s1",
+				(actor) =>
+					useProjectFolder(ports)(actor, {
+						spaceId: "s1",
+						projectId: "p1",
+						repoPath: "/work/mine",
+					}),
+				() => [ports.store.records.clones, ports.cloneImports.imported],
+			),
+		).toEqual(allowing("owner", "admin", "member"));
 	});
 });

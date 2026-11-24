@@ -1,4 +1,6 @@
+import type { Permissions } from "@nightshift/auth";
 import { Refusal } from "@nightshift/refusal";
+import type { Access } from "../../../access";
 import type { Actor } from "../../../contract";
 import {
 	asProjects,
@@ -17,7 +19,11 @@ import {
 import { folderTaken, noActiveRun, otherRepository } from "../domain/words";
 import type { CloneImports, HostRelay, ProjectRuns } from "./ports";
 
+/** What a role must allow for this request. */
+const ADD_PROJECTS: Permissions = { project: ["add"] };
+
 export type UseProjectFolderPorts = {
+	access: Pick<Access, "openSpace">;
 	store: Pick<ProjectStore, "find" | "row" | "here" | "cloneRow">;
 	spaceProjects: Pick<SpaceProjects, "recordCloneHere" | "clones">;
 	projectLog: Pick<ProjectLog, "append">;
@@ -41,12 +47,15 @@ export type UseProjectFolder = {
  * computer: its first one, or in place of the one it has. The folder must
  * hold the project's repository (its `origin` names the project's remote,
  * in any case), and be no other project's folder. A run here works in the
- * folder it has: a new one waits for its end. The door checks the owner.
+ * folder it has: a new one waits for its end. Refuses a Person whose role
+ * does not add projects (`access.openSpace`). The door lets only the owner
+ * of this computer ask.
  */
 export const useProjectFolder =
 	(ports: UseProjectFolderPorts) =>
-	async (_actor: Actor, request: UseProjectFolder): Promise<Project> => {
+	async (actor: Actor, request: UseProjectFolder): Promise<Project> => {
 		const { spaceId, projectId } = request;
+		await ports.access.openSpace(actor, { spaceId, need: ADD_PROJECTS });
 		const { store } = ports;
 		const current = await store.find(projectId, spaceId);
 		if (!current) throw new Refusal("not-found", PROJECT_NOT_FOUND);
