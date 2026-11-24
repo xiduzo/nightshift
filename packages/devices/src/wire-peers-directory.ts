@@ -16,7 +16,6 @@ export function deviceDirectory(db: Database): DeviceDirectory {
 		selfId: async () => (await registry.ensureSelfDevice()).id,
 		selfOwnerId: () => registry.readSelfOwner(),
 		names: (ids) => registry.listDeviceNames({ ids }),
-		known: () => registry.listKnownDevices(),
 		hostedElsewhere: async (spaceId) =>
 			(await hostSpaces.hostOf(spaceId)) !== null,
 		hostOf: (spaceId) => hostSpaces.hostOf(spaceId),

@@ -139,8 +139,6 @@ export type Registry = {
 	setSelfOwner: ReturnType<typeof setSelfOwner>;
 	/** Lists the names of Devices by id. */
 	listDeviceNames: ReturnType<typeof listDeviceNames>;
-	/** Lists every Device whose access is not removed. */
-	listKnownDevices: DeviceStore["known"];
 	/** Lists the Persons whose home Host this computer is. */
 	listHomePersons: DeviceStore["homePersons"];
 	/**
@@ -237,7 +235,6 @@ export function wireRegistry(deps: RegistryDeps): Registry {
 		readSelfOwner: () => store.selfOwnerId(),
 		setSelfOwner: setSelfOwner(ports),
 		listDeviceNames: listDeviceNames(ports),
-		listKnownDevices: () => store.known(),
 		listHomePersons: () => store.homePersons(),
 		paired,
 	};

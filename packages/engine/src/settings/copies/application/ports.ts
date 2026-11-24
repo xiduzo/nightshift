@@ -1,4 +1,4 @@
-import type { DeviceCopy, DeviceRecord } from "../domain/device-copy";
+import type { DeviceRecord } from "../domain/device-copy";
 
 /**
  * The Device documents this Replica keeps: its own (`device:<id>`), those
@@ -20,10 +20,4 @@ export type DeviceDocuments<Doc> = {
 	readKept(deviceId: string): Promise<DeviceRecord | null>;
 	/** What the stored copy of a Device says, or null when there is none. Opens nothing. */
 	readStoredCopy(deviceId: string): Promise<DeviceRecord | null>;
-	/**
-	 * Every Device whose document this Replica keeps, one entry per
-	 * Device: a kept document wins over a copy. A document this version
-	 * cannot read names no Device.
-	 */
-	readAll(): Promise<DeviceCopy[]>;
 };

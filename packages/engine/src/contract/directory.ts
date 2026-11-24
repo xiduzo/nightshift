@@ -7,9 +7,6 @@
  * exist, so the daemon makes it first and gives it to both. The engine's
  * own tests use `aloneDirectory` (`testing/alone-directory.ts`).
  */
-/** A Device row as `DeviceDirectory.known` lists it. */
-export type KnownDevice = { id: string; name: string; ownerId: string | null };
-
 export type DeviceDirectory = {
 	/**
 	 * This computer's Device id: the Walker of its runs. Made when the
@@ -20,11 +17,6 @@ export type DeviceDirectory = {
 	selfOwnerId(): Promise<string | null>;
 	/** The names of the Devices with these ids. A Device without a row has no entry. */
 	names(ids: readonly string[]): Promise<Map<string, string>>;
-	/**
-	 * Every Device row this Replica has whose access is not removed, with
-	 * its owner: on a Host, its paired Devices and itself.
-	 */
-	known(): Promise<KnownDevice[]>;
 	/** Whether a Host keeps the Space, not this Replica. */
 	hostedElsewhere(spaceId: string): Promise<boolean>;
 	/** The id of the Host that keeps the Space, or null when this Replica keeps it. */

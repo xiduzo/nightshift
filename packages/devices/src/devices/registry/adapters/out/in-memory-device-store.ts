@@ -187,11 +187,6 @@ export function inMemoryDeviceStore(options: { now?: () => number } = {}) {
 				}),
 			);
 		},
-		async known() {
-			return [...rows.values()]
-				.filter((row) => row.revokedAt === null)
-				.map((row) => ({ id: row.id, name: row.name, ownerId: row.ownerId }));
-		},
 		async homePersons() {
 			const owners = [...rows.values()].flatMap((row) =>
 				!row.self &&

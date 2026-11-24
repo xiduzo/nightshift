@@ -31,7 +31,6 @@ export function deviceDocumentsContract(
 
 		test("a Replica with no Device documents has no copy and no record", async () => {
 			expect(await under.documents.copyIds()).toEqual([]);
-			expect(await under.documents.readAll()).toEqual([]);
 			expect(await under.documents.readKept("laptop")).toBeNull();
 			expect(await under.documents.readStoredCopy("laptop")).toBeNull();
 		});
@@ -63,19 +62,12 @@ export function deviceDocumentsContract(
 			expect(await under.documents.readStoredCopy("laptop")).toBeNull();
 		});
 
-		test("a kept document wins over a copy of the same Device", async () => {
+		test("a kept document and a copy of the same Device stay apart", async () => {
 			await under.writeCopy("laptop", "Copy");
 			await under.writeKept("laptop", "Kept");
-			await under.writeCopy("desktop", "Desktop");
-			const all = await under.documents.readAll();
-			expect(
-				all
-					.map((c) => [c.deviceId, c.name])
-					.sort(([a], [b]) => (a ?? "").localeCompare(b ?? "")),
-			).toEqual([
-				["desktop", "Desktop"],
-				["laptop", "Kept"],
-			]);
+			expect((await under.documents.readStoredCopy("laptop"))?.copy.name).toBe(
+				"Copy",
+			);
 			expect((await under.documents.readKept("laptop"))?.copy.name).toBe(
 				"Kept",
 			);

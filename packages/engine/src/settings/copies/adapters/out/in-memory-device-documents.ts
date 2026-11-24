@@ -37,13 +37,6 @@ export function inMemoryDeviceDocuments() {
 		},
 		readKept: async (deviceId: string) => kept.get(deviceId) ?? null,
 		readStoredCopy: async (deviceId: string) => copies.get(deviceId) ?? null,
-		async readAll() {
-			const all = new Map([...copies, ...kept]);
-			return [...all.keys()].sort().flatMap((id) => {
-				const record = all.get(id);
-				return record ? [record.copy] : [];
-			});
-		},
 		/** Writes what the sync of a copy brings. */
 		sync(record: DeviceRecord) {
 			copies.set(record.copy.deviceId, record);

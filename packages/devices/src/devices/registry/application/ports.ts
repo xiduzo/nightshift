@@ -62,8 +62,6 @@ export type DeviceStore = {
 	forget(id: string, engine: RowBatch): Promise<void>;
 	/** The names of these rows, by id. A row this Replica lacks is missing. */
 	names(ids: readonly string[]): Promise<Map<string, string>>;
-	/** Every row whose access is not removed, with its owner. */
-	known(): Promise<{ id: string; name: string; ownerId: string | null }[]>;
 	/** The owners of the paired rows with access that joined this computer as their home Host. */
 	homePersons(): Promise<string[]>;
 };

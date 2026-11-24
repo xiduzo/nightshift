@@ -198,12 +198,6 @@ export function drizzleDeviceStore(db: Database): DeviceStore {
 				.where(inArray(device.id, [...ids]));
 			return new Map(rows.map((d) => [d.id, d.name]));
 		},
-		async known() {
-			return db
-				.select({ id: device.id, name: device.name, ownerId: device.ownerId })
-				.from(device)
-				.where(isNull(device.revokedAt));
-		},
 		async homePersons() {
 			const rows = await db
 				.selectDistinct({ ownerId: device.ownerId })

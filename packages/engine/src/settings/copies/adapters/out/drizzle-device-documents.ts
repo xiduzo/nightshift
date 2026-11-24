@@ -1,12 +1,11 @@
 import type { Database } from "@nightshift/db";
 import { ydoc } from "@nightshift/db/schema";
-import { like, or } from "drizzle-orm";
+import { like } from "drizzle-orm";
 import * as Y from "yjs";
 import {
 	createSyncedDocuments,
 	deviceDocumentName,
 	documentId,
-	documentKind,
 	documentName,
 	documentRows,
 	type SyncedDocuments,
@@ -87,31 +86,6 @@ export function drizzleDeviceDocuments(deps: {
 				deviceId,
 				await documentRows(db).fetch(documentName("device-copy", deviceId)),
 			);
-		},
-		async readAll() {
-			const rows = await db
-				.select({ name: ydoc.name, state: ydoc.state })
-				.from(ydoc)
-				.where(
-					or(
-						like(ydoc.name, `${documentName("device", "")}%`),
-						like(ydoc.name, `${documentName("device-copy", "")}%`),
-					),
-				);
-			const found = new Map<string, DeviceCopy>();
-			for (const row of rows.sort((a, b) => (a.name < b.name ? -1 : 1))) {
-				const named = documentKind(row.name);
-				if (!named) continue;
-				const { kind, id: deviceId } = named;
-				if (kind === "device-copy" && found.has(deviceId)) continue;
-				try {
-					const record = await fromState(deviceId, new Uint8Array(row.state));
-					if (record) found.set(deviceId, record.copy);
-				} catch {
-					// A document this version cannot read names no Device.
-				}
-			}
-			return [...found.values()];
 		},
 	};
 }

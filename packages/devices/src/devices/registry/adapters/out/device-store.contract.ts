@@ -175,13 +175,6 @@ export function deviceStoreContract(
 					[pairing.id, "MacBook"],
 				]),
 			);
-			const known = await store.known();
-			expect(known.sort((a, b) => a.id.localeCompare(b.id))).toEqual([
-				{ id: "d-guest", name: "MacBook", ownerId: "person-bo" },
-				{ id: "d-second", name: "MacBook", ownerId: ada },
-				{ id: pairing.id, name: "MacBook", ownerId: ada },
-				{ id: "self-1", name: "studio", ownerId: null },
-			]);
 			expect(await store.homePersons()).toEqual([ada]);
 		});
 
