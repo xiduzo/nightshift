@@ -28,6 +28,7 @@ import {
 	type RunSettings,
 } from "../../src/settings/settings";
 import type { SpaceEngine } from "../../src/space-engine";
+import { createTestEngine } from "../../src/testing/test-engine";
 import {
 	createSandbox,
 	expectRunLogsInSync,
@@ -37,7 +38,6 @@ import {
 	waitFor,
 	withDevice,
 } from "../../src/testing/test-support";
-import { createEngine } from "../../src/wire";
 
 /**
  * Services through the engine's public seam (ADR 9), with a real Bun web
@@ -88,7 +88,7 @@ function makeEngine(
 		dataDir: sandbox.dataDir,
 	});
 	runLogs.push(runLog);
-	return createEngine(
+	return createTestEngine(
 		withDevice({
 			db: sandbox.db,
 			harnesses: { "claude-code": harness },

@@ -28,6 +28,7 @@ import {
 import type { SpaceEngine } from "../../src/space-engine";
 import { aloneDirectory } from "../../src/testing/alone-directory";
 import { alonePeers } from "../../src/testing/alone-peers";
+import { createTestEngine } from "../../src/testing/test-engine";
 import {
 	createSandbox,
 	expectRunLogsInSync,
@@ -37,7 +38,6 @@ import {
 	waitFor,
 	withDevice,
 } from "../../src/testing/test-support";
-import { createEngine } from "../../src/wire";
 
 /**
  * Leases through the engine's public seam (ADR 7): two runs that contend
@@ -71,7 +71,7 @@ function makeEngine(
 		dataDir: sandbox.dataDir,
 	});
 	runLogs.push(runLog);
-	return createEngine(
+	return createTestEngine(
 		withDevice({
 			db: sandbox.db,
 			harnesses: { "claude-code": harness },
@@ -604,7 +604,7 @@ function engineWith(
 		dataDir: sandbox.dataDir,
 	});
 	runLogs.push(runLog);
-	return createEngine(
+	return createTestEngine(
 		withDevice({
 			db: sandbox.db,
 			harnesses: { "claude-code": scriptedHarness().harness },

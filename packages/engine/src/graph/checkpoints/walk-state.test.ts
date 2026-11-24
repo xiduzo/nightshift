@@ -14,13 +14,13 @@ import { createRunBus } from "../../log/transcript/bus";
 import type { PeerContext } from "../../peers";
 import type { SpaceEngine } from "../../space-engine";
 import { alonePeers } from "../../testing/alone-peers";
+import { createTestEngine } from "../../testing/test-engine";
 import {
 	createSandbox,
 	type Sandbox,
 	waitFor,
 	withDevice,
 } from "../../testing/test-support";
-import { createEngine } from "../../wire";
 import { createRunWalks } from "./walk-state";
 
 /**
@@ -76,7 +76,7 @@ async function computer() {
 	const sandbox = await createSandbox();
 	sandboxes.push(sandbox);
 	let context: PeerContext | undefined;
-	const engine = createEngine(
+	const engine = createTestEngine(
 		withDevice({
 			db: sandbox.db,
 			harnesses: { "claude-code": fakeHarness(() => ({})) },

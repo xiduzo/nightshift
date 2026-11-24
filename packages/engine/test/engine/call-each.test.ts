@@ -35,6 +35,7 @@ import type {
 import type { RunStatus } from "../../src/run-status";
 import type { SpaceEngine } from "../../src/space-engine";
 import { seedFlows } from "../../src/testing/seed-flows";
+import { createTestEngine } from "../../src/testing/test-engine";
 import {
 	createSandbox,
 	expectRunLogsInSync,
@@ -46,7 +47,6 @@ import {
 	waitFor,
 	withDevice,
 } from "../../src/testing/test-support";
-import { createEngine } from "../../src/wire";
 
 let sandbox: Sandbox;
 /** The run log of each engine the test made, oldest first: checked against the database after it. */
@@ -75,7 +75,7 @@ function makeEngine(
 		dataDir: sandbox.dataDir,
 	});
 	runLogs.push(runLog);
-	return createEngine(
+	return createTestEngine(
 		withDevice({
 			db: sandbox.db,
 			harnesses: { "claude-code": harness },

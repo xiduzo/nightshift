@@ -25,6 +25,7 @@ import { createRunLog, type RunLog } from "../../src/log/run-log/run-log";
 import type { RunDetail, StepSummary } from "../../src/read/views";
 import type { SpaceEngine } from "../../src/space-engine";
 import { seedFlows } from "../../src/testing/seed-flows";
+import { createTestEngine } from "../../src/testing/test-engine";
 import {
 	cliToolsOf,
 	createSandbox,
@@ -36,7 +37,6 @@ import {
 	waitFor,
 	withDevice,
 } from "../../src/testing/test-support";
-import { createEngine } from "../../src/wire";
 
 /**
  * Flow format 2: inputs and outputs, templates with paths, the Call
@@ -68,7 +68,7 @@ function makeEngine(
 		dataDir: sandbox.dataDir,
 	});
 	runLogs.push(runLog);
-	return createEngine(
+	return createTestEngine(
 		withDevice({
 			db: sandbox.db,
 			harnesses: { "claude-code": harness },

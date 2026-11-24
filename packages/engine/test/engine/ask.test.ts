@@ -7,6 +7,7 @@ import { FLOW_VERSION } from "@nightshift/flows";
 import { NIGHT_SHIFT } from "../../src/contract";
 import { createRunLog, type RunLog } from "../../src/log/run-log/run-log";
 import type { SpaceEngine } from "../../src/space-engine";
+import { createTestEngine } from "../../src/testing/test-engine";
 import {
 	createSandbox,
 	expectRunLogsInSync,
@@ -15,7 +16,6 @@ import {
 	waitFor,
 	withDevice,
 } from "../../src/testing/test-support";
-import { createEngine } from "../../src/wire";
 
 /**
  * An Ask (a Value made by a person, ADR 10) through the whole engine: the
@@ -43,7 +43,7 @@ function makeEngine(): SpaceEngine {
 		dataDir: sandbox.dataDir,
 	});
 	runLogs.push(runLog);
-	return createEngine(
+	return createTestEngine(
 		withDevice({
 			db: sandbox.db,
 			harnesses: { "claude-code": fakeHarness() },
