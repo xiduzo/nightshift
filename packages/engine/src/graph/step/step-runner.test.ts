@@ -57,7 +57,7 @@ const stateOf = (extra: Partial<RunStateValues> = {}): RunStateValues => ({
 	visits: {},
 	traversals: {},
 	loops: {},
-	pending: null,
+	pending: {},
 	ended: null,
 	joins: {},
 	...extra,
@@ -125,7 +125,7 @@ async function runRow(row: Row) {
 		});
 		const pending = (first.update as { pending: PendingWait }).pending;
 		expect(pending.kind).toBe("wait");
-		state = stateOf({ pending, visits: { n: 1 } });
+		state = stateOf({ pending: { n: pending }, visits: { n: 1 } });
 	}
 	switch (row.situation) {
 		case "stop-requested":

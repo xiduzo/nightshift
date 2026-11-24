@@ -93,10 +93,14 @@ const edgeTaken = (
 const A = { id: "a" };
 const body: Scope = { parentStepId: "c1", itemId: null };
 
-const stateOf = (
-	over: Partial<Pick<RunStateValues, "pending" | "loops" | "visits">> = {},
-): Pick<RunStateValues, "pending" | "loops" | "visits"> => ({
-	pending: null,
+const stateOf = ({
+	pending,
+	...over
+}: Partial<Pick<RunStateValues, "loops" | "visits">> & {
+	/** The one step the state holds. */
+	pending?: Pending;
+} = {}): Pick<RunStateValues, "pending" | "loops" | "visits"> => ({
+	pending: pending ? { [pending.nodeId]: pending } : {},
 	loops: {},
 	visits: {},
 	...over,
@@ -170,9 +174,9 @@ describe("the step a node holds", () => {
 		expect(at.held(A)?.pending).toBe(parked);
 		expect(at.held(A)?.step?.id).toBe("s1");
 		expect(at.held({ id: "b" })).toBeNull();
-		expect(heldStep({ pending: parked }, "a")).toBe(parked);
-		expect(heldStep({ pending: parked }, "b")).toBeNull();
-		expect(heldStep({ pending: null }, "a")).toBeNull();
+		expect(heldStep({ pending: { a: parked } }, "a")).toBe(parked);
+		expect(heldStep({ pending: { a: parked } }, "b")).toBeNull();
+		expect(heldStep({}, "a")).toBeNull();
 	});
 
 	test("a park before the step started holds no step", () => {
@@ -247,10 +251,8 @@ describe("the step a node holds", () => {
 });
 
 describe("a step that is done: it ended on its own, and the commit after it never landed", () => {
-	const doneAt = (
-		state: Partial<Pick<RunStateValues, "pending" | "loops" | "visits">>,
-		...events: Ev[]
-	) => positionOf(stateOf(state), foldRun(logOf(...events)), null).done(A);
+	const doneAt = (state: Parameters<typeof stateOf>[0], ...events: Ev[]) =>
+		positionOf(stateOf(state), foldRun(logOf(...events)), null).done(A);
 
 	test("an uncommitted step that ended on its own is done, with the edge the walk took after it", () => {
 		expect(doneAt({}, started("s1", "a"), ended("s1"))).toMatchObject({

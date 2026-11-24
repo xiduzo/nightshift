@@ -1997,6 +1997,45 @@ describe("recovery prunes", () => {
 	});
 });
 
+describe("recovery prunes a run that ended", () => {
+	test("what its end could not prune goes at the next start, and its log stays", async () => {
+		const first = makeEngine(scriptedHarness().harness);
+		const run = await first.startRun({
+			projectId: await projectId(first),
+			flow: flowOf([command("build", "true")], []),
+		});
+		expect(await waitForEnd(first, run.id)).toBe("finished");
+		const checkpoints = () =>
+			sandbox.db
+				.select()
+				.from(lgCheckpoint)
+				.where(eq(lgCheckpoint.threadId, run.id));
+		const [latest] = await checkpoints();
+		// As a daemon that died before the prune of a stop leaves it.
+		await sandbox.db.$client.batch(
+			[
+				{
+					sql: "INSERT INTO lg_checkpoint (thread_id, checkpoint_ns, checkpoint_id, type, checkpoint, metadata) VALUES (?, '', '0', 'json', '{}', '{}')",
+					args: [run.id],
+				},
+				{
+					sql: "INSERT INTO lg_write (thread_id, checkpoint_ns, checkpoint_id, task_id, idx, channel, type, value) VALUES (?, 'gone:task', '0', 't', 0, 'nodes', 'json', '{}')",
+					args: [run.id],
+				},
+			],
+			"write",
+		);
+		const second = makeEngine(scriptedHarness().harness);
+		expect(await statusOf(second, run.id)).toBe("finished");
+		expect(await checkpoints()).toEqual(latest ? [latest] : []);
+		const { rows } = await sandbox.db.$client.execute({
+			sql: "SELECT count(*) AS n FROM lg_write WHERE thread_id = ? AND checkpoint_ns = 'gone:task'",
+			args: [run.id],
+		});
+		expect(Number(rows[0]?.n)).toBe(0);
+	});
+});
+
 describe("recovery of an open run of an older shape", () => {
 	test("it ends interrupted with the reason, and the next run goes on", async () => {
 		const dying = scriptedHarness({ hang: true });
@@ -2103,7 +2142,14 @@ describe("recovery of an open run of an older shape", () => {
 		);
 		await waitForStatus(second, oldRun, "interrupted");
 		const ended = await second.getRun(oldRun);
-		expect(ended.reason).toContain("Night Shift stopped while this run ran.");
+		const reason =
+			"This run is from an older version of Night Shift. Start the flow again.";
+		expect(ended.reason).toBe(reason);
+		// A resume by a person refuses with the same words, and changes nothing.
+		await expect(second.act(oldRun, { kind: "resume" })).rejects.toThrow(
+			reason,
+		);
+		expect(await statusOf(second, oldRun)).toBe("interrupted");
 		expect(ended.steps.map((s) => [s.nodeId, s.outcome])).toEqual([
 			["loop", "interrupted"],
 			["work", "interrupted"],

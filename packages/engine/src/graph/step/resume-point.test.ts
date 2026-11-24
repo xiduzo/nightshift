@@ -111,10 +111,14 @@ const gateOpened = (stepId: string): Ev => ({
 	stepId,
 	payload: { question: "Ship it?", choices: [{ name: "yes" }, { name: "no" }] },
 });
-const stateOf = (
-	over: Partial<Pick<RunStateValues, "pending" | "loops" | "visits">> = {},
-): Pick<RunStateValues, "pending" | "loops" | "visits"> => ({
-	pending: null,
+const stateOf = ({
+	pending,
+	...over
+}: Partial<Pick<RunStateValues, "loops" | "visits">> & {
+	/** The one step the state holds. */
+	pending?: Pending;
+} = {}): Pick<RunStateValues, "pending" | "loops" | "visits"> => ({
+	pending: pending ? { [pending.nodeId]: pending } : {},
 	loops: {},
 	visits: {},
 	...over,

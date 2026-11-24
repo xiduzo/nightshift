@@ -22,12 +22,13 @@ type TwinRun = { events: LoggedEvent[]; walkerId: string; arriving: boolean };
  * The work the last daemon left open, in memory. A test adds runs with
  * their logs (`add`). `close` ends the open sessions, the open steps and
  * a running run as a dead daemon's cut does, without the outputs a step's
- * node gives. It records what it closed and let go, and a test can make
- * the next let-go fail (`failNextLetGo`).
+ * node gives. It records what it pruned, closed and let go, and a test
+ * can make the next let-go or prune fail.
  */
 export function inMemoryOpenWork(walkerId = THIS_COMPUTER) {
 	const runs = new Map<string, TwinRun>();
 	let letGoFails = false;
+	let pruneFails = false;
 	let seq = 0;
 
 	function append(
@@ -50,6 +51,8 @@ export function inMemoryOpenWork(walkerId = THIS_COMPUTER) {
 	}
 
 	const twin = {
+		/** How often the checkpoints were pruned. */
+		pruned: 0,
 		/** Each cut, in order. */
 		closed: [] as { runId: string; reason: string }[],
 		/** The runs that let go of what they hold, in order. */
@@ -76,6 +79,18 @@ export function inMemoryOpenWork(walkerId = THIS_COMPUTER) {
 			letGoFails = true;
 		},
 
+		/** The next prune throws. */
+		failNextPrune() {
+			pruneFails = true;
+		},
+
+		async pruneCheckpoints() {
+			if (pruneFails) {
+				pruneFails = false;
+				throw new Error("The disk is full.");
+			}
+			twin.pruned++;
+		},
 		async walkedHere() {
 			const byRun = new Map<string, LoggedEvent[]>();
 			for (const [runId, run] of runs) {

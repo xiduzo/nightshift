@@ -117,7 +117,7 @@ const edgeTaken = (from: string, to: string): Ev => ({
 const stateOf = (
 	over: Partial<Pick<RunStateValues, "pending" | "loops" | "visits">> = {},
 ): Pick<RunStateValues, "pending" | "loops" | "visits"> => ({
-	pending: null,
+	pending: {},
 	loops: {},
 	visits: {},
 	...over,

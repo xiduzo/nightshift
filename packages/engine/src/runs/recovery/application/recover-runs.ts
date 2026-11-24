@@ -36,6 +36,10 @@ export type RecoverRunsPorts = {
 export const recoverRuns =
 	(ports: RecoverRunsPorts) => async (): Promise<string[]> => {
 		const { openWork, turns } = ports;
+		// What the end of a run could not prune. Cheap once clean.
+		await openWork.pruneCheckpoints().catch((error) => {
+			console.warn("[engine] could not prune the checkpoints", error);
+		});
 		const toResume: string[] = [];
 		for (const [runId, events] of await openWork.walkedHere()) {
 			// The lifecycle events are enough to see what is open.

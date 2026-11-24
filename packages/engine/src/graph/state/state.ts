@@ -305,8 +305,7 @@ export const RunState = z.object({
 	/**
 	 * The steps a wait, a park or a Gate holds, by node id: one per branch
 	 * that holds one, so parallel branches each keep their own (`holds`).
-	 * Read it through `heldOf`: a checkpoint from before parallel branches
-	 * holds one `Pending` or null here.
+	 * Read it through `heldOf`.
 	 */
 	pending: withLangGraph(z.record(z.string(), pendingSchema), {
 		reducer: { schema: z.any(), fn: holds },
@@ -327,7 +326,7 @@ export type RunStateValues = Omit<
 > & {
 	/** Optional: a state a test or an older checkpoint writes may have none. */
 	dueAt?: string;
-	pending: PendingValue;
+	pending: Held;
 	joins: Record<string, JoinRound>;
 	/** Optional: a state a test or an older checkpoint writes may have none. */
 	cascades?: Record<string, CascadePosition | null>;
@@ -343,12 +342,9 @@ export type RunStateUpdate = Partial<
 /** The steps the checkpoint holds, by node id. */
 export type Held = Record<string, Pending>;
 
-/** `pending` as a checkpoint may hold it: by node id, or one hold or none from before parallel branches. */
-export type PendingValue = Held | Pending | null;
-
 /** The part of the state that says where the run is: what the run position reads (`positionOf`). */
 export type PositionState = {
-	pending?: PendingValue;
+	pending?: Held;
 	loops?: RunStateValues["loops"];
 	visits?: RunStateValues["visits"];
 };
@@ -360,7 +356,7 @@ export type PositionState = {
  */
 export type PendingWrite = Pending | Record<string, Pending | null> | null;
 
-/** Whether a stored or written value is one `Pending`, not a record of them. */
+/** Whether a written value is one `Pending`, not a record of them. */
 function isPending(value: unknown): value is Pending {
 	return (
 		typeof value === "object" &&
@@ -369,15 +365,13 @@ function isPending(value: unknown): value is Pending {
 	);
 }
 
-/** The holds of a `pending` value, by node id. A checkpoint from before parallel branches holds one or none. */
-export function heldOf(value: unknown): Held {
-	if (value === null || value === undefined) return {};
-	if (isPending(value)) return { [value.nodeId]: value };
-	return value as Held;
+/** The holds of a `pending` value, by node id. A thread that never ran has none. */
+export function heldOf(value: Held | undefined): Held {
+	return value ?? {};
 }
 
 /** The reducer of `pending`: a write sets or releases holds by node, null releases all. */
-function holds(current: unknown, write: PendingWrite): Held {
+function holds(current: Held | undefined, write: PendingWrite): Held {
 	if (write === null) return {};
 	const next = { ...heldOf(current) };
 	if (isPending(write)) {

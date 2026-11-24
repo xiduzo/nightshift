@@ -332,6 +332,12 @@ describe("a run of an older flow", () => {
 			const gate = await again.getRun("b-gate");
 			expect(gate.steps.map((s) => s.outcome)).toEqual(["interrupted"]);
 			expect(await again.listGates()).toEqual([]);
+			// A resume by a person says the same, and none of them fails.
+			for (const id of ["a-running", "b-gate"]) {
+				const resume = await refusalOf(again.act(id, { kind: "resume" }));
+				expect(resume.message).toBe(OLDER_RUN);
+				expect((await again.getRun(id)).status).toBe("interrupted");
+			}
 			expect(await rows()).toEqual(before);
 		} finally {
 			warn.mockRestore();

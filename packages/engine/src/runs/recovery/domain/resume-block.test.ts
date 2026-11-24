@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { Refusal } from "@nightshift/refusal";
 import {
 	INTERRUPTED_REASON,
 	interruptedReason,
@@ -164,6 +165,18 @@ describe("resumeBlock", () => {
 				}),
 			),
 		).toBe("Night Shift could not check it: bad snapshot");
+		// A refusal says it all.
+		expect(
+			await resumeBlock(
+				facts({
+					record: record({
+						ownResume: () => {
+							throw new Refusal("invalid", "Update Night Shift.");
+						},
+					}),
+				}),
+			),
+		).toBe("Update Night Shift.");
 	});
 
 	test("it reads no fact it does not need: a paused scheduler reads no record", async () => {

@@ -9,6 +9,8 @@ import type { LoggedEvent, SleepFact } from "../../../log";
 
 /** The work the last daemon left open on this computer. */
 export type OpenWork = {
+	/** Prunes every run's thread to what a resume reads. Cheap once clean. */
+	pruneCheckpoints(): Promise<void>;
 	/**
 	 * The lifecycle events of the runs this computer walks, by run, in seq
 	 * order: the events that open or close work. A run that moved here and

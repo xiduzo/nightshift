@@ -41,7 +41,7 @@ import {
 	heldOf,
 	type Parked,
 	type Pending,
-	type PendingValue,
+	type PositionState,
 	type RunEvent,
 	type RunStateValues,
 } from "../graph/state/state";
@@ -392,7 +392,7 @@ export async function drive(
  * holds none. Throws when it holds several: a test of parallel branches
  * reads them by node (`heldOf`).
  */
-export function held(state: { pending?: PendingValue }): Pending | null {
+export function held(state: Pick<PositionState, "pending">): Pending | null {
 	const holds = Object.values(heldOf(state.pending));
 	if (holds.length > 1) throw new Error("The state holds several steps.");
 	return holds[0] ?? null;
