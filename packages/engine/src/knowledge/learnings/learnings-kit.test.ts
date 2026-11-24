@@ -19,7 +19,7 @@ import {
 import { kitCommand } from "@nightshift/flows/testing";
 import { Refusal } from "@nightshift/refusal";
 import { NIGHT_SHIFT } from "../../contract";
-import { createLearnings } from "./test-support";
+import { wireLearnings } from "./wire";
 
 /**
  * The two forms of keep and delete: the TypeScript of the Learnings module,
@@ -112,7 +112,7 @@ function learningsOver(
 		{ sha256: string; changedAt: number }
 	> = new Map(),
 ) {
-	return createLearnings({
+	return wireLearnings({
 		access: { openSpace: async () => {} },
 		folders: { folder: () => knowledge },
 		documents: {
@@ -271,7 +271,12 @@ describe.each(["keep", "delete"] as const)("%s, in both forms", (decision) => {
 	async function both(id: string, tree: Tree) {
 		const inTypeScript = await folderOf(tree);
 		const refusal = await learningsOver(inTypeScript)
-			.settle(NIGHT_SHIFT, "space-1", "p1", id, decision)
+			.settle(NIGHT_SHIFT, {
+				spaceId: "space-1",
+				projectId: "p1",
+				id,
+				decision,
+			})
 			.then(
 				() => null,
 				(error: unknown) => error,
@@ -359,7 +364,9 @@ describe("what the Gate lists", () => {
 				{ sha256: path, changedAt: path.length },
 			]),
 		);
-		const waiting = await learningsOver(knowledge, listed).waiting("p1");
+		const waiting = await learningsOver(knowledge, listed).waiting({
+			projectId: "p1",
+		});
 		expect(gate.files.trim().split(" ").sort()).toEqual(
 			waiting.map(({ id }) => id).sort(),
 		);
@@ -421,25 +428,23 @@ describe("after one note was settled on its own", () => {
 		const person = { id: "ada", name: "Ada" };
 		const byNote = async () => {
 			const knowledge = await folderOf(tree);
-			await learningsOver(knowledge).settleNote(
-				NIGHT_SHIFT,
-				"space-1",
-				"p1",
-				{ id: "run-1.s1.md", index: 0, note: "One." },
-				"keep",
-				person,
-			);
+			await learningsOver(knowledge).settleNote(NIGHT_SHIFT, {
+				spaceId: "space-1",
+				projectId: "p1",
+				note: { id: "run-1.s1.md", index: 0, note: "One." },
+				decision: "keep",
+				by: person,
+			});
 			return knowledge;
 		};
 
 		const inTypeScript = await byNote();
-		await learningsOver(inTypeScript).settle(
-			NIGHT_SHIFT,
-			"space-1",
-			"p1",
-			"run-1.s1.md",
-			"keep",
-		);
+		await learningsOver(inTypeScript).settle(NIGHT_SHIFT, {
+			spaceId: "space-1",
+			projectId: "p1",
+			id: "run-1.s1.md",
+			decision: "keep",
+		});
 
 		const byShell = await byNote();
 		const list = rendered("list", "");

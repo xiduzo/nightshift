@@ -645,7 +645,7 @@ describe("the learnings of a run", () => {
 		await exchange(a, b);
 
 		// B has no folder copy of them yet: the document and the Host's archive list them.
-		const waiting = await b.knowledge.learnings(["p1"]);
+		const waiting = await b.knowledge.learnings({ projectIds: ["p1"] });
 		expect(
 			waiting.map((w) => [w.id, w.runId, w.stepId, w.notes]).sort(),
 		).toEqual([
@@ -656,43 +656,39 @@ describe("the learnings of a run", () => {
 			waiting[1]?.proposedAt ?? 0,
 		);
 
-		await b.knowledge.settleLearning(
-			NIGHT_SHIFT,
-			"space-1",
-			"p1",
-			"run-1.s1.md",
-			"keep",
-		);
-		await b.knowledge.settleLearning(
-			NIGHT_SHIFT,
-			"space-1",
-			"p1",
-			"run-1.s2.md",
-			"delete",
-		);
+		await b.knowledge.settleLearning(NIGHT_SHIFT, {
+			spaceId: "space-1",
+			projectId: "p1",
+			id: "run-1.s1.md",
+			decision: "keep",
+		});
+		await b.knowledge.settleLearning(NIGHT_SHIFT, {
+			spaceId: "space-1",
+			projectId: "p1",
+			id: "run-1.s2.md",
+			decision: "delete",
+		});
 		await expect(
-			b.knowledge.settleLearning(
-				NIGHT_SHIFT,
-				"space-1",
-				"p1",
-				"run-1.s2.md",
-				"keep",
-			),
+			b.knowledge.settleLearning(NIGHT_SHIFT, {
+				spaceId: "space-1",
+				projectId: "p1",
+				id: "run-1.s2.md",
+				decision: "keep",
+			}),
 		).rejects.toThrow("This learning no longer waits.");
 		await expect(
-			b.knowledge.settleLearning(
-				NIGHT_SHIFT,
-				"space-1",
-				"p1",
-				"../x.md",
-				"keep",
-			),
+			b.knowledge.settleLearning(NIGHT_SHIFT, {
+				spaceId: "space-1",
+				projectId: "p1",
+				id: "../x.md",
+				decision: "keep",
+			}),
 		).rejects.toThrow("This learning no longer waits.");
-		expect(await b.knowledge.learnings(["p1"])).toEqual([]);
+		expect(await b.knowledge.learnings({ projectIds: ["p1"] })).toEqual([]);
 
 		// A gets the change as a Link brings it: the kept notes are what agents read.
 		await exchange(a, b);
-		expect(await a.knowledge.learnings(["p1"])).toEqual([]);
+		expect(await a.knowledge.learnings({ projectIds: ["p1"] })).toEqual([]);
 		await a.knowledge.listing("p1");
 		expect(await readProposals(a.dir)).toEqual([]);
 		const kept = await readFile(
@@ -991,16 +987,14 @@ describe("the learnings that wait", () => {
 		await writeFile(join(other, "run-2.s1.md"), "- Two.\n");
 		await a.knowledge.listing("p2");
 		expect(
-			(await a.knowledge.learnings(["p1", "p2"])).map((learning) => [
-				learning.projectId,
-				learning.id,
-				learning.notes,
-			]),
+			(await a.knowledge.learnings({ projectIds: ["p1", "p2"] })).map(
+				(learning) => [learning.projectId, learning.id, learning.notes],
+			),
 		).toEqual([
 			["p2", "run-2.s1.md", ["Two."]],
 			["p1", "run-1.s1.md", ["One."]],
 		]);
-		expect(await a.knowledge.learnings([])).toEqual([]);
+		expect(await a.knowledge.learnings({ projectIds: [] })).toEqual([]);
 	});
 });
 
@@ -1067,21 +1061,19 @@ describe("what waits changes, and the open screens hear", () => {
 		await (await stepProposes(a, "s2", ["Delete me."])).done();
 		a.told.length = 0;
 
-		await a.knowledge.settleLearning(
-			NIGHT_SHIFT,
-			"space-1",
-			"p1",
-			"run-1.s1.md",
-			"keep",
-		);
+		await a.knowledge.settleLearning(NIGHT_SHIFT, {
+			spaceId: "space-1",
+			projectId: "p1",
+			id: "run-1.s1.md",
+			decision: "keep",
+		});
 		expect(a.told).toEqual([a.heard]);
-		await a.knowledge.settleLearning(
-			NIGHT_SHIFT,
-			"space-1",
-			"p1",
-			"run-1.s2.md",
-			"delete",
-		);
+		await a.knowledge.settleLearning(NIGHT_SHIFT, {
+			spaceId: "space-1",
+			projectId: "p1",
+			id: "run-1.s2.md",
+			decision: "delete",
+		});
 		expect(a.told).toEqual([a.heard, a.heard]);
 		expect((await a.knowledge.listing("p1")).proposed).toBe(0);
 	});
@@ -1091,22 +1083,20 @@ describe("what waits changes, and the open screens hear", () => {
 		await (await stepProposes(a, "s1", ["Use bun."])).done();
 		a.told.length = 0;
 		await expect(
-			a.knowledge.settleLearning(
-				NIGHT_SHIFT,
-				"space-1",
-				"p1",
-				"../x.md",
-				"keep",
-			),
+			a.knowledge.settleLearning(NIGHT_SHIFT, {
+				spaceId: "space-1",
+				projectId: "p1",
+				id: "../x.md",
+				decision: "keep",
+			}),
 		).rejects.toThrow("This learning no longer waits.");
 		await expect(
-			a.knowledge.settleLearning(
-				NIGHT_SHIFT,
-				"space-1",
-				"p1",
-				"gone.md",
-				"keep",
-			),
+			a.knowledge.settleLearning(NIGHT_SHIFT, {
+				spaceId: "space-1",
+				projectId: "p1",
+				id: "gone.md",
+				decision: "keep",
+			}),
 		).rejects.toThrow("This learning no longer waits.");
 		expect(a.told).toEqual([]);
 	});
@@ -1145,13 +1135,12 @@ describe("what waits changes, and the open screens hear", () => {
 		await b.knowledge.listing("p1");
 		expect(b.told).toEqual([b.heard]);
 
-		await a.knowledge.settleLearning(
-			NIGHT_SHIFT,
-			"space-1",
-			"p1",
-			"run-1.s1.md",
-			"delete",
-		);
+		await a.knowledge.settleLearning(NIGHT_SHIFT, {
+			spaceId: "space-1",
+			projectId: "p1",
+			id: "run-1.s1.md",
+			decision: "delete",
+		});
 		await exchange(a, b);
 		await b.knowledge.listing("p1");
 		expect(b.told).toEqual([b.heard, b.heard]);

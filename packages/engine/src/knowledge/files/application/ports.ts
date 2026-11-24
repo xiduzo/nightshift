@@ -136,7 +136,7 @@ export type ContentArchive = {
  * @filledBy engine/knowledge
  */
 export type WaitingNotes = {
-	count(projectId: string): Promise<number>;
+	count(request: { projectId: string }): Promise<number>;
 };
 
 /**

@@ -19,12 +19,8 @@ import { createRunLog, knowledgeUseEvent } from "../log";
 import type { UsageNotes } from "../usage";
 import { type KnowledgeListing, type KnowledgeText, wireFiles } from "./files";
 import {
-	type FollowRunsDeps,
+	type Learnings,
 	type LearningsNotifications,
-	type NotePerson,
-	type ProjectLearning,
-	type RunLearnings,
-	type WaitingNote,
 	wireLearnings,
 } from "./learnings";
 import { type KnowledgeMap, wireMap } from "./map";
@@ -139,85 +135,15 @@ export type Knowledge = {
 	): Promise<PageReaderSetting>;
 
 	// The learnings.
-	/**
-	 * The learnings agents proposed that wait for a person in these
-	 * projects, newest first. Each is one step's proposed learnings.
-	 */
-	learnings(projectIds: readonly string[]): Promise<ProjectLearning[]>;
-	/**
-	 * Keeps or deletes one step's proposed learnings, as the review of learnings
-	 * (`kit:knowledge/review-learnings`) does: keep adds them to
-	 * `learnings/accepted/`, where agents read them, and both take them
-	 * out of `learnings/proposed/`. It holds the folder as a step does,
-	 * so the change goes to the Space when it ends, and the open screens
-	 * hear of it. Refuses a proposed learning that no longer waits, and one whose
-	 * content cannot be fetched now.
-	 */
-	settleLearning(
-		actor: Actor,
-		spaceId: string,
-		projectId: string,
-		id: string,
-		decision: "keep" | "delete",
-	): Promise<void>;
-	/**
-	 * Keeps or deletes one note of a learning that waits, not the whole
-	 * step's: a kept note goes to `learnings/accepted/` with who kept it and
-	 * when. The proposed file loses the note, and goes when none is left.
-	 * It holds the folder as `settleLearning` does, and refuses what it
-	 * refuses, and a note that no longer waits.
-	 */
-	settleNote(
-		actor: Actor,
-		spaceId: string,
-		projectId: string,
-		note: WaitingNote,
-		decision: "keep" | "delete",
-		by: NotePerson,
-	): Promise<void>;
-	/**
-	 * Keeps a note a person wrote, with who told it and when, in their own
-	 * file of `learnings/accepted/`: agents read it. With `replaces`, it
-	 * takes the place of a note that waits. It holds the folder as
-	 * `settleLearning` does.
-	 */
-	tellLearning(
-		actor: Actor,
-		spaceId: string,
-		projectId: string,
-		note: string,
-		by: NotePerson,
-		replaces?: WaitingNote,
-	): Promise<void>;
-	/**
-	 * Proposes what Night Shift learned from a run that ended, in the run's
-	 * own file in `learnings/proposed/`. It waits for a person as a step's
-	 * learnings do. No note: nothing is written.
-	 */
-	proposeFromRun(
-		projectId: string,
-		runId: string,
-		notes: readonly string[],
-	): Promise<void>;
-	/** The notes the project has on this computer, waiting and kept: what not to propose again. */
-	knownLearnings(projectId: string): Promise<string[]>;
-	/**
-	 * Whether Night Shift proposes learnings from the runs of the project
-	 * that ended (ADR 37): on unless a person turned it off.
-	 */
-	learnsFromRuns(projectId: string): Promise<boolean>;
-	/** Turns the learnings from runs on or off for the project, for every Device of its Space. */
-	setLearnsFromRuns(
-		actor: Actor,
-		spaceId: string,
-		projectId: string,
-		on: boolean,
-	): Promise<void>;
-	/**
-	 * The look back at the runs this computer walks (ADR 37): when one ends
-	 * with a signal, the Learner proposes what to learn, one look at a time.
-	 */
-	followRuns(deps: FollowRunsDeps): RunLearnings;
+	learnings: Learnings["ofProjects"];
+	settleLearning: Learnings["settle"];
+	settleNote: Learnings["settleNote"];
+	tellLearning: Learnings["tell"];
+	proposeFromRun: Learnings["proposeFromRun"];
+	knownLearnings: Learnings["known"];
+	learnsFromRuns: Learnings["learnsFromRuns"];
+	setLearnsFromRuns: Learnings["setLearnsFromRuns"];
+	followRuns: Learnings["followRuns"];
 
 	// The sources, the Map and the review.
 	/**

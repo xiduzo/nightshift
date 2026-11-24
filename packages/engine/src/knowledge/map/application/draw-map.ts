@@ -37,7 +37,7 @@ export const drawMap =
 			ports.documents.open(projectId).then((document) => document.entries()),
 			ports.index.mapStamp(projectId),
 			ports.asked.asked(projectId),
-			ports.learnings.waiting(projectId, { onlyHere: true }),
+			ports.learnings.waiting({ projectId, onlyHere: true }),
 			ports.notTopics.read(projectId).then(parseNotTopics),
 		]);
 		const spaceFiles = [...listed.keys()].filter(isReadable);

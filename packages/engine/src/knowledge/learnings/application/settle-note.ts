@@ -24,7 +24,6 @@ export type SettleNotePorts = {
 
 /** One note of a learning that waits, what a person decided, and who. */
 export type SettleNote = {
-	actor: Actor;
 	spaceId: string;
 	projectId: string;
 	note: WaitingNote;
@@ -43,14 +42,10 @@ export type SettleNote = {
  */
 export const settleNote =
 	(ports: SettleNotePorts) =>
-	async ({
-		actor,
-		spaceId,
-		projectId,
-		note,
-		decision,
-		by,
-	}: SettleNote): Promise<void> => {
+	async (
+		actor: Actor,
+		{ spaceId, projectId, note, decision, by }: SettleNote,
+	): Promise<void> => {
 		await ports.access.openSpace(actor, { spaceId, need: CHANGES_KNOWLEDGE });
 		if (!proposedLearningOf(note.id)) throw learningGone();
 		const hold = await ports.holds.startStep(projectId);

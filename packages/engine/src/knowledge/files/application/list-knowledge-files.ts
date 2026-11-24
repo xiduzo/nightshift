@@ -41,7 +41,7 @@ export const listKnowledgeFiles =
 		const spaceId = await ports.status.spaceOf(projectId);
 		return {
 			files: listedFiles((await ports.documents.open(projectId)).entries()),
-			proposed: await ports.notes.count(projectId),
+			proposed: await ports.notes.count({ projectId }),
 			shared: spaceId ? await ports.status.isShared(spaceId) : false,
 			olderHost: spaceId ? ports.status.isOlder(spaceId) : false,
 			...(await ports.documents.open(projectId).then((document) => ({

@@ -1,7 +1,5 @@
-import type { AgentEvent } from "@nightshift/agents/types";
 import { now as timeNow } from "@nightshift/time";
 import type { Access } from "../../access";
-import type { Actor } from "../../contract";
 import type { TranscriptEntry } from "../../log";
 import type { CloseNotes } from "../search";
 import type {
@@ -30,19 +28,8 @@ import { setLearnsFromRuns } from "./application/set-learns-from-runs";
 import { settleLearning } from "./application/settle-learning";
 import { settleNote } from "./application/settle-note";
 import { tellLearning } from "./application/tell-learning";
-import {
-	createLookQueue,
-	LOOK_TIMEOUT_MS,
-	type RunLookBack,
-} from "./domain/look-back";
+import { createLookQueue, LOOK_TIMEOUT_MS } from "./domain/look-back";
 import type { ListedReads } from "./domain/proposed";
-import type {
-	LearningStep,
-	NotePerson,
-	ProjectLearning,
-	WaitingLearning,
-	WaitingNote,
-} from "./domain/waiting";
 
 /**
  * The wiring of knowledge/learnings: the one place that builds its real adapters
@@ -82,7 +69,7 @@ export type FollowRunsDeps = {
 /** Learnings from runs that ended (ADR 37), one look at a time. */
 export type RunLearnings = {
 	/** Looks back at one run of a Space now, in the queue. */
-	lookBack(spaceId: string, runId: string): Promise<RunLookBack>;
+	lookBack: ReturnType<typeof lookBackAtRun>;
 	/** Looks back at each run this computer walks when it ends. Returns the stop. */
 	follow(): () => void;
 	/** Resolves when every look in the queue is done. */
@@ -91,72 +78,19 @@ export type RunLearnings = {
 
 /** The learnings of the projects on this computer, bound to their ports. */
 export type Learnings = {
-	/** Adds what an agent of a run's step proposes to learn to its file (`proposeLearnings`). */
-	propose(
-		projectId: string,
-		step: LearningStep,
-		notes: readonly string[],
-	): Promise<void>;
-	/** Proposes what Night Shift learned from a run that ended (`proposeFromRun`). */
-	proposeFromRun(
-		projectId: string,
-		runId: string,
-		notes: readonly string[],
-	): Promise<void>;
-	/** The notes the project has on this computer, waiting and kept (`listKnownLearnings`). */
-	known(projectId: string): Promise<string[]>;
-	/** The session's events, with the learnings of its reports proposed (`keepReportedLearnings`). */
-	keepReported(
-		events: AsyncIterable<AgentEvent>,
-		projectId: string,
-		step: LearningStep,
-	): AsyncGenerator<AgentEvent>;
-	/** What waits for a person, newest first (`listWaitingLearnings`). */
-	waiting(
-		projectId: string,
-		options?: { onlyHere?: boolean },
-	): Promise<WaitingLearning[]>;
-	/** What waits for a person in these projects, each with its project, newest first (`listProjectLearnings`). */
-	ofProjects(projectIds: readonly string[]): Promise<ProjectLearning[]>;
-	/** How many notes wait (`countWaitingNotes`). */
-	count(projectId: string): Promise<number>;
-	/** Keeps or deletes one step's proposed learnings (`settleLearning`). */
-	settle(
-		actor: Actor,
-		spaceId: string,
-		projectId: string,
-		id: string,
-		decision: "keep" | "delete",
-	): Promise<void>;
-	/** Keeps or deletes one note of a learning that waits (`settleNote`). */
-	settleNote(
-		actor: Actor,
-		spaceId: string,
-		projectId: string,
-		note: WaitingNote,
-		decision: "keep" | "delete",
-		by: NotePerson,
-	): Promise<void>;
-	/** Keeps a note a person wrote (`tellLearning`). */
-	tell(
-		actor: Actor,
-		spaceId: string,
-		projectId: string,
-		note: string,
-		by: NotePerson,
-		replaces?: WaitingNote,
-	): Promise<void>;
-	/** A reconcile ended (`hearReconcile`). */
+	propose: ReturnType<typeof proposeLearnings>;
+	proposeFromRun: ReturnType<typeof proposeFromRun>;
+	known: ReturnType<typeof listKnownLearnings>;
+	keepReported: ReturnType<typeof keepReportedLearnings>;
+	waiting: ReturnType<typeof listWaitingLearnings>;
+	ofProjects: ReturnType<typeof listProjectLearnings>;
+	count: ReturnType<typeof countWaitingNotes>;
+	settle: ReturnType<typeof settleLearning>;
+	settleNote: ReturnType<typeof settleNote>;
+	tell: ReturnType<typeof tellLearning>;
 	reconciled: ReturnType<typeof hearReconcile>;
-	/** Whether Night Shift proposes learnings from the project's runs (`readLearnsFromRuns`). */
-	learnsFromRuns(projectId: string): Promise<boolean>;
-	/** Turns the learnings from runs on or off (`setLearnsFromRuns`). */
-	setLearnsFromRuns(
-		actor: Actor,
-		spaceId: string,
-		projectId: string,
-		on: boolean,
-	): Promise<void>;
+	learnsFromRuns: ReturnType<typeof readLearnsFromRuns>;
+	setLearnsFromRuns: ReturnType<typeof setLearnsFromRuns>;
 	/** The look back at runs that end, over these learnings (`lookBackAtRun`). */
 	followRuns(deps: FollowRunsDeps): RunLearnings;
 };
@@ -179,62 +113,23 @@ export function wireLearnings(deps: LearningsDeps): Learnings {
 	});
 	const ofProjects = listProjectLearnings({ waiting });
 	const count = countWaitingNotes({ status, documents, archive });
-	const settle = settleLearning({
-		access: deps.access,
-		folder,
-		documents,
-		holds,
-	});
-	const settleOne = settleNote({
-		access: deps.access,
-		folder,
-		documents,
-		holds,
-		now,
-	});
-	const tell = tellLearning({
-		access: deps.access,
-		folder,
-		documents,
-		holds,
-		now,
-	});
 	const learnsFromRuns = readLearnsFromRuns({ documents });
-	const setLearns = setLearnsFromRuns({ access: deps.access, documents });
+	const { access } = deps;
 
 	return {
-		propose: (projectId, step, notes) => propose({ projectId, step, notes }),
-		proposeFromRun: (projectId, runId, notes) =>
-			fromRun({ projectId, runId, notes }),
-		known: (projectId) => known({ projectId }),
-		keepReported: (events, projectId, step) =>
-			keepReported({ events, projectId, step }),
-		waiting: (projectId, options) =>
-			waiting({
-				projectId,
-				...(options?.onlyHere !== undefined
-					? { onlyHere: options.onlyHere }
-					: {}),
-			}),
-		ofProjects: (projectIds) => ofProjects({ projectIds }),
-		count: (projectId) => count({ projectId }),
-		settle: (actor, spaceId, projectId, id, decision) =>
-			settle({ actor, spaceId, projectId, id, decision }),
-		settleNote: (actor, spaceId, projectId, note, decision, by) =>
-			settleOne({ actor, spaceId, projectId, note, decision, by }),
-		tell: (actor, spaceId, projectId, note, by, replaces) =>
-			tell({
-				actor,
-				spaceId,
-				projectId,
-				note,
-				by,
-				...(replaces ? { replaces } : {}),
-			}),
+		propose,
+		proposeFromRun: fromRun,
+		known,
+		keepReported,
+		waiting,
+		ofProjects,
+		count,
+		settle: settleLearning({ access, folder, documents, holds }),
+		settleNote: settleNote({ access, folder, documents, holds, now }),
+		tell: tellLearning({ access, folder, documents, holds, now }),
 		reconciled: hearReconcile({ notifications, known: new Map() }),
-		learnsFromRuns: (projectId) => learnsFromRuns({ projectId }),
-		setLearnsFromRuns: (actor, spaceId, projectId, on) =>
-			setLearns({ actor, spaceId, projectId, on }),
+		learnsFromRuns,
+		setLearnsFromRuns: setLearnsFromRuns({ access, documents }),
 		followRuns(late) {
 			const queue = createLookQueue();
 			const lookBack = lookBackAtRun({
@@ -248,7 +143,7 @@ export function wireLearnings(deps: LearningsDeps): Learnings {
 				proposeFromRun: fromRun,
 			});
 			return {
-				lookBack: (spaceId, runId) => lookBack({ spaceId, runId }),
+				lookBack,
 				follow: () => followEndedRuns(late.runs, lookBack),
 				idle: queue.idle,
 			};

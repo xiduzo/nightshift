@@ -61,7 +61,7 @@ export const knowledgeLearnings = {
 					? [(await projectIn(context, projectId)).projectId]
 					: (await context.space.listProjects()).map(({ id }) => id);
 			const [learnings, mayDecide] = await Promise.all([
-				context.knowledge.learnings(projectIds),
+				context.knowledge.learnings({ projectIds }),
 				context.access.can(MAY.changeKnowledge),
 			]);
 			return learnings.map((learning) => ({ ...learning, mayDecide }));
@@ -78,13 +78,12 @@ export const knowledgeLearnings = {
 		})
 		.output(output(z.void()))
 		.handler(({ context, input }) =>
-			context.knowledge.settleLearning(
-				context.actor,
-				context.spaceId,
-				input.projectId,
-				input.id,
-				"keep",
-			),
+			context.knowledge.settleLearning(context.actor, {
+				spaceId: context.spaceId,
+				projectId: input.projectId,
+				id: input.id,
+				decision: "keep",
+			}),
 		),
 	/** Deletes one step's proposed learnings. A role that may start runs, as for keep. */
 	deleteLearning: knowledgeProcedure(learningInput)
@@ -93,13 +92,12 @@ export const knowledgeLearnings = {
 		})
 		.output(output(z.void()))
 		.handler(({ context, input }) =>
-			context.knowledge.settleLearning(
-				context.actor,
-				context.spaceId,
-				input.projectId,
-				input.id,
-				"delete",
-			),
+			context.knowledge.settleLearning(context.actor, {
+				spaceId: context.spaceId,
+				projectId: input.projectId,
+				id: input.id,
+				decision: "delete",
+			}),
 		),
 	/**
 	 * Keeps or deletes one note of a learning that waits, not the whole
@@ -118,14 +116,13 @@ export const knowledgeLearnings = {
 		})
 		.output(output(z.void()))
 		.handler(({ context, input }) =>
-			context.knowledge.settleNote(
-				context.actor,
-				context.spaceId,
-				input.projectId,
-				waitingNote(input),
-				input.decision,
-				notePerson(context),
-			),
+			context.knowledge.settleNote(context.actor, {
+				spaceId: context.spaceId,
+				projectId: input.projectId,
+				note: waitingNote(input),
+				decision: input.decision,
+				by: notePerson(context),
+			}),
 		),
 	/**
 	 * Keeps a note the person writes, with who told it and when: agents read
@@ -147,16 +144,13 @@ export const knowledgeLearnings = {
 			const { projectId, note, replaces } = input;
 			const by = notePerson(context);
 			const { actor, spaceId } = context;
-			return replaces
-				? context.knowledge.tellLearning(
-						actor,
-						spaceId,
-						projectId,
-						note,
-						by,
-						waitingNote(replaces),
-					)
-				: context.knowledge.tellLearning(actor, spaceId, projectId, note, by);
+			return context.knowledge.tellLearning(actor, {
+				spaceId,
+				projectId,
+				note,
+				by,
+				...(replaces ? { replaces: waitingNote(replaces) } : {}),
+			});
 		}),
 	/**
 	 * Turns the learnings from runs that ended on or off for the project, on
@@ -172,12 +166,11 @@ export const knowledgeLearnings = {
 		})
 		.output(output(z.object({ on: z.boolean() })))
 		.handler(async ({ context, input }) => {
-			await context.knowledge.setLearnsFromRuns(
-				context.actor,
-				context.spaceId,
-				input.projectId,
-				input.on,
-			);
+			await context.knowledge.setLearnsFromRuns(context.actor, {
+				spaceId: context.spaceId,
+				projectId: input.projectId,
+				on: input.on,
+			});
 			return { on: input.on };
 		}),
 };

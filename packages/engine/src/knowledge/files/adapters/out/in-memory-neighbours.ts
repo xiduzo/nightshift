@@ -91,7 +91,7 @@ export function inMemoryContentArchive() {
 /** How many notes wait, in memory. */
 export function inMemoryWaitingNotes() {
 	const twin = {
-		count: async (_projectId: string) => twin.notes,
+		count: async () => twin.notes,
 		notes: 0,
 	};
 	return twin satisfies WaitingNotes;

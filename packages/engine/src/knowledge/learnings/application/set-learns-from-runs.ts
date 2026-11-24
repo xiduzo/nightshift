@@ -12,7 +12,6 @@ export type SetLearnsFromRunsPorts = {
 
 /** The project, and whether Night Shift learns from its runs. */
 export type SetLearnsFromRuns = {
-	actor: Actor;
 	spaceId: string;
 	projectId: string;
 	on: boolean;
@@ -26,12 +25,10 @@ export type SetLearnsFromRuns = {
  */
 export const setLearnsFromRuns =
 	(ports: SetLearnsFromRunsPorts) =>
-	async ({
-		actor,
-		spaceId,
-		projectId,
-		on,
-	}: SetLearnsFromRuns): Promise<void> => {
+	async (
+		actor: Actor,
+		{ spaceId, projectId, on }: SetLearnsFromRuns,
+	): Promise<void> => {
 		await ports.access.openSpace(actor, { spaceId, need: CHANGES_KNOWLEDGE });
 		await (await ports.documents.open(projectId)).setLearnsFromRuns(on);
 	};

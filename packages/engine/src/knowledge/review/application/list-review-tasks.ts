@@ -38,7 +38,7 @@ export const listReviewTasks =
 	async ({ projectId, space }: ListReviewTasks): Promise<ReviewTask[]> => {
 		const [syncs, waiting, asked, used] = await Promise.all([
 			ports.sources.sourcesIn(space).syncs(projectId),
-			ports.learnings.ofProjects([projectId]),
+			ports.learnings.ofProjects({ projectIds: [projectId] }),
 			ports.asked({ projectId }),
 			ports.use({ projectId }),
 		]);

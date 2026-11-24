@@ -631,12 +631,12 @@ const ROUTES: Route[] = [
 	route("knowledge.get", project, "session", ["space.listProjects", "knowledge.sources"]),
 	route("knowledge.review", project, "session", "knowledge.review", ["p1", any]),
 	route("knowledge.files", project, "session", "knowledge.listing", ["p1"]),
-	route("knowledge.learnings", project, "session", "knowledge.learnings", [["p1"]]),
-	route("knowledge.keepLearning", learning, START, "knowledge.settleLearning", [ASKING, SPACE, "p1", "l1", "keep"]),
-	route("knowledge.deleteLearning", learning, START, "knowledge.settleLearning", [ASKING, SPACE, "p1", "l1", "delete"]),
-	route("knowledge.settleNote", { ...project, learningId: "l1", index: 1, note: "One.", decision: "keep" }, START, "knowledge.settleNote", [ASKING, SPACE, "p1", { id: "l1", index: 1, note: "One." }, "keep", like({ id: PERSON })]),
-	route("knowledge.tell", { ...project, note: " Two. " }, START, "knowledge.tellLearning", [ASKING, SPACE, "p1", "Two.", like({ id: PERSON })]),
-	route("knowledge.tell", { ...project, note: "Two.", replaces: { learningId: "l1", index: 0 } }, START, "knowledge.tellLearning", [ASKING, SPACE, "p1", "Two.", like({ id: PERSON }), { id: "l1", index: 0 }]),
+	route("knowledge.learnings", project, "session", "knowledge.learnings", [{ projectIds: ["p1"] }]),
+	route("knowledge.keepLearning", learning, START, "knowledge.settleLearning", [ASKING, { spaceId: SPACE, projectId: "p1", id: "l1", decision: "keep" }]),
+	route("knowledge.deleteLearning", learning, START, "knowledge.settleLearning", [ASKING, { spaceId: SPACE, projectId: "p1", id: "l1", decision: "delete" }]),
+	route("knowledge.settleNote", { ...project, learningId: "l1", index: 1, note: "One.", decision: "keep" }, START, "knowledge.settleNote", [ASKING, { spaceId: SPACE, projectId: "p1", note: { id: "l1", index: 1, note: "One." }, decision: "keep", by: like({ id: PERSON }) }]),
+	route("knowledge.tell", { ...project, note: " Two. " }, START, "knowledge.tellLearning", [ASKING, { spaceId: SPACE, projectId: "p1", note: "Two.", by: like({ id: PERSON }) }]),
+	route("knowledge.tell", { ...project, note: "Two.", replaces: { learningId: "l1", index: 0 } }, START, "knowledge.tellLearning", [ASKING, { spaceId: SPACE, projectId: "p1", note: "Two.", by: like({ id: PERSON }), replaces: { id: "l1", index: 0 } }]),
 	route("knowledge.saveSource", { ...project, source: webSource }, SAVE, "knowledge.sources", [any], { given: { knowledge: { sources: sourcesOf(SAVE) } } }),
 	route("knowledge.removeSource", { ...flowRef, removeFiles: false }, { flow: ["remove"] }, "knowledge.sources", [any], { given: { knowledge: { sources: sourcesOf({ flow: ["remove"] }) } } }),
 	route("knowledge.syncSource", flowRef, START, "knowledge.sources", [any], { given: { knowledge: { sources: sourcesOf(START) } } }),
@@ -649,7 +649,7 @@ const ROUTES: Route[] = [
 	route("knowledge.markQuestion", { ...project, query: "q", answers: ["a.md"] }, START, "knowledge.markQuestion", [ASKING, SPACE, "p1", { query: "q", answers: ["a.md"], by: PERSON }]),
 	route("knowledge.evaluate", project, "session", "knowledge.evaluate", ["p1"]),
 	route("knowledge.setMeaning", { ...project, on: true }, START, "knowledge.setMeaning", [ASKING, SPACE, "p1", true]),
-	route("knowledge.setLearnsFromRuns", { ...project, on: false }, START, "knowledge.setLearnsFromRuns", [ASKING, SPACE, "p1", false]),
+	route("knowledge.setLearnsFromRuns", { ...project, on: false }, START, "knowledge.setLearnsFromRuns", [ASKING, { spaceId: SPACE, projectId: "p1", on: false }]),
 	route("knowledge.setReader", { ...project, reader: { kind: "jina" } }, START, "knowledge.setReader", [ASKING, SPACE, "p1", { kind: "jina" }]),
 	route("knowledge.look", { ...project, urls: ["https://example.com/docs/"] }, SAVE, "knowledge.look", [ASKING, SPACE, "p1", ["https://example.com/docs/"]]),
 	route("knowledge.use", project, "session", "knowledge.use", ["p1"]),
@@ -1147,7 +1147,7 @@ describe("a procedure keyed by a project", () => {
 		await call(appRouter.knowledge.learnings, undefined, { context });
 		expect(calls.at(-1)).toMatchObject({
 			method: "knowledge.learnings",
-			args: [["p1"]],
+			args: [{ projectIds: ["p1"] }],
 		});
 		expect(
 			await errorOf(

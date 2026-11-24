@@ -32,8 +32,7 @@ function setup(notes = ["One.", "Two."]) {
 describe("settleNote", () => {
 	test("keeps one note with who kept it and when, and leaves the others waiting", async () => {
 		const ports = setup();
-		await settleNote(ports)({
-			actor: NIGHT_SHIFT,
+		await settleNote(ports)(NIGHT_SHIFT, {
 			spaceId: "space-1",
 			projectId: "p1",
 			note: { id: "run-1.s1.md", index: 0, note: "One." },
@@ -49,8 +48,7 @@ describe("settleNote", () => {
 
 	test("a delete of the last note keeps nothing, and the proposed file goes", async () => {
 		const ports = setup(["One."]);
-		await settleNote(ports)({
-			actor: NIGHT_SHIFT,
+		await settleNote(ports)(NIGHT_SHIFT, {
 			spaceId: "space-1",
 			projectId: "p1",
 			note: { id: "run-1.s1.md", index: 0 },
@@ -62,8 +60,7 @@ describe("settleNote", () => {
 
 	test("finds a note that moved by its text, and refuses one that is gone", async () => {
 		const ports = setup();
-		await settleNote(ports)({
-			actor: NIGHT_SHIFT,
+		await settleNote(ports)(NIGHT_SHIFT, {
 			spaceId: "space-1",
 			projectId: "p1",
 			note: { id: "run-1.s1.md", index: 1, note: "One." },
@@ -72,8 +69,7 @@ describe("settleNote", () => {
 		});
 		expect(ports.folder.read("p1", PROPOSED)).toContain("- Two.");
 		const refusal = await refusalOf(
-			settleNote(ports)({
-				actor: NIGHT_SHIFT,
+			settleNote(ports)(NIGHT_SHIFT, {
 				spaceId: "space-1",
 				projectId: "p1",
 				note: { id: "run-1.s1.md", index: 0, note: "One." },
@@ -86,8 +82,7 @@ describe("settleNote", () => {
 		);
 		const missing = (id: string, index: number) =>
 			refusalOf(
-				settleNote(ports)({
-					actor: NIGHT_SHIFT,
+				settleNote(ports)(NIGHT_SHIFT, {
 					spaceId: "space-1",
 					projectId: "p1",
 					note: { id, index },
@@ -108,8 +103,7 @@ describe("settleNote", () => {
 		const ports = inMemoryLearningsPorts();
 		await ports.sync.publish("p1", PROPOSED, "- One.\n", 1, "nowhere");
 		const refusal = await refusalOf(
-			settleNote(ports)({
-				actor: NIGHT_SHIFT,
+			settleNote(ports)(NIGHT_SHIFT, {
 				spaceId: "space-1",
 				projectId: "p1",
 				note: { id: "run-1.s1.md", index: 0 },
@@ -126,8 +120,7 @@ describe("settleNote", () => {
 			await ports.access.whoMay(
 				"space-1",
 				(actor) =>
-					settleNote(ports)({
-						actor,
+					settleNote(ports)(actor, {
 						spaceId: "space-1",
 						projectId: "p1",
 						note: { id: "run-1.s1.md", index: 0 },

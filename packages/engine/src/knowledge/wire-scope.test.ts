@@ -58,19 +58,43 @@ const requests: Record<
 	],
 	settleLearning: [
 		CHANGES,
-		(k) => k.settleLearning(ACTOR, "space", "project", "id", "keep"),
+		(k) =>
+			k.settleLearning(ACTOR, {
+				spaceId: "space",
+				projectId: "project",
+				id: "id",
+				decision: "keep",
+			}),
 	],
 	settleNote: [
 		CHANGES,
-		(k) => k.settleNote(ACTOR, "space", "project", NOTE, "keep", BY),
+		(k) =>
+			k.settleNote(ACTOR, {
+				spaceId: "space",
+				projectId: "project",
+				note: NOTE,
+				decision: "keep",
+				by: BY,
+			}),
 	],
 	tellLearning: [
 		CHANGES,
-		(k) => k.tellLearning(ACTOR, "space", "project", "note", BY),
+		(k) =>
+			k.tellLearning(ACTOR, {
+				spaceId: "space",
+				projectId: "project",
+				note: "note",
+				by: BY,
+			}),
 	],
 	setLearnsFromRuns: [
 		CHANGES,
-		(k) => k.setLearnsFromRuns(ACTOR, "space", "project", true),
+		(k) =>
+			k.setLearnsFromRuns(ACTOR, {
+				spaceId: "space",
+				projectId: "project",
+				on: true,
+			}),
 	],
 	markQuestion: [
 		CHANGES,

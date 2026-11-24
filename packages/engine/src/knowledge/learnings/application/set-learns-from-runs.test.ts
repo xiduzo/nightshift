@@ -18,19 +18,9 @@ describe("setLearnsFromRuns", () => {
 			access: inMemoryAccess(),
 			documents,
 		});
-		await set({
-			actor: NIGHT_SHIFT,
-			spaceId: "space-1",
-			projectId: "p1",
-			on: false,
-		});
+		await set(NIGHT_SHIFT, { spaceId: "space-1", projectId: "p1", on: false });
 		expect(await on("p1")).toBe(false);
-		await set({
-			actor: NIGHT_SHIFT,
-			spaceId: "space-1",
-			projectId: "p1",
-			on: true,
-		});
+		await set(NIGHT_SHIFT, { spaceId: "space-1", projectId: "p1", on: true });
 		expect(await on("p1")).toBe(true);
 		expect(documents.changes).toEqual(["p1", "p1"]);
 	});
@@ -44,8 +34,7 @@ describe("setLearnsFromRuns", () => {
 			await ports.access.whoMay(
 				"space-1",
 				(actor) =>
-					setLearnsFromRuns(ports)({
-						actor,
+					setLearnsFromRuns(ports)(actor, {
 						spaceId: "space-1",
 						projectId: "p1",
 						on: false,

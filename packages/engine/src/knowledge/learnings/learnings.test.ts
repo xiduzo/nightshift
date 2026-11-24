@@ -28,9 +28,13 @@ describe("keepReported", () => {
 			yield* events;
 		}
 		const seen: AgentEvent[] = [];
-		for await (const event of a.learnings.keepReported(session(), "p1", {
-			runId: "run-1",
-			stepId: "s1",
+		for await (const event of a.learnings.keepReported({
+			events: session(),
+			projectId: "p1",
+			step: {
+				runId: "run-1",
+				stepId: "s1",
+			},
 		})) {
 			seen.push(event);
 		}
@@ -54,11 +58,11 @@ describe("waiting and count", () => {
 		await a.put("learnings/proposed/run-3.txt", "- Not markdown.\n");
 		await a.reconciler.reconcile("p1");
 
-		const waiting = await a.learnings.waiting("p1");
+		const waiting = await a.learnings.waiting({ projectId: "p1" });
 		expect(waiting.map(({ id, notes }) => [id, notes])).toEqual([
 			["run-1.s1.md", ["One.", "Two."]],
 		]);
-		expect(await a.learnings.count("p1")).toBe(2);
+		expect(await a.learnings.count({ projectId: "p1" })).toBe(2);
 		expect((await a.reader.listing("p1")).proposed).toBe(2);
 	});
 
@@ -70,8 +74,10 @@ describe("waiting and count", () => {
 			"# Learnings of run run-1\n\n- \n- One.\n-  \nProse.\n",
 		);
 		await a.reconciler.reconcile("p1");
-		expect((await a.learnings.waiting("p1"))[0]?.notes).toEqual(["One."]);
-		expect(await a.learnings.count("p1")).toBe(1);
+		expect((await a.learnings.waiting({ projectId: "p1" }))[0]?.notes).toEqual([
+			"One.",
+		]);
+		expect(await a.learnings.count({ projectId: "p1" })).toBe(1);
 	});
 
 	test("the count asks no Host: a Host that never answers cannot hold the page", async () => {
@@ -91,7 +97,7 @@ describe("waiting and count", () => {
 		await syncDocuments(a, stalled);
 		expect(kept.size).toBe(1);
 
-		expect(await stalled.learnings.count("p1")).toBe(1);
+		expect(await stalled.learnings.count({ projectId: "p1" })).toBe(1);
 		expect(asked).toBe(0);
 		resolve(null);
 	});
@@ -131,11 +137,11 @@ describe("waiting and count", () => {
 		await syncDocuments(a, b);
 
 		state.down = true;
-		const waiting = await b.learnings.waiting("p1");
+		const waiting = await b.learnings.waiting({ projectId: "p1" });
 		expect(waiting.map(({ notes }) => notes)).toEqual([[], [], []]);
 		expect(asked).toBe(1);
 		state.down = false;
-		const back = await b.learnings.waiting("p1");
+		const back = await b.learnings.waiting({ projectId: "p1" });
 		expect(back.map(({ notes }) => notes.length)).toEqual([1, 1, 1]);
 	});
 
@@ -148,14 +154,16 @@ describe("waiting and count", () => {
 		await syncDocuments(a, b);
 
 		state.down = true;
-		expect((await b.learnings.waiting("p1"))[0]?.notes).toEqual([]);
-		expect(await b.learnings.count("p1")).toBe(1);
+		expect((await b.learnings.waiting({ projectId: "p1" }))[0]?.notes).toEqual(
+			[],
+		);
+		expect(await b.learnings.count({ projectId: "p1" })).toBe(1);
 		state.down = false;
-		expect((await b.learnings.waiting("p1"))[0]?.notes).toEqual([
+		expect((await b.learnings.waiting({ projectId: "p1" }))[0]?.notes).toEqual([
 			"One.",
 			"Two.",
 		]);
-		expect(await b.learnings.count("p1")).toBe(2);
+		expect(await b.learnings.count({ projectId: "p1" })).toBe(2);
 	});
 
 	test("only here: the Host is not asked, and what is not here has no notes", async () => {
@@ -166,14 +174,20 @@ describe("waiting and count", () => {
 		await a.reconciler.reconcile("p1");
 		await syncDocuments(a, b);
 
-		const onlyHere = await b.learnings.waiting("p1", { onlyHere: true });
+		const onlyHere = await b.learnings.waiting({
+			projectId: "p1",
+			onlyHere: true,
+		});
 		expect(onlyHere.map(({ id, notes }) => [id, notes])).toEqual([
 			["run-1.md", []],
 		]);
 		expect(
-			(await a.learnings.waiting("p1", { onlyHere: true }))[0]?.notes,
+			(await a.learnings.waiting({ projectId: "p1", onlyHere: true }))[0]
+				?.notes,
 		).toEqual(["One."]);
-		expect((await b.learnings.waiting("p1"))[0]?.notes).toEqual(["One."]);
+		expect((await b.learnings.waiting({ projectId: "p1" }))[0]?.notes).toEqual([
+			"One.",
+		]);
 	});
 
 	test("the newest come first", async () => {
@@ -182,10 +196,9 @@ describe("waiting and count", () => {
 		await a.put("learnings/proposed/run-1.md", "- Old.\n", 1_000_000);
 		await a.put("learnings/proposed/run-2.md", "- New.\n", 2_000_000);
 		await a.reconciler.reconcile("p1");
-		expect((await a.learnings.waiting("p1")).map(({ id }) => id)).toEqual([
-			"run-2.md",
-			"run-1.md",
-		]);
+		expect(
+			(await a.learnings.waiting({ projectId: "p1" })).map(({ id }) => id),
+		).toEqual(["run-2.md", "run-1.md"]);
 	});
 });
 
@@ -200,10 +213,20 @@ describe("settle", () => {
 
 		state.down = true;
 		await expect(
-			b.learnings.settle(NIGHT_SHIFT, "space-1", "p1", "run-1.md", "keep"),
+			b.learnings.settle(NIGHT_SHIFT, {
+				spaceId: "space-1",
+				projectId: "p1",
+				id: "run-1.md",
+				decision: "keep",
+			}),
 		).rejects.toThrow("Night Shift cannot get this learning now.");
 		state.down = false;
-		await b.learnings.settle(NIGHT_SHIFT, "space-1", "p1", "run-1.md", "keep");
+		await b.learnings.settle(NIGHT_SHIFT, {
+			spaceId: "space-1",
+			projectId: "p1",
+			id: "run-1.md",
+			decision: "keep",
+		});
 		expect(await b.read("learnings/accepted/run-1.md")).toBe("- One.\n");
 		expect(await b.has("learnings/proposed/run-1.md")).toBe(false);
 	});
@@ -227,22 +250,21 @@ describe("one note at a time", () => {
 
 	test("keeps one note with who kept it and when, and leaves the others waiting", async () => {
 		const a = await waitingOne();
-		await a.learnings.settleNote(
-			NIGHT_SHIFT,
-			"space-1",
-			"p1",
-			{ id: "run-1.s1.md", index: 1, note: "Two." },
-			"keep",
-			ada,
-		);
+		await a.learnings.settleNote(NIGHT_SHIFT, {
+			spaceId: "space-1",
+			projectId: "p1",
+			note: { id: "run-1.s1.md", index: 1, note: "Two." },
+			decision: "keep",
+			by: ada,
+		});
 		expect(await a.read("learnings/accepted/run-1.s1.md")).toBe(
 			`# Learnings of run run-1\n\nWhat the agents of run run-1 proposed to learn about this project.\n\n- Two.\n  Kept by Ada Lovelace on ${today}.\n`,
 		);
-		expect((await a.learnings.waiting("p1"))[0]?.notes).toEqual([
+		expect((await a.learnings.waiting({ projectId: "p1" }))[0]?.notes).toEqual([
 			"One.",
 			"Three.",
 		]);
-		expect(await a.learnings.count("p1")).toBe(2);
+		expect(await a.learnings.count({ projectId: "p1" })).toBe(2);
 		// The reconcile at the end put it in the Space, and the screens heard.
 		expect(a.told).toEqual([[a.sandbox.spaceId, "p1"]]);
 	});
@@ -250,30 +272,27 @@ describe("one note at a time", () => {
 	test("a second kept note adds to the file, and a delete keeps nothing", async () => {
 		const a = await waitingOne();
 		const at = { id: "run-1.s1.md" };
-		await a.learnings.settleNote(
-			NIGHT_SHIFT,
-			"space-1",
-			"p1",
-			{ ...at, index: 0 },
-			"keep",
-			ada,
-		);
-		await a.learnings.settleNote(
-			NIGHT_SHIFT,
-			"space-1",
-			"p1",
-			{ ...at, index: 0 },
-			"delete",
-			ada,
-		);
-		await a.learnings.settleNote(
-			NIGHT_SHIFT,
-			"space-1",
-			"p1",
-			{ ...at, index: 0 },
-			"keep",
-			ada,
-		);
+		await a.learnings.settleNote(NIGHT_SHIFT, {
+			spaceId: "space-1",
+			projectId: "p1",
+			note: { ...at, index: 0 },
+			decision: "keep",
+			by: ada,
+		});
+		await a.learnings.settleNote(NIGHT_SHIFT, {
+			spaceId: "space-1",
+			projectId: "p1",
+			note: { ...at, index: 0 },
+			decision: "delete",
+			by: ada,
+		});
+		await a.learnings.settleNote(NIGHT_SHIFT, {
+			spaceId: "space-1",
+			projectId: "p1",
+			note: { ...at, index: 0 },
+			decision: "keep",
+			by: ada,
+		});
 		const accepted = await a.read("learnings/accepted/run-1.s1.md");
 		expect(
 			accepted.endsWith(
@@ -283,30 +302,28 @@ describe("one note at a time", () => {
 		expect(accepted).not.toContain("Two.");
 		// No note left: the proposed file goes.
 		expect(await a.has(file)).toBe(false);
-		expect(await a.learnings.waiting("p1")).toEqual([]);
+		expect(await a.learnings.waiting({ projectId: "p1" })).toEqual([]);
 	});
 
 	test("a told note goes to the person's own file, with who told it and when", async () => {
 		const a = await waitingOne();
-		await a.learnings.tell(
-			NIGHT_SHIFT,
-			"space-1",
-			"p1",
-			"  Deploys wait\n for two people. ",
-			ada,
-		);
-		await a.learnings.tell(
-			NIGHT_SHIFT,
-			"space-1",
-			"p1",
-			"The sweep takes 40 minutes.",
-			ada,
-		);
+		await a.learnings.tell(NIGHT_SHIFT, {
+			spaceId: "space-1",
+			projectId: "p1",
+			note: "  Deploys wait\n for two people. ",
+			by: ada,
+		});
+		await a.learnings.tell(NIGHT_SHIFT, {
+			spaceId: "space-1",
+			projectId: "p1",
+			note: "The sweep takes 40 minutes.",
+			by: ada,
+		});
 		expect(await a.read("learnings/accepted/told-ada.md")).toBe(
 			`# Learnings people told\n\nWhat a person of this Space told agents about this project.\n\n- Deploys wait for two people.\n  Told by Ada Lovelace on ${today}.\n- The sweep takes 40 minutes.\n  Told by Ada Lovelace on ${today}.\n`,
 		);
-		expect(await a.learnings.count("p1")).toBe(3);
-		expect(await a.learnings.known("p1")).toEqual([
+		expect(await a.learnings.count({ projectId: "p1" })).toBe(3);
+		expect(await a.learnings.known({ projectId: "p1" })).toEqual([
 			"One.",
 			"Two.",
 			"Three.",
@@ -314,7 +331,12 @@ describe("one note at a time", () => {
 			"The sweep takes 40 minutes.",
 		]);
 		await expect(
-			a.learnings.tell(NIGHT_SHIFT, "space-1", "p1", " \n", ada),
+			a.learnings.tell(NIGHT_SHIFT, {
+				spaceId: "space-1",
+				projectId: "p1",
+				note: " \n",
+				by: ada,
+			}),
 		).rejects.toThrow("Write the note first.");
 	});
 });
