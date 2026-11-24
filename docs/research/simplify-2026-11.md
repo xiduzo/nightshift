@@ -106,3 +106,33 @@ Each entry names its source. "Read" means found by reading and not reproduced.
   one gap that is now tested, and one same title over a different function (case restored).
 - The whole engine suite is not measurably faster: 642 s against 631 s, within noise. The
   time is in real git and graph walks. So candidate 4 is worth its lines, not its seconds.
+
+### AG. Proof for the assistant and the agents (b21eb18f0)
+
+- Production lines of the assistant: 5,245 to 5,016. A comparison of 1,035 prompt and tool
+  records before and after is byte-identical.
+- Two gaps in H7: a contract suite without `expect()` passes, and a twin may import the real
+  adapter. A port type that sits in a use-case file escapes H7.
+
+### D0. Old data (read only, one computer)
+
+- Most runs and flow revisions in the store that was counted hold an old flow format. In a
+  dry run on a copy, all of them migrated with no failure.
+- Project data without the `folder` field must be filled before its default goes. Without
+  that, those projects disappear.
+- Not counted: the Host and other computers. Removals that touch data wait for the owner.
+
+### P1. Plan for candidates 1 and 5 (read only, b21eb18f0)
+
+- Candidate 1 is worth less than half of its claim. Of 413 use cases, 52 forward one port
+  call and 20 forward after a fixed mapping. The table says about 81.
+- 32 forwards can go (64 files, 1,541 lines). 10 more in devices are dead today (20 files,
+  202 lines). With the rule lines added, about 1,580 lines go. Complexity does not fall.
+- 43 files in `domain/` are async, not 55. Most are the shared steps that P2 asks for.
+- Candidate 5 is worth almost nothing as titled. Of 88 own ports, 2 have no reader beside
+  forwards. Lane F3 gives the twins more readers. It becomes a check, not a lane.
+- The time is in the migrations. `createDb` and `migrateDb` took 84 to 282 ms for each case,
+  and a schema text took 3.4 to 6.1 ms. The machine was loaded: the ratio holds, the times do
+  not. 216 cases pay this. The journal, the FTS tables and the seed rows are not checked yet.
+- Nine use-case tests assert only that a function exists. Four of them sit beside 1,526
+  lines in devices placement and membership. Tests in other places were not checked.
