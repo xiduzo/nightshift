@@ -118,7 +118,7 @@ bun lefthook install
 - **File structure:** One workspace package per bounded context. Inside a package, group by feature, not by kind. Each vertical is a folder with an `index.ts` barrel as its only public surface (`src/features/<vertical>/` in apps, `src/<vertical>/` in packages). No `lib/`, `utils/` or `hooks/` buckets at the top of `src/`. See `docs/steering/STRUCTURE.md`.
 - **Test files:** Put `*.test.ts` next to its module. Use Bun's test runner.
 - **Imports:** Import workspace packages by name (`@nightshift/db`). No relative imports across packages.
-- **Formatting:** Biome. The pre-commit hook formats staged files.
+- **Formatting:** Biome. The pre-commit hook formats staged files. The pre-push hook checks the whole repository.
 - **Environment:** varlock schemas in `.env.schema`. Use the generated types, never `process.env` by hand.
 - **Prose:** Durable docs follow the ASD-STE100 style of the WTF skills. Short sentences, active voice, one idea per sentence.
 

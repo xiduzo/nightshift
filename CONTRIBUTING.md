@@ -12,7 +12,7 @@ Thank you for your interest. Night Shift is pre-alpha. Read this before you star
 
 ```bash
 bun install
-bun lefthook install   # git hooks: format, lint and the structure checks on commit
+bun lefthook install   # git hooks: the structure checks on commit, types and lint on push
 bun run dev            # web UI, API and phone app with hot reload, no .env needed
 bun run dev:mobile     # the phone app alone, in Expo
 bun run dev:desktop    # the desktop app
@@ -29,13 +29,23 @@ bun test               # tests, next to the code as *.test.ts
 bun run check-types    # TypeScript: the scripts, then every workspace
 bun run check          # Biome: lint and format
 bun scripts/check-layers.ts        # packages depend only on lower layers
-bun scripts/check-verticals.ts     # imports go through a vertical's barrel
+bun scripts/check-verticals.ts     # imports go through a vertical's barrel and name a file
 bun scripts/check-capabilities.ts  # every vertical is on the capability map
 bun scripts/check-budgets.ts       # file size, folder size, barrel width, peer ports
 bun run check:rings                # the rings of a capability in a server package
 bun run docs:reference --check     # the tables in the docs match the code
 bun scripts/check-doc-paths.ts     # a path that a doc names exists
 ```
+
+The pre-commit hook runs the structure checks. The pre-push hook runs the type check and Biome on the whole repository. A rebase and a cherry-pick run no pre-commit hook, so the push is the last check on your computer.
+
+`main` takes only a commit that passed CI. To land work:
+
+1. Open a pull request, or push the commit to a branch `arch/<name>`.
+2. Wait until the check **CI passed** is green.
+3. Merge the pull request, or push the same commit to `main`.
+
+The nightly build and a release also build only a commit with a green **CI passed**.
 
 Some old code breaks a size or a structure rule. A debt list in `scripts/` names it (`size-debt.txt` and the other `*-debt.txt` files). Never add a line to a debt list. When a check tells you that a line is clean, remove that line in your change. [STRUCTURE.md](docs/steering/STRUCTURE.md) section 8 gives the steps.
 

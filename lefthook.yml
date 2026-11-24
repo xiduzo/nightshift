@@ -131,3 +131,17 @@ pre-commit:
       # Some tests read the whole repository. On a busy computer they take
       # longer than the 5 seconds a test gets by default.
       run: bun test --timeout 60000 ./scripts/
+
+# The checks that need the whole repository, and that a rebase or a
+# cherry-pick runs no hook for: they go before each push. turbo takes the
+# workspaces that did not change from its cache.
+pre-push:
+  parallel: true
+  jobs:
+    - name: types
+      # The web build (part of check-types) requires it. Same value as CI.
+      env:
+        VITE_SERVER_URL: http://localhost:3000
+      run: bun run check-types --continue
+    - name: biome
+      run: bun biome ci packages apps scripts docs

@@ -44,7 +44,8 @@ Read `docs/steering/STRUCTURE.md` before you add a file, a folder or a package.
 - **Run the checks.** `bun scripts/check-layers.ts`, `bun scripts/check-verticals.ts`,
   `bun scripts/check-capabilities.ts`, `bun scripts/check-budgets.ts` and
   `bun run check:rings` check these rules in every workspace. The pre-commit hook and CI
-  run them too.
+  run them too. The pre-push hook runs the types and Biome. `main` takes only a commit
+  that passed CI: push it to `arch/**` or a pull request first.
 - **Do not copy a known deviation** (section 8 of `STRUCTURE.md`). Old code that breaks
   a rule is debt, not a pattern.
 

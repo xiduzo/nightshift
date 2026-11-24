@@ -13,6 +13,10 @@ builds macOS (arm64) and Linux (x64). Electrobun cannot build on Intel Macs,
 so there is no Intel Mac build. A pull request that changes `apps/desktop`
 runs the same build as a check, without a release.
 
+Release and Nightly build only a commit with a green **CI passed** check. If
+they stop there, wait for CI or fix the commit, then start them again. Delete
+a tag that you pushed on a commit that did not pass.
+
 ## Release a version
 
 Do one of these:
