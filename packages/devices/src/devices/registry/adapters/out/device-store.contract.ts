@@ -71,6 +71,8 @@ export function deviceStoreContract(
 			const batch = store.joinRows({ ...pairing, machine: "m-1" });
 			expect(await store.paired(pairing.id)).toBeNull();
 			await under.run(batch);
+			// The owner of a paired Device is not the owner of this computer.
+			expect(await store.selfOwnerId()).toBeNull();
 			expect(await store.paired(pairing.id)).toMatchObject({
 				...pairing,
 				machine: "m-1",
@@ -155,20 +157,30 @@ export function deviceStoreContract(
 			await store.addSelf({ id: "self-1", name: "studio", platform: "linux" });
 			await under.run(store.joinRows(pairing));
 			await under.run(
-				store.joinRows({ ...pairing, id: "d-guest", homeHost: null }),
+				store.joinRows({
+					...pairing,
+					id: "d-guest",
+					ownerId: "person-bo",
+					homeHost: null,
+				}),
 			);
-			await under.run(store.joinRows({ ...pairing, id: "d-gone" }));
+			await under.run(
+				store.joinRows({ ...pairing, id: "d-gone", ownerId: "person-cy" }),
+			);
 			await under.run(store.revokeRows("d-gone", 1));
+			await under.run(store.joinRows({ ...pairing, id: "d-second" }));
 			expect(await store.names(["self-1", pairing.id, "nobody"])).toEqual(
 				new Map([
 					["self-1", "studio"],
 					[pairing.id, "MacBook"],
 				]),
 			);
-			expect((await store.known()).map((row) => row.id).sort()).toEqual([
-				"d-guest",
-				pairing.id,
-				"self-1",
+			const known = await store.known();
+			expect(known.sort((a, b) => a.id.localeCompare(b.id))).toEqual([
+				{ id: "d-guest", name: "MacBook", ownerId: "person-bo" },
+				{ id: "d-second", name: "MacBook", ownerId: ada },
+				{ id: pairing.id, name: "MacBook", ownerId: ada },
+				{ id: "self-1", name: "studio", ownerId: null },
 			]);
 			expect(await store.homePersons()).toEqual([ada]);
 		});

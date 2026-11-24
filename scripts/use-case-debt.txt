@@ -7,9 +7,3 @@
 forward packages/auth/src/spaces/application/mirror-host-space.ts
 forward packages/auth/src/spaces/members/application/remove-memberships.ts
 forward packages/auth/src/spaces/members/application/set-membership-role.ts
-forward packages/devices/src/devices/registry/application/list-home-persons.ts
-forward packages/devices/src/devices/registry/application/list-known-devices.ts
-forward packages/devices/src/devices/registry/application/read-self-owner.ts
-empty-test packages/devices/src/devices/membership/application/create-home-membership.test.ts
-empty-test packages/devices/src/devices/membership/application/merge-steps.test.ts
-empty-test packages/devices/src/devices/membership/application/split-steps.test.ts

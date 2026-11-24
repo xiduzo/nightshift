@@ -97,6 +97,22 @@ describe("the Devices of a Host", () => {
 		expect(await registry.list("someone-else")).toEqual([]);
 	});
 
+	test("the Persons of this home Host, and the Devices the engine knows: this computer and each with access, with its owner", async () => {
+		await registry.join({ ...macbook, ownerId });
+		await registry.join({ ...macbook, id: "device-gone", ownerId });
+		await registry.revoke("device-gone");
+
+		expect(await registry.homePersons()).toEqual([ownerId]);
+		const known = await wireRegistry({ db: sandbox.db }).listKnownDevices();
+
+		expect(known.map(({ id, ownerId }) => [id, ownerId]).sort()).toEqual(
+			[
+				["device-b", ownerId],
+				[sandbox.deviceId, ownerId],
+			].sort(),
+		);
+	});
+
 	test("revoking ends access: DeviceRevoked, offline, its document no longer kept", async () => {
 		await registry.join({ ...macbook, ownerId });
 		await registry.seen("device-b");

@@ -21,11 +21,12 @@ import { forgetDevice } from "./application/forget-device";
 import { joinDevice } from "./application/join-device";
 import { listDeviceNames } from "./application/list-device-names";
 import { listDevices } from "./application/list-devices";
-import { listHomePersons } from "./application/list-home-persons";
-import { listKnownDevices } from "./application/list-known-devices";
 import { markDeviceSeen } from "./application/mark-device-seen";
-import type { DeviceFacts, PersonalSpaces } from "./application/ports";
-import { readSelfOwner } from "./application/read-self-owner";
+import type {
+	DeviceFacts,
+	DeviceStore,
+	PersonalSpaces,
+} from "./application/ports";
 import { revokeDevice } from "./application/revoke-device";
 import { setSelfOwner } from "./application/set-self-owner";
 import { sweepPresence } from "./application/sweep-presence";
@@ -133,15 +134,15 @@ export type Registry = {
 	/** Gives this computer's Device, made when there is none. */
 	ensureSelfDevice: ReturnType<typeof ensureSelfDevice>;
 	/** Reads the Person who owns this computer's Device. */
-	readSelfOwner: ReturnType<typeof readSelfOwner>;
+	readSelfOwner: DeviceStore["selfOwnerId"];
 	/** Names the Person who owns this computer's Device. */
 	setSelfOwner: ReturnType<typeof setSelfOwner>;
 	/** Lists the names of Devices by id. */
 	listDeviceNames: ReturnType<typeof listDeviceNames>;
 	/** Lists every Device whose access is not removed. */
-	listKnownDevices: ReturnType<typeof listKnownDevices>;
+	listKnownDevices: DeviceStore["known"];
 	/** Lists the Persons whose home Host this computer is. */
-	listHomePersons: ReturnType<typeof listHomePersons>;
+	listHomePersons: DeviceStore["homePersons"];
 	/**
 	 * The Devices paired with this Host, over the engine's log. Made once
 	 * per engine: it starts by marking offline the Devices the log still
@@ -156,15 +157,14 @@ export function wireRegistry(deps: RegistryDeps): Registry {
 	const spaces: PersonalSpaces = {
 		idOf: (personId) => bound.personal.findPersonalSpaceBySlug({ personId }),
 	};
+	const store = drizzleDeviceStore(db);
 	const ports = {
-		store: drizzleDeviceStore(db),
+		store,
 		spaces,
 		computer: thisComputer,
 		newId: deps.newId ?? randomUUID,
 		documentPrefix: deviceDocumentName(""),
 	};
-	const selfOwner = readSelfOwner(ports);
-	const homePersons = listHomePersons(ports);
 
 	function paired(engine: PairedDeps): DeviceRegistry {
 		const facts: DeviceFacts = {
@@ -227,18 +227,18 @@ export function wireRegistry(deps: RegistryDeps): Registry {
 			lastWalkerSeq: (deviceId) => engine.history.lastWalkerSeq(deviceId),
 			adopt: (deviceId, lastSeq) =>
 				adopt(lastSeq === undefined ? { deviceId } : { deviceId, lastSeq }),
-			selfOwnerId: () => selfOwner(),
-			homePersons: () => homePersons(),
+			selfOwnerId: () => store.selfOwnerId(),
+			homePersons: () => store.homePersons(),
 		};
 	}
 
 	return {
 		ensureSelfDevice: ensureSelfDevice(ports),
-		readSelfOwner: selfOwner,
+		readSelfOwner: () => store.selfOwnerId(),
 		setSelfOwner: setSelfOwner(ports),
 		listDeviceNames: listDeviceNames(ports),
-		listKnownDevices: listKnownDevices(ports),
-		listHomePersons: homePersons,
+		listKnownDevices: () => store.known(),
+		listHomePersons: () => store.homePersons(),
 		paired,
 	};
 }
