@@ -72,6 +72,8 @@ export type AuthoringRun = {
 	inputs: Record<string, unknown>;
 	/** The copy of the flow the run started from. */
 	flow: Flow;
+	/** Why that copy does not read: then `flow` has no nodes. Absent: it reads. */
+	flowUnread?: string;
 	/** In the order they started. */
 	steps: AuthoringRunStep[];
 	/** The step the run failed or stopped at, or null. Inside a called flow: that step, not its Subflow step. */
@@ -222,9 +224,11 @@ export function runReport(
 	if (inputs !== "{}") lines.push(`Inputs: ${cut(inputs, 1_000)}`);
 	const diff = flowDiffSummary(diffFlows(run.flow, draft));
 	lines.push(
-		diff.empty
-			? `${what} is the flow this run used.`
-			: `${what} changed since this run: ${diff.added} steps added, ${diff.removed} removed, ${diff.changed} changed, ${diff.edges} edges changed.`,
+		run.flowUnread
+			? `Another version of Night Shift made the flow this run used, or it is broken (${run.flowUnread}), so it cannot be shown or compared.`
+			: diff.empty
+				? `${what} is the flow this run used.`
+				: `${what} changed since this run: ${diff.added} steps added, ${diff.removed} removed, ${diff.changed} changed, ${diff.edges} edges changed.`,
 	);
 	lines.push("", "## Steps, in the order they ran");
 	if (cite) {

@@ -3,6 +3,7 @@ import {
 	createProjectQueries,
 	createRunQueries,
 	flowLabel,
+	flowUnreadWords,
 	gateParts,
 	isTestRun,
 	markdownPreview,
@@ -34,6 +35,7 @@ import {
 	FlaskConical,
 	GitPullRequest,
 	Hand,
+	History,
 	Play,
 	RotateCcw,
 	Share as ShareIcon,
@@ -225,6 +227,7 @@ function RunBody({
 	const share = useShareTakeOver(run.id, run.takeOverCommand);
 	const ownSteps = steps.filter((step) => step.scope === null);
 	const labels = nodeLabels(run);
+	const unread = flowUnreadWords(run);
 	// Parallel branches run several steps at once: each that talks shows.
 	const talking = ended
 		? []
@@ -368,6 +371,14 @@ function RunBody({
 						captionColor={toneColor(look.tone, colors)}
 					/>
 					{verdict ? <NativeTextRow text={verdict} /> : null}
+					{unread ? (
+						<NativeRow
+							icon={{ sf: "clock.arrow.circlepath", lucide: History }}
+							iconColor={colors.mutedForeground}
+							title={unread.title}
+							subtitle={unread.body}
+						/>
+					) : null}
 					{isTestRun(run) ? (
 						<NativeRow
 							icon={{ sf: "flask", lucide: FlaskConical }}

@@ -1,4 +1,4 @@
-import { flowNameSchema, newFlow } from "@nightshift/flows";
+import { flowNameSchema, newFlow, OLDER_FLOW } from "@nightshift/flows";
 import {
 	Alert,
 	AlertDescription,
@@ -107,6 +107,10 @@ export function FlowPage({
 	}
 
 	if (!loaded.data.flow && !startOver) {
+		// A save over it is refused: it stays for the Night Shift that made it.
+		const older = loaded.data.issues.some(
+			({ message }) => message === OLDER_FLOW,
+		);
 		return (
 			<Shell crumbs={crumbs}>
 				<Card className="mx-auto w-full max-w-2xl">
@@ -118,8 +122,9 @@ export function FlowPage({
 								</EmptyMedia>
 								<EmptyTitle>This flow cannot be opened</EmptyTitle>
 								<EmptyDescription>
-									The saved flow is not valid. Fix the problems below in its
-									file, or start over.
+									{older
+										? "You cannot change or run it. Delete it, or make a new flow with another name."
+										: "The saved flow is not valid. Fix the problems below in its file, or start over."}
 								</EmptyDescription>
 							</EmptyHeader>
 							<EmptyContent>
@@ -140,9 +145,14 @@ export function FlowPage({
 									</AlertDescription>
 								</Alert>
 								<div className="flex flex-wrap justify-center gap-2">
-									<Button variant="outline" onClick={() => setStartOver(true)}>
-										Start over with a new flow
-									</Button>
+									{older ? null : (
+										<Button
+											variant="outline"
+											onClick={() => setStartOver(true)}
+										>
+											Start over with a new flow
+										</Button>
+									)}
 									<Button
 										variant="ghost"
 										nativeButton={false}

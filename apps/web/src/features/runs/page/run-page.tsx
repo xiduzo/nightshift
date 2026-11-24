@@ -52,6 +52,7 @@ import {
 } from "../steps";
 import { RunStory, type StepPick } from "../story";
 import { useRunStream } from "../transcript";
+import { FlowUnread } from "./flow-unread";
 import { FocusBreadcrumb, StepContext } from "./run-focus";
 import { RunGraph } from "./run-graph";
 import { RunBadges, RunTitle } from "./run-header";
@@ -338,6 +339,7 @@ function RunPageBody({ runId, stepId }: { runId: string; stepId?: string }) {
 					) : undefined
 				}
 			/>
+			<FlowUnread run={runData} />
 			<RunUseful run={runData} status={status} />
 			<RunLeases run={runData} />
 			<RunServices run={runData} />

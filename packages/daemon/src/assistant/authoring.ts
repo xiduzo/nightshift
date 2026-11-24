@@ -363,6 +363,7 @@ export async function chatRun(
 		...(isTestRun(detail) ? { test: detail.test } : {}),
 		inputs: detail.inputs,
 		flow: detail.flow,
+		...(detail.flowUnread ? { flowUnread: detail.flowUnread } : {}),
 		steps,
 		failedStepId: failedStep?.id ?? null,
 		transcript: transcript?.lines ?? [],

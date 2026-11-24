@@ -36,6 +36,7 @@ export {
 } from "./start";
 export {
 	finishedShare,
+	flowUnreadWords,
 	groupStatuses,
 	hasEnded,
 	openGates,

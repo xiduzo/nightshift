@@ -241,6 +241,7 @@ export {
 	type FlowUse,
 	fileTree,
 	flowLabel,
+	flowUnreadWords,
 	formatCost,
 	formatCountdown,
 	formatKnownCost,
