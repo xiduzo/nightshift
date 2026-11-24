@@ -1,6 +1,7 @@
 import type { Permissions } from "@nightshift/auth";
 import type { Access } from "../../../access";
 import type { Actor } from "../../../contract";
+import type { KnowledgeDocuments } from "../../sync";
 import {
 	emptyLook,
 	type LinkLook,
@@ -18,18 +19,13 @@ import {
 import type { Seen } from "../domain/page-read";
 import { type ReaderSecret, readerOf } from "../domain/reader-choice";
 import { cleanAddress, folderOf, type Robots } from "../domain/site";
-import type {
-	PageReader,
-	ReaderServices,
-	ReaderSettings,
-	SiteFacts,
-} from "./ports";
+import type { PageReader, ReaderServices, SiteFacts } from "./ports";
 
 const SAVES_FLOWS: Permissions = { flow: ["save"] };
 
 export type LookAtLinksPorts = {
 	access: Pick<Access, "openSpace">;
-	settings: Pick<ReaderSettings, "setting">;
+	documents: Pick<KnowledgeDocuments, "open">;
 	services: ReaderServices;
 	sites: SiteFacts;
 	/** The looks of the last minutes (`createLookMemo`). */
@@ -67,7 +63,7 @@ export const lookAtLinks =
 	}: LookAtLinks): Promise<LinkLook[]> => {
 		await ports.access.openSpace(actor, { spaceId, need: SAVES_FLOWS });
 		const reader = await readerOf(
-			await ports.settings.setting(projectId),
+			(await ports.documents.open(projectId)).reader(),
 			ports.secret,
 			ports.services,
 		);

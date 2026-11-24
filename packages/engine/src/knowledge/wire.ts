@@ -401,14 +401,7 @@ export function wireKnowledge(deps: KnowledgeDeps): Knowledge {
 	const readers = wireReaders({
 		access: deps.access,
 		dataDir: deps.dataDir,
-		settings: {
-			setting: async (projectId) => (await documents.open(projectId)).reader(),
-			async choose(projectId, setting) {
-				const document = await documents.open(projectId);
-				await document.setReader(setting);
-				return document.reader();
-			},
-		},
+		documents,
 		rules: () => ({ privateNetwork: deps.privateNetwork?.() ?? true }),
 		...(deps.secret ? { secret: deps.secret } : {}),
 	});
@@ -431,34 +424,30 @@ export function wireKnowledge(deps: KnowledgeDeps): Knowledge {
 				console.warn("A use of the knowledge was not logged:", error);
 			});
 	}
-	const holds = {
-		startStep: (projectId: string) => reconciler.startStep(projectId),
-	};
 	const sources = wireSources({
 		access: deps.access,
-		files: { listing: reader.listing, removeFolder: reconciler.removeFolder },
-		readers: { ready: readers.ready },
+		files: reader,
+		reconciler,
+		readers,
 		device: deps.device,
 	});
 	const review = wireReview({
 		access: deps.access,
 		db,
 		folders,
-		holds,
-		files: { files: (projectId) => reader.files(projectId) },
-		syncs: {
-			syncs: (space, projectId) => sources.sourcesIn(space).syncs(projectId),
-		},
-		learnings: { learnings: learnings.ofProjects },
+		holds: reconciler,
+		files: reader,
+		sources,
+		learnings,
 	});
 	const map = wireMap({
 		access: deps.access,
 		folders,
-		entries: documents,
+		documents,
 		index: search,
 		learnings,
-		asked: { asked: review.asked },
-		holds,
+		asked: review,
+		holds: reconciler,
 	});
 
 	return {

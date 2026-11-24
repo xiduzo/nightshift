@@ -18,7 +18,7 @@ import { inMemorySearchPorts } from "./in-memory-neighbours";
  */
 export function inMemorySearch(
 	sync = inMemorySync(),
-	folders = inMemoryKnowledgeFolders(),
+	folders = inMemoryKnowledgeFolders(sync.copy.folders),
 ) {
 	const ports = { ...inMemorySearchPorts(), folders };
 	const { index, meaning } = ports;

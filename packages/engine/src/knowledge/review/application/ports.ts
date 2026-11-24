@@ -1,7 +1,3 @@
-import type { KnowledgeFile } from "../../files";
-import type { ProjectLearning } from "../../learnings";
-import type { KnowledgeSync, SourcesSpace } from "../../sources";
-import type { KnowledgeStepHold } from "../../sync";
 import type { KnowledgeUseRow } from "../domain/use";
 
 /**
@@ -34,38 +30,4 @@ export type KnowledgeUseLog = {
 		types: readonly KnowledgeUseRow["type"][],
 		options: { limit: number; since?: number },
 	): Promise<KnowledgeUseRow[]>;
-};
-
-/**
- * Holds a project's folder as a step does: what a mark changes there goes
- * to the Space when the hold ends.
- * @filledBy engine/knowledge
- */
-export type FolderHolds = {
-	startStep(projectId: string): Promise<KnowledgeStepHold>;
-};
-
-/**
- * The files the project's knowledge document lists.
- * @filledBy engine/knowledge
- */
-export type ListedFiles = {
-	files(projectId: string): Promise<KnowledgeFile[]>;
-};
-
-/**
- * The flows that fill the knowledge, in the Space as the person who asks
- * sees it.
- * @filledBy engine/knowledge
- */
-export type SourceSyncs = {
-	syncs(space: SourcesSpace, projectId: string): Promise<KnowledgeSync[]>;
-};
-
-/**
- * The learnings that wait in these projects, newest first.
- * @filledBy engine/knowledge
- */
-export type WaitingLearnings = {
-	learnings(projectIds: readonly string[]): Promise<ProjectLearning[]>;
 };

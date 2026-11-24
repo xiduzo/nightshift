@@ -44,12 +44,10 @@ function setup() {
 describe("listKnowledgeSources", () => {
 	test("the listing, the flows that fill it with what the role allows, and whether the reader's secret is here", async () => {
 		const { ports, list } = setup();
-		ports.files.listed = {
-			...ports.files.listed,
-			files: [{ path: "a.md", size: 1, changedAt: 1 }],
-			proposed: 2,
-		};
-		ports.readers.isReady = false;
+		const { documents, publish } = ports.sync;
+		await publish("p1", "a.md", "A");
+		await publish("p1", "learnings/proposed/run-1.md", "- One.\n- Two.\n");
+		await (await documents.open("p1")).setReader({ kind: "firecrawl" });
 		const overview = await list({ projectId: "p1", can: all });
 		expect(overview).toMatchObject({
 			files: [{ path: "a.md", size: 1, changedAt: 1 }],
@@ -59,7 +57,7 @@ describe("listKnowledgeSources", () => {
 			shared: false,
 			olderHost: false,
 			learnsFromRuns: true,
-			reader: { kind: "nightshift" },
+			reader: { kind: "firecrawl" },
 			readerReady: false,
 		});
 		expect(overview.syncs.map(({ flow, may }) => [flow, may])).toEqual([

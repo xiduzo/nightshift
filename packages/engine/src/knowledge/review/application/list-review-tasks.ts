@@ -1,15 +1,14 @@
 import type { KnowledgeFile } from "../../files";
-import type { ProjectLearning } from "../../learnings";
+import type { Learnings, ProjectLearning } from "../../learnings";
 import { learningNode, questionNode } from "../../map";
-import type { KnowledgeSync, SourcesSpace } from "../../sources";
+import type { KnowledgeSync, Sources, SourcesSpace } from "../../sources";
 import { type ReviewTaskOf, reviewTasks } from "../domain/review-tasks";
 import type { listAskedQuestions } from "./list-asked-questions";
-import type { SourceSyncs, WaitingLearnings } from "./ports";
 import type { readKnowledgeUse } from "./read-knowledge-use";
 
 export type ListReviewTasksPorts = {
-	syncs: SourceSyncs;
-	learnings: WaitingLearnings;
+	sources: Pick<Sources, "sourcesIn">;
+	learnings: Pick<Learnings, "ofProjects">;
 	/** `listAskedQuestions`, bound by the wire. */
 	asked: ReturnType<typeof listAskedQuestions>;
 	/** `readKnowledgeUse`, bound by the wire. */
@@ -38,8 +37,8 @@ export const listReviewTasks =
 	(ports: ListReviewTasksPorts) =>
 	async ({ projectId, space }: ListReviewTasks): Promise<ReviewTask[]> => {
 		const [syncs, waiting, asked, used] = await Promise.all([
-			ports.syncs.syncs(space, projectId),
-			ports.learnings.learnings([projectId]),
+			ports.sources.sourcesIn(space).syncs(projectId),
+			ports.learnings.ofProjects([projectId]),
 			ports.asked({ projectId }),
 			ports.use({ projectId }),
 		]);

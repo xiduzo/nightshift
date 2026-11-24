@@ -32,7 +32,9 @@ describe("openSessionKnowledge", () => {
 		const plain = await openSessionKnowledge(ports)({
 			request: { knowledge: { projectId: "p1" } },
 		});
-		expect(plain.contribution).toEqual({ env: { NS_KNOWLEDGE: "/k/p1" } });
+		expect(plain.contribution).toEqual({
+			env: { NS_KNOWLEDGE: "/knowledge/p1" },
+		});
 		await plain.done();
 		expect(ports.events).toEqual(["hold p1", "scan p1", "done p1"]);
 		expect(ports.brief.sessions).toEqual([]);
@@ -42,25 +44,25 @@ describe("openSessionKnowledge", () => {
 			request: { knowledge: { projectId: "p1", always: true } },
 		});
 		expect(always.contribution).toEqual({
-			env: { NS_KNOWLEDGE: "/k/p1" },
-			addDirs: ["/k/p1"],
+			env: { NS_KNOWLEDGE: "/knowledge/p1" },
+			addDirs: ["/knowledge/p1"],
 		});
 		expect(ports.events).toEqual([
 			"hold p1",
 			"scan p1",
-			"index /k/p1",
+			"index /knowledge/p1",
 			"refresh p1",
 		]);
 	});
 
 	test("a folder with files: the index after the reconcile, the brief, and the uses before the next event", async () => {
 		const ports = inMemoryStepsPorts();
-		ports.folders.files.set("p1", ["a.md"]);
+		ports.search.put("p1", "a.md", "A q.");
 		const knowledge = await openSessionKnowledge(ports)({
 			request: { knowledge: { projectId: "p1" } },
 		});
 		const [brief] = ports.brief.sessions;
-		expect(brief?.folder).toBe("/k/p1");
+		expect(brief?.folder).toBe("/knowledge/p1");
 		expect(brief?.learnings).toBe(false);
 		brief?.onUse("p1", { kind: "search", query: "q", hits: [] });
 		expect(await collect(knowledge.events(stream(said("one"))))).toEqual([
@@ -76,43 +78,51 @@ describe("openSessionKnowledge", () => {
 		expect(ports.events).toEqual([
 			"hold p1",
 			"scan p1",
-			"index /k/p1",
+			"index /knowledge/p1",
 			"refresh p1",
 			"search p1",
+			"scan p1",
 			"done p1",
 		]);
 	});
 
 	test("a step of a run may propose learnings: its events go through them", async () => {
 		const ports = inMemoryStepsPorts();
-		ports.folders.files.set("p1", ["a.md"]);
+		ports.search.put("p1", "a.md", "A q.");
 		const knowledge = await openSessionKnowledge(ports)({
 			request: { knowledge: { projectId: "p1" } },
 			step: { runId: "run-1", stepId: "s1" },
 		});
 		expect(ports.brief.sessions[0]?.learnings).toBe(true);
-		expect(await collect(knowledge.events(stream(said("one"))))).toEqual([
-			said("one"),
-		]);
-		expect(ports.events).toContain("keep p1 run-1 s1");
+		const report = {
+			type: "report",
+			outcome: "pass",
+			learnings: ["Run make first."],
+		} as AgentEvent;
+		expect(await collect(knowledge.events(stream(report)))).toEqual([report]);
+		expect(
+			ports.learnings.folder.read("p1", "learnings/proposed/run-1.s1.md"),
+		).toContain("- Run make first.");
 	});
 
 	test("a folder that cannot be read gives its path alone", async () => {
 		const ports = inMemoryStepsPorts();
-		ports.folders.unread.add("p1");
+		ports.folders.scan = async () => {
+			throw new Error("no look");
+		};
 		const warn = spyOn(console, "warn").mockImplementation(() => {});
 		try {
 			const knowledge = await openSessionKnowledge(ports)({
 				request: { knowledge: { projectId: "p1", always: true } },
 			});
 			expect(knowledge.contribution).toEqual({
-				env: { NS_KNOWLEDGE: "/k/p1" },
+				env: { NS_KNOWLEDGE: "/knowledge/p1" },
 			});
 			await knowledge.done();
 		} finally {
 			warn.mockRestore();
 		}
-		expect(ports.events).toEqual(["hold p1", "scan p1", "done p1"]);
+		expect(ports.events).toEqual(["hold p1", "done p1"]);
 	});
 
 	test("some folders only: a view of them, the tools find nothing else, and done removes the view first", async () => {
@@ -121,7 +131,7 @@ describe("openSessionKnowledge", () => {
 			request: { knowledgeOnly: { projectId: "p1", folders: ["books"] } },
 		});
 		const [brief] = ports.brief.sessions;
-		expect(brief?.folder).toBe("/k/p1.view");
+		expect(brief?.folder).toBe("/views/view-1");
 		expect(
 			await brief?.tools.readKnowledge("p1", "ops/a.md", 100, undefined),
 		).toBeNull();
@@ -130,17 +140,19 @@ describe("openSessionKnowledge", () => {
 		expect(ports.events).toEqual([
 			"hold p1",
 			"scan p1",
-			"view /k/p1 books",
+			"view /knowledge/p1 books",
 			"refresh p1",
 			"read p1 books/a.md",
-			"remove /k/p1.view",
+			"remove /views/view-1",
 			"done p1",
 		]);
 	});
 
 	test("a view that cannot be made gives nothing, never the whole folder", async () => {
 		const ports = inMemoryStepsPorts();
-		ports.files.failView = new Error("disk");
+		ports.views.make = async () => {
+			throw new Error("disk");
+		};
 		const warn = spyOn(console, "warn").mockImplementation(() => {});
 		try {
 			const knowledge = await openSessionKnowledge(ports)({
@@ -155,7 +167,7 @@ describe("openSessionKnowledge", () => {
 		expect(ports.events).toEqual([
 			"hold p1",
 			"scan p1",
-			"view /k/p1 books",
+			"view /knowledge/p1 books",
 			"done p1",
 		]);
 	});

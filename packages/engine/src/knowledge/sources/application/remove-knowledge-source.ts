@@ -2,6 +2,7 @@ import type { Permissions } from "@nightshift/auth";
 import { Refusal } from "@nightshift/refusal";
 import type { Access } from "../../../access";
 import type { Actor } from "../../../contract";
+import type { KnowledgeReconciler } from "../../sync";
 import { foldersOf, foldersOthersFill } from "../domain/source-flows";
 import {
 	OWNER_ONLY,
@@ -9,7 +10,7 @@ import {
 	savedSchedules,
 	sourceNamed,
 } from "../domain/syncs";
-import type { SourceFiles, SourcesSpace } from "./ports";
+import type { SourcesSpace } from "./ports";
 
 const REMOVES_FLOWS: Permissions = { flow: ["remove"] };
 const CHANGES_KNOWLEDGE: Permissions = { run: ["start"] };
@@ -17,7 +18,7 @@ const CHANGES_KNOWLEDGE: Permissions = { run: ["start"] };
 export type RemoveKnowledgeSourcePorts = {
 	access: Pick<Access, "openSpace">;
 	space: Pick<SourcesSpace, "flows" | "listSchedules" | "saveSchedules">;
-	files: Pick<SourceFiles, "removeFolder">;
+	reconciler: Pick<KnowledgeReconciler, "removeFolder">;
 };
 
 /** The source to remove, by its flow's name, and what the person may do. */
@@ -71,7 +72,7 @@ export const removeKnowledgeSource =
 			const others = foldersOthersFill(flows, name);
 			for (const folder of foldersOf(flow)) {
 				if (others.has(folder)) continue;
-				removedFiles += await ports.files.removeFolder(projectId, folder);
+				removedFiles += await ports.reconciler.removeFolder(projectId, folder);
 			}
 		}
 		if (kept.length < schedules.length) {

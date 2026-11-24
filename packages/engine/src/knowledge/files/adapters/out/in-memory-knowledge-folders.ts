@@ -7,6 +7,9 @@ import { textResult } from "../../domain/text";
 /** A file of a folder in memory: its text and its time of change. */
 export type MemoryFile = { text: string; changedAt: number };
 
+/** The folders in memory: the files of each project, by path. */
+export type MemoryFolders = Map<string, Map<string, MemoryFile>>;
+
 /**
  * A look at a folder in memory, as `snapshotFolder` takes one of a folder on
  * the disk: the files that count, by path, and those a person or an agent
@@ -63,8 +66,7 @@ export function memorySnapshot(
  * `KnowledgeFolders` in memory: a folder per project, `/knowledge/<id>`. A
  * test puts a file (`put`) where a sync would write one.
  */
-export function inMemoryKnowledgeFolders() {
-	const folders = new Map<string, Map<string, MemoryFile>>();
+export function inMemoryKnowledgeFolders(folders: MemoryFolders = new Map()) {
 	const filesOf = (projectId: string) => {
 		const files = folders.get(projectId) ?? new Map<string, MemoryFile>();
 		folders.set(projectId, files);

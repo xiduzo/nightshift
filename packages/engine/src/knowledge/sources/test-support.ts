@@ -16,6 +16,7 @@ export function knowledgeSources<Run extends SourceRun>(deps: {
 	return wireSources({
 		access: { openSpace: async () => {} },
 		files: deps.files,
+		reconciler: deps.files,
 		readers: { ready: deps.readerReady },
 		device: deps.device,
 	}).sourcesIn(deps.space);

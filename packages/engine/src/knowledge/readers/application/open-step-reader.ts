@@ -1,3 +1,4 @@
+import type { KnowledgeDocuments } from "../../sync";
 import { type ReaderSecret, readerOf } from "../domain/reader-choice";
 import {
 	isPageAddress,
@@ -6,10 +7,10 @@ import {
 	pageFile,
 	type StepRead,
 } from "../domain/step-reads";
-import type { ReaderServices, ReaderSettings, ReadMarks } from "./ports";
+import type { ReaderServices, ReadMarks } from "./ports";
 
 export type OpenStepReaderPorts = {
-	settings: Pick<ReaderSettings, "setting">;
+	documents: Pick<KnowledgeDocuments, "open">;
 	services: Pick<ReaderServices, "local" | "service">;
 	marks: ReadMarks;
 };
@@ -45,7 +46,7 @@ export const openStepReader =
 	async ({ projectId, secret }: OpenStepReader): Promise<StepReader> => {
 		const { marks } = ports;
 		const reader = await readerOf(
-			await ports.settings.setting(projectId),
+			(await ports.documents.open(projectId)).reader(),
 			secret,
 			ports.services,
 		);

@@ -16,21 +16,13 @@ describe("readQuestionSet", () => {
 				by: null,
 			},
 		];
-		ports.questions.files.set("p1", formatQuestions(set));
 		const read = readQuestionSet(ports);
-		ports.holds.startStep = async (projectId) => {
-			ports.holds.events.push(`hold ${projectId}`);
-			ports.holds.events.push(
-				`file ${ports.questions.files.has(projectId) ? "there" : "gone"}`,
-			);
-			return {
-				done: async () => {
-					ports.holds.events.push(`done ${projectId}`);
-				},
-			};
+		ports.questions.read = async () => {
+			ports.sync.holds.push("read");
+			return formatQuestions(set);
 		};
 		expect(await read({ projectId: "p1" })).toEqual(set);
-		expect(ports.holds.events).toEqual(["hold p1", "file there", "done p1"]);
+		expect(ports.sync.holds).toEqual(["hold p1", "read", "done p1"]);
 	});
 
 	test("no file, or one that is not valid, is an empty set", async () => {
@@ -39,7 +31,7 @@ describe("readQuestionSet", () => {
 		expect(await read({ projectId: "p1" })).toEqual([]);
 		ports.questions.files.set("p1", "{ not json");
 		expect(await read({ projectId: "p1" })).toEqual([]);
-		expect(ports.holds.events).toEqual([
+		expect(ports.sync.holds).toEqual([
 			"hold p1",
 			"done p1",
 			"hold p1",
@@ -57,6 +49,6 @@ describe("readQuestionSet", () => {
 			(caught: unknown) => caught,
 		);
 		expect(error).toBe(failure);
-		expect(ports.holds.events).toEqual(["hold p1", "done p1"]);
+		expect(ports.sync.holds).toEqual(["hold p1", "done p1"]);
 	});
 });

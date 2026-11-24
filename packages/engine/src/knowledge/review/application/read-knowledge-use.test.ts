@@ -11,10 +11,8 @@ describe("readKnowledgeUse", () => {
 		const ports = inMemoryReviewPorts();
 		const now = 200 * DAY;
 		ports.setNow(now);
-		ports.files.listed.set("p1", [
-			{ path: "used.md", size: 1, changedAt: 1 },
-			{ path: "idle.md", size: 1, changedAt: 1 },
-		]);
+		await ports.sync.publish("p1", "used.md", "Used.");
+		await ports.sync.publish("p1", "idle.md", "Idle.");
 		ports.log.log("p1", {
 			type: "KnowledgeRead",
 			at: now - DAY,
@@ -23,7 +21,7 @@ describe("readKnowledgeUse", () => {
 			payload: { path: "used.md", found: true },
 		});
 		const { files, use } = await readKnowledgeUse(ports)({ projectId: "p1" });
-		expect(files.map((file) => file.path)).toEqual(["used.md", "idle.md"]);
+		expect(files.map((file) => file.path)).toEqual(["idle.md", "used.md"]);
 		expect(use).toEqual({
 			since: now - 90 * DAY,
 			unusedDays: 30,

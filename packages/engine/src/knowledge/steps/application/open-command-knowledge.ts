@@ -1,18 +1,15 @@
 import type { CommandKnowledge } from "../../../contract";
-import type { ReaderSecret } from "../../readers";
-import type {
-	StepBrief,
-	StepFolders,
-	StepHolds,
-	StepPageReaders,
-} from "./ports";
+import type { KnowledgeFolders } from "../../files";
+import type { PageReaders, ReaderSecret } from "../../readers";
+import type { KnowledgeReconciler } from "../../sync";
+import type { StepBrief } from "./ports";
 
 export type OpenCommandKnowledgePorts = {
-	holds: StepHolds;
-	folders: Pick<StepFolders, "folder" | "ensure">;
+	holds: Pick<KnowledgeReconciler, "startStep">;
+	folders: Pick<KnowledgeFolders, "folder" | "ensure">;
 	brief: Pick<StepBrief, "env">;
 	/** The page readers: a Command step gets the project's. Without them, none. */
-	readers?: StepPageReaders;
+	readers?: Pick<PageReaders, "forStep">;
 };
 
 /** The project of the step, and the step's own secrets for the key of its page reader. */

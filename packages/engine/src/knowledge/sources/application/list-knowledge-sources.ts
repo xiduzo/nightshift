@@ -1,5 +1,10 @@
 import type { PageReaderSetting } from "@nightshift/flows";
-import { KNOWLEDGE_FILES_WARNING, type KnowledgeFile } from "../../files";
+import {
+	KNOWLEDGE_FILES_WARNING,
+	type KnowledgeFile,
+	type KnowledgeReader,
+} from "../../files";
+import type { PageReaders } from "../../readers";
 import {
 	type KnowledgeSync,
 	type SourceActions,
@@ -7,11 +12,10 @@ import {
 	sourceActions,
 } from "../domain/syncs";
 import type { listFillingFlows } from "./list-filling-flows";
-import type { ReaderReady, SourceFiles } from "./ports";
 
 export type ListKnowledgeSourcesPorts = {
-	files: Pick<SourceFiles, "listing">;
-	readers: ReaderReady;
+	files: Pick<KnowledgeReader, "listing">;
+	readers: Pick<PageReaders, "ready">;
 	/** The flows that fill the knowledge (`listFillingFlows`, bound). */
 	fillingFlows: ReturnType<typeof listFillingFlows>;
 };

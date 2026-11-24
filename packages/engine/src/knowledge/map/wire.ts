@@ -1,16 +1,13 @@
 import { now as timeNow } from "@nightshift/time";
 import type { Access } from "../../access";
 import type { Actor } from "../../contract";
+import type { Learnings } from "../learnings";
+import type { KnowledgeSearch } from "../search";
+import type { KnowledgeDocuments, KnowledgeReconciler } from "../sync";
 import { fsNotTopicsFile } from "./adapters/out/fs-not-topics-file";
 import { drawMap } from "./application/draw-map";
 import { markNotTopic } from "./application/mark-not-topic";
-import type {
-	AskedQuestions,
-	FolderHolds,
-	MapEntries,
-	MapIndex,
-	MapLearnings,
-} from "./application/ports";
+import type { AskedQuestions } from "./application/ports";
 import type { KnowledgeMap } from "./domain/map";
 import { createMapMemo } from "./domain/memo";
 
@@ -27,11 +24,11 @@ export type MapDeps = {
 		folder(projectId: string): string;
 		ensure(projectId: string): Promise<string>;
 	};
-	entries: MapEntries;
-	index: MapIndex;
-	learnings: MapLearnings;
+	documents: Pick<KnowledgeDocuments, "open">;
+	index: Pick<KnowledgeSearch, "mapStamp" | "forMap">;
+	learnings: Pick<Learnings, "waiting">;
 	asked: AskedQuestions;
-	holds: FolderHolds;
+	holds: Pick<KnowledgeReconciler, "startStep">;
 	/** The clock. Default `now`. */
 	now?: () => number;
 };
@@ -52,7 +49,7 @@ export type KnowledgeMaps = {
 export function wireMap(deps: MapDeps): KnowledgeMaps {
 	const notTopics = fsNotTopicsFile(deps.folders);
 	const draw = drawMap({
-		entries: deps.entries,
+		documents: deps.documents,
 		index: deps.index,
 		asked: deps.asked,
 		learnings: deps.learnings,

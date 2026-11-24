@@ -88,6 +88,7 @@ describe("listWaitingLearnings", () => {
 				at: 1,
 				only: "host",
 			},
+			"learnings/proposed/run-2.s1.md": { text: "- Two.\n", at: 2 },
 		});
 		const compared: string[] = [];
 		ports.search.meaning.set(comparing(compared));
@@ -95,8 +96,9 @@ describe("listWaitingLearnings", () => {
 			projectId: "p1",
 			onlyHere: true,
 		});
-		expect(list.map((learning) => learning.notes)).toEqual([[]]);
+		expect(list.map((learning) => learning.notes)).toEqual([["Two."], []]);
 		expect(ports.archive.calls).toEqual([]);
+		for (let turn = 0; turn < 20; turn++) await Promise.resolve();
 		expect(compared).toEqual([]);
 	});
 

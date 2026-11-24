@@ -10,19 +10,18 @@ import type {
 	SessionKnowledge,
 	SessionStep,
 } from "../../contract";
-import type { ReaderSecret } from "../readers";
+import type {
+	KnowledgeFiles,
+	KnowledgeFolders,
+	KnowledgeReader,
+} from "../files";
+import type { Learnings } from "../learnings";
+import type { PageReaders, ReaderSecret } from "../readers";
+import type { KnowledgeSearch } from "../search";
+import type { KnowledgeReconciler } from "../sync";
 import { openCommandKnowledge } from "./application/open-command-knowledge";
 import { openSessionKnowledge } from "./application/open-session-knowledge";
-import type {
-	StepBrief,
-	StepFiles,
-	StepFolders,
-	StepHolds,
-	StepLearnings,
-	StepPageReaders,
-	StepReader,
-	StepSearch,
-} from "./application/ports";
+import type { StepBrief } from "./application/ports";
 
 /**
  * The wiring of knowledge/steps: the one place that fills its ports and
@@ -31,15 +30,15 @@ import type {
 
 /** What the knowledge gives knowledge/steps: the parts of it a step reads. */
 export type StepsDeps = {
-	folders: StepFolders;
+	folders: Pick<KnowledgeFolders, "folder" | "ensure" | "scan">;
 	/** The index and the views of the folders. */
-	files: StepFiles;
-	reconciler: StepHolds;
-	reader: StepReader;
-	search: StepSearch;
-	learnings: StepLearnings;
+	files: Pick<KnowledgeFiles, "writeIndex" | "openView">;
+	reconciler: Pick<KnowledgeReconciler, "startStep">;
+	reader: Pick<KnowledgeReader, "read">;
+	search: Pick<KnowledgeSearch, "search" | "refresh">;
+	learnings: Pick<Learnings, "keepReported">;
 	/** The page readers: a Command step gets the project's. Without them, none. */
-	readers?: StepPageReaders;
+	readers?: Pick<PageReaders, "forStep">;
 };
 
 /** What a step gets of the knowledge, bound to the ports: `Knowledge.forCommand` and `Knowledge.forSession`. */

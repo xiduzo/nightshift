@@ -22,7 +22,7 @@ const callFlow = (kit: string, inputs: Record<string, string>): Flow =>
 		edges: [],
 	});
 
-function setup() {
+async function setup() {
 	const ports = inMemorySourcesPorts();
 	ports.space.flows.saved.set(
 		"web",
@@ -35,9 +35,21 @@ function setup() {
 	ports.space.schedules = [
 		{ id: "web", flow: "web", inputs: {}, enabled: true, cron: "0 3 * * *" },
 	];
-	ports.files.folders.set("pages", 3);
+	for (const path of [
+		"pages/a.md",
+		"pages/b.md",
+		"pages/c/d.md",
+		"shared/e.md",
+	]) {
+		await ports.sync.publish("p1", path, path);
+	}
 	return ports;
 }
+
+/** The files the Space lists. */
+const listedIn = async (ports: Awaited<ReturnType<typeof setup>>) => [
+	...(await ports.sync.documents.open("p1")).entries().keys(),
+];
 
 /** What a request refuses with, or null. */
 const refusalOf = (work: Promise<unknown>) =>
@@ -48,7 +60,7 @@ const refusalOf = (work: Promise<unknown>) =>
 
 describe("removeKnowledgeSource", () => {
 	test("removes the files first, then the schedules, then the flow", async () => {
-		const ports = setup();
+		const ports = await setup();
 		const removed = await removeKnowledgeSource(ports)({
 			actor: NIGHT_SHIFT,
 			spaceId: "space-1",
@@ -58,7 +70,7 @@ describe("removeKnowledgeSource", () => {
 			may: owner,
 		});
 		expect(removed).toEqual({ removedFiles: 3 });
-		expect(ports.files.removed).toEqual(["pages"]);
+		expect(await listedIn(ports)).toEqual(["shared/e.md"]);
 		expect(ports.space.schedules).toEqual([]);
 		expect(ports.space.calls).toEqual([
 			"flows.map",
@@ -69,7 +81,7 @@ describe("removeKnowledgeSource", () => {
 	});
 
 	test("checks first: a source with a schedule refuses someone else, and nothing changes", async () => {
-		const ports = setup();
+		const ports = await setup();
 		const refusal = await refusalOf(
 			removeKnowledgeSource(ports)({
 				actor: NIGHT_SHIFT,
@@ -81,14 +93,14 @@ describe("removeKnowledgeSource", () => {
 			}),
 		);
 		expect((refusal as Refusal).message).toBe(OWNER_ONLY);
-		expect(ports.files.removed).toEqual([]);
+		expect(await listedIn(ports)).toHaveLength(4);
 		expect(ports.space.flows.saved.has("web")).toBe(true);
 	});
 
 	test("a failed removal of the files leaves the source in place", async () => {
-		const ports = setup();
-		const failure = new Error("disk");
-		ports.files.failRemove(failure);
+		const ports = await setup();
+		// A run writes the folder now.
+		await ports.reconciler.startStep("p1");
 		expect(
 			await refusalOf(
 				removeKnowledgeSource(ports)({
@@ -100,13 +112,13 @@ describe("removeKnowledgeSource", () => {
 					may: owner,
 				}),
 			),
-		).toBe(failure);
+		).toBeInstanceOf(Refusal);
 		expect(ports.space.schedules).toHaveLength(1);
 		expect(ports.space.flows.saved.has("web")).toBe(true);
 	});
 
 	test("a flow that is no source refuses", async () => {
-		const ports = setup();
+		const ports = await setup();
 		const refusal = await refusalOf(
 			removeKnowledgeSource(ports)({
 				actor: NIGHT_SHIFT,
@@ -126,7 +138,7 @@ describe("removeKnowledgeSource", () => {
 	test("owners, admins and members may, and nobody else", async () => {
 		// With the files it asks for a second right.
 		for (const files of [false, true]) {
-			const ports = setup();
+			const ports = await setup();
 			expect(
 				await ports.access.whoMay(
 					"space-1",

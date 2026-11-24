@@ -1,20 +1,17 @@
 import { isReadable } from "../../files";
+import type { Learnings } from "../../learnings";
+import type { KnowledgeSearch } from "../../search";
+import type { KnowledgeDocuments } from "../../sync";
 import { type KnowledgeMap, knowledgeMapOf, MAP_LIMITS } from "../domain/map";
 import type { MapMemo } from "../domain/memo";
 import { parseNotTopics } from "../domain/not-topics";
-import type {
-	AskedQuestions,
-	MapEntries,
-	MapIndex,
-	MapLearnings,
-	NotTopicsFile,
-} from "./ports";
+import type { AskedQuestions, NotTopicsFile } from "./ports";
 
 export type DrawMapPorts = {
-	entries: MapEntries;
-	index: MapIndex;
+	documents: Pick<KnowledgeDocuments, "open">;
+	index: Pick<KnowledgeSearch, "mapStamp" | "forMap">;
 	asked: AskedQuestions;
-	learnings: MapLearnings;
+	learnings: Pick<Learnings, "waiting">;
 	notTopics: Pick<NotTopicsFile, "read">;
 	/** Each project's last Map: the wire makes it once (decision 21). */
 	memo: MapMemo;
@@ -37,7 +34,7 @@ export const drawMap =
 	(ports: DrawMapPorts) =>
 	async ({ projectId }: DrawMap): Promise<KnowledgeMap> => {
 		const [listed, stamp, asked, waiting, marked] = await Promise.all([
-			ports.entries.open(projectId).then((document) => document.entries()),
+			ports.documents.open(projectId).then((document) => document.entries()),
 			ports.index.mapStamp(projectId),
 			ports.asked.asked(projectId),
 			ports.learnings.waiting(projectId, { onlyHere: true }),

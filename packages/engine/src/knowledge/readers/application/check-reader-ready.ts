@@ -1,8 +1,8 @@
+import type { KnowledgeDocuments } from "../../sync";
 import { keyOf, type ReaderSecret } from "../domain/reader-choice";
-import type { ReaderSettings } from "./ports";
 
 export type CheckReaderReadyPorts = {
-	settings: Pick<ReaderSettings, "setting">;
+	documents: Pick<KnowledgeDocuments, "open">;
 	/** A secret of this computer outside a run. Without it, no service reader is ready. */
 	secret?: ReaderSecret;
 };
@@ -18,7 +18,7 @@ export type CheckReaderReady = { projectId: string };
 export const checkReaderReady =
 	(ports: CheckReaderReadyPorts) =>
 	async ({ projectId }: CheckReaderReady): Promise<boolean> => {
-		const setting = await ports.settings.setting(projectId);
+		const setting = (await ports.documents.open(projectId)).reader();
 		if (setting.kind === "nightshift") return true;
 		return Boolean(await keyOf(setting, ports.secret));
 	};

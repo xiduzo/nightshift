@@ -8,24 +8,25 @@ import type {
 	SessionStep,
 } from "../../../contract";
 import type { FolderSnapshot } from "../../../folder-snapshot";
-import { inFolders, type KnowledgeView } from "../../files";
-import type {
-	StepBrief,
-	StepFiles,
-	StepFolders,
-	StepHolds,
-	StepLearnings,
-	StepReader,
-	StepSearch,
-} from "./ports";
+import {
+	inFolders,
+	type KnowledgeFiles,
+	type KnowledgeFolders,
+	type KnowledgeReader,
+	type KnowledgeView,
+} from "../../files";
+import type { Learnings } from "../../learnings";
+import type { KnowledgeSearch } from "../../search";
+import type { KnowledgeReconciler } from "../../sync";
+import type { StepBrief } from "./ports";
 
 export type OpenSessionKnowledgePorts = {
-	holds: StepHolds;
-	folders: Pick<StepFolders, "folder" | "scan">;
-	files: StepFiles;
-	reader: StepReader;
-	search: StepSearch;
-	learnings: StepLearnings;
+	holds: Pick<KnowledgeReconciler, "startStep">;
+	folders: Pick<KnowledgeFolders, "folder" | "scan">;
+	files: Pick<KnowledgeFiles, "writeIndex" | "openView">;
+	reader: Pick<KnowledgeReader, "read">;
+	search: Pick<KnowledgeSearch, "search" | "refresh">;
+	learnings: Pick<Learnings, "keepReported">;
 	brief: Pick<StepBrief, "env" | "session">;
 };
 

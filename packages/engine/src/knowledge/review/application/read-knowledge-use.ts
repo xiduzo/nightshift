@@ -1,14 +1,14 @@
-import type { KnowledgeFile } from "../../files";
+import type { KnowledgeFile, KnowledgeReader } from "../../files";
 import {
 	fileUseOf,
 	type KnowledgeUseReport,
 	USE_EVENTS,
 	useSince,
 } from "../domain/use";
-import type { KnowledgeUseLog, ListedFiles } from "./ports";
+import type { KnowledgeUseLog } from "./ports";
 
 export type ReadKnowledgeUsePorts = {
-	files: ListedFiles;
+	files: Pick<KnowledgeReader, "files">;
 	log: KnowledgeUseLog;
 	now: () => number;
 };

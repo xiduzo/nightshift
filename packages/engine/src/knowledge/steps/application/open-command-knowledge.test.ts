@@ -9,7 +9,7 @@ describe("openCommandKnowledge", () => {
 		const ports = inMemoryStepsPorts();
 		const knowledge = await openCommandKnowledge(ports)({ projectId: "p1" });
 		expect(knowledge.env).toEqual({
-			NS_KNOWLEDGE: "/k/p1",
+			NS_KNOWLEDGE: "/knowledge/p1",
 			NS_READER_URL: "http://reader/p1",
 		});
 		await knowledge.done();
@@ -24,11 +24,13 @@ describe("openCommandKnowledge", () => {
 
 	test("a folder that cannot be made is left out, and so is the reader", async () => {
 		const ports = inMemoryStepsPorts();
-		ports.folders.unmade.add("p1");
+		ports.folders.ensure = async () => {
+			throw new Error("no folder");
+		};
 		const knowledge = await openCommandKnowledge(ports)({ projectId: "p1" });
 		expect(knowledge.env).toEqual({});
 		await knowledge.done();
-		expect(ports.events).toEqual(["hold p1", "ensure p1", "done p1"]);
+		expect(ports.events).toEqual(["hold p1", "done p1"]);
 	});
 
 	test("a page reader that cannot open leaves the step with the folder alone", async () => {
@@ -37,7 +39,7 @@ describe("openCommandKnowledge", () => {
 		const warn = spyOn(console, "warn").mockImplementation(() => {});
 		try {
 			const knowledge = await openCommandKnowledge(ports)({ projectId: "p1" });
-			expect(knowledge.env).toEqual({ NS_KNOWLEDGE: "/k/p1" });
+			expect(knowledge.env).toEqual({ NS_KNOWLEDGE: "/knowledge/p1" });
 			await knowledge.done();
 		} finally {
 			warn.mockRestore();
@@ -53,6 +55,6 @@ describe("openCommandKnowledge", () => {
 	test("without page readers, the folder alone", async () => {
 		const { readers: _none, ...ports } = inMemoryStepsPorts();
 		const knowledge = await openCommandKnowledge(ports)({ projectId: "p1" });
-		expect(knowledge.env).toEqual({ NS_KNOWLEDGE: "/k/p1" });
+		expect(knowledge.env).toEqual({ NS_KNOWLEDGE: "/knowledge/p1" });
 	});
 });

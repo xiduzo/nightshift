@@ -2,20 +2,21 @@ import type { Permissions } from "@nightshift/auth";
 import type { Access } from "../../../access";
 import type { Actor } from "../../../contract";
 import { isReadable } from "../../files";
+import type { KnowledgeReconciler } from "../../sync";
 import {
 	formatQuestions,
 	type KnowledgeQuestion,
 	markQuestion as marked,
 	parseQuestions,
 } from "../domain/questions";
-import type { FolderHolds, QuestionSetFile } from "./ports";
+import type { QuestionSetFile } from "./ports";
 
 const CHANGES_KNOWLEDGE: Permissions = { run: ["start"] };
 
 export type MarkQuestionPorts = {
 	access: Pick<Access, "openSpace">;
 	questions: QuestionSetFile;
-	holds: FolderHolds;
+	holds: Pick<KnowledgeReconciler, "startStep">;
 	now: () => number;
 };
 

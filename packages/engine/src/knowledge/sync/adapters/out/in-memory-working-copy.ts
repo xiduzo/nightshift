@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import {
 	type MemoryFile,
+	type MemoryFolders,
 	memorySnapshot,
 } from "../../../files/adapters/out/in-memory-knowledge-folders";
 import type { WorkingCopy } from "../../application/ports";
@@ -12,7 +13,7 @@ import type { WorkingCopy } from "../../application/ports";
  * and reads what the twin was asked, in order (`calls`).
  */
 export function inMemoryWorkingCopy() {
-	const folders = new Map<string, Map<string, MemoryFile>>();
+	const folders: MemoryFolders = new Map();
 	const states = new Map<string, string>();
 	let clock = 1_000;
 	const filesOf = (projectId: string) => {
@@ -21,6 +22,8 @@ export function inMemoryWorkingCopy() {
 		return files;
 	};
 	const twin = {
+		/** The folders: the twin of the knowledge folders can stand on the same ones. */
+		folders,
 		/** What the twin was asked, in order: `write a.md`, `remove b.md`, `state`. */
 		calls: [] as string[],
 		/** The paths whose folders lead out of the knowledge folder. */

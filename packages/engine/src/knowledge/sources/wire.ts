@@ -2,17 +2,16 @@ import type { FlowIssue, KnowledgeSource } from "@nightshift/flows";
 import { now as timeNow } from "@nightshift/time";
 import type { Access } from "../../access";
 import type { Actor } from "../../contract";
+import type { KnowledgeReader } from "../files";
+import type { PageReaders } from "../readers";
+import type { KnowledgeReconciler } from "../sync";
 import { timerWait } from "./adapters/out/timer-wait";
 import { listFillingFlows } from "./application/list-filling-flows";
 import {
 	type KnowledgeOverview,
 	listKnowledgeSources,
 } from "./application/list-knowledge-sources";
-import type {
-	ReaderReady,
-	SourceFiles,
-	SourcesSpace,
-} from "./application/ports";
+import type { SourcesSpace } from "./application/ports";
 import { removeKnowledgeSource } from "./application/remove-knowledge-source";
 import { saveKnowledgeSource } from "./application/save-knowledge-source";
 import { syncKnowledgeSource } from "./application/sync-knowledge-source";
@@ -31,9 +30,11 @@ import type {
 /** What the knowledge gives knowledge/sources: the ports another part fills. */
 export type SourcesDeps = {
 	access: Pick<Access, "openSpace">;
-	/** This Device's knowledge: the files, and the removal of a folder. */
-	files: SourceFiles;
-	readers: ReaderReady;
+	/** This Device's files, after a reconcile. */
+	files: Pick<KnowledgeReader, "listing">;
+	/** Removes a folder for every Device of the Space. */
+	reconciler: Pick<KnowledgeReconciler, "removeFolder">;
+	readers: Pick<PageReaders, "ready">;
 	/** This computer: a source that reads a folder here syncs here. */
 	device: { id: string; name: string };
 	/** The clock. Default `now`. */
@@ -87,7 +88,7 @@ export type Sources = {
 };
 
 export function wireSources(deps: SourcesDeps): Sources {
-	const { files, readers, device } = deps;
+	const { files, reconciler, readers, device } = deps;
 	const wait = timerWait();
 	const now = deps.now ?? timeNow;
 	return {
@@ -98,7 +99,7 @@ export function wireSources(deps: SourcesDeps): Sources {
 			const remove = removeKnowledgeSource({
 				access: deps.access,
 				space,
-				files,
+				reconciler,
 			});
 			const sync = syncKnowledgeSource({ access: deps.access, space });
 			return {

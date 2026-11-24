@@ -110,7 +110,7 @@ describe("openStepReader", () => {
 
 	test("a service reader gets its key from the step's secret, by the setting's name, and maps a site", async () => {
 		const ports = inMemoryReadersPorts();
-		await ports.settings.choose("p1", {
+		await (await ports.documents.open("p1")).setReader({
 			kind: "firecrawl",
 			address: "https://crawl.example",
 			secret: "CRAWL_KEY",

@@ -1,5 +1,6 @@
 import type { PageReaderSetting } from "@nightshift/flows";
 import type { AddressRules } from "../../web-access";
+import { inMemoryKnowledgeDocuments } from "../sync/adapters/out/in-memory-knowledge-documents";
 import type { ReaderSecret } from "./domain/reader-choice";
 import { type PageReaders, wireReaders } from "./wire";
 
@@ -17,10 +18,12 @@ export function createPageReaders(deps: {
 	return wireReaders({
 		access: { openSpace: async () => {} },
 		dataDir: deps.dataDir,
-		settings: {
-			setting: deps.setting,
-			choose: () => {
-				throw new Error("No test chooses a reader here.");
+		documents: {
+			async open(projectId) {
+				const documents = inMemoryKnowledgeDocuments();
+				const document = await documents.open(projectId);
+				await document.setReader(await deps.setting(projectId));
+				return document;
 			},
 		},
 		rules: deps.rules,

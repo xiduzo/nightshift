@@ -107,9 +107,10 @@ export function inMemoryLearner(answer: string[] = []): InMemoryLearner {
 }
 
 /** Every port of knowledge/learnings in memory at once, over the real sync and search: where each use-case test starts. */
-export function inMemoryLearningsPorts() {
-	const sync = inMemorySync();
-	const search = inMemorySearch(sync);
+export function inMemoryLearningsPorts(
+	sync = inMemorySync(),
+	search = inMemorySearch(sync),
+) {
 	return {
 		access: inMemoryAccess(),
 		folder: inMemoryLearningFolder(),

@@ -1,5 +1,4 @@
 import type { Flow, FlowIssue, Schedule } from "@nightshift/flows";
-import type { KnowledgeListing } from "../../files";
 import type { FlowMap } from "../domain/source-flows";
 import type { SourceRun } from "../domain/syncs";
 
@@ -35,26 +34,6 @@ export type SourcesSpace<Run extends SourceRun = SourceRun> = {
 		startedBy: string;
 	}): Promise<Run>;
 	listDevices(projectId: string): Promise<{ deviceId: string; name: string }[]>;
-};
-
-/**
- * This Device's knowledge: the files after a reconcile, and the removal of
- * a folder for every Device of the Space.
- * @filledBy engine/knowledge
- */
-export type SourceFiles = {
-	listing(projectId: string): Promise<KnowledgeListing>;
-	/** Removes the files of a folder. Returns how many it removed. */
-	removeFolder(projectId: string, folder: string): Promise<number>;
-};
-
-/**
- * Whether the secret of the project's page reader is saved where this
- * computer finds it.
- * @filledBy engine/knowledge
- */
-export type ReaderReady = {
-	ready(projectId: string): Promise<boolean>;
 };
 
 /** A wait of some time: how long a list waits for the names of other computers. */

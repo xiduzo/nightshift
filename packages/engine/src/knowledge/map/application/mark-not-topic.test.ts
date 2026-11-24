@@ -47,7 +47,7 @@ describe("markNotTopic", () => {
 				by: null,
 			}),
 		).toEqual(["Night shift"]);
-		expect(ports.holds.events).toEqual([
+		expect(ports.sync.holds).toEqual([
 			"hold p1",
 			"done p1",
 			"hold p1",
@@ -72,7 +72,7 @@ describe("markNotTopic", () => {
 			by: null,
 		}).catch((error: unknown) => error);
 		expect(refusal).toBe(failure);
-		expect(ports.holds.events).toEqual(["hold p1", "done p1"]);
+		expect(ports.sync.holds).toEqual(["hold p1", "done p1"]);
 	});
 
 	test("owners, admins and members may, and nobody else", async () => {
@@ -89,7 +89,7 @@ describe("markNotTopic", () => {
 						notTopic: true,
 						by: null,
 					}),
-				() => ports.holds.events,
+				() => ports.sync.holds,
 			),
 		).toEqual(allowing("owner", "admin", "member"));
 	});

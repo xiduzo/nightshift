@@ -91,7 +91,7 @@ describe("lookAtLinks", () => {
 
 	test("a reader with its own map counts the folder when the sitemap does not", async () => {
 		const ports = inMemoryReadersPorts();
-		await ports.settings.choose("p1", { kind: "firecrawl" });
+		await (await ports.documents.open("p1")).setReader({ kind: "firecrawl" });
 		ports.services.firecrawl.mapTo([`${SITE}/docs/a`, `${SITE}/docs/b`]);
 		ports.services.local.put(`${SITE}/docs/a`, page("A"));
 		const [one] = await lookAtLinks(ports)({
@@ -210,7 +210,7 @@ describe("lookAtLinks", () => {
 			urls: [target],
 		});
 		expect(own).toMatchObject({ kind: "needs-browser" });
-		await ports.settings.choose("p1", {
+		await (await ports.documents.open("p1")).setReader({
 			kind: "jina",
 			address: "https://jina.example/",
 		});
@@ -228,7 +228,7 @@ describe("lookAtLinks", () => {
 
 	test("a service reader gets the key of this computer's secret, by the setting's name", async () => {
 		const ports = inMemoryReadersPorts();
-		await ports.settings.choose("p1", {
+		await (await ports.documents.open("p1")).setReader({
 			kind: "firecrawl",
 			secret: "CRAWL_KEY",
 		});

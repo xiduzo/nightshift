@@ -42,7 +42,7 @@ describe("markQuestion", () => {
 				by: null,
 			}),
 		).toEqual([]);
-		expect(ports.holds.events).toEqual([
+		expect(ports.sync.holds).toEqual([
 			"hold p1",
 			"done p1",
 			"hold p1",
@@ -65,7 +65,7 @@ describe("markQuestion", () => {
 			by: null,
 		}).catch((caught: unknown) => caught);
 		expect(error).toBe(failure);
-		expect(ports.holds.events).toEqual(["hold p1", "done p1"]);
+		expect(ports.sync.holds).toEqual(["hold p1", "done p1"]);
 	});
 
 	test("owners, admins and members may, and nobody else", async () => {
@@ -82,7 +82,7 @@ describe("markQuestion", () => {
 						answers: ["a.md"],
 						by: null,
 					}),
-				() => ports.holds.events,
+				() => ports.sync.holds,
 			),
 		).toEqual(allowing("owner", "admin", "member"));
 	});

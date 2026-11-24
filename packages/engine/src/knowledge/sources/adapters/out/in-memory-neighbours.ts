@@ -1,12 +1,10 @@
 import type { Flow, Schedule } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { inMemoryAccess } from "../../../../access/adapters/out/in-memory-access";
-import type { KnowledgeListing } from "../../../files";
-import type {
-	ReaderReady,
-	SourceFiles,
-	SourcesSpace,
-} from "../../application/ports";
+import { inMemoryFiles } from "../../../files/adapters/out/in-memory-files";
+import { checkReaderReady } from "../../../readers/application/check-reader-ready";
+import { inMemorySync } from "../../../sync/adapters/out/in-memory-sync";
+import type { SourcesSpace } from "../../application/ports";
 import type { SourceRun } from "../../domain/syncs";
 import { inMemoryWait } from "./in-memory-wait";
 
@@ -101,66 +99,21 @@ export function inMemorySourcesSpace(): InMemorySourcesSpace {
 	return twin;
 }
 
-/** This Device's knowledge files in memory: a listing, and the folders a test removes. */
-export type InMemorySourceFiles = SourceFiles & {
-	/** What `listing` answers. */
-	listed: KnowledgeListing;
-	/** How many files each folder holds, by folder. */
-	folders: Map<string, number>;
-	/** Each folder removed, in order. */
-	removed: string[];
-	/** From now on `removeFolder` fails with this. */
-	failRemove(error: unknown): void;
-};
-
-export function inMemorySourceFiles(): InMemorySourceFiles {
-	let failure: { error: unknown } | null = null;
-	const twin: InMemorySourceFiles = {
-		listed: {
-			files: [],
-			proposed: 0,
-			shared: false,
-			olderHost: false,
-			learnsFromRuns: true,
-			reader: { kind: "nightshift" },
-		},
-		folders: new Map(),
-		removed: [],
-		failRemove: (error) => {
-			failure = { error };
-		},
-		async listing() {
-			return twin.listed;
-		},
-		async removeFolder(_projectId, folder) {
-			if (failure) throw failure.error;
-			twin.removed.push(folder);
-			const count = twin.folders.get(folder) ?? 0;
-			twin.folders.delete(folder);
-			return count;
-		},
-	};
-	return twin;
-}
-
-/** Whether the page reader's secret is here: yes, until a test says no. */
-export function inMemoryReaderReady(): ReaderReady & { isReady: boolean } {
-	const twin = {
-		isReady: true,
-		ready: async () => twin.isReady,
-	};
-	return twin;
-}
-
-/** Every port of knowledge/sources in memory at once: where each use-case test starts. */
-
-export function inMemorySourcesPorts() {
+/**
+ * Every port of knowledge/sources in memory at once, over the real sync,
+ * files and page readers: where each use-case test starts. No secret of a
+ * page reader is here.
+ */
+export function inMemorySourcesPorts(sync = inMemorySync()) {
 	let clock = 1_000_000;
+	const ready = checkReaderReady({ documents: sync.documents });
 	return {
 		access: inMemoryAccess(),
 		space: inMemorySourcesSpace(),
-		files: inMemorySourceFiles(),
-		readers: inMemoryReaderReady(),
+		sync,
+		files: inMemoryFiles(sync).reader,
+		reconciler: sync.reconciler,
+		readers: { ready: (projectId: string) => ready({ projectId }) },
 		wait: inMemoryWait(),
 		device: { id: "device-here", name: "This Mac" },
 		now: () => clock,

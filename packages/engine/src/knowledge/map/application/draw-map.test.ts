@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 import { inMemoryMapPorts } from "../adapters/out/in-memory-neighbours";
 import { drawMap } from "./draw-map";
 
@@ -7,19 +7,18 @@ import { drawMap } from "./draw-map";
 describe("drawMap", () => {
 	test("the files the Space lists and the index holds, the questions and the learnings that name a topic", async () => {
 		const ports = inMemoryMapPorts();
-		ports.entries.listed.set("p1", [
-			"a.md",
-			"INDEX.md",
-			"learnings/proposed/x.md",
-		]);
-		ports.index.held = {
-			...ports.index.held,
-			files: ["b.md"],
-			read: [
-				{ path: "a.md", sections: ["Deploys at night. Deploys again."] },
-				{ path: "b.md", sections: ["Deploys need care."] },
-			],
-		};
+		const { publish } = ports.sync;
+		await publish("p1", "a.md", "Deploys at night. Deploys again.");
+		await publish("p1", "INDEX.md", "The index.");
+		await publish(
+			"p1",
+			"learnings/proposed/run-1.md",
+			"- Deploy.\n",
+			1,
+			"host",
+		);
+		ports.index.put("p1", "a.md", "Deploys at night. Deploys again.");
+		ports.index.put("p1", "b.md", "Deploys need care.");
 		ports.asked.askedIn.set("p1", [
 			{ query: "how to deploy", hits: [{ path: "a.md" }] },
 		]);
@@ -34,17 +33,16 @@ describe("drawMap", () => {
 			kind: "found",
 		});
 		// Only the learnings that wait on this computer: drawing never asks the Host.
-		expect(ports.learnings.asked).toEqual([
-			{ projectId: "p1", onlyHere: true },
-		]);
+		expect(ports.sync.archive.calls).toEqual([]);
 	});
 
 	test("draws again only when what it was drawn from changes, a marked word too", async () => {
 		const ports = inMemoryMapPorts();
+		const reads = spyOn(ports.index, "forMap");
 		const draw = drawMap(ports);
 		await draw({ projectId: "p1" });
 		await draw({ projectId: "p1" });
-		expect(ports.index.reads).toBe(1);
+		expect(reads).toHaveBeenCalledTimes(1);
 		ports.notTopics.files.set(
 			"p1",
 			JSON.stringify({
@@ -53,10 +51,10 @@ describe("drawMap", () => {
 			}),
 		);
 		const map = await draw({ projectId: "p1" });
-		expect(ports.index.reads).toBe(2);
+		expect(reads).toHaveBeenCalledTimes(2);
 		expect(map.notTopics).toEqual(["deploys"]);
-		ports.index.stamp = "stamp-2";
+		ports.index.put("p1", "new.md", "A new file.");
 		await draw({ projectId: "p1" });
-		expect(ports.index.reads).toBe(3);
+		expect(reads).toHaveBeenCalledTimes(3);
 	});
 });

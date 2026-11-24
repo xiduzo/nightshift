@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { PageReaderSetting } from "@nightshift/flows";
-import { inMemoryReaderSettings } from "../adapters/out/in-memory-neighbours";
+import { inMemoryKnowledgeDocuments } from "../../sync/adapters/out/in-memory-knowledge-documents";
 import { checkReaderReady } from "./check-reader-ready";
 
 /** The use case checkReaderReady, on in-memory adapters. The twins of "whether the reader is ready" in `readers.test.ts`. */
@@ -9,9 +9,9 @@ async function ready(
 	setting: PageReaderSetting,
 	saved: Record<string, string> = {},
 ): Promise<boolean> {
-	const settings = inMemoryReaderSettings();
-	await settings.choose("p1", setting);
-	return checkReaderReady({ settings, secret: async (name) => saved[name] })({
+	const documents = inMemoryKnowledgeDocuments();
+	await (await documents.open("p1")).setReader(setting);
+	return checkReaderReady({ documents, secret: async (name) => saved[name] })({
 		projectId: "p1",
 	});
 }
@@ -20,7 +20,7 @@ describe("checkReaderReady", () => {
 	test("Night Shift's own reader needs no key", async () => {
 		expect(await ready({ kind: "nightshift" })).toBe(true);
 		expect(
-			await checkReaderReady({ settings: inMemoryReaderSettings() })({
+			await checkReaderReady({ documents: inMemoryKnowledgeDocuments() })({
 				projectId: "p1",
 			}),
 		).toBe(true);
@@ -43,16 +43,16 @@ describe("checkReaderReady", () => {
 	});
 
 	test("a secret that cannot be read counts as not saved; without secrets no service is ready", async () => {
-		const settings = inMemoryReaderSettings();
-		await settings.choose("p1", { kind: "jina" });
+		const documents = inMemoryKnowledgeDocuments();
+		await (await documents.open("p1")).setReader({ kind: "jina" });
 		const locked = checkReaderReady({
-			settings,
+			documents,
 			secret: async () => {
 				throw new Error("locked");
 			},
 		});
 		expect(await locked({ projectId: "p1" })).toBe(false);
-		expect(await checkReaderReady({ settings })({ projectId: "p1" })).toBe(
+		expect(await checkReaderReady({ documents })({ projectId: "p1" })).toBe(
 			false,
 		);
 	});

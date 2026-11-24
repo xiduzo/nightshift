@@ -1,9 +1,10 @@
+import type { KnowledgeReconciler } from "../../sync";
 import { type KnowledgeQuestion, parseQuestions } from "../domain/questions";
-import type { FolderHolds, QuestionSetFile } from "./ports";
+import type { QuestionSetFile } from "./ports";
 
 export type ReadQuestionSetPorts = {
 	questions: Pick<QuestionSetFile, "read">;
-	holds: FolderHolds;
+	holds: Pick<KnowledgeReconciler, "startStep">;
 };
 
 /** Which project's question set. */

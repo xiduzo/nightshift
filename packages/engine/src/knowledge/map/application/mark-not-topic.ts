@@ -1,19 +1,20 @@
 import type { Permissions } from "@nightshift/auth";
 import type { Access } from "../../../access";
 import type { Actor } from "../../../contract";
+import type { KnowledgeReconciler } from "../../sync";
 import {
 	formatNotTopics,
 	markNotTopic as marked,
 	parseNotTopics,
 } from "../domain/not-topics";
-import type { FolderHolds, NotTopicsFile } from "./ports";
+import type { NotTopicsFile } from "./ports";
 
 const CHANGES_KNOWLEDGE: Permissions = { run: ["start"] };
 
 export type MarkNotTopicPorts = {
 	access: Pick<Access, "openSpace">;
 	notTopics: NotTopicsFile;
-	holds: FolderHolds;
+	holds: Pick<KnowledgeReconciler, "startStep">;
 	now: () => number;
 };
 

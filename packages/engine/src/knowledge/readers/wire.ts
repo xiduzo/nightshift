@@ -3,6 +3,7 @@ import { now } from "@nightshift/time";
 import type { Access } from "../../access";
 import type { Actor } from "../../contract";
 import type { AddressRules } from "../../web-access";
+import type { KnowledgeDocuments } from "../sync";
 import { openReaderRoute } from "./adapters/in/reader-endpoint";
 import { stepRoute } from "./adapters/in/step-route";
 import { fsReadMarks } from "./adapters/out/fs-read-marks";
@@ -12,7 +13,6 @@ import { checkReaderReady } from "./application/check-reader-ready";
 import { chooseReader } from "./application/choose-reader";
 import { lookAtLinks } from "./application/look-at-links";
 import { openStepReader } from "./application/open-step-reader";
-import type { ReaderSettings } from "./application/ports";
 import { createLookMemo, type LinkLook } from "./domain/link-look";
 import type { ReaderSecret } from "./domain/reader-choice";
 
@@ -31,8 +31,8 @@ export type ReadersDeps = {
 	access: Pick<Access, "openSpace">;
 	/** Where this computer keeps its data: the marks are in its `knowledge/.reads/`. */
 	dataDir: string;
-	/** The project's reader setting, as its Space has it. */
-	settings: ReaderSettings;
+	/** The knowledge documents of the projects (`sync`): the reader setting of each is in its own. */
+	documents: Pick<KnowledgeDocuments, "open">;
 	/** Where a reader of this computer may connect now. */
 	rules: () => AddressRules;
 	/** A secret outside a run, for the quick look. */
@@ -83,16 +83,19 @@ export function wireReaders(deps: ReadersDeps): PageReaders {
 	const secret = deps.secret ? { secret: deps.secret } : {};
 	const look = lookAtLinks({
 		access: deps.access,
-		settings: deps.settings,
+		documents: deps.documents,
 		services,
 		sites: webSiteFacts({ rules: deps.rules }),
 		memo: createLookMemo(),
 		...secret,
 		now: deps.clock ?? now,
 	});
-	const open = openStepReader({ settings: deps.settings, services, marks });
-	const ready = checkReaderReady({ settings: deps.settings, ...secret });
-	const choose = chooseReader({ access: deps.access, settings: deps.settings });
+	const open = openStepReader({ documents: deps.documents, services, marks });
+	const ready = checkReaderReady({ documents: deps.documents, ...secret });
+	const choose = chooseReader({
+		access: deps.access,
+		documents: deps.documents,
+	});
 	return {
 		async forStep(projectId, secret) {
 			const reader = await open({ projectId, secret });

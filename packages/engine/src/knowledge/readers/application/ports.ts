@@ -1,4 +1,3 @@
-import type { PageReaderSetting } from "@nightshift/flows";
 import type { KeptRead, Looked, PageRead, ReadMark } from "../domain/page-read";
 import type { Robots } from "../domain/site";
 
@@ -74,18 +73,4 @@ export type ReadMarks = {
 	): Promise<void>;
 	/** Writes what waits now. */
 	flush(): Promise<void>;
-};
-
-/**
- * The page reader setting of a project, as its Space has it (the project's
- * knowledge document).
- * @filledBy engine/knowledge
- */
-export type ReaderSettings = {
-	setting(projectId: string): Promise<PageReaderSetting>;
-	/** Saves the project's setting for every Device of its Space, and gives it back as saved. */
-	choose(
-		projectId: string,
-		setting: PageReaderSetting,
-	): Promise<PageReaderSetting>;
 };

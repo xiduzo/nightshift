@@ -1,13 +1,9 @@
 import { inMemoryAccess } from "../../../../access/adapters/out/in-memory-access";
-import type { KnowledgeFile } from "../../../files";
-import type { ProjectLearning } from "../../../learnings";
-import type { KnowledgeSync } from "../../../sources";
-import type {
-	FolderHolds,
-	ListedFiles,
-	SourceSyncs,
-	WaitingLearnings,
-} from "../../application/ports";
+import { inMemoryLearnings } from "../../../learnings/adapters/out/in-memory-learnings";
+import type { Sources, SourcesSpace } from "../../../sources";
+import { inMemorySourcesPorts } from "../../../sources/adapters/out/in-memory-neighbours";
+import { listFillingFlows } from "../../../sources/application/list-filling-flows";
+import { inMemorySync } from "../../../sync/adapters/out/in-memory-sync";
 import { inMemoryKnowledgeUseLog } from "./in-memory-knowledge-use-log";
 import { inMemoryQuestionSetFile } from "./in-memory-question-set-file";
 
@@ -18,67 +14,32 @@ import { inMemoryQuestionSetFile } from "./in-memory-question-set-file";
  * the slice at once. Test code: production code never imports this file.
  */
 
-/** The holds of the folders: each start and end, in order. */
-export function inMemoryFolderHolds() {
-	const twin = {
-		events: [] as string[],
-		async startStep(projectId: string) {
-			twin.events.push(`hold ${projectId}`);
-			return {
-				done: async () => {
-					twin.events.push(`done ${projectId}`);
-				},
-			};
-		},
-	};
-	return twin satisfies FolderHolds;
-}
-
-/** The files each project's document lists. */
-export function inMemoryListedFiles() {
-	const twin = {
-		listed: new Map<string, KnowledgeFile[]>(),
-		async files(projectId: string) {
-			return twin.listed.get(projectId) ?? [];
-		},
-	};
-	return twin satisfies ListedFiles;
-}
-
-/** The flows that fill each project's knowledge. */
-export function inMemorySourceSyncs() {
-	const twin = {
-		syncsIn: new Map<string, KnowledgeSync[]>(),
-		async syncs(_space: unknown, projectId: string) {
-			return twin.syncsIn.get(projectId) ?? [];
-		},
-	};
-	return twin satisfies SourceSyncs;
-}
-
-/** The learnings that wait in each project. */
-export function inMemoryWaitingLearnings() {
-	const twin = {
-		waitingIn: new Map<string, ProjectLearning[]>(),
-		async learnings(projectIds: readonly string[]) {
-			return projectIds.flatMap((id) => twin.waitingIn.get(id) ?? []);
-		},
-	};
-	return twin satisfies WaitingLearnings;
-}
-
-/** Every port of knowledge/review in memory at once: where each use-case test starts. */
+/** Every port of knowledge/review in memory at once, over the real sync, files, learnings and sources: where each use-case test starts. */
 export function inMemoryReviewPorts() {
 	let clock = 1_000;
+	const now = () => clock;
+	const sync = inMemorySync();
+	const ports = inMemorySourcesPorts(sync);
 	return {
 		access: inMemoryAccess(),
 		log: inMemoryKnowledgeUseLog(),
 		questions: inMemoryQuestionSetFile(),
-		holds: inMemoryFolderHolds(),
-		files: inMemoryListedFiles(),
-		syncs: inMemorySourceSyncs(),
-		learnings: inMemoryWaitingLearnings(),
-		now: () => clock,
+		sync,
+		holds: sync.reconciler,
+		files: ports.files,
+		/** The Space of the sources, as the person who asks sees it. */
+		space: ports.space,
+		sources: {
+			sourcesIn: (space: SourcesSpace) => {
+				const flows = listFillingFlows({ ...ports, space, now });
+				return {
+					syncs: async (projectId: string) =>
+						(await flows({ projectId })).syncs,
+				};
+			},
+		} as Pick<Sources, "sourcesIn">,
+		learnings: inMemoryLearnings(sync),
+		now,
 		/** Sets the clock of `now`. */
 		setNow(at: number) {
 			clock = at;

@@ -2,13 +2,13 @@ import type { Permissions } from "@nightshift/auth";
 import type { PageReaderSetting } from "@nightshift/flows";
 import type { Access } from "../../../access";
 import type { Actor } from "../../../contract";
-import type { ReaderSettings } from "./ports";
+import type { KnowledgeDocuments } from "../../sync";
 
 const CHANGES_KNOWLEDGE: Permissions = { run: ["start"] };
 
 export type ChooseReaderPorts = {
 	access: Pick<Access, "openSpace">;
-	settings: Pick<ReaderSettings, "choose">;
+	documents: Pick<KnowledgeDocuments, "open">;
 };
 
 /** The project, and the reader a person chose for it. */
@@ -34,5 +34,7 @@ export const chooseReader =
 		setting,
 	}: ChooseReader): Promise<PageReaderSetting> => {
 		await ports.access.openSpace(actor, { spaceId, need: CHANGES_KNOWLEDGE });
-		return ports.settings.choose(projectId, setting);
+		const document = await ports.documents.open(projectId);
+		await document.setReader(setting);
+		return document.reader();
 	};

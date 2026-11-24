@@ -1,5 +1,5 @@
-import { describe, expect, test } from "bun:test";
-import type { SourcesSpace } from "../../sources";
+import { describe, expect, spyOn, test } from "bun:test";
+import { FLOW_VERSION, flowSchema } from "@nightshift/flows";
 import { inMemoryReviewPorts } from "../adapters/out/in-memory-neighbours";
 import { listAskedQuestions } from "./list-asked-questions";
 import { listReviewTasks } from "./list-review-tasks";
@@ -8,26 +8,38 @@ import { readKnowledgeUse } from "./read-knowledge-use";
 /** The use case listReviewTasks, on in-memory adapters. */
 
 const DAY = 24 * 60 * 60 * 1000;
-const space = {} as SourcesSpace;
+const webFlow = flowSchema.parse({
+	version: FLOW_VERSION,
+	start: "sync",
+	nodes: [
+		{
+			id: "sync",
+			type: "call",
+			position: { x: 0, y: 0 },
+			flow: "kit:knowledge/web",
+			inputs: { urls: "https://a.b" },
+		},
+	],
+	edges: [],
+});
 
 describe("listReviewTasks", () => {
 	test("sources that need a look, learnings, questions that found nothing and files no run used, in order", async () => {
 		const ports = inMemoryReviewPorts();
 		ports.setNow(100 * DAY);
-		ports.syncs.syncsIn.set("p1", [
-			{ flow: "wiki", health: "failed" },
-			{ flow: "ok", health: null },
-		] as never);
-		ports.learnings.waitingIn.set("p1", [
+		const flowsOf = spyOn(ports.space.flows, "map");
+		ports.space.flows.saved.set("wiki", webFlow);
+		ports.space.flows.saved.set("ok", webFlow);
+		ports.space.runs = [
 			{
-				id: "one.md",
-				projectId: "p1",
-				notes: ["A note."],
-				runId: "r",
-				stepId: null,
-				proposedAt: 1,
+				id: "r1",
+				status: "failed",
+				flowName: "wiki",
+				createdAt: 1,
+				endedAt: 2,
 			},
-		]);
+		];
+		await ports.sync.publish("p1", "learnings/proposed/one.md", "- A note.\n");
 		ports.log.log("p1", {
 			type: "KnowledgeSearched",
 			at: 100 * DAY - 1,
@@ -35,13 +47,14 @@ describe("listReviewTasks", () => {
 			stepId: "s",
 			payload: { query: "gold", hits: [] },
 		});
-		ports.files.listed.set("p1", [{ path: "a.md", size: 1, changedAt: 1 }]);
+		await ports.sync.publish("p1", "a.md", "A");
 		const tasks = await listReviewTasks({
-			syncs: ports.syncs,
+			sources: ports.sources,
 			learnings: ports.learnings,
 			asked: listAskedQuestions(ports),
 			use: readKnowledgeUse(ports),
-		})({ projectId: "p1", space });
+		})({ projectId: "p1", space: ports.space });
+		expect(flowsOf.mock.calls).toEqual([["p1"]]);
 		expect(tasks.map(({ id, node }) => [id, node])).toEqual([
 			["source:wiki", null],
 			["learning:one.md", "learning:one.md"],
@@ -53,11 +66,11 @@ describe("listReviewTasks", () => {
 	test("nothing waits: no tasks", async () => {
 		const ports = inMemoryReviewPorts();
 		const tasks = await listReviewTasks({
-			syncs: ports.syncs,
+			sources: ports.sources,
 			learnings: ports.learnings,
 			asked: listAskedQuestions(ports),
 			use: readKnowledgeUse(ports),
-		})({ projectId: "p1", space });
+		})({ projectId: "p1", space: ports.space });
 		expect(tasks).toEqual([]);
 	});
 });

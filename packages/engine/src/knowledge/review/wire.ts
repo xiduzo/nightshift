@@ -2,7 +2,10 @@ import type { Database } from "@nightshift/db";
 import { now as timeNow } from "@nightshift/time";
 import type { Access } from "../../access";
 import type { Actor } from "../../contract";
-import type { SourceRun, SourcesSpace } from "../sources";
+import type { KnowledgeReader } from "../files";
+import type { Learnings } from "../learnings";
+import type { SourceRun, Sources, SourcesSpace } from "../sources";
+import type { KnowledgeReconciler } from "../sync";
 import { drizzleKnowledgeUseLog } from "./adapters/out/drizzle-knowledge-use-log";
 import { fsQuestionSetFile } from "./adapters/out/fs-question-set-file";
 import { listAskedQuestions } from "./application/list-asked-questions";
@@ -15,12 +18,6 @@ import {
 	type ReviewTask,
 } from "./application/list-review-tasks";
 import { markQuestion } from "./application/mark-question";
-import type {
-	FolderHolds,
-	ListedFiles,
-	SourceSyncs,
-	WaitingLearnings,
-} from "./application/ports";
 import { readKnowledgeUse } from "./application/read-knowledge-use";
 import { readQuestionSet } from "./application/read-question-set";
 import type { KnowledgeQuestion } from "./domain/questions";
@@ -41,10 +38,10 @@ export type ReviewDeps = {
 		folder(projectId: string): string;
 		ensure(projectId: string): Promise<string>;
 	};
-	holds: FolderHolds;
-	files: ListedFiles;
-	syncs: SourceSyncs;
-	learnings: WaitingLearnings;
+	holds: Pick<KnowledgeReconciler, "startStep">;
+	files: Pick<KnowledgeReader, "files">;
+	sources: Pick<Sources, "sourcesIn">;
+	learnings: Pick<Learnings, "ofProjects">;
 	/** The clock. Default `now`. */
 	now?: () => number;
 };
@@ -83,7 +80,7 @@ export function wireReview(deps: ReviewDeps): KnowledgeReview {
 	const asked = listAskedQuestions({ log });
 	const use = readKnowledgeUse({ files: deps.files, log, now });
 	const tasks = listReviewTasks({
-		syncs: deps.syncs,
+		sources: deps.sources,
 		learnings: deps.learnings,
 		asked,
 		use,
