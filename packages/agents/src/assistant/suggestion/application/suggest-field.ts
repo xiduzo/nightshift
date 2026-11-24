@@ -6,7 +6,6 @@ import type {
 } from "@nightshift/flows";
 import type { AssistantReport, AssistantVia, Sessions } from "../../sessions";
 import { retryPrompt } from "../domain/flow-text";
-import type { ProjectFacts } from "../domain/project-facts";
 import { suggestionPrompt } from "../domain/suggestion-prompt";
 import {
 	cannotSuggest,
@@ -14,6 +13,7 @@ import {
 	SUGGESTION_ATTEMPTS,
 	suggestionDataSchema,
 } from "../domain/suggestion-rules";
+import type { ProjectFactsReader } from "./ports";
 
 const sum = (a: AssistantUsage, b: AssistantUsage) => {
 	const costUsd =
@@ -33,8 +33,6 @@ export type SuggestFieldInput = {
 	place: FlowPlace;
 	signal: AbortSignal;
 };
-
-export type ProjectFactsReader = (folder: string) => Promise<ProjectFacts>;
 
 export const suggestField = (
 	ports: Pick<Sessions, "runReport"> & { readProjectFacts: ProjectFactsReader },

@@ -9,6 +9,7 @@ import {
 } from "@nightshift/flows";
 import type { AssistantVia } from "../../sessions";
 import { inMemorySessions } from "../../sessions/adapters/out/in-memory-sessions";
+import { inMemoryProjectFactsReader } from "../adapters/out/in-memory-project-facts-reader";
 import { suggestionPrompt } from "../domain/suggestion-prompt";
 import { suggestionDataSchema } from "../domain/suggestion-rules";
 import { suggestField } from "./suggest-field";
@@ -109,14 +110,11 @@ async function suggest(
 	over: { request?: SuggestionRequest; via?: AssistantVia } = {},
 ) {
 	const sessions = inMemorySessions(...scripts);
-	const read: string[] = [];
+	const readProjectFacts = inMemoryProjectFactsReader({ "/repo": facts });
 	const events: SuggestionEvent[] = [];
 	for await (const event of suggestField({
 		...sessions,
-		readProjectFacts: async (folder) => {
-			read.push(folder);
-			return facts;
-		},
+		readProjectFacts,
 	})({
 		request: over.request ?? request(),
 		via: over.via ?? agent,
@@ -125,7 +123,7 @@ async function suggest(
 	})) {
 		events.push(event);
 	}
-	return { events, asked: sessions.asked, read };
+	return { events, asked: sessions.asked, read: readProjectFacts.read };
 }
 
 const good = { text: "Plan {{issue}}." };

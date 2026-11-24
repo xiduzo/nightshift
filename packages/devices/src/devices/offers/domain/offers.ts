@@ -19,7 +19,7 @@ type OfferMap = {
 };
 
 /** A document whose `offers` map these rules read or write. */
-type OfferDocument = {
+export type OfferDocument = {
 	offers: OfferMap;
 	change(fn: () => void): Promise<void>;
 };

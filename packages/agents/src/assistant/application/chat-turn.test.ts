@@ -1,13 +1,13 @@
 import { describe, expect, test } from "bun:test";
-import { FLOW_VERSION, flowSchema } from "@nightshift/flows";
+import { builtinAgent, FLOW_VERSION, flowSchema } from "@nightshift/flows";
 import type { AuthoringPort } from "../domain/authoring";
 import type { HistoryPort } from "../domain/history-port";
 import { inMemorySessions } from "../sessions/adapters/out/in-memory-sessions";
 import {
-	type ChatTools,
 	type ChatTurnEvent,
 	type ChatTurnInput,
 	chatTurn,
+	type TurnTools,
 } from "./chat-turn";
 
 const flow = flowSchema.parse({
@@ -57,19 +57,16 @@ async function turn(
 	propose = 0,
 ) {
 	const sessions = inMemorySessions(script);
-	const given: Parameters<ChatTools["forTurn"]>[0][] = [];
+	const given: TurnTools[] = [];
 	const events: ChatTurnEvent[] = [];
 	for await (const event of chatTurn({
 		...sessions,
-		chatTools: {
-			forTurn: (input) => {
-				given.push(input);
-				for (let i = 0; i < propose; i++) input.proposals.push(proposal);
-				return [{ name: "get_draft", description: "" }] as never;
-			},
-			describeTool: () => "Reads your flow",
-			limits: (agent) => ({ turns: agent === "builder" ? 1 : 2 }),
+		toolsFor: (input) => {
+			given.push(input);
+			for (let i = 0; i < propose; i++) input.proposals.push(proposal);
+			return [{ name: "get_draft", description: "" }] as never;
 		},
+		describeTool: () => "Reads your flow",
 	})({
 		agent: "improver",
 		request: {
@@ -112,10 +109,12 @@ describe("chatTurn", () => {
 		expect(asked.resumeSessionId).toBeUndefined();
 		expect(asked.tools?.map((tool) => tool.name)).toEqual(["get_draft"]);
 		expect(asked.describeTool?.("get_draft", {})).toBe("Reads your flow");
-		expect(asked.limits).toEqual({ turns: 2 });
-		expect((await turn({ agent: "builder" })).asked.limits).toEqual({
-			turns: 1,
-		});
+		const limits = builtinAgent("improver").limits;
+		expect(asked.limits).toBe(limits);
+		expect(builtinAgent("builder").limits).not.toBe(limits);
+		expect((await turn({ agent: "builder" })).asked.limits).toBe(
+			builtinAgent("builder").limits,
+		);
 	});
 
 	test("streams the answer, each proposal before what follows it, then done", async () => {

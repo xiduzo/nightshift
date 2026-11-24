@@ -1,6 +1,10 @@
 import type { HostRelay } from "../../../contract";
 import type { OfferRef } from "../domain/offered-sessions";
-import { spaceOffers, unpublishOffer } from "../domain/offers";
+import {
+	type OfferDocument,
+	spaceOffers,
+	unpublishOffer,
+} from "../domain/offers";
 
 export type RetractOfferInput = {
 	spaceId: string;
@@ -8,15 +12,6 @@ export type RetractOfferInput = {
 	/** The profile's id. */
 	profile: string;
 	by: string | null;
-};
-
-type OfferDocument = {
-	offers: {
-		values(): Iterable<unknown>;
-		has(key: string): boolean;
-		delete(key: string): void;
-	};
-	change(fn: () => void): Promise<void>;
 };
 
 export type RetractOfferPorts = {

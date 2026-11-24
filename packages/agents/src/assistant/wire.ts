@@ -1,5 +1,8 @@
 import { serveTools } from "./adapters/in/mcp-tool-server";
-import { tanstackChatTools } from "./adapters/out/tanstack-chat-tools";
+import {
+	chatToolsForTurn,
+	describeChatTool,
+} from "./adapters/out/tanstack-chat-tools";
 import { terminalTools } from "./adapters/out/tanstack-terminal-tools";
 import { chatTurn } from "./application/chat-turn";
 import { checkAgent } from "./application/check-agent";
@@ -17,7 +20,11 @@ import { wireSuggestion } from "./suggestion";
 export function wireAssistant() {
 	const sessions = wireSessions();
 	return {
-		chatTurn: chatTurn({ ...sessions, chatTools: tanstackChatTools() }),
+		chatTurn: chatTurn({
+			...sessions,
+			toolsFor: chatToolsForTurn,
+			describeTool: describeChatTool,
+		}),
 		checkAgent: checkAgent(sessions),
 		explainRun: explainRun(sessions),
 		learnFromRun: learnFromRun(sessions),

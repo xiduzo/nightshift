@@ -1,12 +1,12 @@
 import type { Sessions } from "../sessions";
-import { readProjectFacts } from "./adapters/out/project-facts";
+import { folderProjectFactsReader } from "./adapters/out/folder-project-facts-reader";
 import { suggestField } from "./application/suggest-field";
 
 export function wireSuggestion(sessions: Sessions) {
 	return {
 		suggestField: suggestField({
 			runReport: sessions.runReport,
-			readProjectFacts,
+			readProjectFacts: folderProjectFactsReader,
 		}),
 	};
 }

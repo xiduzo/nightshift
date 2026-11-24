@@ -6,7 +6,7 @@
 import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 
-import type { ProjectFacts } from "../../domain/project-facts";
+import type { ProjectFactsReader } from "../../application/ports";
 
 const LOCK_FILES: [file: string, manager: string][] = [
 	["bun.lock", "bun"],
@@ -25,8 +25,8 @@ async function exists(path: string): Promise<boolean> {
 	);
 }
 
-/** The project's package manager, scripts and task files. Never throws: what it cannot read stays empty. */
-export async function readProjectFacts(cwd: string): Promise<ProjectFacts> {
+/** `ProjectFactsReader` over the folder of the project. */
+export const folderProjectFactsReader: ProjectFactsReader = async (cwd) => {
 	let packageManager: string | null = null;
 	for (const [file, manager] of LOCK_FILES) {
 		if (await exists(join(cwd, file))) {
@@ -54,4 +54,4 @@ export async function readProjectFacts(cwd: string): Promise<ProjectFacts> {
 		if (await exists(join(cwd, file))) taskFiles.push(file);
 	}
 	return { packageManager, scripts, taskFiles };
-}
+};

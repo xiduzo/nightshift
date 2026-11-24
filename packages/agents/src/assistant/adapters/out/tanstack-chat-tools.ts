@@ -1,21 +1,13 @@
-import { builtinAgent } from "@nightshift/flows";
 import type { BridgedTool } from "../../../port";
-import type { ChatTools } from "../../application/chat-turn";
+import type { TurnTools } from "../../application/chat-turn";
 import { toolsOf } from "../../catalog";
-import type { AuthoringPort } from "../../domain/authoring";
-import type { HistoryPort } from "../../domain/history-port";
 import {
 	authoringTools,
 	describeAuthoringTool,
 } from "./tanstack-authoring-tools";
 import { describeHistoryTool, historyTools } from "./tanstack-history-tools";
 
-export function chatToolsForTurn(input: {
-	agent: "builder" | "improver";
-	port: Omit<AuthoringPort, "propose">;
-	past?: HistoryPort;
-	proposals: { push(p: import("@nightshift/flows").FlowProposal): void };
-}): readonly BridgedTool[] {
+export function chatToolsForTurn(input: TurnTools): readonly BridgedTool[] {
 	const past = input.agent === "improver" ? input.past : undefined;
 	const { run: _run, ...withoutRun } = input.port;
 	return toolsOf(input.agent, [
@@ -29,19 +21,5 @@ export function chatToolsForTurn(input: {
 	]);
 }
 
-export function describeChatTool(
-	name: string,
-	_input: unknown,
-): string | undefined {
-	return describeAuthoringTool(name) ?? describeHistoryTool(name);
-}
-
-export const chatAgentLimits = (agent: "builder" | "improver") =>
-	builtinAgent(agent).limits;
-export function tanstackChatTools(): ChatTools {
-	return {
-		forTurn: chatToolsForTurn,
-		describeTool: describeChatTool,
-		limits: chatAgentLimits,
-	};
-}
+export const describeChatTool = (name: string): string | undefined =>
+	describeAuthoringTool(name) ?? describeHistoryTool(name);

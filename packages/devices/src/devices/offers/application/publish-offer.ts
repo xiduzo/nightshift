@@ -1,5 +1,9 @@
 import type { HostRelay, OfferCaps } from "../../../contract";
-import { type SpaceOffer, publishOffer as writeOffer } from "../domain/offers";
+import {
+	type OfferDocument,
+	type SpaceOffer,
+	publishOffer as writeOffer,
+} from "../domain/offers";
 
 /** An Offer as the Space document receives it, before `offeredAt`. */
 export type PublishOfferInput = OfferCaps & {
@@ -10,11 +14,6 @@ export type PublishOfferInput = OfferCaps & {
 	profile: string;
 	profileName: string;
 	by: string | null;
-};
-
-type OfferDocument = {
-	offers: { set(key: string, value: unknown): unknown };
-	change(fn: () => void): Promise<void>;
 };
 
 export type PublishOfferPorts = {

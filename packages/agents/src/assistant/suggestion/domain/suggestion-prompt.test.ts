@@ -1,7 +1,4 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import {
 	FLOW_VERSION,
 	type Flow,
@@ -9,13 +6,12 @@ import {
 	type SuggestionRequest,
 	suggestionRequestSchema,
 } from "@nightshift/flows";
-import { suggestionPrompt } from "../../domain/suggestion-prompt";
+import { suggestionPrompt } from "./suggestion-prompt";
 import {
 	cannotSuggest,
 	checkSuggestion,
 	suggestionDataSchema,
-} from "../../domain/suggestion-rules";
-import { readProjectFacts } from "./project-facts";
+} from "./suggestion-rules";
 
 const flow: Flow = flowSchema.parse({
 	version: FLOW_VERSION,
@@ -311,34 +307,5 @@ describe("the checks of the newer kinds", () => {
 			{},
 		);
 		expect("problems" in result && result.problems.join(" ")).toContain("pr");
-	});
-});
-
-describe("readProjectFacts", () => {
-	test("reads the lock file, the scripts and the task files", async () => {
-		const dir = await mkdtemp(join(tmpdir(), "ns-facts-"));
-		try {
-			await writeFile(join(dir, "pnpm-lock.yaml"), "");
-			await writeFile(join(dir, "Makefile"), "");
-			await writeFile(
-				join(dir, "package.json"),
-				JSON.stringify({ scripts: { lint: "biome check", bad: 1 } }),
-			);
-			expect(await readProjectFacts(dir)).toEqual({
-				packageManager: "pnpm",
-				scripts: { lint: "biome check" },
-				taskFiles: ["Makefile"],
-			});
-		} finally {
-			await rm(dir, { recursive: true, force: true });
-		}
-	});
-
-	test("a folder without a project gives nothing, without throwing", async () => {
-		expect(await readProjectFacts("/nonexistent-ns-folder")).toEqual({
-			packageManager: null,
-			scripts: {},
-			taskFiles: [],
-		});
 	});
 });

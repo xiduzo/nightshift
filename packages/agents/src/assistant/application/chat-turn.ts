@@ -1,5 +1,6 @@
 import {
 	type AgentProfileSettings,
+	builtinAgent,
 	type ChatEvent,
 	type ChatRequest,
 	chatMessage,
@@ -9,22 +10,22 @@ import type { AgentHarness, BridgedTool } from "../../port";
 import { type ChatExchange, chatFollowUpPrompt, chatPrompt } from "../catalog";
 import type { AuthoringPort } from "../domain/authoring";
 import type { HistoryPort } from "../domain/history-port";
-import type { SessionLimits, Sessions } from "../sessions";
+import type { Sessions } from "../sessions";
 import { draftSummary } from "../suggestion";
 
-export type ChatTools = {
-	forTurn(input: {
-		agent: "builder" | "improver";
-		port: Omit<AuthoringPort, "propose">;
-		past?: HistoryPort;
-		proposals: { push(p: FlowProposal): void };
-	}): readonly BridgedTool[];
-	describeTool(name: string, input: unknown): string | undefined;
-	limits(agent: "builder" | "improver"): SessionLimits;
+/** What the tools of one turn stand on. They push each proposal on `proposals`. */
+export type TurnTools = {
+	agent: "builder" | "improver";
+	port: Omit<AuthoringPort, "propose">;
+	past?: HistoryPort;
+	proposals: FlowProposal[];
 };
 
 export type ChatTurnPorts = Pick<Sessions, "runSession"> & {
-	chatTools: ChatTools;
+	/** The tools of one turn. They do no I/O of their own. */
+	toolsFor(turn: TurnTools): readonly BridgedTool[];
+	/** The line of one tool call in plain words. */
+	describeTool(name: string): string | undefined;
 };
 
 export type ChatTurnInput = {
@@ -74,7 +75,7 @@ export const chatTurn = (ports: ChatTurnPorts) =>
 				yield { type: "proposal", proposal };
 			}
 		};
-		const tools = ports.chatTools.forTurn({
+		const tools = ports.toolsFor({
 			agent: input.agent,
 			port: input.port,
 			...(past ? { past } : {}),
@@ -89,8 +90,8 @@ export const chatTurn = (ports: ChatTurnPorts) =>
 				? { resumeSessionId: input.resumeSessionId }
 				: {}),
 			tools,
-			describeTool: ports.chatTools.describeTool,
-			limits: ports.chatTools.limits(input.agent),
+			describeTool: ports.describeTool,
+			limits: builtinAgent(input.agent).limits,
 			signal,
 		})) {
 			yield* flush();
