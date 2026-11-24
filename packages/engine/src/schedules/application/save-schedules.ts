@@ -1,3 +1,4 @@
+import type { Permissions } from "@nightshift/auth";
 import type { Schedule, ScheduleIssue } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import type { Access } from "../../access";
@@ -6,6 +7,8 @@ import { NOT_ON_THIS_COMPUTER } from "../../projects";
 import type { UsageNotes } from "../../usage";
 import { withTimeZone } from "../domain/saved-schedules";
 import type { ScheduledProjects, ScheduleOffers, ScheduleStore } from "./ports";
+
+const SAVES_SCHEDULES: Permissions = { schedule: ["save"] };
 
 export type SaveSchedulesPorts = {
 	access: Pick<Access, "openSpace">;
@@ -29,10 +32,9 @@ export type SaveSchedules = {
  * the issues. A schedule on another Person's Device gets the saver as its
  * Person, when that Device's Offers cover what its flow runs there.
  *
- * Refuses a Person who is not a Member of the Space, before anything else
- * (`access.openSpace`). The door decides who else may save: the API lets
- * only the owner of this computer save, because the save writes its
- * Clone. Refuses (`not-found`) a project that is not in the Space, and
+ * Refuses a Person whose role does not save schedules, before anything
+ * else (`access.openSpace`). The API lets only the owner of this computer
+ * save, because the save writes its Clone. Refuses (`not-found`) a project that is not in the Space, and
  * (`conflict`) a project with a folder that has no Clone on this
  * computer, before the Offers are asked. A project without a folder needs
  * no Clone (ADR 22). It tells no screen: the change of the flow document
@@ -44,7 +46,7 @@ export const saveSchedules =
 		const { access, projects, offers, store, usage } = ports;
 		const { spaceId, projectId, schedules, timeZone } = request;
 
-		await access.openSpace(actor, { spaceId });
+		await access.openSpace(actor, { spaceId, need: SAVES_SCHEDULES });
 		const project = await projects.inSpace(projectId, spaceId);
 		if (project.hasFolder && !project.clonedHere) {
 			throw new Refusal("conflict", NOT_ON_THIS_COMPUTER);

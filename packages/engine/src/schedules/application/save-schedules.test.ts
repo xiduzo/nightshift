@@ -211,7 +211,7 @@ describe("the save of a project's schedules", () => {
 		]);
 	});
 
-	test("every Member may, whatever the role (the door decides who may save), and nobody else", async () => {
+	test("asks schedule:save: owners, admins and members may, and nobody else", async () => {
 		const { ports, saveAs } = project();
 		expect(
 			await ports.access.whoMay(
@@ -224,6 +224,6 @@ describe("the save of a project's schedules", () => {
 					}),
 				() => ports.offers.asked,
 			),
-		).toEqual(allowing("owner", "admin", "member", "viewer"));
+		).toEqual(allowing("owner", "admin", "member"));
 	});
 });
