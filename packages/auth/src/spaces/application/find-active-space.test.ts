@@ -1,15 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { inMemorySpacesPorts } from "../adapters/out/in-memory-neighbours";
+import { spacesPorts } from "../test-support";
 import { findActiveSpace } from "./find-active-space";
 
 describe("findActiveSpace", () => {
 	test("is the active Space while the Person is a member of it", async () => {
-		const ports = inMemorySpacesPorts();
-		ports.spaceStore.records.members.push({
-			spaceId: "platform",
-			personId: "ada",
-			role: "member",
-		});
+		const ports = await spacesPorts();
+		await ports.join("platform", "ada", "member");
 		expect(
 			await findActiveSpace(ports)({
 				personId: "ada",
@@ -20,7 +16,7 @@ describe("findActiveSpace", () => {
 	});
 
 	test("else, or without one, the personal Space", async () => {
-		const ports = inMemorySpacesPorts();
+		const ports = await spacesPorts();
 		const find = findActiveSpace(ports);
 		expect(await find({ personId: "ada", activeSpaceId: "left" })).toBe(
 			"personal-of-ada",

@@ -1,18 +1,18 @@
 import { describe, expect, test } from "bun:test";
 import { DAY_MS } from "@nightshift/time";
-import { inMemoryDeviceKeysPorts } from "../adapters/out/in-memory-neighbours";
+import { deviceKeysPorts } from "../test-support";
 import { issueKey } from "./issue-key";
 
-/** The use case issueKey, on in-memory adapters. */
+/** The use case issueKey, over a database in memory. */
 
 const B = { personId: "ada", deviceId: "device-b", deviceName: "MacBook" };
 
 describe("issueKey", () => {
 	test("a key of the Person, with every Device permission, that expires after the idle time", async () => {
-		const ports = inMemoryDeviceKeysPorts();
+		const ports = await deviceKeysPorts();
 		const { key, keyId } = await issueKey(ports)(B);
 		expect(key.startsWith("nsd_")).toBe(true);
-		expect(ports.keyStore.byId(keyId)).toMatchObject({
+		expect(await ports.byId(keyId)).toMatchObject({
 			personId: "ada",
 			deviceId: "device-b",
 			permissions: {
@@ -25,10 +25,10 @@ describe("issueKey", () => {
 	});
 
 	test("pairing again replaces the Device's key", async () => {
-		const ports = inMemoryDeviceKeysPorts();
+		const ports = await deviceKeysPorts();
 		const first = await issueKey(ports)(B);
 		const second = await issueKey(ports)(B);
-		expect(ports.keyStore.byId(first.keyId)).toBeNull();
-		expect(ports.keyStore.byId(second.keyId)).not.toBeNull();
+		expect(await ports.byId(first.keyId)).toBeNull();
+		expect(await ports.byId(second.keyId)).not.toBeNull();
 	});
 });

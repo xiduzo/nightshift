@@ -1,11 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { inMemoryMembersPorts } from "../adapters/out/in-memory-neighbours";
+import { membersPorts } from "../test-support";
 import { checkSignUp } from "./check-sign-up";
 
 const NOW = 1_000;
 
 async function withInvitation() {
-	const ports = inMemoryMembersPorts();
+	const ports = await membersPorts();
 	await ports.seed.person({ id: "ada", name: "Ada", email: "a@x.org" });
 	await ports.seed.space({ id: "platform", name: "Platform" });
 	await ports.seed.invitation({
@@ -23,7 +23,7 @@ async function withInvitation() {
 
 describe("checkSignUp", () => {
 	test("on a Host without anyone, the first sign-up needs no invitation", async () => {
-		const ports = inMemoryMembersPorts();
+		const ports = await membersPorts();
 		expect(await checkSignUp(ports)({ body: {}, now: NOW })).toBeNull();
 	});
 

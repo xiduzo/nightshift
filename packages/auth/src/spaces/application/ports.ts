@@ -1,8 +1,8 @@
 import type { Role } from "../roles";
 
 /**
- * The driven ports of spaces. A port of its own has a real adapter, an
- * in-memory adapter and a contract suite in `adapters/out/`.
+ * The driven ports of spaces. The adapters of its own ports sit
+ * in `adapters/out/`.
  */
 
 /** The Spaces of this Replica and the roles of their Members. */

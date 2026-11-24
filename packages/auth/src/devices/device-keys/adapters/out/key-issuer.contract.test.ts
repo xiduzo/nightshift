@@ -1,10 +1,10 @@
 import { defaultKeyHasher } from "@better-auth/api-key";
 import { now } from "@nightshift/time";
 import { createAuthSandbox } from "../../../../testing/sandbox";
+import type { StoredKey } from "../../domain/device-keys";
 import { betterAuthKeyIssuer } from "./better-auth-key-issuer";
 import { drizzleKeyStore } from "./drizzle-key-store";
 import { inMemoryKeyIssuer } from "./in-memory-key-issuer";
-import { inMemoryKeyStore } from "./in-memory-key-store";
 import { keyIssuerContract } from "./key-issuer.contract";
 
 /**
@@ -13,12 +13,19 @@ import { keyIssuerContract } from "./key-issuer.contract";
  */
 
 keyIssuerContract("in memory", async () => {
-	const store = inMemoryKeyStore();
+	const keys = new Map<string, StoredKey>();
 	const clock = { now: 1_000 };
 	return {
-		keyIssuer: inMemoryKeyIssuer(store, () => clock.now),
+		keyIssuer: inMemoryKeyIssuer(
+			{
+				add: async (hash, key) => {
+					keys.set(hash, key);
+				},
+			},
+			() => clock.now,
+		),
 		personId: "ada",
-		stored: (key) => store.find(`hash-${key}`),
+		stored: async (key) => keys.get(`hash-${key}`) ?? null,
 		now: () => clock.now,
 		close: async () => {},
 	};

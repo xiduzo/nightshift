@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { inMemoryMembersPorts } from "../adapters/out/in-memory-neighbours";
+import { membersPorts } from "../test-support";
 import { listPersonNames } from "./list-person-names";
 
 describe("listPersonNames", () => {
 	test("names the Persons this Replica knows", async () => {
-		const ports = inMemoryMembersPorts();
+		const ports = await membersPorts();
 		await ports.seed.person({ id: "ada", name: "Ada", email: "a@x.org" });
 		expect(await listPersonNames(ports)({ ids: ["ada", "bo"] })).toEqual(
 			new Map([["ada", "Ada"]]),

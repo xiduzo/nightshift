@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from "bun:test";
-import { memoryDb } from "../../test-support";
+import { memoryDb } from "../../../../testing/memory-db";
 import { drizzleLocalPersonStore } from "./drizzle-local-person-store";
 
 const make = async () => ({

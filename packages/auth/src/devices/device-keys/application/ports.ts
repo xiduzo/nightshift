@@ -1,8 +1,8 @@
 import type { StoredKey } from "../domain/device-keys";
 
 /**
- * The driven ports of device-keys. A port of its own has a real adapter,
- * an in-memory adapter and a contract suite in `adapters/out/`.
+ * The driven ports of device-keys. The adapters of its own ports sit
+ * in `adapters/out/`.
  */
 
 /** The Device keys this Host keeps, as rows. */

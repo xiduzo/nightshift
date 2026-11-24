@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { inMemoryMembersPorts } from "../adapters/out/in-memory-neighbours";
+import { membersPorts } from "../test-support";
 import { listMembers } from "./list-members";
 
 describe("listMembers", () => {
 	test("lists the Members and the pending invitations that have not expired", async () => {
-		const ports = inMemoryMembersPorts();
+		const ports = await membersPorts();
 		await ports.seed.person({ id: "ada", name: "Ada", email: "a@x.org" });
 		await ports.seed.space({ id: "platform", name: "Platform" });
 		await ports.seed.membership({

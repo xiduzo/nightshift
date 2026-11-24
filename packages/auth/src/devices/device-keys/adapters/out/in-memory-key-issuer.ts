@@ -1,14 +1,13 @@
 import type { KeyIssuer } from "../../application/ports";
 import type { StoredKey } from "../../domain/device-keys";
-import type { InMemoryKeyStore } from "./in-memory-key-store";
 
 /**
- * `KeyIssuer` in memory. A new key goes into the key store twin under the
+ * `KeyIssuer` in memory. A new key goes into `store` under the
  * hash `hash-<key>`, as the plugin stores its hash. `now` is the twin's
  * clock for the expiry.
  */
 export function inMemoryKeyIssuer(
-	store: Pick<InMemoryKeyStore, "add">,
+	store: { add(hash: string, key: StoredKey): Promise<void> },
 	now: () => number,
 ) {
 	let next = 0;
@@ -32,7 +31,7 @@ export function inMemoryKeyIssuer(
 				deviceId: key.deviceId,
 			};
 			const clear = `nsd_${key.deviceId}-${next}`;
-			store.add(`hash-${clear}`, made);
+			await store.add(`hash-${clear}`, made);
 			twin.made.push(made);
 			return { key: clear, keyId: made.id };
 		},

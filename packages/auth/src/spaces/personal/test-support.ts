@@ -1,7 +1,7 @@
 import type { Database } from "@nightshift/db";
 import { member, organization, user } from "@nightshift/db/schema";
-import { migratedDb } from "@nightshift/db/testing";
 import { asDate } from "@nightshift/time";
+import { memoryDb } from "../../testing/memory-db";
 import { drizzleLocalPersonStore } from "./adapters/out/drizzle-local-person-store";
 import { drizzlePersonalSpaceStore } from "./adapters/out/drizzle-personal-space-store";
 import type { RowBatch } from "./domain/personal-space";
@@ -32,18 +32,6 @@ export type PersonalSeed = {
 		role: string;
 	}): Promise<void>;
 };
-
-/**
- * A migrated database in memory, without the local Person and the
- * personal Space that the migrations make: an empty Replica.
- */
-export async function memoryDb(): Promise<Database> {
-	const db = await migratedDb();
-	await db.delete(member);
-	await db.delete(organization);
-	await db.delete(user);
-	return db;
-}
 
 /** Puts rows on the database. */
 export function drizzlePersonalSeed(db: Database): PersonalSeed {

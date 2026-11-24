@@ -1,10 +1,16 @@
 import { describe, expect, test } from "bun:test";
-import { inMemoryMembersPorts } from "../adapters/out/in-memory-neighbours";
+import { membersPorts } from "../test-support";
 import { removeMemberships } from "./remove-memberships";
 
 describe("removeMemberships", () => {
 	test("ends the Person's memberships of these Spaces only", async () => {
-		const ports = inMemoryMembersPorts();
+		const ports = await membersPorts();
+		for (const id of ["ada", "bo"]) {
+			await ports.seed.person({ id, name: id, email: `${id}@x.org` });
+		}
+		for (const id of ["platform", "other"]) {
+			await ports.seed.space({ id, name: id });
+		}
 		for (const [id, spaceId, personId] of [
 			["m-1", "platform", "ada"],
 			["m-2", "other", "ada"],
@@ -19,6 +25,6 @@ describe("removeMemberships", () => {
 			});
 		}
 		await removeMemberships(ports)({ spaceIds: ["platform"], personId: "ada" });
-		expect(ports.records.members.map((m) => m.id)).toEqual(["m-2", "m-3"]);
+		expect(await ports.membershipIds()).toEqual(["m-2", "m-3"]);
 	});
 });

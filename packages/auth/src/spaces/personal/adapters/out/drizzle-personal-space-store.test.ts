@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, test } from "bun:test";
+import { memoryDb } from "../../../../testing/memory-db";
 import type { PersonalSpaceStore } from "../../application/ports";
 import type { RowBatch } from "../../domain/personal-space";
-import { drizzlePersonalSeed, memoryDb, runBatch } from "../../test-support";
+import { drizzlePersonalSeed, runBatch } from "../../test-support";
 import { drizzlePersonalSpaceStore } from "./drizzle-personal-space-store";
 
 async function make() {

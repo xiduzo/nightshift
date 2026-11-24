@@ -1,6 +1,6 @@
 /**
- * The driven ports of login. A port of its own has a real adapter, an
- * in-memory adapter and a contract suite in `adapters/out/`.
+ * The driven ports of login. The adapters of its own ports sit
+ * in `adapters/out/`.
  */
 
 /** The email and password each Person signs in with. */

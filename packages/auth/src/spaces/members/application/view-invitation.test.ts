@@ -1,11 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { inMemoryMembersPorts } from "../adapters/out/in-memory-neighbours";
+import { membersPorts } from "../test-support";
 import { viewInvitation } from "./view-invitation";
 
 const NOW = 1_000;
 
 async function withInvitation(status = "pending") {
-	const ports = inMemoryMembersPorts();
+	const ports = await membersPorts();
 	await ports.seed.person({ id: "ada", name: "Ada", email: "a@x.org" });
 	await ports.seed.space({ id: "platform", name: "Platform" });
 	await ports.seed.invitation({
@@ -23,7 +23,7 @@ async function withInvitation(status = "pending") {
 
 describe("viewInvitation", () => {
 	test("an unknown id is null", async () => {
-		const ports = inMemoryMembersPorts();
+		const ports = await membersPorts();
 		expect(await viewInvitation(ports)({ id: "inv", now: NOW })).toBeNull();
 	});
 

@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { inMemoryMembersPorts } from "../adapters/out/in-memory-neighbours";
+import { membersPorts } from "../test-support";
 import { claimHostAdmin } from "./claim-host-admin";
 
 describe("claimHostAdmin", () => {
 	test("the first Person becomes the Host admin", async () => {
-		const ports = inMemoryMembersPorts();
+		const ports = await membersPorts();
 		await ports.seed.person({
 			id: "ada",
 			name: "Ada",
@@ -16,7 +16,7 @@ describe("claimHostAdmin", () => {
 	});
 
 	test("a Host with an admin keeps it", async () => {
-		const ports = inMemoryMembersPorts();
+		const ports = await membersPorts();
 		await ports.seed.person({
 			id: "ada",
 			name: "Ada",

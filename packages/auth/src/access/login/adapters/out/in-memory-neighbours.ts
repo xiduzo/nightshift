@@ -1,14 +1,12 @@
 import { inMemoryCredentials } from "./in-memory-credentials";
-import { inMemorySessionStore } from "./in-memory-session-store";
 /**
- * `inMemoryLoginPorts`, which gives a use-case test every port of login
- * at once. Test code: production code never imports this file.
+ * `inMemoryLoginPorts`, the ports of login that are no database. Test code:
+ * production code never imports this file.
  */
 
-/** Every port of login in memory at once: where each use-case test starts. */
+/** The ports of login that are no database, in memory. */
 export function inMemoryLoginPorts() {
 	return {
 		credentials: inMemoryCredentials(),
-		sessionStore: inMemorySessionStore(),
 	};
 }

@@ -1,27 +1,45 @@
 import type { Database } from "@nightshift/db";
 import { invitation, member, organization, user } from "@nightshift/db/schema";
-import { migratedDb } from "@nightshift/db/testing";
 import { asDate } from "@nightshift/time";
-import type { MembersSeed } from "./adapters/out/in-memory-person-store";
+import { memoryDb } from "../../testing/memory-db";
+import { drizzleInvitationStore } from "./adapters/out/drizzle-invitation-store";
+import { drizzleMemberStore } from "./adapters/out/drizzle-member-store";
+import { drizzlePersonStore } from "./adapters/out/drizzle-person-store";
 
 /**
- * The real side of the contract suites of members: a database in memory,
- * and the rows a test puts on it before it asks a store.
+ * The ports of members over a database in memory, and the rows a test puts
+ * on it before it asks a store.
  */
 
-/**
- * A migrated database in memory, without the local Person and the
- * personal Space that the migrations make: an empty Replica.
- */
-export async function memoryDb(): Promise<Database> {
-	const db = await migratedDb();
-	await db.delete(member);
-	await db.delete(organization);
-	await db.delete(user);
-	return db;
-}
+/** What a test puts on a Replica before it asks a store. A time is an instant. */
+export type MembersSeed = {
+	person(person: {
+		id: string;
+		name: string;
+		email: string;
+		role?: string | null;
+	}): Promise<void>;
+	space(space: { id: string; name: string }): Promise<void>;
+	membership(membership: {
+		id: string;
+		spaceId: string;
+		personId: string;
+		role: string;
+		createdAt: number;
+	}): Promise<void>;
+	invitation(invitation: {
+		id: string;
+		spaceId: string;
+		email: string;
+		role: string | null;
+		status: string;
+		expiresAt: number;
+		inviterId: string;
+		createdAt: number;
+	}): Promise<void>;
+};
 
-/** Puts rows on the database, as `seedRecords` puts them on the in-memory Replica. */
+/** Puts rows on the database. */
 export function drizzleMembersSeed(db: Database): MembersSeed {
 	return {
 		async person(person) {
@@ -61,5 +79,23 @@ export function drizzleMembersSeed(db: Database): MembersSeed {
 				createdAt: asDate(row.createdAt),
 			});
 		},
+	};
+}
+
+/** Every port of members over one database: where each use-case test starts. */
+export async function membersPorts() {
+	const db = await memoryDb();
+	let ids = 0;
+	return {
+		seed: drizzleMembersSeed(db),
+		/** The ids of the memberships, in order. */
+		membershipIds: async () =>
+			(await db.select({ id: member.id }).from(member).orderBy(member.id)).map(
+				(row) => row.id,
+			),
+		newId: () => `id-${++ids}`,
+		personStore: drizzlePersonStore(db),
+		invitationStore: drizzleInvitationStore(db),
+		memberStore: drizzleMemberStore(db),
 	};
 }

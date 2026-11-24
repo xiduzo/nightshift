@@ -2,8 +2,8 @@ import type { PendingInvitation, SpaceMember } from "./list-members";
 import type { StoredInvitation } from "./view-invitation";
 
 /**
- * The driven ports of members. A port of its own has a real adapter, an
- * in-memory adapter and a contract suite in `adapters/out/`.
+ * The driven ports of members. The adapters of its own ports sit
+ * in `adapters/out/`.
  */
 
 /** The accounts of the Persons of this Replica. */
