@@ -8,6 +8,7 @@ import {
 	isHomeHost,
 } from "./host-links";
 import { type HttpsLinkOptions, httpsLink, type Link } from "./link";
+import { keepUnderOwnName, reportKeyNames } from "./own-key-names";
 import type { LinkedHost } from "./types";
 
 /**
@@ -102,10 +103,14 @@ export function createDeviceLinks(deps: {
 		}
 	}
 
+	/** This install does not connect to that Host. */
+	const staysLocal = (link: HostLink) =>
+		deps.localOnly === true && !isLocalHost(link.addresses);
+
 	async function add(link: HostLink, key?: string) {
 		await stop(link.hostId);
 		if (link.revokedAt) return;
-		if (deps.localOnly && !isLocalHost(link.addresses)) {
+		if (staysLocal(link)) {
 			console.warn(`Not connecting to ${link.name}: ${DEV_STAYS_LOCAL}`);
 			return;
 		}
@@ -134,6 +139,9 @@ export function createDeviceLinks(deps: {
 			onAddresses: (addresses) => {
 				deps.links.setAddresses(link.hostId, addresses).catch(() => {});
 			},
+			onAccepted: () => {
+				void keepUnderOwnName(deps.keys, link.hostId, secret);
+			},
 			onRevoked: () => {
 				void lostAccess(link);
 			},
@@ -145,7 +153,14 @@ export function createDeviceLinks(deps: {
 
 	return {
 		async start() {
-			for (const link of await deps.links.list()) await add(link);
+			const all = await deps.links.list();
+			await reportKeyNames(
+				deps.keys,
+				all
+					.filter((link) => !link.revokedAt && !staysLocal(link))
+					.map((link) => link.hostId),
+			);
+			for (const link of all) await add(link);
 		},
 		add,
 		async hosts() {

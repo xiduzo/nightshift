@@ -5,6 +5,7 @@ import { type KeyStoreKind, valueStore } from "@nightshift/engine";
 import { Refusal } from "@nightshift/refusal";
 import { asDate, instant, instantOrNull } from "@nightshift/time";
 import { and, asc, eq, isNotNull, isNull, ne } from "drizzle-orm";
+import type { KeyNaming } from "./own-key-names";
 
 export type { KeyStoreKind } from "@nightshift/engine";
 
@@ -183,6 +184,8 @@ export type DeviceKeyStore = {
 	 * before that another install may use (`deviceKeysOf`).
 	 */
 	delete(hostId: string, options?: { ownOnly: boolean }): Promise<void>;
+	/** CONVERSION, with an end (`KeyNaming`). Left out: each key has one name. */
+	readonly naming?: KeyNaming;
 };
 
 const KEYCHAIN_SERVICE = "nightshift-device-keys";
@@ -218,26 +221,66 @@ export async function deviceKeyStore(options: {
  * `<deviceId>/<hostId>`. A key from before, under the Host's id alone, is
  * read while the Device has none of its own. It may be another install's:
  * the link refuses a key the Host knows as another Device's
- * (`expectDeviceId`). A new key never goes there.
+ * (`HttpsLinkOptions.deviceId`). A new key never goes there.
+ *
+ * CONVERSION, with an end (`KeyNaming`): the key from before is kept under
+ * the Device's own name too. That write never crosses a join or a leave: it
+ * does not start after one, and one that comes while it runs waits for it.
  */
 export function deviceKeysOf(
 	store: DeviceKeyStore,
 	deviceId: string,
 ): DeviceKeyStore {
 	const own = (hostId: string) => `${deviceId}/${hostId}`;
+	/** The Hosts whose key was set or deleted since the start. */
+	const changed = new Set<string>();
+	/** The one attempt per Host since the start. It never rejects. */
+	const kept = new Map<string, Promise<unknown>>();
+	async function change(hostId: string) {
+		changed.add(hostId);
+		await kept.get(hostId);
+	}
+	async function copyToOwn(hostId: string, key: string) {
+		if ((await store.get(own(hostId))) !== null) return false;
+		if ((await store.get(hostId)) !== key) return false;
+		await store.set(own(hostId), key);
+		return true;
+	}
 	return {
 		kind: store.kind,
 		async get(hostId) {
 			return (await store.get(own(hostId))) ?? store.get(hostId);
 		},
-		set: (hostId, key) => store.set(own(hostId), key),
+		async set(hostId, key) {
+			await change(hostId);
+			await store.set(own(hostId), key);
+		},
 		async delete(hostId, options) {
-			// A key from before goes only when it was the one in use.
-			if (!options?.ownOnly && (await store.get(own(hostId))) === null) {
-				await store.delete(hostId);
-				return;
+			await change(hostId);
+			if (!options?.ownOnly) {
+				// A key from before goes only when it was the one in use, under
+				// either name.
+				const key = await store.get(own(hostId));
+				if (key === null || key === (await store.get(hostId))) {
+					await store.delete(hostId);
+				}
 			}
 			await store.delete(own(hostId));
+		},
+		naming: {
+			async nameOf(hostId) {
+				if ((await store.get(own(hostId))) !== null) return "own";
+				return (await store.get(hostId)) === null ? null : "host";
+			},
+			async keepOwn(hostId, key) {
+				if (changed.has(hostId) || kept.has(hostId)) return false;
+				const copy = copyToOwn(hostId, key);
+				kept.set(
+					hostId,
+					copy.catch(() => {}),
+				);
+				return copy;
+			},
 		},
 	};
 }

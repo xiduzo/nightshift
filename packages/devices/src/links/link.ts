@@ -148,6 +148,8 @@ export type HttpsLinkOptions = {
 	answerTimeoutMs?: number;
 	/** The Host listed its addresses: keep them for the next start. */
 	onAddresses?(addresses: string[]): void;
+	/** The Host accepted the key as this Device's (`deviceId`): each time the link comes online. */
+	onAccepted?(): void;
 	/** The Host refused the key. */
 	onRevoked?(): void;
 	onState?(state: LinkState): void;
@@ -381,6 +383,7 @@ export function httpsLink(options: HttpsLinkOptions): Link {
 					endWaits(said);
 					return;
 				}
+				if (options.deviceId) options.onAccepted?.();
 				learn(value, address);
 				setState("online", address);
 				waits.reset();
