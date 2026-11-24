@@ -1,5 +1,4 @@
-import { createDb } from "@nightshift/db";
-import { migrateDb } from "@nightshift/db/migrate";
+import { migratedDb } from "@nightshift/db/testing";
 import { drizzleProjectSecretStore } from "./drizzle-project-secret-store";
 import { inMemoryProjectSecretStore } from "./in-memory-project-secret-store";
 import { projectSecretStoreContract } from "./project-secret-store.contract";
@@ -12,8 +11,7 @@ projectSecretStoreContract("in memory", async (now) => ({
 }));
 
 projectSecretStoreContract("over drizzle", async (now) => {
-	const db = createDb({ DATABASE_URL: ":memory:" });
-	await migrateDb(db);
+	const db = await migratedDb();
 	const cipher = webcryptoSecretsCipher(
 		"a-secrets-key-for-these-tests-0123456789",
 	);

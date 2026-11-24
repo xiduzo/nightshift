@@ -1,5 +1,4 @@
-import { createDb } from "@nightshift/db";
-import { migrateDb } from "@nightshift/db/migrate";
+import { migratedDb } from "@nightshift/db/testing";
 import { openDeviceDocument } from "@nightshift/engine";
 import { deviceOffersContract } from "./device-offers.contract";
 import { inMemoryDeviceOffers } from "./in-memory-device-offers";
@@ -10,8 +9,7 @@ import { yjsDeviceOffers } from "./yjs-device-offers";
 deviceOffersContract("in memory", () => inMemoryDeviceOffers());
 
 deviceOffersContract("over the Device document", async () => {
-	const db = createDb({ DATABASE_URL: ":memory:" });
-	await migrateDb(db);
+	const db = await migratedDb();
 	const document = await openDeviceDocument({ db, deviceId: "self" });
 	return yjsDeviceOffers(document);
 });
