@@ -5,6 +5,13 @@
  */
 
 import {
+	type Flow,
+	type FlowInputDef,
+	type FlowNode,
+	type FlowVariableDef,
+	nodeOutcomes,
+} from "../../flow";
+import {
 	type NodeOption,
 	setInputs,
 	setVariables,
@@ -12,14 +19,7 @@ import {
 	withOptions,
 	withOutputSchema,
 	withWrites,
-} from "../../draft";
-import {
-	type Flow,
-	type FlowInputDef,
-	type FlowNode,
-	type FlowVariableDef,
-	nodeOutcomes,
-} from "../../flow";
+} from "../../flows";
 import { type VariableWrite, waitCommandOf } from "../../nodes";
 import { typedOutput } from "../../shapes";
 import type {

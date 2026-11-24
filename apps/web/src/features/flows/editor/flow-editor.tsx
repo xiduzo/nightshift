@@ -57,6 +57,8 @@ type Props = {
 	revisionLink?: string;
 	/** The revision link did its work: drop it from the address. */
 	onRevisionLinkUsed?: () => void;
+	/** False for a Space viewer: My kits show this project only. Default true. */
+	canCopyKits?: boolean;
 };
 
 /** What the chat panel covers of the canvas on a wide screen: its width (`w-[min(380px,…)]`) and its gap. */
@@ -80,6 +82,7 @@ function Editor({
 	onChatLinkUsed,
 	revisionLink,
 	onRevisionLinkUsed,
+	canCopyKits = true,
 }: Props) {
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
@@ -293,6 +296,7 @@ function Editor({
 		flows: projectFlows.flows,
 		defaults: nodeDefaults,
 		disabled: Boolean(preview) || subflows.inside,
+		canCopyKits,
 	});
 
 	const previewCheck = useMemo(

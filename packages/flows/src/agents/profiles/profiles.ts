@@ -8,7 +8,7 @@ import {
 	profileOf,
 	tierUsers,
 	withTierNode,
-} from "../flow";
+} from "../../flow";
 import {
 	type AgentHarnessName,
 	type AgentNode,
@@ -31,7 +31,7 @@ import {
 	tierLabel,
 	type ValueNode,
 	valueDeciderNameSchema,
-} from "../nodes";
+} from "../../nodes";
 
 /**
  * Profiles: a setup that nodes name in `profile`. An Agent Profile holds a

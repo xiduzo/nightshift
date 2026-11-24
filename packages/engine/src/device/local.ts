@@ -2,7 +2,6 @@ import { stat } from "node:fs/promises";
 import { delimiter } from "node:path";
 import { harnessNoun } from "@nightshift/agents/harness-facts";
 import type {
-	AgentHarness,
 	AgentSessionInput,
 	Decider,
 	DeciderName,
@@ -30,17 +29,16 @@ import {
 	type Git,
 	systemGit,
 } from "../git";
-import { NOT_ON_THIS_COMPUTER, wireSetup } from "../projects";
 import type { RunFolders } from "../run-folders";
-import {
-	type CliToolStore,
-	type ConnectionStore,
-	cliToolsInstruction,
-	type ProfileStore,
-	unreachableNote,
-} from "../settings";
 import { spawnCommand } from "./command";
 import { ARTIFACTS_ENV, type KeptFiles, openKeptFiles } from "./kept-files";
+import type {
+	DeviceCliToolsPort,
+	DeviceConnectionsPort,
+	DeviceProfilesPort,
+	DeviceProjectPort,
+	Harnesses,
+} from "./ports";
 import { readFolderFile } from "./read-file";
 import { redactExec, redactSession, redactText } from "./redact";
 import { callServerTool } from "./tool-call";
@@ -63,32 +61,19 @@ import {
 	type WebRequestResult,
 } from "./types";
 import { type OutgoingRequest, sendRequest } from "./web-request";
+import {
+	cliToolsInstruction,
+	NOT_ON_THIS_COMPUTER,
+	unreachableNote,
+} from "./words";
+
+export type { Harnesses } from "./ports";
 
 /** What the Device reads of this computer's connections and secrets. */
-export type DeviceConnections = Pick<
-	ConnectionStore,
-	"names" | "mcpServersFor" | "secretEnv"
->;
+export type DeviceConnections = DeviceConnectionsPort;
 
 /** What the Device reads of this computer's CLI tools. */
-export type DeviceCliTools = Pick<CliToolStore, "names" | "program" | "guides">;
-
-/**
- * The agent harnesses of this computer, read at each question: the ones
- * added on the Agents page, and the custom agents (`acp:<slug>`). The
- * daemon reads them from its settings (`localHarnesses` of
- * `@nightshift/daemon`), a test from a record (`harnessesOf`).
- */
-export type Harnesses = {
-	/**
-	 * The harness of that name, when it is added and built here. Undefined:
-	 * none of that name. `use`: where the session happens, for the Secret
-	 * scope rule of a custom agent's env.
-	 */
-	get(name: AgentHarnessName, use?: SecretUse): AgentHarness | undefined;
-	/** The names `get` finds: the harnesses this Device reports. */
-	names(): readonly AgentHarnessName[];
-};
+export type DeviceCliTools = DeviceCliToolsPort;
 
 /**
  * Everything on this computer a step body may touch: the harnesses, the
@@ -124,8 +109,10 @@ export type LocalDeviceDeps = {
 	 * and a tool runs the program of its name.
 	 */
 	cliTools?: DeviceCliTools;
-	/** This computer's Agent Profiles (`ProfileStore`), by id. Without it: none. */
-	profiles?: Pick<ProfileStore, "settingsFor">;
+	/** This computer's Agent Profiles, by id. Without it: none. */
+	profiles?: DeviceProfilesPort;
+	/** Project readiness before a worktree. Without it: no check (tests). */
+	checkProject?: DeviceProjectPort;
 	/** Where a program is on this computer, or null. Default: `findProgram`. */
 	which?: (program: string) => string | null;
 	/**
@@ -831,7 +818,9 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 		flows: async (projectId) => deps.flows?.(projectId) ?? {},
 		async worktree(run) {
 			const repoPath = await cloneOf(run.projectId);
-			const readiness = await wireSetup({ git }).check(repoPath);
+			const readiness = deps.checkProject
+				? await deps.checkProject.check(repoPath)
+				: { steps: [] as const };
 			// A missing name for git or program of a knowledge source does not stop a run.
 			const notReady = readiness.steps.find(
 				(step) =>

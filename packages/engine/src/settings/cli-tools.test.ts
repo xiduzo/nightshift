@@ -1,10 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { agentProfile } from "@nightshift/db/schema";
 import { createSandbox, type Sandbox } from "../testing/test-support";
-import {
-	cliToolsInstruction,
-	wireCliTools as createCliToolStore,
-} from "./cli-tools";
+import { wireCliTools as createCliToolStore } from "./cli-tools";
+import { cliToolsInstruction } from "./cli-tools/domain/cli-tool-guides";
 import { wireProfiles as createProfileStore } from "./profiles";
 
 let sandbox: Sandbox;

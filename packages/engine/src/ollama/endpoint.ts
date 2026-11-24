@@ -1,8 +1,13 @@
-import {
-	type ConnectionStore,
-	isLoopbackHost,
-	type SettingsStore,
-} from "../settings";
+import type { OllamaSecretsPort, OllamaSettingsPort } from "./ports";
+
+function isLoopbackHost(hostname: string): boolean {
+	return (
+		hostname === "localhost" ||
+		hostname === "[::1]" ||
+		hostname === "::1" ||
+		/^127\.\d+\.\d+\.\d+$/.test(hostname)
+	);
+}
 
 /** Ollama's own address on this computer: where Night Shift starts it, and looks first. */
 export const OLLAMA_LOCAL = "http://127.0.0.1:11434";
@@ -44,8 +49,8 @@ export function whereOf(address: string): string | null {
  * from the setting with `${NAME}` expanded from the secrets.
  */
 export async function resolveOllamaEndpoint(deps: {
-	settings: Pick<SettingsStore, "current" | "view">;
-	secrets: Pick<ConnectionStore, "expandEnv">;
+	settings: Pick<OllamaSettingsPort, "current" | "view">;
+	secrets: Pick<OllamaSecretsPort, "expandEnv">;
 }): Promise<OllamaEndpoint> {
 	const { values, fields } = deps.settings.view();
 	const set = values.ollamaAddress.trim();
@@ -80,7 +85,7 @@ export async function resolveOllamaEndpoint(deps: {
 
 /** The embedding model of search by meaning: the owner's setting, else `NIGHTSHIFT_EMBEDDING_MODEL`, else qwen3-embedding:0.6b. */
 export function knowledgeModel(
-	settings: Pick<SettingsStore, "current">,
+	settings: Pick<OllamaSettingsPort, "current">,
 ): string {
 	return settings.current().embeddingModel;
 }

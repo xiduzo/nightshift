@@ -153,15 +153,6 @@ export {
 	waitingForYou,
 } from "./gates";
 export {
-	type GlanceSnapshot,
-	type GlanceTone,
-	glanceLooks,
-	glanceSnapshot,
-	type RunProgress,
-	runProgress,
-	sameProgress,
-} from "./glance";
-export {
 	ASK_A_MEMBER,
 	agentSource,
 	arrangeTasks,
@@ -394,3 +385,12 @@ export {
 	now,
 } from "./time";
 export { createUsageQueries } from "./usage";
+export {
+	type GlanceSnapshot,
+	type GlanceTone,
+	glanceLooks,
+	glanceSnapshot,
+	type RunProgress,
+	runProgress,
+	sameProgress,
+} from "./widgets";

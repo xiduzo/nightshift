@@ -1,10 +1,9 @@
 import type { Permissions } from "@nightshift/auth";
 import { secretNameSchema } from "@nightshift/flows";
 import { z } from "zod";
-
-import { secretScopeSchema } from "../config";
 import { output } from "../output";
 import { ownerOnly, permitted, protectedProcedure } from "../procedures";
+import { secretScopeSchema } from "../settings";
 import { projectProcedure } from "./project-space";
 import { projectSecretListSchema } from "./schemas";
 

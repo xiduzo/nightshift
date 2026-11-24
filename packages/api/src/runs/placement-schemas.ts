@@ -1,8 +1,7 @@
 import type { OwnDevice, Placement } from "@nightshift/engine";
 import { z } from "zod";
-
-import { deviceProfileSchema } from "../config";
 import { exact } from "../output";
+import { deviceProfileSchema } from "../settings";
 
 /**
  * The Devices a run can run on. Each output mirrors the engine's view

@@ -1,18 +1,6 @@
 import type { RouterClient } from "@orpc/server";
 import { z } from "zod";
 import { assistant } from "./assistant";
-import {
-	agentSetup,
-	cliTools,
-	connections,
-	deciderSetup,
-	deciders,
-	harnesses,
-	ollama,
-	profiles,
-	programs,
-	settings,
-} from "./config";
 import { dashboard } from "./dashboard";
 import { account, devices, hostPeer, offers } from "./devices";
 import { flows } from "./flows";
@@ -24,6 +12,18 @@ import { publicProcedure } from "./procedures";
 import { projects } from "./projects";
 import { runs } from "./runs";
 import { schedules } from "./schedules";
+import {
+	agentSetup,
+	cliTools,
+	connections,
+	deciderSetup,
+	deciders,
+	harnesses,
+	ollama,
+	profiles,
+	programs,
+	settings,
+} from "./settings";
 import { invitations, members, spaces } from "./spaces";
 import { usage } from "./usage";
 

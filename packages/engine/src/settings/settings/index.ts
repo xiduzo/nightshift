@@ -18,4 +18,4 @@ export {
 	type TelemetryProtocol,
 } from "./domain/setting-defs";
 export type { SettingField } from "./domain/setting-fields";
-export type { SettingsStore, WiredSettings } from "./wire";
+export { type SettingsStore, type WiredSettings, wireSettings } from "./wire";

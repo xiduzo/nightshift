@@ -13,10 +13,9 @@ import {
 } from "@nightshift/devices";
 
 import { z } from "zod";
-
-import { deviceProfileSchema } from "../config";
 import { exact } from "../output";
 import { runStatusSchema } from "../runs";
+import { deviceProfileSchema } from "../settings";
 
 /**
  * The output schemas of Devices and Hosts, as a Person sees them: this

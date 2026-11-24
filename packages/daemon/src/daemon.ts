@@ -16,7 +16,7 @@ import {
 } from "@nightshift/engine";
 import { createTelemetry } from "@nightshift/telemetry";
 import { instant } from "@nightshift/time";
-import { reportDeviceFacts } from "./harnesses";
+import { reportDeviceFacts } from "./agents";
 import { createHttp, type DaemonServe, trustedOriginsOf } from "./http";
 import {
 	createKeepAwake,

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { addNode, planSubflowFromSection, renameNode } from "../../draft";
 import { FLOW_VERSION, type Flow, flowSchema } from "../../flow";
+import { addNode, planSubflowFromSection, renameNode } from "../../flows";
 import { validateFlow } from "../../validate";
 import { endMessage, MAX_REPORT_BYTES, reportText } from "./end";
 

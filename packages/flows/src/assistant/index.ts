@@ -5,6 +5,28 @@
  */
 
 export {
+	AGENT_ENTRIES,
+	type AgentEntry,
+	type AgentEntryId,
+	BUILTIN_AGENTS,
+	type BuiltinAgent,
+	type BuiltinAgentId,
+	type BuiltinAnswer,
+	type BuiltinAnswers,
+	type BuiltinCheck,
+	type BuiltinModelAnswer,
+	type BuiltinStatus,
+	type BuiltinTakes,
+	builtinAgent,
+	builtinAgentIdSchema,
+	builtinAnswersSchema,
+	builtinModel,
+	type EntryMove,
+	type EntrySaving,
+	entryOpening,
+	type ModelPick,
+} from "./builtin";
+export {
 	applySuggestion,
 	argumentChanges,
 	type Change,

@@ -11,7 +11,7 @@
  * person's own agents.
  */
 import { z } from "zod";
-
+import { isAgentProfile, type Profile } from "../../agents";
 import {
 	type AgentHarnessName,
 	agentNodeSchema,
@@ -20,8 +20,7 @@ import {
 	deciderNameSchema,
 	type ModelAddress,
 	nameSchema,
-} from "../nodes";
-import { isAgentProfile, type Profile } from "../profiles";
+} from "../../nodes";
 
 export const builtinAgentIds = [
 	"builder",

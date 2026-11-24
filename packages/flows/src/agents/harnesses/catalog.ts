@@ -2,7 +2,7 @@ import {
 	type AgentHarnessName,
 	type HarnessName,
 	isCustomHarness,
-} from "../nodes";
+} from "../../nodes";
 
 /**
  * What a person sees of each built-in harness, as pure data: the web app's

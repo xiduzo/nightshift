@@ -24,4 +24,4 @@ export {
 	publicNumbers,
 	type Retention,
 	retention,
-} from "./queries";
+} from "./reports";

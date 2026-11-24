@@ -5,6 +5,7 @@ import {
 	createRunFolders,
 	localDevice,
 } from "@nightshift/engine";
+import { wireSetup } from "@nightshift/engine/projects";
 import {
 	type ConfigStores,
 	reachesPrivateNetwork,
@@ -15,7 +16,7 @@ import {
 	type ModelPick,
 } from "@nightshift/flows";
 import type { Telemetry } from "@nightshift/telemetry";
-import { localHarnesses } from "./harnesses";
+import { localHarnesses } from "./agents";
 
 type LocalDeviceDeps = Parameters<typeof localDevice>[0];
 type Ollama = Awaited<ReturnType<typeof createOllama>>;
@@ -85,6 +86,8 @@ export function wireLocalDevice(
 		connections,
 		cliTools,
 		profiles,
+		// Project readiness before a worktree: projects capability, as a port.
+		checkProject: wireSetup(),
 		toolLaunchers: deps.toolLaunchers,
 		clonePath: deps.clonePath,
 		// A run of a project without a folder works in a folder of its own

@@ -53,6 +53,7 @@ export function useNodeAdder({
 	flows,
 	defaults,
 	disabled,
+	canCopyKits,
 }: {
 	session: EditingSession;
 	projectId: string;
@@ -62,6 +63,8 @@ export function useNodeAdder({
 	flows: ProjectFlowMap | undefined;
 	defaults: NodeDefaults | undefined;
 	disabled: boolean;
+	/** False for a Space viewer: My kits show this project only. */
+	canCopyKits: boolean;
 }) {
 	const { draft: flow, selection } = useEditingSession(session);
 	const [open, setOpen] = useState(false);
@@ -71,7 +74,14 @@ export function useNodeAdder({
 	const anchor = useRef<Point | undefined>(undefined);
 	const spot = useNewNodeSpot();
 	const { getInternalNode } = useReactFlow();
-	const myKits = useMyKits({ projectId, flowName, flows, draft: flow, open });
+	const myKits = useMyKits({
+		projectId,
+		flowName,
+		flows,
+		draft: flow,
+		open,
+		canCopy: canCopyKits,
+	});
 	const recent = useRecentNodes();
 
 	const show = useCallback(

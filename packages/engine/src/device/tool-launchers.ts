@@ -15,13 +15,9 @@ import { findProgram, shellQuoteAlways } from "@nightshift/agents/types";
 import type { Login } from "@nightshift/flows";
 import { now as timeNow } from "@nightshift/time";
 import type { SecretEnv, SecretUse } from "../contract";
-import {
-	type CliTool,
-	type CliToolStore,
-	programOf,
-	unreachableNote,
-} from "../settings";
+import type { DeviceCliToolLookup } from "./ports";
 import { redactText } from "./redact";
+import { type DeviceCliTool, programOf, unreachableNote } from "./words";
 
 /**
  * The CLI tools of one step, with their logins. A tool that runs another
@@ -126,7 +122,7 @@ const expand = (value: string, secrets: Record<string, string>) =>
 	value.replace(REFERENCE, (_, name: string) => secrets[name] ?? "");
 
 export function createToolLaunchers(options: {
-	tools: Pick<CliToolStore, "get" | "list">;
+	tools: DeviceCliToolLookup;
 	/** Secrets by name: the saved ones, then the environment. */
 	secretEnv: (names: readonly string[], use?: SecretUse) => Promise<SecretEnv>;
 	/** Night Shift's data folder: the logins' own folders go in `tools/`. */
@@ -167,7 +163,7 @@ export function createToolLaunchers(options: {
 
 	/** The tool's login with its secrets read: its variables, its folder, its sign-in input. */
 	async function resolveLogin(
-		tool: CliTool,
+		tool: DeviceCliTool,
 		login: Login,
 		use?: SecretUse,
 	): Promise<
@@ -258,7 +254,7 @@ export function createToolLaunchers(options: {
 
 	/** Runs the sign-in command in the login's folder, with its input on stdin. */
 	async function runSignIn(
-		tool: CliTool,
+		tool: DeviceCliTool,
 		login: Login & { signIn: NonNullable<Login["signIn"]> },
 		resolved: {
 			env: Record<string, string>;
@@ -328,7 +324,7 @@ export function createToolLaunchers(options: {
 
 	/** Signs the tool in when it must (or `force`), one sign-in at a time. */
 	function ensureSignedIn(
-		tool: CliTool,
+		tool: DeviceCliTool,
 		login: Login,
 		resolved: {
 			env: Record<string, string>;
@@ -355,7 +351,7 @@ export function createToolLaunchers(options: {
 
 	/** The launcher script of a tool: its variables, then the program. */
 	const launcher = (
-		tool: CliTool,
+		tool: DeviceCliTool,
 		path: string,
 		vars: Record<string, string>,
 	) =>
@@ -381,7 +377,7 @@ export function createToolLaunchers(options: {
 		use?: SecretUse,
 	): Promise<({ ok: true } & PreparedTools) | { ok: false; message: string }> {
 		const launchers: {
-			tool: CliTool;
+			tool: DeviceCliTool;
 			path: string;
 			env: Record<string, string>;
 		}[] = [];

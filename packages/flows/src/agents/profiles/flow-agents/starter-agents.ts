@@ -1,5 +1,5 @@
-import { type Flow, flowSchema, migrateFlow } from "../../flow";
-import { starterList } from "../../starters";
+import { type Flow, flowSchema, migrateFlow } from "../../../flow";
+import { starterList } from "../../../starters";
 import { type FlowAgent, flowAgents } from "./flow-agents";
 
 /**

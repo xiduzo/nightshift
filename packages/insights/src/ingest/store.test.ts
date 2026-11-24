@@ -7,7 +7,7 @@ import { migrate } from "drizzle-orm/pglite/migrator";
 
 import type { InsightsDb } from "../client";
 import { migrationsFolder } from "../migrate/migrate";
-import { feedback, funnel, ladders, overview, publicNumbers } from "../queries";
+import { feedback, funnel, ladders, overview, publicNumbers } from "../reports";
 import { usageEvent } from "../schema";
 import { attribute } from "../schema/keys";
 import { ingestLogs } from "./ingest";

@@ -1,7 +1,6 @@
 import { join } from "node:path";
 import { findProgram } from "@nightshift/agents/types";
 import { Ollama } from "ollama";
-import type { ConnectionStore, SettingsStore } from "../settings";
 import { type OllamaEmbedder, ollamaEmbedder } from "./embedder";
 import {
 	knowledgeModel,
@@ -9,6 +8,7 @@ import {
 	type OllamaEndpoint,
 	resolveOllamaEndpoint,
 } from "./endpoint";
+import type { OllamaSecretsPort, OllamaSettingsPort } from "./ports";
 import { createOllamaPulls } from "./pulls";
 import { createOllamaStarter, type SpawnOllama } from "./starter";
 
@@ -68,8 +68,8 @@ export type OllamaService = Awaited<ReturnType<typeof createOllama>>;
 
 export async function createOllama(deps: {
 	dataDir: string;
-	settings: Pick<SettingsStore, "current" | "view" | "onChange">;
-	secrets: Pick<ConnectionStore, "expandEnv" | "onSecretsChange">;
+	settings: Pick<OllamaSettingsPort, "current" | "view" | "onChange">;
+	secrets: Pick<OllamaSecretsPort, "expandEnv" | "onSecretsChange">;
 	/** The environment of a started `ollama serve`. */
 	env: Record<string, string | undefined>;
 	/** Starts `ollama serve`: `Bun.spawn` by default. */

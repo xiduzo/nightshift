@@ -15,7 +15,6 @@ export const APP_INSIGHTS: Record<string, Place> = {
 	"features/reports": "reports",
 	"features/retention": "retention",
 	// The admin's own sign-in (Better Auth, its tables, the one admin).
-	"features/session": "access",
 	"shared/api": M,
 	"shared/config": M,
 	"shared/format": M,

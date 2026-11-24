@@ -33,6 +33,7 @@ export function FlowPage({
 	onChatLinkUsed,
 	revision,
 	onRevisionLinkUsed,
+	canCopyKits,
 }: {
 	projectId: string;
 	name: string;
@@ -44,6 +45,8 @@ export function FlowPage({
 	revision?: string;
 	/** Drops `revision` from the address once the editor used it. */
 	onRevisionLinkUsed?: () => void;
+	/** False for a Space viewer: My kits show this project only. */
+	canCopyKits?: boolean;
 }) {
 	const validName = flowNameSchema.safeParse(name).success;
 	const projects = useQuery(projectQueries.list());
@@ -173,6 +176,7 @@ export function FlowPage({
 			onChatLinkUsed={onChatLinkUsed}
 			revisionLink={revision}
 			onRevisionLinkUsed={onRevisionLinkUsed}
+			canCopyKits={canCopyKits}
 		/>
 	);
 }

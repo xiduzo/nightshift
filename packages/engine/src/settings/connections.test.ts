@@ -1,14 +1,17 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { connection } from "@nightshift/db/schema";
 import type { StepRun } from "../contract";
-import type { PersonalSecrets, ProjectSecrets } from "../secrets";
+import {
+	type PersonalSecrets,
+	type ProjectSecrets,
+	unreachableNote,
+} from "../secrets";
 import { createSandbox, type Sandbox } from "../testing/test-support";
 import {
 	type ConnectionInput,
 	type ConnectionStore,
 	wireConnections as createConnectionStore,
 	type SecretBackend,
-	unreachableNote,
 } from "./connections";
 import { referencedVariables } from "./connections/domain/saved-connection";
 

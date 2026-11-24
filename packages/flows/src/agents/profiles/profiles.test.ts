@@ -1,12 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { FLOW_VERSION, type Flow, flowSchema, nodeProfiles } from "../flow";
+import { FLOW_VERSION, type Flow, flowSchema, nodeProfiles } from "../../flow";
 import {
 	type AgentNode,
 	agentHarnessSchema,
 	type DecisionNode,
 	type ValueNode,
-} from "../nodes";
-import { validateFlow } from "../validate";
+} from "../../nodes";
+import { validateFlow } from "../../validate";
 import {
 	type AgentProfileSettings,
 	agentProfileSettingsSchema,

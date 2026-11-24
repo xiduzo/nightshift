@@ -3,12 +3,12 @@ import { join } from "node:path";
 import type { tanstackDecider } from "@nightshift/agents";
 import type { Engine, SpaceEngine } from "@nightshift/engine";
 import type { ConfigStores } from "@nightshift/engine/settings";
+import { harnessLookup, type localHarnesses } from "./agents";
 import {
 	createAssistant,
 	createLearner,
 	recordingAssistant,
 } from "./assistant";
-import { harnessLookup, type localHarnesses } from "./harnesses";
 
 type AssistantDeps = Parameters<typeof createAssistant>[0];
 

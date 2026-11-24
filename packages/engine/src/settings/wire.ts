@@ -15,6 +15,7 @@ import {
 	HARNESS_BIN,
 	type SettingsStore,
 	type WiredSettings,
+	wireSettings as wireSettingsStore,
 } from "./settings";
 
 /** The stores of the configuration, as their readers hold them. */
@@ -72,7 +73,7 @@ export function wireSettings(deps: {
 }): DeviceConfig {
 	const { document, env, secrets, personal, projects } = deps;
 	const where = deps.programs ?? ((program: string) => findProgram(program));
-	const { viewSettings, saveSettings, ...settings } = wireSettings({
+	const { viewSettings, saveSettings, ...settings } = wireSettingsStore({
 		document,
 		env,
 	});

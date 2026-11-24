@@ -1,6 +1,6 @@
+import { everyProfileOf, runsAs } from "../agents";
 import type { Flow } from "../flow";
 import { isProfileRef, type ProfileRef, sameProfileRef } from "../nodes";
-import { everyProfileOf, runsAs } from "../profiles";
 import { type CalledFlowsOptions, walkCalledFlows } from "./called-flows";
 
 /**

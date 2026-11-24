@@ -12,7 +12,7 @@ export const PACKAGE_CLIENT: Record<string, Place> = {
 	flows: "flows",
 	gates: "gates",
 	// What a widget and a lock-screen run show.
-	glance: "widgets",
+	widgets: "widgets",
 	knowledge: "knowledge",
 	// The live cache: the one follower of a Host for both apps. It is the
 	// composition of the client (rule 6). It makes the Gate queries and the

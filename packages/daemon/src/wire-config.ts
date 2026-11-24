@@ -10,7 +10,7 @@ import {
 import { type DeciderSetupDeps, wireAgents } from "@nightshift/engine/agents";
 import { type DeviceConfig, wireSettings } from "@nightshift/engine/settings";
 import type { Telemetry } from "@nightshift/telemetry";
-import { programChecks } from "./harnesses";
+import { programChecks } from "./agents";
 import {
 	type DaemonEnv,
 	type HotRegistry,

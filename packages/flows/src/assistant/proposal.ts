@@ -5,16 +5,16 @@
  * and the person see the same issues.
  */
 
+import { everyProfileOf } from "../agents";
+import { FLOW_VERSION, type Flow, type FlowNode, flowSchema } from "../flow";
 import {
 	checkDraft,
 	type DraftMessages,
 	type FlowPlace,
 	type FolderNeed,
 	type PlaceDevice,
-} from "../draft";
-import { FLOW_VERSION, type Flow, type FlowNode, flowSchema } from "../flow";
+} from "../flows";
 import { deviceIdOf, isProfileRef } from "../nodes";
-import { everyProfileOf } from "../profiles";
 import type { FlowIssue } from "../validate";
 
 /**

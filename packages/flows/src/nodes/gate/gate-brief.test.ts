@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { withDecidedBy, withValueBy } from "../../draft";
 import { FLOW_VERSION, flowSchema } from "../../flow";
+import { withDecidedBy, withValueBy } from "../../flows";
 import { validateFlow } from "../../validate";
 import type { DecisionNode } from "../decide/decision";
 import type { ValueNode } from "../shape/value";

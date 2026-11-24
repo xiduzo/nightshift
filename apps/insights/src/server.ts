@@ -7,14 +7,13 @@ import {
 } from "@nightshift/insights";
 import { RPCHandler } from "@orpc/server/fetch";
 import { Hono } from "hono";
-
-import { ingestRequest } from "@/features/ingest";
-import { adminRouter } from "@/features/reports";
 import {
 	createAdminAuth,
 	ensureAdmin,
 	migrateAdminAuth,
-} from "@/features/session";
+} from "@/features/access";
+import { ingestRequest } from "@/features/ingest";
+import { adminRouter } from "@/features/reports";
 import type { Env } from "@/shared/config";
 
 const DIST = join(import.meta.dir, "../dist");

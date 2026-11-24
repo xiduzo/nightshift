@@ -6,7 +6,7 @@ export const PACKAGE_API: Record<string, Place> = {
 	assistant: "assistant",
 	// This computer's configuration: settings, harnesses, profiles,
 	// connections, CLI tools and the guided setup.
-	config: "settings",
+	settings: "settings",
 	dashboard: "dashboard",
 	devices: "devices",
 	flows: "flows",

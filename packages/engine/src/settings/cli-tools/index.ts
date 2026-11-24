@@ -7,5 +7,4 @@ export {
 	cliToolInputSchema,
 	programOf,
 } from "./domain/cli-tool";
-export { cliToolsInstruction } from "./domain/cli-tool-guides";
 export { type CliToolStore, wireCliTools } from "./wire";

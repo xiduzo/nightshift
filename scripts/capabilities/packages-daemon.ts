@@ -5,7 +5,7 @@ import { MECHANISM as M } from "./kinds";
 export const PACKAGE_DAEMON: Record<string, Place> = {
 	assistant: "assistant",
 	// The harness table of this computer.
-	harnesses: "agents",
+	agents: "agents",
 	// The Hono app and its routes.
 	http: M,
 	// The OS's sleep lock behind a port. The rule for when to hold it is

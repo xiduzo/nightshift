@@ -11,7 +11,6 @@ import {
 } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { projectQueries } from "@/features/projects";
-import { spaceQueries } from "@/features/spaces";
 import { flowMutations, flowQueries } from "../../queries";
 import { myKitEntries, type OtherProject } from "./my-kits";
 
@@ -22,6 +21,7 @@ const STALE_MS = 30_000;
  * "My kits" of the node grid (`myKitEntries`). The other projects'
  * flows are read only while the grid is open. A viewer cannot copy a
  * flow into this project, so a viewer sees this project's flows only.
+ * The route passes `canCopy` from the Space role (wiring).
  */
 export function useMyKits({
 	projectId,
@@ -29,6 +29,7 @@ export function useMyKits({
 	flows,
 	draft,
 	open,
+	canCopy,
 }: {
 	projectId: string;
 	flowName: string;
@@ -36,13 +37,10 @@ export function useMyKits({
 	flows: ProjectFlowMap | undefined;
 	draft: Flow;
 	open: boolean;
+	/** False for a Space viewer: only this project's flows show. */
+	canCopy: boolean;
 }) {
 	const queryClient = useQueryClient();
-	const spaces = useQuery(spaceQueries.list());
-	const role = spaces.data?.spaces.find(
-		(space) => space.id === spaces.data?.active,
-	)?.role;
-	const canCopy = role !== undefined && role !== "viewer";
 	const projects = useQuery(projectQueries.list());
 	const others = canCopy
 		? (projects.data ?? []).filter((project) => project.id !== projectId)

@@ -5,14 +5,11 @@ export {
 	type CliToolStore,
 	cliToolGitSchema,
 	cliToolInputSchema,
-	cliToolsInstruction,
-	programOf,
 } from "./cli-tools";
 export {
 	type Connection,
 	type ConnectionStore,
 	connectionInputSchema,
-	unreachableNote,
 } from "./connections";
 export { type DeviceCopies, type DeviceCopy, wireCopies } from "./copies";
 export { agentProfileOn, customAgentOf, saveProfile } from "./edits";

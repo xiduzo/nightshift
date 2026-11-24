@@ -7,6 +7,6 @@ export const PACKAGE_INSIGHTS: Record<string, Place> = {
 	ingest: "ingest",
 	migrate: M,
 	// The SQL of each admin page: what its numbers mean.
-	queries: "reports",
+	reports: "reports",
 	schema: M,
 };

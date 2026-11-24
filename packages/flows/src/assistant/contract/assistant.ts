@@ -17,20 +17,6 @@
  * the daemon; `AssistantService` is the daemon's side.
  */
 import { z } from "zod";
-
-import {
-	type AgentEntryId,
-	agentEntryIdSchema,
-	type BuiltinAgentId,
-	type BuiltinCheck,
-	type BuiltinStatus,
-	builtinModelAnswerSchema,
-	type EntryMove,
-	type EntrySaving,
-	entryMoveSchema,
-	entryOpening,
-	entrySavingSchema,
-} from "../../builtin";
 import {
 	type Flow,
 	flowInputSchema,
@@ -48,6 +34,19 @@ import {
 	variableWriteSchema,
 } from "../../nodes";
 import type { FlowIssue } from "../../validate";
+import {
+	type AgentEntryId,
+	agentEntryIdSchema,
+	type BuiltinAgentId,
+	type BuiltinCheck,
+	type BuiltinStatus,
+	builtinModelAnswerSchema,
+	type EntryMove,
+	type EntrySaving,
+	entryMoveSchema,
+	entryOpening,
+	entrySavingSchema,
+} from "../builtin";
 
 /**
  * What a suggestion fills in. Of a node: its prompt, its output schema, its
