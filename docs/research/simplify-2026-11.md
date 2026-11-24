@@ -163,3 +163,15 @@ Each entry names its source. "Read" means found by reading and not reproduced.
   `git init` inside a hook and inherited `GIT_DIR`. It is repaired, and the test drops `GIT_*`.
   Other tests that run `git init` are not checked for this fault.
 - Gap: `insights-image.yml` does not read the check when a person starts it.
+
+### 3. Call the sibling slice (lane F3: e82d8d0d2, c3973c04c, be739468e, ca2701a86)
+
+- 62 engine ports were classified. 40 are removed, 22 stay. The use cases take the type of
+  the sibling. Engine code lines: 170,452 to 170,018. Files: 1,672 to 1,681.
+- The claim was high. The 55 neighbour files were counted in all packages. In the engine they
+  go from 5,107 to 4,344 lines. "Runs 16" does not hold for ports that runs fills.
+- Seven fakes were wrong about the real sibling. None hid a fault of the product.
+- 21 mutants on callers: 18 red. Open: `others.has(folder)` in `remove-knowledge-source`, and
+  one in `tool-edits` that ran against the wrong test.
+- What stays, and what frees it, is in the ledger of the lane. The main causes are cycles
+  (`knowledge/files`, map, secrets) and ports that the wire composes.
