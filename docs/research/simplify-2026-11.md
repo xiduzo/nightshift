@@ -288,3 +288,25 @@ Each entry names its source. "Read" means found by reading and not reproduced.
 - The twin copies the order of the engine by hand. The merge and split suites are the only
   proof on a real database. The split and merge of knowledge data are not proven.
 - At ed3f33e0d alone the ring check is red, because the debt lines left one commit later.
+
+### VC. Controls follow the role (636f354b6, 43ac28371)
+
+- The web disables what the server refuses: 12 controls for a Viewer, project Move and Remove
+  for a Member. 20 guards removed one by one, 20 red. The pages were not looked at.
+
+### M1. The rule that brings a stored flow to the current format (343054101)
+
+- A value is old when the chain changes it, not when its version is low. A version 9 flow can
+  still need a step. 2,117 generated flows of v1 to v8: none throws, none changes twice.
+- The chain drops known old fields, for example the checker of an Agent (v4, v5) and a second
+  open edge on one outcome (v1 to v5). The reader of today drops them too. A rewrite removes
+  them from the stored record. Nothing calls the rule yet.
+
+### LG. Legacy without stored data (04fbaa3ba to 2f4158ee0)
+
+- 125 files, +275/-4,392: hot-reload slots of old daemons, the reader of old run bundles, the
+  import of the `.nightshift/` folder of a Clone, the old notification switches, dead exports.
+- An install that started no build since 2026-10-21 and had a notification switch off gets the
+  defaults. No such install was found on the one Mac that was counted.
+- A dev daemon that runs since before this change needs one restart.
+- All contract tests now start from `migratedDb()`.
