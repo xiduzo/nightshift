@@ -235,3 +235,18 @@ Each entry names its source. "Read" means found by reading and not reproduced.
   Two survive: the bindings of `readRunTrace` and `findTargets` in a wire. No test that
   asserts them was found on the base. Nothing proves that `take` is one document change.
 - AskedQuestions stays. It is not as small as lane F3 wrote.
+
+### M. A faster test database (787ae4f26)
+
+- `migratedDb()` builds the schema text from the real migrations once per process. Set-up:
+  27.7 ms to 3.6 ms, median. The 84 to 282 ms of the plan was load.
+- Contract tests of auth, engine and notifications: CPU -48%, wall -28%. Three full suites by
+  CPU: 256 s to 179 s, nearly all in the engine. The wall times are confounded by load.
+- A test compares each schema object, row and pragma with a migrated database. Nine faults
+  make it fail.
+- 14 test files still use the old way. They follow, so that one way is left.
+
+### Continuous integration
+
+- One test of the `flows` command passed the 5 seconds of Bun on a slow runner. Bun then
+  stopped the daemon of the file. The limit of that file is now 60 seconds (a301dccad).
