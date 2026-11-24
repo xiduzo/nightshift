@@ -8,6 +8,7 @@ import type {
 	ProjectLog,
 	ProjectRow,
 	Repos,
+	SpaceHolds,
 	TakenProjects,
 } from "../keep";
 import { addProjectFromRemote } from "./application/add-project-from-remote";
@@ -35,6 +36,7 @@ export type ClonesDeps = Keep & {
 	projectLog: ProjectLog;
 	repos: Repos;
 	directory: ProjectDirectory;
+	spaceHolds: SpaceHolds;
 	ids: NewIds;
 	knownSpaces: KnownSpaces;
 };

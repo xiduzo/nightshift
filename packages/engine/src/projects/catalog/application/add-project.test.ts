@@ -9,6 +9,20 @@ import { addProject } from "./add-project";
 const ADA: Actor = { personId: "person-ada", door: "session" };
 
 describe("addProject", () => {
+	test("is refused in a Space whose Projects move", async () => {
+		const ports = inMemoryCatalogPorts();
+		ports.repos.add("/work/late", "git@github.com:acme/late.git");
+		ports.spaceHolds.held.add("s1");
+		await expect(
+			addProject(ports)(ADA, {
+				spaceId: "s1",
+				repoPath: "/work/late",
+			}),
+		).rejects.toThrow("held");
+		expect(ports.spaceProjects.documentOf("s1").projects.size).toBe(0);
+		expect(ports.projectLog.facts).toEqual([]);
+	});
+
 	test("a folder becomes a project with its remote, a Clone here, and its flows come in", async () => {
 		const ports = inMemoryCatalogPorts();
 		ports.repos.add("/work/app", "git@github.com:acme/app.git");

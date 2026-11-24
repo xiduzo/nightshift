@@ -25,6 +25,8 @@ type StoredDocument = {
 	schedules: Schedule[];
 	notices: FlowNotice[];
 	merged: Set<string>;
+	/** The notices that were added once (`note`). */
+	marks: Set<string>;
 };
 
 /** The in-memory `FlowStore`, with what a test sets and reads. */
@@ -50,6 +52,7 @@ const plain = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
  */
 export function inMemoryFlowStore(): InMemoryFlowStore {
 	const documents = new Map<string, StoredDocument>();
+	let notes = 0;
 	let counter = 0;
 	const next = (kind: string) => `${kind}-${++counter}`;
 
@@ -61,6 +64,7 @@ export function inMemoryFlowStore(): InMemoryFlowStore {
 				revisions: new Map(),
 				schedules: [],
 				notices: [],
+				marks: new Set(),
 				merged: new Set(),
 			};
 			documents.set(projectId, document);
@@ -200,6 +204,13 @@ export function inMemoryFlowStore(): InMemoryFlowStore {
 
 		async notices(projectId) {
 			return [...documentOf(projectId).notices];
+		},
+
+		async note(projectId, marker, notice) {
+			const document = documentOf(projectId);
+			if (document.marks.has(marker)) return;
+			document.marks.add(marker);
+			document.notices.push({ id: `notice-${++notes}`, ...notice });
 		},
 
 		async dismissNotice(projectId, noticeId) {

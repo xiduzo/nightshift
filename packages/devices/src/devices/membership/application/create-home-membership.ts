@@ -255,6 +255,7 @@ export function createHomeMembership(deps: HomeMembershipDeps) {
 					if (started?.step === "merge" && started.row.state === "moved") {
 						await merges.resume(started.row);
 					}
+					if (!started) await merges.moveLate();
 				}, "wait").catch((error) => {
 					if (!(error instanceof Refusal)) {
 						console.error("[devices] Personal did not finish its move:", error);

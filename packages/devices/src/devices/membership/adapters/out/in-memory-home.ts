@@ -31,6 +31,7 @@ type Plan = {
 	projects: Readonly<Record<string, { spaceId: string; projectId: string }>>;
 	personMap?: Readonly<Record<string, string>>;
 	renumber?: boolean;
+	empties?: boolean;
 	ownRunsOnly?: boolean;
 };
 type HostRow = NonNullable<
@@ -98,6 +99,7 @@ export function inMemoryHome() {
 	const asked: PersonalMergeInput[] = [];
 	const merged: { from: string; to: string; persons: unknown }[] = [];
 	const planned: unknown[] = [];
+	const marked = new Set<string>();
 	const plans: Plan[] = [];
 	const forgotten: string[] = [];
 	const opened: string[] = [];
@@ -124,6 +126,8 @@ export function inMemoryHome() {
 		/** The Spaces a Host keeps. */
 		keptBy: new Map([["theirs", "host"]]),
 		projects: [moving("p1")] as Moving[],
+		/** The notes on the Flows pages, by Project. */
+		notes: new Map<string, string[]>(),
 		runs: [] as Run[],
 		schedules: new Map<string, Schedule[]>(),
 		answer: (input: PersonalMergeInput): PersonalMerge => ({
@@ -257,6 +261,11 @@ export function inMemoryHome() {
 			};
 			const batch = await move.statements?.(done);
 			if (world.batchFails) throw world.batchFails;
+			// As the engine's batch: a Project that is left fails it.
+			const left = world.projects.some(
+				(p) => p.spaceId === move.from && !sources.includes(p.id),
+			);
+			if (plan.empties && left) throw new Error("A project is left.");
 			runInMemory((batch ?? []) as RowBatch);
 			for (const run of moves) {
 				const to = plan.projects[run.projectId];
@@ -285,6 +294,12 @@ export function inMemoryHome() {
 			async planMerge(...args: unknown[]) {
 				planned.push(args);
 				return { flows: { hello: "hello-2" } };
+			},
+			async note(id: string, marker: string, notice: { message: string }) {
+				const notes = world.notes.get(id) ?? [];
+				if (marked.has(`${id} ${marker}`)) return;
+				marked.add(`${id} ${marker}`);
+				world.notes.set(id, [...notes, notice.message]);
 			},
 			async merge(from: string, to: string, options: { persons: unknown }) {
 				merged.push({ from, to, persons: options.persons });

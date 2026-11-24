@@ -2,7 +2,7 @@ import type { Database } from "@nightshift/db";
 import { spaceMerge, spaceSplit } from "@nightshift/db/schema";
 import type { RowBatch } from "@nightshift/engine";
 import { asDate, instant } from "@nightshift/time";
-import { desc, eq, ne } from "drizzle-orm";
+import { asc, desc, eq, ne } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import type { MembershipRecord } from "../../application/ports";
 import type { MergeRow, SplitRow } from "../../domain/membership-rows";
@@ -22,6 +22,7 @@ function mergeOf(row: typeof spaceMerge.$inferSelect): MergeRow {
 		projectMap: parse(row.projectMap, {}),
 		personMap: parse(row.personMap, {}),
 		joined: parse(row.joined, []),
+		late: parse(row.late, []),
 		backup: row.backup,
 		createdAt: instant(row.createdAt),
 		updatedAt: instant(row.updatedAt),
@@ -88,6 +89,15 @@ export function drizzleMembershipRecord(db: Database): MembershipRecord {
 				return latest ? mergeOf(latest) : null;
 			},
 
+			async done() {
+				const rows = await db
+					.select()
+					.from(spaceMerge)
+					.where(eq(spaceMerge.state, "pushed"))
+					.orderBy(asc(spaceMerge.createdAt));
+				return rows.map(mergeOf);
+			},
+
 			async plan(input) {
 				const [row] = await db
 					.insert(spaceMerge)
@@ -122,6 +132,23 @@ export function drizzleMembershipRecord(db: Database): MembershipRecord {
 					db
 						.update(spaceMerge)
 						.set({ state: "moved", updatedAt: asDate() })
+						.where(eq(spaceMerge.fromSpace, fromSpace)),
+				);
+			},
+
+			late(fromSpace, input) {
+				return asBatch(
+					db
+						.update(spaceMerge)
+						.set({
+							state: "moved",
+							projectMap: JSON.stringify(input.projectMap),
+							personMap: JSON.stringify(input.personMap),
+							late: JSON.stringify(
+								Object.values(input.projectMap).map((t) => t.projectId),
+							),
+							updatedAt: asDate(),
+						})
 						.where(eq(spaceMerge.fromSpace, fromSpace)),
 				);
 			},

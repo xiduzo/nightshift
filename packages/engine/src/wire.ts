@@ -206,6 +206,7 @@ export function createEngine(
 		hosts,
 		options,
 		access,
+		startHolds: () => startHolds,
 		runner: () => runner,
 	});
 

@@ -29,7 +29,7 @@ import { saveProjectSchedules } from "./application/save-project-schedules";
 import { upgradeProjectFlows } from "./application/upgrade-project-flows";
 import type { FlowRevision } from "./domain/flow-json";
 import type { OutputType, StepShapes } from "./domain/inferred";
-import type { FlowNotice } from "./domain/notices";
+import type { FlowNotice, NewNotice } from "./domain/notices";
 
 /**
  * The merge of one Project's flow documents into another's, as the store
@@ -106,6 +106,12 @@ export type ProjectFlows = {
 	): Promise<ScheduleIssue[]>;
 	/** What a person must know about the project's flows, oldest first. */
 	notices(projectId: string): Promise<FlowNotice[]>;
+	/** Adds a notice once per `marker`, on every Device of the Space. It names a document, not a Project of this Replica. */
+	note(
+		projectId: string,
+		marker: string,
+		notice: Pick<NewNotice, "kind" | "message">,
+	): Promise<void>;
 	/** Removes a notice, on every Device of the Space. One that is gone already is no error. */
 	dismissNotice(projectId: string, noticeId: string): Promise<void>;
 	/**
@@ -187,6 +193,12 @@ export function wireStore(deps: {
 		saveSchedules: (projectId, list) =>
 			saveSchedules({ projectId, schedules: list }),
 		notices: (projectId) => notices({ projectId }),
+		note: async (projectId, marker, notice) =>
+			store.note(projectId, marker, {
+				...notice,
+				deviceId: await device.id(),
+				at: clock(),
+			}),
 		dismissNotice: (projectId, noticeId) =>
 			dismissNotice({ projectId, noticeId }),
 		// Without migrations nothing upgrades: no document is opened.

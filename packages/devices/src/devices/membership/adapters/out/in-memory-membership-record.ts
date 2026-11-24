@@ -37,6 +37,11 @@ export function inMemoryMembershipRecord(): MembershipRecord & {
 				);
 				return latest && { ...latest };
 			},
+			async done() {
+				return mergesRows
+					.filter((row) => row.state === "pushed")
+					.map((row) => ({ ...row }));
+			},
 			async plan(input) {
 				const row: MergeRow = {
 					fromSpace: input.fromSpace,
@@ -47,6 +52,7 @@ export function inMemoryMembershipRecord(): MembershipRecord & {
 					projectMap: {},
 					personMap: {},
 					joined: [...input.joined],
+					late: [],
 					backup: input.backup,
 					createdAt: nextTime(),
 					updatedAt: nextTime(),
@@ -69,6 +75,18 @@ export function inMemoryMembershipRecord(): MembershipRecord & {
 					if (!row) return;
 					row.state = "moved";
 					row.updatedAt = nextTime();
+				});
+			},
+			late(fromSpace, input) {
+				return inMemoryBatch(() => {
+					const row = mergesRows.find((m) => m.fromSpace === fromSpace);
+					if (!row) return;
+					Object.assign(row, {
+						state: "moved",
+						...input,
+						late: Object.values(input.projectMap).map((t) => t.projectId),
+						updatedAt: nextTime(),
+					});
 				});
 			},
 			abandon() {

@@ -13,7 +13,7 @@ import {
 	upgradedSources,
 	upgradeFlows,
 } from "./yjs-flow-saves";
-import { dismissNotice, flowNotices } from "./yjs-notices";
+import { dismissNotice, flowNotices, noteOnce } from "./yjs-notices";
 import {
 	readSchedules,
 	saveSchedules,
@@ -100,6 +100,10 @@ export function yjsFlowStore(deps: {
 
 		async notices(projectId) {
 			return flowNotices(await open(projectId));
+		},
+
+		async note(projectId, marker, notice) {
+			await noteOnce(await open(projectId), marker, notice);
 		},
 
 		async dismissNotice(projectId, noticeId) {

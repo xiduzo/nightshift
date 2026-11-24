@@ -4,11 +4,12 @@ import type { Access } from "../../access";
 import type { Actor } from "../../contract";
 import { STILL_RUNNING } from "../domain/move";
 import { type MoveProjectsPorts, moveProjects } from "./move-projects";
-import type { MoveLog, ProjectLookup, ProjectRuns } from "./ports";
+import type { MoveHolds, MoveLog, ProjectLookup, ProjectRuns } from "./ports";
 
 const MOVE_PROJECTS: Permissions = { project: ["move"] };
 
 export type MoveProjectPorts = MoveProjectsPorts & {
+	holds: MoveHolds;
 	access: Pick<Access, "openSpace">;
 	projectLookup: ProjectLookup;
 	projectRuns: ProjectRuns;
@@ -26,7 +27,8 @@ export type MoveProject = {
  * A person moves a Project of a Space to another Space, with its runs,
  * as one Space move. Refuses a Person who may not move projects in both Spaces
  * (`access.openSpace`). A move to its own Space does nothing. A move while a run of the
- * project runs a step is refused under the hold.
+ * project runs a step is refused under the hold, and so is a move into a
+ * Space that a move out of it holds.
  */
 export const moveProject =
 	(ports: MoveProjectPorts) =>
@@ -40,7 +42,16 @@ export const moveProject =
 		await ports.projectLookup.find(projectId, spaceId);
 		if (toSpaceId === spaceId) return;
 		await ports.projectLookup.refuseMove(projectId, spaceId, toSpaceId);
-		await moveProjects(ports)({
+		const { moveStore, holds } = ports;
+		await moveProjects({
+			...ports,
+			moveStore: {
+				...moveStore,
+				// Only the batch: two moves across wait for neither's holds.
+				commit: (batches) =>
+					holds.unlessHeld(toSpaceId, () => moveStore.commit(batches)),
+			},
+		})({
 			from: spaceId,
 			plan: async () => {
 				const runIds = await ports.projectRuns.runIds(projectId);

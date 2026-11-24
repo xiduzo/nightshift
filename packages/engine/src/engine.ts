@@ -123,7 +123,10 @@ export interface Engine {
 	 * merge of Personal). Who may see the Project is the caller's check. A
 	 * person reads and saves through `space(id).flows`.
 	 */
-	readonly flows: Pick<ProjectFlows, "flows" | "schedules"> & {
+	readonly flows: Pick<
+		ProjectFlows,
+		"flows" | "schedules" | "saveSchedules" | "note"
+	> & {
 		/**
 		 * The names the flows of `source` and the ids its schedules take
 		 * when they merge into `destination`, only those that change.

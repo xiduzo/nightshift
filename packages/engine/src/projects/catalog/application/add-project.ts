@@ -19,6 +19,7 @@ import {
 	type Repos,
 	recordCloneHere,
 	restoreProject,
+	type SpaceHolds,
 	type SpaceProjects,
 	type ThisDevice,
 } from "../../keep";
@@ -43,6 +44,7 @@ export type AddProjectPorts = {
 	repos: Pick<Repos, "topLevel" | "origin" | "exists">;
 	directory: ProjectDirectory;
 	relay?: HostRelay;
+	spaceHolds: SpaceHolds;
 	ids: NewIds;
 };
 
@@ -62,7 +64,10 @@ export const addProject =
 			spaceId: request.spaceId,
 			need: ADD_PROJECTS,
 		});
-		const row = await addFolder(ports, request);
+		const add = () => addFolder(ports, request);
+		const row = (await ports.directory.hostedElsewhere(request.spaceId))
+			? await add()
+			: await ports.spaceHolds.unlessHeld(request.spaceId, add);
 		const [added] = await asProjects(
 			{
 				clones: (spaceId, ids) => ports.spaceProjects.clones(spaceId, ids),

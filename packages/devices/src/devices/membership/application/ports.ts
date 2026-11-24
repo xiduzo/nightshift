@@ -24,6 +24,8 @@ export type MembershipRecord = {
 	merges: {
 		/** The latest merge, done or not. */
 		latest(): Promise<MergeRow | null>;
+		/** The merges that are done, oldest first. */
+		done(): Promise<MergeRow[]>;
 		/** A new merge, planned: its copy of the database is made. */
 		plan(input: {
 			fromSpace: string;
@@ -46,6 +48,17 @@ export type MembershipRecord = {
 		 * moves the rows.
 		 */
 		moved(fromSpace: string): RowBatch;
+		/**
+		 * The statements that make a done merge `moved` again, for Projects it
+		 * left here: they go in the batch that moves their rows.
+		 */
+		late(
+			fromSpace: string,
+			input: {
+				projectMap: Record<string, MergeTarget>;
+				personMap: Record<string, string>;
+			},
+		): RowBatch;
 		/**
 		 * The statements that end a merge that is not done, when this
 		 * computer leaves its home Host.
@@ -85,7 +98,7 @@ export type DatabaseCopy = {
 	copy(
 		dataDir: string,
 		at: number,
-		before?: "personal-merge" | "leaving-host",
+		before?: "personal-merge" | "leaving-host" | "late-projects",
 	): Promise<string>;
 };
 

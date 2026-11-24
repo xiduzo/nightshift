@@ -161,6 +161,25 @@ export function flowStoreContract(
 				});
 			}));
 
+		test("a note is added once per marker, also after it was dismissed", () =>
+			withStore(async ({ store, projects: [project] }) => {
+				const notice = {
+					kind: "project-moved",
+					message: "It moved.",
+					deviceId: "laptop",
+					at: 5,
+				} as const;
+				await store.note(project, "one", notice);
+				await store.note(project, "one", notice);
+				const notices = await store.notices(project);
+				expect(notices).toMatchObject([notice]);
+				await store.dismissNotice(project, notices[0]?.id as string);
+				await store.note(project, "one", notice);
+				expect(await store.notices(project)).toEqual([]);
+				await store.note(project, "two", notice);
+				expect(await store.notices(project)).toHaveLength(1);
+			}));
+
 		test("a notice that is gone is no error", () =>
 			withStore(async ({ store, projects: [project] }) => {
 				expect(await store.notices(project)).toEqual([]);

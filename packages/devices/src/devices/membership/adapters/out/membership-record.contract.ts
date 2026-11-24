@@ -1,5 +1,12 @@
 import { describe, expect, test } from "bun:test";
+import type { RowBatch } from "@nightshift/engine";
 import type { MembershipRecord } from "../../application/ports";
+
+/** One adapter, and what runs its batches. */
+export type MembershipRecordSubject = {
+	record: MembershipRecord;
+	run(batch: RowBatch): Promise<void>;
+};
 
 /**
  * What every adapter of `MembershipRecord` does.
@@ -7,11 +14,11 @@ import type { MembershipRecord } from "../../application/ports";
  */
 export function membershipRecordContract(
 	name: string,
-	make: () => Promise<MembershipRecord> | MembershipRecord,
+	make: () => Promise<MembershipRecordSubject>,
 ): void {
 	describe(`MembershipRecord contract: ${name}`, () => {
 		test("plan then unfinished returns the merge", async () => {
-			const record = await make();
+			const { record } = await make();
 			const row = await record.merges.plan({
 				fromSpace: "from",
 				hostId: "host",
@@ -25,7 +32,7 @@ export function membershipRecordContract(
 		});
 
 		test("mapped then moved then pushed ends the merge", async () => {
-			const record = await make();
+			const { record, run } = await make();
 			await record.merges.plan({
 				fromSpace: "from",
 				hostId: "host",
@@ -38,10 +45,34 @@ export function membershipRecordContract(
 				projectMap: { p1: { spaceId: "to", projectId: "p1" } },
 				personMap: { person: "host-person" },
 			});
-			record.merges.moved("from");
+			await run(record.merges.moved("from"));
 			await record.merges.pushed("from");
 			expect(await record.unfinished()).toBeNull();
 			expect((await record.merges.latest())?.state).toBe("pushed");
+		});
+
+		test("a done merge goes on for the Projects it left", async () => {
+			const { record, run } = await make();
+			const from = {
+				hostId: "host",
+				personId: "ada",
+				joined: [],
+				backup: "/b",
+			};
+			await record.merges.plan({ fromSpace: "from", ...from });
+			expect(await record.merges.done()).toEqual([]);
+			await record.merges.pushed("from");
+			expect((await record.merges.done()).map((m) => m.late)).toEqual([[]]);
+			const late = {
+				projectMap: { p9: { spaceId: "to", projectId: "there" } },
+				personMap: { ada: "ada-there" },
+			};
+			await run(record.merges.late("from", late));
+			expect(await record.unfinished()).toMatchObject({
+				step: "merge",
+				row: { state: "moved", late: ["there"], backup: "/b", ...late },
+			});
+			expect(await record.merges.done()).toEqual([]);
 		});
 	});
 }

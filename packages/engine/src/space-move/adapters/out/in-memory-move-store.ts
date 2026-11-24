@@ -136,13 +136,31 @@ export function inMemoryMoveStore(
 		async batchOf(move) {
 			return changesOf(records, move) as unknown as RowBatch;
 		},
+		emptied(spaceId) {
+			const check: Change = (state) => {
+				if ([...state.projects.values()].some((p) => p.spaceId === spaceId)) {
+					throw new Error(`A project is left in the Space ${spaceId}.`);
+				}
+			};
+			return [check] as unknown as RowBatch;
+		},
 		async commit(batches) {
 			const changes = batches.flatMap((batch) => [...batch]);
 			if (changes.length === 0) return;
-			records.committed.push(changes);
-			for (const change of changes) {
-				if (typeof change === "function") (change as Change)(records);
+			// All or nothing, as the real batch.
+			const before = {
+				projects: new Map(records.projects),
+				runs: records.runs.map((r) => ({ ...r })),
+			};
+			try {
+				for (const change of changes) {
+					if (typeof change === "function") (change as Change)(records);
+				}
+			} catch (error) {
+				Object.assign(records, before);
+				throw error;
 			}
+			records.committed.push(changes);
 		},
 		async spaceExists(spaceId) {
 			return records.spaces.has(spaceId);

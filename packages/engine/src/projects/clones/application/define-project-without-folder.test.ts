@@ -37,6 +37,15 @@ async function seeded() {
 }
 
 describe("defineProjectWithoutFolder", () => {
+	test("is refused in a Space whose Projects move", async () => {
+		const ports = await seeded();
+		ports.spaceHolds.held.add("s1");
+		await expect(
+			defineProjectWithoutFolder(ports)({ spaceId: "s1", name: "Leads" }),
+		).rejects.toThrow("held");
+		expect(ports.projectLog.facts).toEqual([]);
+	});
+
 	test("a new project without a folder each time; refused in a Space a Host keeps", async () => {
 		const ports = await seeded();
 		expect(

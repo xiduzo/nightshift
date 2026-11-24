@@ -31,6 +31,7 @@ import {
 import type { Flow } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
+import { asDate } from "@nightshift/time";
 import { eq } from "drizzle-orm";
 import * as Y from "yjs";
 import type { HostClient } from "../../contract";
@@ -39,7 +40,7 @@ import type { JoinProgress } from "../../links";
 import { createHostLinks, type Link } from "../../links";
 import { httpsLink } from "../../links/link";
 import { type PairedReplicas, pairedReplicas } from "../../testing";
-import { MERGE_WORDS } from "./domain/words";
+import { MERGE_WORDS, movedLate } from "./domain/words";
 import { type MembershipTestDeps, membershipOver } from "./test-support";
 
 const personalSpaceId = (
@@ -92,6 +93,22 @@ const quickFlow = {
 		},
 	],
 	edges: [],
+} as Flow;
+
+const gateFlow = {
+	...quickFlow,
+	start: "ship",
+	nodes: [
+		{
+			id: "ship",
+			type: "decision",
+			position: { x: 0, y: 0 },
+			prompt: "Ship it?",
+			options: [{ name: "approve" }, { name: "reject" }],
+			by: "person",
+			decider: "typesafe",
+		},
+	],
 } as Flow;
 
 /** B's link to A in memory, with B's exchange: it pushes what B walks. */
@@ -795,6 +812,280 @@ describe("the merge of Personal", () => {
 	test("the Host's personal Space keeps the name the Host gives it before a merge", async () => {
 		const rows = await b.db.select().from(hostSpace);
 		expect(rows.map((r) => r.name)).toEqual(["Personal on A"]);
+	});
+});
+
+describe("a Project that comes after the Host's answer", () => {
+	/** A merge whose batch fails: it stopped at `mapped`. */
+	async function stoppedAtMapped() {
+		const { link } = online();
+		await ready(link);
+		await expect(
+			merger(link, {
+				engine: beforeBatch(() => {
+					throw new Error("stop");
+				}),
+			}).merge(),
+		).rejects.toThrow("stop");
+		expect((await b.db.select().from(spaceMerge))[0]?.state).toBe("mapped");
+		return link;
+	}
+	/** A project without a folder in B's old Personal, with one finished run. */
+	async function lateProject() {
+		const space = paired.device.space(b.spaceId, NIGHT_SHIFT);
+		const late = await space.addProjectWithoutFolder({ name: "Late" });
+		await seedFlows(space, late.id, { hello: quickFlow });
+		const run = await space.startRun({ projectId: late.id, flow: quickFlow });
+		await waitFor(
+			async () => (await space.getRun(run.id)).status === "finished",
+			{ label: "the late run finished", timeoutMs: 10_000 },
+		);
+		return { projectId: late.id, runId: run.id };
+	}
+	const spacesOfProjects = async () =>
+		Object.fromEntries(
+			(await b.db.select().from(project)).map((p) => [p.id, p.spaceId]),
+		);
+	/** Lets `keepFinishing` run until `done`. */
+	async function finishing(
+		membership: ReturnType<typeof merger>,
+		done: () => Promise<boolean>,
+	) {
+		const stop = new AbortController();
+		membership.keepFinishing(stop.signal, 50);
+		await waitFor(done, { label: "finished", timeoutMs: 10_000 }).finally(() =>
+			stop.abort(),
+		);
+	}
+
+	test("goes along when the merge goes on, with its runs", async () => {
+		await projectWithRun();
+		const link = await stoppedAtMapped();
+		const late = await lateProject();
+
+		expect((await merger(link).merge()).state).toBe("pushed");
+
+		expect(new Set(Object.values(await spacesOfProjects()))).toEqual(
+			new Set([a.spaceId]),
+		);
+		expect(await spaceOfRun(a, late.runId)).toMatchObject({
+			spaceId: a.spaceId,
+		});
+	});
+
+	test("that another process adds before the batch calls the batch off, and goes along in the next one", async () => {
+		await projectWithRun();
+		const { link } = online();
+		await ready(link);
+		let added = false;
+		const engine: MembershipTestDeps["engine"] = {
+			...paired.device,
+			moveProjects: (move) =>
+				paired.device.moveProjects({
+					...move,
+					statements: async (moved) => {
+						if (!added) {
+							added = true;
+							await b.db.insert(project).values({
+								id: "late",
+								spaceId: b.spaceId,
+								name: "Late",
+								folder: false,
+							});
+						}
+						return (await move.statements?.(moved)) ?? [];
+					},
+				}),
+		};
+
+		expect((await merger(link, { engine }).merge()).state).toBe("pushed");
+
+		expect((await spacesOfProjects()).late).toBe(a.spaceId);
+		const onA = await paired.host.space(a.spaceId, NIGHT_SHIFT).listProjects();
+		expect(onA.map((p) => p.id)).toContain("late");
+	});
+
+	test("needs the Host again: without it the merge waits and nothing moves", async () => {
+		const { projectId } = await projectWithRun();
+		const link = await stoppedAtMapped();
+		await lateProject();
+		const down: Link = {
+			...link,
+			state: () => ({ ...link.state(), status: "offline" }),
+		};
+
+		await expect(merger(down).merge()).rejects.toThrow(MERGE_WORDS.offline);
+
+		expect((await spacesOfProjects())[projectId]).toBe(b.spaceId);
+		expect((await merger(link).merge()).state).toBe("pushed");
+	});
+
+	test("a Project that a person moved to another Space does not hold the merge, and stays there", async () => {
+		const { projectId } = await projectWithRun();
+		const kept = await paired.device
+			.space(b.spaceId, NIGHT_SHIFT)
+			.addProjectWithoutFolder({ name: "Kept" });
+		const link = await stoppedAtMapped();
+		await b.db.insert(organization).values({
+			id: "other",
+			name: "Other",
+			slug: "other",
+			createdAt: asDate(),
+		});
+		await paired.device
+			.space(b.spaceId, NIGHT_SHIFT)
+			.moveProject(projectId, "other");
+
+		expect((await merger(link).merge()).state).toBe("pushed");
+
+		expect(await spacesOfProjects()).toEqual({
+			[projectId]: "other",
+			[kept.id]: a.spaceId,
+		});
+	});
+
+	test("that a done merge left here moves by itself after a copy of the database, and its Flows page says so once", async () => {
+		await projectWithRun();
+		const { link } = online();
+		await ready(link);
+		await merger(link).merge();
+		const late = await lateProject();
+		const removed = await paired.device
+			.space(b.spaceId, NIGHT_SHIFT)
+			.addProjectWithoutFolder({ name: "Removed" });
+		await paired.device.space(b.spaceId, NIGHT_SHIFT).removeProject(removed.id);
+
+		await finishing(merger(link), async () => {
+			const [row] = await b.db.select().from(spaceMerge);
+			return (
+				(await spacesOfProjects())[late.projectId] === a.spaceId &&
+				row?.state === "pushed"
+			);
+		});
+
+		expect((await spacesOfProjects())[removed.id]).toBe(a.spaceId);
+		expect(await spaceOfRun(a, late.runId)).toMatchObject({
+			spaceId: a.spaceId,
+		});
+		const backups = await readdir(join(b.dataDir, "backups"));
+		expect(
+			backups.filter((f) => f.startsWith("before-late-projects-")),
+		).toHaveLength(1);
+		const flows = paired.device.space(a.spaceId, NIGHT_SHIFT).flows;
+		const notices = await flows.notices(late.projectId);
+		expect(notices.map((n) => n.message)).toEqual([movedLate("A")]);
+		expect((await flows.list(late.projectId)).map((f) => f.name)).toEqual([
+			"hello",
+		]);
+		// What the old Space left goes too, and a later look finds nothing.
+		expect(await paired.device.forgetSpace(b.spaceId)).toBe(true);
+		const [notice] = notices;
+		await flows.dismissNotice(late.projectId, notice?.id as string);
+		const stop = new AbortController();
+		merger(link).keepFinishing(stop.signal, 20);
+		await Bun.sleep(300);
+		stop.abort();
+		expect(await flows.notices(late.projectId)).toEqual([]);
+		expect(await readdir(join(b.dataDir, "backups"))).toHaveLength(2);
+	});
+
+	test("that a done merge left here: a batch that fails moves nothing and is not tried on and on, and the next start moves it", async () => {
+		await projectWithRun();
+		const { link } = online();
+		await ready(link);
+		await merger(link).merge();
+		const late = await lateProject();
+		let tries = 0;
+		const error = console.error;
+		console.error = () => {};
+		const broken = merger(link, {
+			engine: beforeBatch(() => {
+				tries++;
+				throw new Error("disk full");
+			}),
+		});
+		const stop = new AbortController();
+		broken.keepFinishing(stop.signal, 20);
+		await waitFor(async () => tries > 0, { label: "tried", timeoutMs: 10_000 });
+		await Bun.sleep(200);
+		stop.abort();
+		console.error = error;
+		expect(tries).toBe(1);
+		expect((await b.db.select().from(spaceMerge))[0]?.state).toBe("pushed");
+		expect((await spacesOfProjects())[late.projectId]).toBe(b.spaceId);
+
+		await finishing(
+			merger(link),
+			async () => (await spacesOfProjects())[late.projectId] === a.spaceId,
+		);
+	});
+
+	test("that a done merge left here joins the project with its remote on the Host, also after a stop behind the batch", async () => {
+		await projectWithRun();
+		const { link } = online();
+		await ready(link);
+		await merger(link).merge();
+		const remote = "https://github.com/acme/app.git";
+		const onA = await paired.host.space(a.spaceId, NIGHT_SHIFT).addProject({
+			repoPath: await repoWithRemote(a, "app", remote),
+		});
+		const late = await projectWithRun(await repoWithRemote(b, "app", remote));
+		const waits: Link = { ...link, inStep: async () => false };
+		await finishing(merger(waits), async () => {
+			const [row] = await b.db.select().from(spaceMerge);
+			return row?.state === "moved";
+		});
+		expect((await spacesOfProjects())[late.projectId]).toBeUndefined();
+
+		await finishing(merger(link), async () => {
+			const [row] = await b.db.select().from(spaceMerge);
+			return row?.state === "pushed";
+		});
+
+		const flows = paired.device.space(a.spaceId, NIGHT_SHIFT).flows;
+		expect((await flows.list(onA.id)).map((f) => f.name)).toEqual(["hello"]);
+		expect(await flows.notices(onA.id)).toHaveLength(1);
+	});
+
+	test("that a done merge left here stays while a run of it is not done, the Host is another one, or its Space is here", async () => {
+		await projectWithRun();
+		const { link } = online();
+		await ready(link);
+		await merger(link).merge();
+		const late = await lateProject();
+		const stays = async () => {
+			const stop = new AbortController();
+			merger(link).keepFinishing(stop.signal, 20);
+			await Bun.sleep(300);
+			stop.abort();
+			expect((await spacesOfProjects())[late.projectId]).toBe(b.spaceId);
+		};
+		const space = paired.device.space(b.spaceId, NIGHT_SHIFT);
+		const waiting = await space.startRun({
+			projectId: late.projectId,
+			flow: gateFlow,
+		});
+		await waitFor(
+			async () => (await space.getRun(waiting.id)).status === "waiting",
+			{ label: "the run waits", timeoutMs: 10_000 },
+		);
+		await stays();
+		await space.act(waiting.id, { kind: "stop" });
+		await b.db.insert(organization).values({
+			id: b.spaceId,
+			name: "Mine",
+			slug: "mine",
+			createdAt: asDate(),
+		});
+		await stays();
+		await b.db.delete(organization).where(eq(organization.id, b.spaceId));
+		await b.db.update(spaceMerge).set({ hostId: "another" });
+		await stays();
+		expect(
+			(await readdir(join(b.dataDir, "backups"))).filter((f) =>
+				f.startsWith("before-late-projects-"),
+			),
+		).toEqual([]);
 	});
 });
 

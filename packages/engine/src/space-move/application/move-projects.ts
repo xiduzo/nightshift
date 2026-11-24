@@ -18,9 +18,12 @@ import type {
 } from "./ports";
 
 export type MoveProjectsPorts = {
-	holds: MoveHolds;
+	holds: Pick<MoveHolds, "holdStarts" | "holdSchedules">;
 	walker: ThisWalker;
-	moveStore: Pick<MoveStore, "runIds" | "projectRows" | "batchOf" | "commit">;
+	moveStore: Pick<
+		MoveStore,
+		"runIds" | "projectRows" | "batchOf" | "emptied" | "commit"
+	>;
 	movedSchedules: Pick<ProjectFlows, "schedules" | "saveSchedules">;
 	spaceEntries: Pick<SpaceEntries, "move">;
 	/** The rows of the packages above the engine, in this order. */
@@ -135,6 +138,7 @@ export const moveProjects =
 				}
 			}
 			batches.push((await request.statements?.(moved)) ?? []);
+			if (plan.empties) batches.push(ports.moveStore.emptied(from));
 			await ports.moveStore.commit(batches);
 			ports.reread.reread(moved.runIds);
 

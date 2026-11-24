@@ -12,6 +12,7 @@ import {
 	type ProjectDirectory,
 	type ProjectLog,
 	type ProjectStore,
+	type SpaceHolds,
 	type SpaceProjects,
 	type ThisDevice,
 } from "../../keep";
@@ -28,6 +29,7 @@ export type AddProjectWithoutFolderPorts = {
 	thisDevice: ThisDevice;
 	directory: Pick<ProjectDirectory, "hostedElsewhere">;
 	relay?: HostRelay;
+	spaceHolds: SpaceHolds;
 	ids: NewIds;
 };
 
@@ -57,14 +59,16 @@ export const addProjectWithoutFolder =
 			await store.keepHostedWithoutFolder({ id: projectId, spaceId, name });
 		} else {
 			projectId = ports.ids.projectId();
-			await createProject(
-				{ create: ports.spaceProjects.create, row: store.row },
-				{
-					spaceId,
-					projectId,
-					entry: { name, remote: null, folder: false },
-					onHost: HOSTED_ELSEWHERE,
-				},
+			await ports.spaceHolds.unlessHeld(spaceId, () =>
+				createProject(
+					{ create: ports.spaceProjects.create, row: store.row },
+					{
+						spaceId,
+						projectId,
+						entry: { name, remote: null, folder: false },
+						onHost: HOSTED_ELSEWHERE,
+					},
+				),
 			);
 			await ports.projectLog.append({
 				type: "ProjectAdded",

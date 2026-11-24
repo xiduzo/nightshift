@@ -56,6 +56,23 @@ describe("moveProject", () => {
 		expect(ports.steps.at(-1)).toBe("log moved app from to");
 	});
 
+	test("a move into a Space that another move holds is refused, and no row moves", async () => {
+		const ports = seeded();
+		ports.holds.held.add("to");
+		await expect(
+			moveProject(ports)(NIGHT_SHIFT, {
+				spaceId: "from",
+				projectId: "app",
+				toSpaceId: "to",
+			}),
+		).rejects.toThrow("held");
+		expect(ports.rows.projects.get("app")?.spaceId).toBe("from");
+		expect(ports.steps.slice(-2)).toEqual([
+			"release starts from",
+			"release schedules",
+		]);
+	});
+
 	test("a move to its own Space does nothing", async () => {
 		const ports = seeded();
 		await moveProject(ports)(NIGHT_SHIFT, {

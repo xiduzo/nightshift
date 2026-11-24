@@ -15,6 +15,8 @@ export type MergeRow = {
 	/** This computer's Person: their id on the Host. */
 	personMap: Record<string, string>;
 	joined: string[];
+	/** The Projects, by their id on the Host, that moved later than the merge. */
+	late: string[];
 	backup: string;
 	createdAt: number;
 	updatedAt: number;

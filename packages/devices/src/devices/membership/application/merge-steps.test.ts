@@ -198,6 +198,7 @@ describe("where the Projects go", () => {
 			},
 			personMap: { ada: "ada-there" },
 			renumber: true,
+			empties: true,
 		});
 		expect(world.personalSpaces.adopted).toEqual([
 			{ personId: "ada", from: "own", to: "theirs" },
@@ -237,6 +238,45 @@ describe("where the Projects go", () => {
 		expect(world.asked.map((a) => [a.dryRun, a.join])).toEqual([
 			[true, ["p1"]],
 		]);
+	});
+});
+
+describe("Projects that change on the way", () => {
+	test("the Host is asked again only when they are not those it answered for, and what stopped goes on", async () => {
+		const { world, steps, state, goOn } = setUp();
+		world.batchFails = new Error("disk full");
+		await expect(steps.start({})).rejects.toThrow("disk full");
+		await expect(goOn()).rejects.toThrow("disk full");
+		expect(world.asked).toHaveLength(1);
+
+		world.projects.push(moving("late", { clone: false }));
+		await expect(goOn()).rejects.toThrow("disk full");
+		expect(world.asked).toHaveLength(2);
+		// The second answer is kept: a stop here asks no third time.
+		world.batchFails = null;
+		expect(await goOn()).toMatchObject({ state: "pushed", projects: 2 });
+		expect(world.asked).toHaveLength(2);
+		expect(state()).toBe("pushed");
+		expect(world.projects.map((p) => p.spaceId)).toEqual(["theirs", "theirs"]);
+	});
+
+	test("one that comes under the hold each time ends the merge, and no row moves", async () => {
+		const { world, steps, state } = setUp();
+		let next = 0;
+		world.underHold = async () => {
+			world.projects.push(moving(`late-${++next}`));
+		};
+		await expect(steps.start({})).rejects.toThrow(MERGE_WORDS.changed);
+		expect(world.asked).toHaveLength(3);
+		expect(state()).toBe("mapped");
+		expect(new Set(world.projects.map((p) => p.spaceId))).toEqual(
+			new Set(["own"]),
+		);
+
+		world.underHold = async () => {};
+		const row = await world.record.merges.latest();
+		if (!row) throw new Error("No merge.");
+		expect(await steps.resume(row)).toMatchObject({ state: "pushed" });
 	});
 });
 

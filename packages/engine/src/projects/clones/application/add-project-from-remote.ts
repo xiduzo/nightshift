@@ -6,6 +6,7 @@ import {
 	type ProjectLog,
 	type ProjectStore,
 	restoreProject,
+	type SpaceHolds,
 	type SpaceProjects,
 } from "../../keep";
 
@@ -13,6 +14,7 @@ export type AddProjectFromRemotePorts = {
 	store: Pick<ProjectStore, "byRemote" | "row">;
 	spaceProjects: Pick<SpaceProjects, "define" | "create">;
 	projectLog: Pick<ProjectLog, "append">;
+	spaceHolds: SpaceHolds;
 	ids: NewIds;
 };
 
@@ -41,14 +43,16 @@ export const addProjectFromRemote =
 			return { projectId: found.id };
 		}
 		const projectId = ports.ids.projectId();
-		await createProject(
-			{ create: ports.spaceProjects.create, row: ports.store.row },
-			{
-				spaceId,
-				projectId,
-				entry: { name, remote, folder: true },
-				onHost: HOSTED_ELSEWHERE,
-			},
+		await ports.spaceHolds.unlessHeld(spaceId, () =>
+			createProject(
+				{ create: ports.spaceProjects.create, row: ports.store.row },
+				{
+					spaceId,
+					projectId,
+					entry: { name, remote, folder: true },
+					onHost: HOSTED_ELSEWHERE,
+				},
+			),
 		);
 		await ports.projectLog.append({
 			type: "ProjectAdded",
