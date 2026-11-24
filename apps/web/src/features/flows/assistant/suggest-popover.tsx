@@ -1,9 +1,5 @@
 import type { Suggestion, SuggestionKind, TextRange } from "@nightshift/flows";
-import {
-	Alert,
-	AlertDescription,
-	AlertTitle,
-} from "@nightshift/ui/components/alert";
+import { Alert, AlertDescription } from "@nightshift/ui/components/alert";
 import { Button } from "@nightshift/ui/components/button";
 import { Kbd } from "@nightshift/ui/components/kbd";
 import {
@@ -29,6 +25,7 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { ErrorAlert } from "@/shared/failure";
 import { Markdown } from "@/shared/markdown";
 import {
 	applyToDraft,
@@ -216,11 +213,7 @@ function SuggestBody({
 			</PopoverHeader>
 
 			{state.status === "failed" ? (
-				<Alert variant="destructive">
-					<CircleAlertIcon />
-					<AlertTitle>No suggestion</AlertTitle>
-					<AlertDescription>{state.message}</AlertDescription>
-				</Alert>
+				<ErrorAlert title="No suggestion" error={state} />
 			) : null}
 
 			{state.status === "running" ? (

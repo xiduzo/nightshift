@@ -53,6 +53,7 @@ import { toast } from "sonner";
 import type { CliTool } from "@/shared/api";
 import { CodeView } from "@/shared/code";
 import { DetailSection, DetailShell } from "@/shared/detail";
+import { ErrorAlert } from "@/shared/failure";
 import { CheckBadge, FactList, UsedBySection } from "../connections";
 import { checkState } from "../harnesses";
 import { cliToolMutations, cliToolQueries } from "../queries";
@@ -149,11 +150,7 @@ export function CliToolDetail({
 							<Skeleton className="h-4 w-1/2" />
 						</div>
 					) : check.error && !data ? (
-						<Alert variant="destructive">
-							<CircleAlertIcon />
-							<AlertTitle>The check did not run</AlertTitle>
-							<AlertDescription>{check.error.message}</AlertDescription>
-						</Alert>
+						<ErrorAlert title="The check did not run" error={check.error} />
 					) : data ? (
 						<>
 							<FactList
@@ -515,13 +512,7 @@ function CliToolForm({
 					</Alert>
 				) : null}
 
-				{save.error ? (
-					<Alert variant="destructive">
-						<CircleAlertIcon />
-						<AlertTitle>Not saved</AlertTitle>
-						<AlertDescription>{save.error.message}</AlertDescription>
-					</Alert>
-				) : null}
+				<ErrorAlert title="Not saved" error={save.error} />
 			</FieldGroup>
 
 			<DialogFooter>

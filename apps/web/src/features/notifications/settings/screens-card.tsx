@@ -1,9 +1,4 @@
 import {
-	Alert,
-	AlertDescription,
-	AlertTitle,
-} from "@nightshift/ui/components/alert";
-import {
 	AlertDialog,
 	AlertDialogAction,
 	AlertDialogCancel,
@@ -38,7 +33,6 @@ import { Spinner } from "@nightshift/ui/components/spinner";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
 	BellRingIcon,
-	CircleAlertIcon,
 	GlobeIcon,
 	type LucideIcon,
 	MonitorIcon,
@@ -47,8 +41,8 @@ import {
 } from "lucide-react";
 import { Fragment, useState } from "react";
 import { toast } from "sonner";
-
 import type { NotificationScreen } from "@/shared/api";
+import { ErrorAlert } from "@/shared/failure";
 import { formatRelative } from "@/shared/format";
 import { PageSection } from "@/shared/page";
 import { LocalTime } from "@/shared/time";
@@ -108,11 +102,7 @@ export function ScreensCard() {
 						</div>
 					) : screens.error ? (
 						<div className="p-4">
-							<Alert variant="destructive">
-								<CircleAlertIcon />
-								<AlertTitle>The list did not load</AlertTitle>
-								<AlertDescription>{screens.error.message}</AlertDescription>
-							</Alert>
+							<ErrorAlert title="The list did not load" error={screens.error} />
 						</div>
 					) : !screens.data || screens.data.length === 0 ? (
 						<Empty>

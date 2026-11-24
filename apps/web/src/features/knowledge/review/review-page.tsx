@@ -50,7 +50,6 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import {
 	CheckCircle2Icon,
 	CheckIcon,
-	CircleAlertIcon,
 	CopyIcon,
 	FileX2Icon,
 	LightbulbIcon,
@@ -62,6 +61,7 @@ import {
 } from "lucide-react";
 import { type ReactNode, useEffect, useId } from "react";
 import { toast } from "sonner";
+import { ErrorAlert } from "@/shared/failure";
 import { formatRelative } from "@/shared/format";
 import { fileNameOf } from "../files";
 import { KnowledgeSection, type Review, useKnowledge } from "../layout";
@@ -167,11 +167,7 @@ function ReviewQueue() {
 
 	if (review.error) {
 		return (
-			<Alert variant="destructive">
-				<CircleAlertIcon />
-				<AlertTitle>The learnings did not load</AlertTitle>
-				<AlertDescription>{review.error.message}</AlertDescription>
-			</Alert>
+			<ErrorAlert title="The learnings did not load" error={review.error} />
 		);
 	}
 	if (review.loading) return <Skeleton className="h-56 w-full" />;

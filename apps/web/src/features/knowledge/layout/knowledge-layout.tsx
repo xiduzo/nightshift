@@ -1,14 +1,9 @@
 import { hasEnded } from "@nightshift/client";
-import {
-	Alert,
-	AlertDescription,
-	AlertTitle,
-} from "@nightshift/ui/components/alert";
 import { Button } from "@nightshift/ui/components/button";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
 import { useQuery } from "@tanstack/react-query";
 import { useMatchRoute } from "@tanstack/react-router";
-import { CircleAlertIcon, PlusIcon } from "lucide-react";
+import { PlusIcon } from "lucide-react";
 import {
 	createContext,
 	type ReactNode,
@@ -18,6 +13,7 @@ import {
 } from "react";
 import { ProjectPage } from "@/features/projects";
 import type { Knowledge } from "@/shared/api";
+import { ErrorAlert } from "@/shared/failure";
 import { PageHeading } from "@/shared/page";
 import { knowledgeQueries } from "../queries";
 import { KnowledgeFileSheet } from "./knowledge-file-sheet";
@@ -124,11 +120,7 @@ function KnowledgeLoader({
 	});
 	if (knowledge.error) {
 		return (
-			<Alert variant="destructive">
-				<CircleAlertIcon />
-				<AlertTitle>Your knowledge did not load</AlertTitle>
-				<AlertDescription>{knowledge.error.message}</AlertDescription>
-			</Alert>
+			<ErrorAlert title="Your knowledge did not load" error={knowledge.error} />
 		);
 	}
 	if (!knowledge.data) {

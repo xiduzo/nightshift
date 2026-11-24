@@ -21,6 +21,7 @@ export const APP_WEB: Record<string, Place> = {
 	"shared/code": M,
 	"shared/data-table": M,
 	"shared/detail": M,
+	"shared/failure": M,
 	"shared/format": M,
 	"shared/larger-window": M,
 	"shared/markdown": M,

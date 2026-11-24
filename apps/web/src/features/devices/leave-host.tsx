@@ -1,9 +1,4 @@
 import {
-	Alert,
-	AlertDescription,
-	AlertTitle,
-} from "@nightshift/ui/components/alert";
-import {
 	AlertDialog,
 	AlertDialogAction,
 	AlertDialogCancel,
@@ -16,9 +11,10 @@ import {
 import { Button } from "@nightshift/ui/components/button";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { CircleAlertIcon, LogOutIcon } from "lucide-react";
+import { LogOutIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { ErrorAlert } from "@/shared/failure";
 
 import { leaveMutation } from "./queries";
 
@@ -75,13 +71,7 @@ export function LeaveHostButton({ hostName }: { hostName: string }) {
 							keeps a copy of your data from before you leave.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
-					{leave.error ? (
-						<Alert variant="destructive">
-							<CircleAlertIcon />
-							<AlertTitle>This computer did not leave</AlertTitle>
-							<AlertDescription>{leave.error.message}</AlertDescription>
-						</Alert>
-					) : null}
+					<ErrorAlert title="This computer did not leave" error={leave.error} />
 					<AlertDialogFooter>
 						<AlertDialogCancel>Cancel</AlertDialogCancel>
 						<AlertDialogAction

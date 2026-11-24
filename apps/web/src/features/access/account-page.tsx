@@ -1,8 +1,3 @@
-import {
-	Alert,
-	AlertDescription,
-	AlertTitle,
-} from "@nightshift/ui/components/alert";
 import { Button } from "@nightshift/ui/components/button";
 import { Card, CardContent } from "@nightshift/ui/components/card";
 import {
@@ -16,8 +11,9 @@ import {
 import { Skeleton } from "@nightshift/ui/components/skeleton";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { CircleAlertIcon, CircleUserRoundIcon } from "lucide-react";
+import { CircleUserRoundIcon } from "lucide-react";
 import { authClient } from "@/shared/api";
+import { ErrorAlert } from "@/shared/failure";
 import { PageHeading, PageSection, SiteHeader } from "@/shared/page";
 import { accountQueries } from "./queries";
 import { TwoFactorSection } from "./two-factor-section";
@@ -38,13 +34,7 @@ export function AccountPage() {
 						title="Account"
 						description="Your name, your email and how you sign in."
 					/>
-					{status.error ? (
-						<Alert variant="destructive">
-							<CircleAlertIcon />
-							<AlertTitle>Your account did not load</AlertTitle>
-							<AlertDescription>{status.error.message}</AlertDescription>
-						</Alert>
-					) : null}
+					<ErrorAlert title="Your account did not load" error={status.error} />
 					<PageSection title="You">
 						<Card>
 							<CardContent>

@@ -1,8 +1,3 @@
-import {
-	Alert,
-	AlertDescription,
-	AlertTitle,
-} from "@nightshift/ui/components/alert";
 import { Button } from "@nightshift/ui/components/button";
 import {
 	Card,
@@ -13,9 +8,10 @@ import {
 } from "@nightshift/ui/components/card";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
 import { Spinner } from "@nightshift/ui/components/spinner";
-import { CircleAlertIcon, SearchXIcon } from "lucide-react";
+import { SearchXIcon } from "lucide-react";
 import { OVERVIEW_ROWS } from "@/features/dashboard";
 import type { KnowledgeHit } from "@/shared/api";
+import { ErrorAlert } from "@/shared/failure";
 import { SearchHits } from "../search";
 
 /**
@@ -44,13 +40,7 @@ export function AskAnswer({
 	finding: boolean;
 }) {
 	if (error) {
-		return (
-			<Alert variant="destructive">
-				<CircleAlertIcon />
-				<AlertTitle>The search did not work</AlertTitle>
-				<AlertDescription>{error.message}</AlertDescription>
-			</Alert>
-		);
+		return <ErrorAlert title="The search did not work" error={error} />;
 	}
 	if (!hits) return <Skeleton className="h-24 w-full" />;
 	if (hits.length === 0) {

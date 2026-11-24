@@ -28,14 +28,10 @@ import {
 	TableRow,
 } from "@nightshift/ui/components/table";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import {
-	ChevronDownIcon,
-	CircleAlertIcon,
-	GaugeIcon,
-	SparklesIcon,
-} from "lucide-react";
+import { ChevronDownIcon, GaugeIcon, SparklesIcon } from "lucide-react";
 import { toast } from "sonner";
 import type { KnowledgeEvaluation } from "@/shared/api";
+import { ErrorAlert } from "@/shared/failure";
 import { formatRelative } from "@/shared/format";
 import { LocalTime } from "@/shared/time";
 import { knowledgeMutations, knowledgeQueries } from "../queries";
@@ -109,11 +105,7 @@ export function SearchEvaluation({
 			</CardHeader>
 			{evaluation.error ? (
 				<CardContent>
-					<Alert variant="destructive">
-						<CircleAlertIcon />
-						<AlertTitle>The test did not run</AlertTitle>
-						<AlertDescription>{evaluation.error.message}</AlertDescription>
-					</Alert>
+					<ErrorAlert title="The test did not run" error={evaluation.error} />
 				</CardContent>
 			) : result ? (
 				<CardContent className="flex flex-col gap-4">

@@ -1,8 +1,3 @@
-import {
-	Alert,
-	AlertDescription,
-	AlertTitle,
-} from "@nightshift/ui/components/alert";
 import { Button } from "@nightshift/ui/components/button";
 import { Card, CardContent } from "@nightshift/ui/components/card";
 import {
@@ -28,10 +23,11 @@ import {
 } from "@nightshift/ui/components/select";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import { Switch } from "@nightshift/ui/components/switch";
-import { CircleAlertIcon, RotateCcwIcon } from "lucide-react";
+import { RotateCcwIcon } from "lucide-react";
 import { type ReactNode, useId, useState } from "react";
 import { toast } from "sonner";
 import { KeyValueRows, recordFrom, rowsFrom } from "@/features/agents";
+import { ErrorAlert } from "@/shared/failure";
 import { SettingNote, SettingRow } from "@/shared/page";
 import {
 	type SettingKey,
@@ -39,24 +35,12 @@ import {
 	useSaveSettings,
 } from "./use-settings-form";
 
-/** The daemon's answer when it refused a save. */
-export function SaveError({ error }: { error: Error | null }) {
-	if (!error) return null;
-	return (
-		<Alert variant="destructive">
-			<CircleAlertIcon />
-			<AlertTitle>Not saved</AlertTitle>
-			<AlertDescription>{error.message}</AlertDescription>
-		</Alert>
-	);
-}
-
 /** The same answer as a row of a settings table. */
 export function SaveErrorRow({ error }: { error: Error | null }) {
 	if (!error) return null;
 	return (
 		<SettingNote>
-			<SaveError error={error} />
+			<ErrorAlert title="Not saved" error={error} />
 		</SettingNote>
 	);
 }
@@ -317,7 +301,7 @@ export function HeadersCard({
 								addLabel="Add header"
 							/>
 						</FieldSet>
-						<SaveError error={save.error} />
+						<ErrorAlert title="Not saved" error={save.error} />
 						<div className="flex justify-end">
 							<Button type="submit" disabled={!changed || save.isPending}>
 								{save.isPending ? <Spinner data-icon="inline-start" /> : null}

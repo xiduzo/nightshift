@@ -1,8 +1,4 @@
-import {
-	Alert,
-	AlertDescription,
-	AlertTitle,
-} from "@nightshift/ui/components/alert";
+import { Alert, AlertDescription } from "@nightshift/ui/components/alert";
 import { Button } from "@nightshift/ui/components/button";
 import {
 	Dialog,
@@ -32,6 +28,7 @@ import {
 import { useId, useState } from "react";
 import { toast } from "sonner";
 import type { CheckTarget, CliCheck, SettingsView } from "@/shared/api";
+import { ErrorAlert } from "@/shared/failure";
 import { formatTime } from "@/shared/format";
 import { LocalTime } from "@/shared/time";
 import { HARNESSES, type HarnessInfo } from "../catalog";
@@ -121,11 +118,7 @@ export function CliPanel({
 					<Skeleton className="h-4 w-2/3" />
 				</div>
 			) : check.error && !data ? (
-				<Alert variant="destructive">
-					<CircleAlertIcon />
-					<AlertTitle>The check did not run</AlertTitle>
-					<AlertDescription>{check.error.message}</AlertDescription>
-				</Alert>
+				<ErrorAlert title="The check did not run" error={check.error} />
 			) : data ? (
 				<>
 					<FactList

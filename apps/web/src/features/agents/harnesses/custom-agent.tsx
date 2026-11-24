@@ -1,9 +1,5 @@
 import type { CustomAgent } from "@nightshift/flows";
-import {
-	Alert,
-	AlertDescription,
-	AlertTitle,
-} from "@nightshift/ui/components/alert";
+import { Alert, AlertDescription } from "@nightshift/ui/components/alert";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -48,6 +44,7 @@ import { useId, useState } from "react";
 import { toast } from "sonner";
 import type { HarnessRow } from "@/shared/api";
 import { DetailSection, DetailShell } from "@/shared/detail";
+import { ErrorAlert } from "@/shared/failure";
 import { formatTime } from "@/shared/format";
 import { LocalTime } from "@/shared/time";
 import { FactList, OffMachineNote } from "../connections";
@@ -242,13 +239,7 @@ function CustomAgentForm({
 					/>
 				</FieldSet>
 
-				{save.error ? (
-					<Alert variant="destructive">
-						<CircleAlertIcon />
-						<AlertTitle>Not saved</AlertTitle>
-						<AlertDescription>{save.error.message}</AlertDescription>
-					</Alert>
-				) : null}
+				<ErrorAlert title="Not saved" error={save.error} />
 			</FieldGroup>
 
 			<DialogFooter>
@@ -373,11 +364,7 @@ export function CustomAgentDetail({
 							<AlertDescription>{data.problem}</AlertDescription>
 						</Alert>
 					) : check.error && !data ? (
-						<Alert variant="destructive">
-							<CircleAlertIcon />
-							<AlertTitle>The check did not run</AlertTitle>
-							<AlertDescription>{check.error.message}</AlertDescription>
-						</Alert>
+						<ErrorAlert title="The check did not run" error={check.error} />
 					) : null}
 					<OffMachineNote>{harness.offMachine}</OffMachineNote>
 					<div className="flex flex-wrap items-center gap-2">

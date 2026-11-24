@@ -29,6 +29,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CircleAlertIcon, MergeIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
+import { ErrorAlert } from "@/shared/failure";
 
 import { MergePreviewList } from "./merge-preview";
 import { mergeQueries } from "./queries";
@@ -132,11 +133,10 @@ function MergeSteps({
 				</DialogDescription>
 			</DialogHeader>
 			{resume ? null : preview.error ? (
-				<Alert variant="destructive">
-					<CircleAlertIcon />
-					<AlertTitle>Night Shift cannot merge now</AlertTitle>
-					<AlertDescription>{preview.error.message}</AlertDescription>
-				</Alert>
+				<ErrorAlert
+					title="Night Shift cannot merge now"
+					error={preview.error}
+				/>
 			) : preview.data ? (
 				<FieldGroup>
 					<MergePreviewList preview={preview.data} />

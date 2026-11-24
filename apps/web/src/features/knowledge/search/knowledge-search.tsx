@@ -1,8 +1,3 @@
-import {
-	Alert,
-	AlertDescription,
-	AlertTitle,
-} from "@nightshift/ui/components/alert";
 import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
 import {
@@ -28,9 +23,10 @@ import {
 import { Skeleton } from "@nightshift/ui/components/skeleton";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import { useQuery } from "@tanstack/react-query";
-import { CircleAlertIcon, SearchIcon, XIcon } from "lucide-react";
+import { SearchIcon, XIcon } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import type { KnowledgeHit } from "@/shared/api";
+import { ErrorAlert } from "@/shared/failure";
 import { KnowledgeFileSheet } from "../layout";
 import { knowledgeQueries } from "../queries";
 import { useKnowledgeHits } from "./use-knowledge-hits";
@@ -85,11 +81,7 @@ export function KnowledgeSearch({
 			{query === "" ? (
 				idle
 			) : hits.error ? (
-				<Alert variant="destructive">
-					<CircleAlertIcon />
-					<AlertTitle>The search did not work</AlertTitle>
-					<AlertDescription>{hits.error.message}</AlertDescription>
-				</Alert>
+				<ErrorAlert title="The search did not work" error={hits.error} />
 			) : !hits.data ? (
 				<Skeleton className="h-16 w-full" />
 			) : hits.data.length === 0 ? (

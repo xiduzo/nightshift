@@ -4,7 +4,6 @@ export {
 	CardForm,
 	HeadersCard,
 	ResetSection,
-	SaveError,
 	SaveErrorRow,
 	SelectSetting,
 	SwitchSetting,

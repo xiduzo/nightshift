@@ -24,6 +24,7 @@ import { toast } from "sonner";
 import type { CliTool } from "@/shared/api";
 import { CodeView } from "@/shared/code";
 import { DetailSection } from "@/shared/detail";
+import { ErrorAlert } from "@/shared/failure";
 import { formatRelative, useNow } from "@/shared/format";
 import { LocalTime } from "@/shared/time";
 import { FactList } from "../connections";
@@ -347,11 +348,7 @@ export function LoginSection({ tool }: { tool: CliTool }) {
 					</div>
 				) : null}
 				{signIn.error ? (
-					<Alert variant="destructive">
-						<CircleAlertIcon />
-						<AlertTitle>The sign-in did not run</AlertTitle>
-						<AlertDescription>{signIn.error.message}</AlertDescription>
-					</Alert>
+					<ErrorAlert title="The sign-in did not run" error={signIn.error} />
 				) : result && !result.ok ? (
 					<Alert variant="destructive">
 						<CircleAlertIcon />

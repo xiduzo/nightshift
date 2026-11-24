@@ -1,8 +1,3 @@
-import {
-	Alert,
-	AlertDescription,
-	AlertTitle,
-} from "@nightshift/ui/components/alert";
 import { Button } from "@nightshift/ui/components/button";
 import {
 	Dialog,
@@ -29,15 +24,11 @@ import {
 	ToggleGroupItem,
 } from "@nightshift/ui/components/toggle-group";
 import { useMutation } from "@tanstack/react-query";
-import {
-	CircleAlertIcon,
-	PlugZapIcon,
-	SendIcon,
-	TerminalIcon,
-} from "lucide-react";
+import { PlugZapIcon, SendIcon, TerminalIcon } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { Connection, McpServer } from "@/shared/api";
+import { ErrorAlert } from "@/shared/failure";
 import { LargerTextarea } from "@/shared/larger-window";
 import {
 	type KeyValueRow,
@@ -392,13 +383,7 @@ function ConnectionForm({
 					</div>
 				) : null}
 
-				{save.error ? (
-					<Alert variant="destructive">
-						<CircleAlertIcon />
-						<AlertTitle>Not saved</AlertTitle>
-						<AlertDescription>{save.error.message}</AlertDescription>
-					</Alert>
-				) : null}
+				<ErrorAlert title="Not saved" error={save.error} />
 			</FieldGroup>
 
 			<DialogFooter className="sm:justify-between">

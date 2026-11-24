@@ -3,6 +3,7 @@
  * it. Each is a row with the agent picker, and a pick saves at once.
  * This is the one place of these settings.
  */
+
 import { Button } from "@nightshift/ui/components/button";
 import {
 	Dialog,
@@ -40,7 +41,8 @@ import { useId, useState } from "react";
 import { toast } from "sonner";
 import { KeyValueRows, recordFrom, rowsFrom } from "@/features/agents";
 import type { SettingsView } from "@/shared/api";
-import { SaveError, type SettingKey, useSaveSettings } from "../form";
+import { ErrorAlert } from "@/shared/failure";
+import { type SettingKey, useSaveSettings } from "../form";
 import { ollamaMutations, ollamaQueries } from "../queries";
 import {
 	type AgentPicker,
@@ -307,7 +309,7 @@ function OllamaHeadersDialog({
 							save its value on the Secrets page.
 						</FieldDescription>
 					</Field>
-					<SaveError error={save.error} />
+					<ErrorAlert title="Not saved" error={save.error} />
 					<DialogFooter>
 						<Button type="button" variant="outline" onClick={onClose}>
 							Cancel

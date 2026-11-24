@@ -1,8 +1,3 @@
-import {
-	Alert,
-	AlertDescription,
-	AlertTitle,
-} from "@nightshift/ui/components/alert";
 import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
 import { Card, CardContent } from "@nightshift/ui/components/card";
@@ -30,9 +25,10 @@ import {
 	TableRow,
 } from "@nightshift/ui/components/table";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { CircleAlertIcon, XIcon } from "lucide-react";
+import { XIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { ErrorAlert } from "@/shared/failure";
 import { formatRelative } from "@/shared/format";
 import { LocalTime } from "@/shared/time";
 import { KnowledgeSection, useKnowledge } from "../layout";
@@ -84,11 +80,7 @@ function AskedQuestions({
 	const questions = useQuery(knowledgeQueries.questions(projectId));
 	if (questions.error) {
 		return (
-			<Alert variant="destructive">
-				<CircleAlertIcon />
-				<AlertTitle>The questions did not load</AlertTitle>
-				<AlertDescription>{questions.error.message}</AlertDescription>
-			</Alert>
+			<ErrorAlert title="The questions did not load" error={questions.error} />
 		);
 	}
 	const asked = questions.data?.asked ?? [];

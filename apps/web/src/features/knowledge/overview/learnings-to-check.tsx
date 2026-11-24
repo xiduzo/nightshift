@@ -3,11 +3,6 @@ import {
 	type NoteToCheck,
 	useCheckNotes,
 } from "@nightshift/client";
-import {
-	Alert,
-	AlertDescription,
-	AlertTitle,
-} from "@nightshift/ui/components/alert";
 import { Button } from "@nightshift/ui/components/button";
 import {
 	Card,
@@ -29,7 +24,6 @@ import { Link } from "@tanstack/react-router";
 import {
 	CheckCheckIcon,
 	CheckIcon,
-	CircleAlertIcon,
 	PencilIcon,
 	SkipForwardIcon,
 	XIcon,
@@ -37,6 +31,7 @@ import {
 import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { orpc } from "@/shared/api";
+import { ErrorAlert } from "@/shared/failure";
 import { formatRelative } from "@/shared/format";
 import { PageSection } from "@/shared/page";
 import { knowledgeQueries } from "../queries";
@@ -138,11 +133,7 @@ export function LearningsToCheck({ notes }: { notes: NotesToCheck }) {
 			{notes.loading ? (
 				<Skeleton className="h-32 w-full rounded-xl" />
 			) : notes.error && !current ? (
-				<Alert variant="destructive">
-					<CircleAlertIcon />
-					<AlertTitle>The learnings did not load</AlertTitle>
-					<AlertDescription>{notes.error.message}</AlertDescription>
-				</Alert>
+				<ErrorAlert title="The learnings did not load" error={notes.error} />
 			) : current ? (
 				<NoteCard
 					key={noteKey(current)}

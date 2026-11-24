@@ -46,16 +46,12 @@ import {
 	ReactFlowProvider,
 	useReactFlow,
 } from "@xyflow/react";
-import {
-	CircleAlertIcon,
-	EyeOffIcon,
-	SearchIcon,
-	TriangleAlertIcon,
-} from "lucide-react";
+import { EyeOffIcon, SearchIcon, TriangleAlertIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { loadElk } from "@/features/flows";
 import type { KnowledgeMap } from "@/shared/api";
+import { ErrorAlert } from "@/shared/failure";
 import { PanelHeader } from "@/shared/panel";
 import { KnowledgeSection, useKnowledge } from "../layout";
 import { knowledgeMutations, knowledgeQueries } from "../queries";
@@ -155,13 +151,7 @@ function MapLoader({ focus }: { focus: string | null }) {
 	};
 	const map = useQuery(knowledgeQueries.map(projectId));
 	if (map.error) {
-		return (
-			<Alert variant="destructive">
-				<CircleAlertIcon />
-				<AlertTitle>The map did not load</AlertTitle>
-				<AlertDescription>{map.error.message}</AlertDescription>
-			</Alert>
-		);
+		return <ErrorAlert title="The map did not load" error={map.error} />;
 	}
 	if (!map.data) return <Skeleton className="h-96 w-full" />;
 	if (map.data.nodes.length === 0) {
