@@ -1,12 +1,15 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { secretStore } from "@nightshift/engine";
+import { createSandbox, type Sandbox } from "@nightshift/engine/testing";
 import {
+	createHostLinks,
 	type DeviceKeyStore,
 	deviceKeyStore,
 	deviceKeysOf,
+	SECOND_HOME,
 } from "./host-links";
 
 const dir = () => mkdtempSync(join(tmpdir(), "nightshift-keychain-"));
@@ -73,5 +76,73 @@ describe("Device keys in a keychain two installs share", () => {
 		expect(await keychain.get("host")).toBe("nsd_before");
 		await keys.delete("host");
 		expect(await keys.get("host")).toBeNull();
+	});
+});
+
+describe("the links of a joining Device", () => {
+	let sandbox: Sandbox;
+	beforeEach(async () => {
+		sandbox = await createSandbox();
+	});
+	afterEach(() => sandbox.cleanup());
+
+	const link = {
+		hostId: "host-a",
+		name: "studio",
+		addresses: ["https://studio.local", "https://studio.example.com"],
+		certificate: null,
+		fingerprint: null,
+		role: "home" as const,
+		personId: "person-a",
+		keyStore: "file" as const,
+	};
+
+	test("a home link is this Device's home Host; a second home is refused", async () => {
+		const links = createHostLinks(sandbox.db);
+		await links.save(link);
+		expect((await links.home())?.hostId).toBe("host-a");
+
+		await expect(
+			links.save({ ...link, hostId: "host-c", name: "other" }),
+		).rejects.toThrow(SECOND_HOME);
+		await links.save({ ...link, hostId: "host-c", role: "guest" });
+		expect((await links.list()).map((l) => [l.hostId, l.role])).toEqual([
+			["host-c", "guest"],
+			["host-a", "home"],
+		]);
+	});
+
+	test("a revoked home can be replaced, and the Device has no home meanwhile", async () => {
+		const links = createHostLinks(sandbox.db);
+		await links.save(link);
+		await links.revoked("host-a");
+		expect((await links.get("host-a"))?.revokedAt).not.toBeNull();
+		expect(await links.home()).toBeNull();
+
+		await links.save({
+			...link,
+			hostId: "host-c",
+			addresses: ["https://new.example.com"],
+		});
+		expect(await links.get("host-a")).toBeNull();
+		expect((await links.home())?.addresses).toEqual([
+			"https://new.example.com",
+		]);
+	});
+
+	test("a key kept in a file is readable by its owner only", async () => {
+		const store = await deviceKeyStore({
+			dataDir: sandbox.dataDir,
+			deviceId: sandbox.deviceId,
+			prefer: "file",
+		});
+		expect(store.kind).toBe("file");
+		expect(await store.get("host-a")).toBeNull();
+		await store.set("host-a", "nsd_secret");
+		expect(await store.get("host-a")).toBe("nsd_secret");
+		const { mode } = statSync(join(sandbox.dataDir, "device-keys", "host-a"));
+		expect(mode & 0o777).toBe(0o600);
+		await store.delete("host-a");
+		expect(await store.get("host-a")).toBeNull();
 	});
 });

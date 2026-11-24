@@ -36,6 +36,8 @@ describe("ensureSelfDevice", () => {
 		p.store.add({ id: "self", self: true, name: "old", platform: "linux" });
 		const stale = { ...host, stale: (name: string) => name === "old" };
 		expect((await ensureSelfDevice(p)({ host: stale })).name).toBe("studio");
+		await p.store.setFacts("self", { name: "Mine" });
+		expect((await ensureSelfDevice(p)({ host: stale })).name).toBe("Mine");
 	});
 
 	test("without a host, the default of this computer: the host name, (dev) for a dev install", async () => {

@@ -64,9 +64,50 @@ describe("answerHello", () => {
 		expect(guest.devices).toBeUndefined();
 	});
 
+	test("another Person's Device learns neither the Host nor its owner's Devices; the Host admin learns they are", async () => {
+		const p = inMemoryHostPorts();
+		p.registry.setSelfOwner("person-ada");
+		p.spaces.admins.add("person-ada");
+		for (const [id, ownerId] of [
+			["laptop", "person-ada"],
+			["bobs", "person-bob"],
+		] as const) {
+			p.registry.put({
+				id,
+				name: id,
+				platform: "test",
+				ownerId,
+				homeHost: "https://studio.invalid",
+				lastSeenAt: null,
+				online: false,
+				pairedAt: 0,
+				revokedAt: null,
+			});
+		}
+		const bobs = await answerHello(p)(key("bobs", "person-bob"));
+		expect(bobs.devices).toEqual([]);
+		expect(bobs.hostAdmin).toBe(false);
+		const adas = await answerHello(p)(key("laptop", "person-ada"));
+		expect(adas.hostAdmin).toBe(true);
+	});
+
 	test("a Device without access is refused", async () => {
 		const p = inMemoryHostPorts();
 		await expect(answerHello(p)(key("ghost", "person-ada"))).rejects.toThrow(
+			NO_ACCESS,
+		);
+		p.registry.put({
+			id: "gone",
+			name: "gone",
+			platform: "test",
+			ownerId: "person-ada",
+			homeHost: "https://studio.invalid",
+			lastSeenAt: null,
+			online: false,
+			pairedAt: 0,
+			revokedAt: 5,
+		});
+		await expect(answerHello(p)(key("gone", "person-ada"))).rejects.toThrow(
 			NO_ACCESS,
 		);
 	});

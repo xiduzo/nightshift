@@ -61,8 +61,8 @@ import { withPeers } from "../../testing";
 import { deviceDirectory } from "../../wire-peers-directory";
 import { createPeerEngine, type PeerEngine } from "../../wire-peers-engine";
 import { serveWork } from "../../work/serve-work";
-import { selfOwnerId } from "../registry/test-support";
-import { createPlacement } from "./test-support";
+import { wireRegistry } from "../registry";
+import { wirePlacement } from "./wire";
 
 /** No profile of this computer, and no Device document kept here. */
 const NO_PROFILES: Pick<PeerProfiles, "here" | "lastKnown"> = {
@@ -1389,13 +1389,15 @@ describe("the owner's other Devices in a Space of the home Host", () => {
 			db: b.db,
 			directory: deviceDirectory(b.db),
 		});
-		const placement = createPlacement({
+		const placement = wirePlacement().createPlacement({
 			db: b.db,
 			device: testDevice({ harnesses: {} }, b.deviceId),
 			walkerId: async () => b.deviceId,
 			profiles: NO_PROFILES,
 			keptDevice: async () => null,
-			registry: { selfOwnerId: () => selfOwnerId(b.db) } as never,
+			registry: {
+				selfOwnerId: () => wireRegistry({ db: b.db }).readSelfOwner(),
+			} as never,
 			documents: spaceDocuments,
 			hostSpaces: createHostSpaces(b.db),
 			// The laptop has a Clone, as the Space document B keeps says.
@@ -1517,13 +1519,15 @@ describe("the owner's other Devices in a Space of the home Host", () => {
 describe("a Device of the plan, by id", () => {
 	/** A's placement module, with no registry and no names it learned. */
 	const placementOfA = () =>
-		createPlacement({
+		wirePlacement().createPlacement({
 			db: a.db,
 			device: testDevice({ harnesses: {} }, a.deviceId),
 			walkerId: async () => a.deviceId,
 			profiles: NO_PROFILES,
 			keptDevice: async () => null,
-			registry: { selfOwnerId: () => selfOwnerId(a.db) } as never,
+			registry: {
+				selfOwnerId: () => wireRegistry({ db: a.db }).readSelfOwner(),
+			} as never,
 			documents,
 			hostSpaces: createHostSpaces(a.db),
 			projects: NO_PROJECTS,
@@ -1559,13 +1563,15 @@ describe("a Device of the plan, by id", () => {
 
 describe("a run with no starter", () => {
 	test("sends nothing to another Device: its calls there are refused here", async () => {
-		const placement = createPlacement({
+		const placement = wirePlacement().createPlacement({
 			db: a.db,
 			device: testDevice({ harnesses: {} }, a.deviceId),
 			walkerId: async () => a.deviceId,
 			profiles: NO_PROFILES,
 			keptDevice: async () => null,
-			registry: { selfOwnerId: () => selfOwnerId(a.db) } as never,
+			registry: {
+				selfOwnerId: () => wireRegistry({ db: a.db }).readSelfOwner(),
+			} as never,
 			documents,
 			hostSpaces: createHostSpaces(a.db),
 			projects: NO_PROJECTS,

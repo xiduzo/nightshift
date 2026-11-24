@@ -124,8 +124,19 @@ export function deviceStoreContract(
 			await under.run(store.revokeRows("d-1", 40));
 			expect((await store.sameMachine(ada, "m", "d-3"))?.id).toBe("d-2");
 			await store.describe("d-3", { name: "x", dev: true, machine: null });
+			await under.run(store.joinRows({ ...pairing, id: "d-3", machine: "m" }));
 			expect((await store.sameMachine(ada, "m", "d-1"))?.id).toBe("d-2");
 			expect(await store.sameMachine("person-bo", "m", "d-1")).toBeNull();
+			expect(await store.sameMachine(ada, "another", "d-3")).toBeNull();
+			// This computer's own row never counts.
+			await store.addSelf({ id: "self-1", name: "s", platform: "linux" });
+			await store.setOwner("self-1", ada);
+			await store.describe("self-1", {
+				name: "s",
+				dev: false,
+				machine: "own",
+			});
+			expect(await store.sameMachine(ada, "own", "d-1")).toBeNull();
 		});
 
 		test("seen: only a paired row; its time and owner", async () => {

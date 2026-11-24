@@ -1,4 +1,8 @@
+import { describe, expect, test } from "bun:test";
+import { HostUnreachableError } from "@nightshift/engine";
+import { ORPCError } from "@orpc/server";
 import type { HostClient } from "../../../../contract";
+import { linksTo } from "../../../../testing/host-in-memory";
 import { hostCallsContract } from "./host-calls.contract";
 import { inMemoryHostCalls } from "./in-memory-host-calls";
 import { linkHostCalls } from "./link-host-calls";
@@ -49,4 +53,31 @@ hostCallsContract("over links", async () => {
 			home = next;
 		},
 	};
+});
+
+describe("the calls over links", () => {
+	const via = (client: unknown) =>
+		linkHostCalls({
+			hostLinks: { home: async () => null },
+			links: () => linksTo(new Map([["host", client as HostClient]])),
+		});
+	const list = (client: HostClient) => client.secrets.list();
+
+	test("a Host that is too slow cannot be reached", async () => {
+		const slow = { secrets: { list: () => new Promise(() => {}) } };
+		await expect(
+			via(slow).ask("host", list, { deadlineMs: 20, olderHost: "Update." }),
+		).rejects.toBeInstanceOf(HostUnreachableError);
+	});
+
+	test("a Host without the procedure is older, in the words asked for", async () => {
+		const older = {
+			secrets: {
+				list: () => Promise.reject(new ORPCError("NOT_FOUND", { status: 404 })),
+			},
+		};
+		await expect(
+			via(older).ask("host", list, { deadlineMs: 1_000, olderHost: "Update." }),
+		).rejects.toThrow("Update.");
+	});
 });

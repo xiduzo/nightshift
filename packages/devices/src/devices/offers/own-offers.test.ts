@@ -15,7 +15,7 @@ import {
 } from "@nightshift/engine/testing";
 import type { AgentProfile } from "@nightshift/flows";
 import { asDate } from "@nightshift/time";
-import { homePersonsOf, selfOwnerId } from "../registry/test-support";
+import { wireRegistry } from "../registry";
 import {
 	deviceOffers,
 	offeredProfile,
@@ -23,7 +23,7 @@ import {
 	setDeviceOffer,
 	spaceOffers,
 } from "./domain/offers";
-import { createEngineOffers, createOffers } from "./test-support";
+import { wireOffers } from "./wire";
 
 /**
  * This computer's own Offers: withdrawing one, and the Devices of a Space
@@ -70,14 +70,14 @@ function offersWith(paired: Record<string, object>) {
 		},
 		devices: {
 			get: async (id: string) => paired[id] ?? null,
-			homePersons: () => homePersonsOf(sandbox.db),
+			homePersons: () => wireRegistry({ db: sandbox.db }).listHomePersons(),
 		},
 		members: {
 			name: async (_space: string, person: string) =>
 				({ me: "Sander", marieke: "Marieke" })[person] ?? null,
 		},
 	};
-	return createOffers({
+	return wireOffers().createOffers({
 		db: sandbox.db,
 		engine: engine as never,
 		document: {} as never,
@@ -98,7 +98,7 @@ describe("withdraw", () => {
 			offeredAt: 1,
 		});
 		const order: string[] = [];
-		const engineOffers = createEngineOffers({
+		const engineOffers = wireOffers().createEngineOffers({
 			ready: Promise.resolve(),
 			documents: {
 				open: async () => ({ offers: new Map() }),
@@ -120,11 +120,13 @@ describe("withdraw", () => {
 				order.push(`stop the runs under ${offer.profileName}`);
 			},
 		});
-		const offers = createOffers({
+		const offers = wireOffers().createOffers({
 			db: sandbox.db,
 			engine: {
 				offers: engineOffers,
-				devices: { homePersons: () => homePersonsOf(sandbox.db) },
+				devices: {
+					homePersons: () => wireRegistry({ db: sandbox.db }).listHomePersons(),
+				},
 			} as never,
 			document,
 			profiles: {} as never,
@@ -253,10 +255,12 @@ describe("Offers by profile id", () => {
 			by: "me",
 		};
 		const published: { spaceId: string; profileName: string }[] = [];
-		const offers = createOffers({
+		const offers = wireOffers().createOffers({
 			db: sandbox.db,
 			engine: {
-				devices: { homePersons: () => homePersonsOf(sandbox.db) },
+				devices: {
+					homePersons: () => wireRegistry({ db: sandbox.db }).listHomePersons(),
+				},
 				offers: {
 					list: async (spaceId: string) =>
 						spaceId === "space-team" ? [listed] : [],
@@ -389,10 +393,12 @@ describe("the Host admin offers to a person's Personal", () => {
 		const profiles = createProfileStore({ document });
 		const saved = await profiles.save(coder);
 		const published: { spaceId: string; by: string | null }[] = [];
-		const offers = createOffers({
+		const offers = wireOffers().createOffers({
 			db: sandbox.db,
 			engine: {
-				devices: { homePersons: () => homePersonsOf(sandbox.db) },
+				devices: {
+					homePersons: () => wireRegistry({ db: sandbox.db }).listHomePersons(),
+				},
 				space: () => ({ listRuns: async () => [] }),
 				offers: {
 					list: async () => [],
@@ -404,7 +410,9 @@ describe("the Host admin offers to a person's Personal", () => {
 			document,
 			profiles,
 			self: { id: "self", name: "studio" },
-			ownerId: (await selfOwnerId(sandbox.db)) as string,
+			ownerId: (await wireRegistry({
+				db: sandbox.db,
+			}).readSelfOwner()) as string,
 			withdrawn: () => {},
 		});
 		return { offers, document, profile: saved.id, published };
@@ -447,7 +455,9 @@ describe("the Host admin offers to a person's Personal", () => {
 	test("an Offer to Ada's Personal is published there and kept here, and lists under that name", async () => {
 		const ada = await person("ada", "Ada", { home: true });
 		const { offers, document, profile, published } = await hostOffers();
-		const owner = (await selfOwnerId(sandbox.db)) as string;
+		const owner = (await wireRegistry({
+			db: sandbox.db,
+		}).readSelfOwner()) as string;
 		await offers.make({ spaceId: ada, profile, ...caps }, owner);
 		expect(published).toEqual([{ spaceId: ada, by: owner }]);
 		expect(deviceOffers(document, () => "coder")).toMatchObject([

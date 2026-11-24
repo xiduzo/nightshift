@@ -63,6 +63,44 @@ describe("redeemPairing", () => {
 		expect(await p.registry.get("new-install")).toBeNull();
 	});
 
+	test("another owner, a guest, or a Device that says no computer gets its own Device", async () => {
+		for (const [personId, home, machine] of [
+			["person-ada", true, "aa"],
+			["person-bob", false, "aa"],
+			["person-bob", true, undefined],
+		] as const) {
+			const p = inMemoryHostPorts();
+			p.registry.put({
+				id: "first",
+				name: "LE2316",
+				platform: "darwin",
+				ownerId: "person-bob",
+				homeHost: "https://studio.invalid",
+				lastSeenAt: 1,
+				online: false,
+				pairedAt: 0,
+				revokedAt: null,
+			});
+			const code = await startPairing(p)({
+				deviceId: "other",
+				name: "LE2316",
+				platform: "darwin",
+				home,
+				...(machine ? { machine } : {}),
+			});
+			p.pairings.approveAs(code.deviceCode, personId);
+			expect(
+				await redeemPairing(p)({
+					deviceCode: code.deviceCode,
+					deviceId: "other",
+					home,
+					address: "https://studio.invalid",
+				}),
+			).toMatchObject({ deviceId: "other" });
+			expect((await p.registry.get("first"))?.ownerId).toBe("person-bob");
+		}
+	});
+
 	test("the same owner on the same computer gets its Device back", async () => {
 		const p = inMemoryHostPorts();
 		p.registry.put({

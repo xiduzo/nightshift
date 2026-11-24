@@ -24,7 +24,7 @@ import { callerOf, withPeers } from "../../testing";
 import { deviceDirectory } from "../../wire-peers-directory";
 import { createPeerEngine, type PeerEngine } from "../../wire-peers-engine";
 import { createWorkHub } from "../../work";
-import { selfOwnerId } from "../registry/test-support";
+import { wireRegistry } from "../registry";
 import { type DeviceOffer, offerRefusal, spaceOffers } from "./domain/offers";
 
 /**
@@ -261,7 +261,9 @@ describe("another Person's run on the computer that walks it", () => {
 		// Every Device of the Person's, for Move to.
 		expect(await names(carol)).toEqual([["test", ["coder"]]]);
 		// Its owner's own computer takes every node.
-		const owner = (await selfOwnerId(sandbox.db)) as string;
+		const owner = (await wireRegistry({
+			db: sandbox.db,
+		}).readSelfOwner()) as string;
 		expect(await names(owner, {})).toEqual([["test", undefined]]);
 	});
 

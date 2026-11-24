@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { DeviceKeyAccess } from "@nightshift/auth";
+import { type DeviceKeyAccess, ROLE_REFUSAL } from "@nightshift/auth";
 import { type AuthSandbox, createAuthSandbox } from "@nightshift/auth/testing";
 import { user } from "@nightshift/db/schema";
 import type { SettingsStore } from "@nightshift/engine/settings";
@@ -13,9 +13,8 @@ import {
 	deviceRowsOn,
 } from "@nightshift/engine/testing";
 import { eq } from "drizzle-orm";
-import { createDeviceRegistry, setSelfOwner } from "../registry/test-support";
-import { createHost } from "./test-support";
-import type { Host } from "./wire";
+import { wireRegistry } from "../registry";
+import { type Host, wireHost } from "./wire";
 
 /**
  * This computer as a Host, with Better Auth on its own database: what it
@@ -30,11 +29,10 @@ beforeEach(async () => {
 	people = await createAuthSandbox();
 	dataDir = mkdtempSync(join(tmpdir(), "nightshift-host-"));
 	const log = createRunLog(people.db, { walkerId: "host-a", dataDir });
-	host = createHost({
+	host = wireHost({
 		auth: people.auth,
 		db: people.db,
-		registry: createDeviceRegistry({
-			db: people.db,
+		registry: wireRegistry({ db: people.db }).paired({
 			deviceRows: deviceRowsOn(people.db),
 			logFact: async (fact, writes) => {
 				await log.append(fact, writes);
@@ -110,53 +108,6 @@ describe("a Device whose link answers", () => {
 			["Platform", false],
 		]);
 	});
-
-	test("on its Home Host learns its owner's other Devices, and the Host when its owner owns it; never another Person's, never on a Guest Host", async () => {
-		const { ada, bob } = await adaAndBob();
-		await setSelfOwner(people.db, ada.userId);
-		const join = (id: string, ownerId: string, home: boolean) =>
-			host.registry.join({
-				id,
-				name: id,
-				platform: "test",
-				ownerId,
-				homeHost: home ? "https://studio.invalid" : null,
-			});
-		await join("laptop", ada.userId, true);
-		await join("desktop", ada.userId, true);
-		await join("old", ada.userId, true);
-		await host.registry.revoke("old");
-		await join("travel", ada.userId, false);
-		await join("bobs", bob.userId, true);
-		const key = (deviceId: string, personId: string): DeviceKeyAccess => ({
-			keyId: `key-${deviceId}`,
-			deviceId,
-			personId,
-			permissions: { sync: ["pull", "push"] },
-		});
-
-		const laptop = await host.hello(key("laptop", ada.userId));
-		expect(laptop.devices).toEqual([
-			{ id: "host-a", name: "Studio" },
-			{ id: "desktop", name: "desktop" },
-		]);
-		// Bob does not own the Host, and Ada's Devices are not his.
-		expect((await host.hello(key("bobs", bob.userId))).devices).toEqual([]);
-		// A Guest Host keeps no Device document, so it lists none.
-		expect(
-			(await host.hello(key("travel", ada.userId))).devices,
-		).toBeUndefined();
-	});
-
-	test("learns whether its owner is the Host admin", async () => {
-		const { ada, bob } = await adaAndBob();
-		expect((await host.hello(await paired(ada.userId, "home"))).hostAdmin).toBe(
-			true,
-		);
-		expect(
-			(await host.hello(await paired(bob.userId, "guest"))).hostAdmin,
-		).toBe(false);
-	});
 });
 
 describe("a pairing allowed by a Person who is not the Host admin", () => {
@@ -185,18 +136,6 @@ describe("a pairing allowed by a Person who is not the Host admin", () => {
 			personId: bob.userId,
 			hostAdmin: false,
 		});
-	}, 15_000);
-
-	test("from a Device of an older version: the review does not know whether it asks for a home Host", async () => {
-		const { ada } = await adaAndBob();
-		const code = await host.startPairing({
-			deviceId: "device-b",
-			name: "laptop",
-			platform: "darwin",
-		});
-		expect(
-			await host.review(ada.headers, code.userCode, ada.userId),
-		).toMatchObject({ hostAdmin: true, home: null });
 	}, 15_000);
 });
 
@@ -250,66 +189,41 @@ describe("one computer is one Device", () => {
 			"first",
 		]);
 	}, 15_000);
+});
 
-	test("a removed Device comes back with its access", async () => {
-		const { bob } = await adaAndBob();
-		await (await pair(bob, { deviceId: "first", machine: FINGERPRINT }))();
-		await host.registry.revoke("first");
-		const again = await pair(bob, {
-			deviceId: "new-install",
-			machine: FINGERPRINT,
-		});
-		expect(await again()).toMatchObject({ deviceId: "first" });
-		expect((await host.registry.get("first"))?.revokedAt).toBeNull();
-	}, 15_000);
-
-	test("another owner on the same computer never gets that Device", async () => {
+describe("the Caller of a keyed call", () => {
+	test("is the key with its Device as paired, and its Person's roles from the member rows", async () => {
 		const { ada, bob } = await adaAndBob();
-		await (await pair(bob, { deviceId: "bobs", machine: FINGERPRINT }))();
-		const adas = await pair(ada, { deviceId: "adas", machine: FINGERPRINT });
-		expect(await adas()).toMatchObject({ deviceId: "adas" });
-		expect((await host.registry.get("bobs"))?.ownerId).toBe(bob.userId);
-	}, 15_000);
-
-	test("another computer gets its own Device", async () => {
-		const { bob } = await adaAndBob();
-		await (await pair(bob, { deviceId: "first", machine: FINGERPRINT }))();
-		const other = await pair(bob, {
-			deviceId: "other",
-			machine: "b".repeat(64),
+		const platform = await people.auth.api.createOrganization({
+			headers: ada.headers,
+			body: { name: "Shared", slug: "shared" },
 		});
-		expect(await other()).toMatchObject({ deviceId: "other" });
-	}, 15_000);
-
-	test("a Device that says no computer gets its own Device", async () => {
-		const { bob } = await adaAndBob();
-		await (await pair(bob, { deviceId: "first", machine: FINGERPRINT }))();
-		const other = await pair(bob, { deviceId: "other" });
-		expect(await other()).toMatchObject({ deviceId: "other" });
-	}, 15_000);
-
-	test("a pairing as a guest never uses the computer", async () => {
-		const { bob } = await adaAndBob();
-		await (await pair(bob, { deviceId: "first", machine: FINGERPRINT }))();
-		const guest = await pair(bob, {
-			deviceId: "other",
-			machine: FINGERPRINT,
-			home: false,
+		const spaceId = platform?.id ?? "";
+		await people.auth.api.addMember({
+			body: { userId: bob.userId, role: "viewer", organizationId: spaceId },
 		});
-		expect(await guest()).toMatchObject({ deviceId: "other" });
-	}, 15_000);
-
-	test("while the Night Shift of that Device is connected, the pairing is refused", async () => {
-		const { bob } = await adaAndBob();
-		await (await pair(bob, { deviceId: "first", machine: FINGERPRINT }))();
-		await host.registry.seen("first");
-		const again = await pair(bob, {
-			deviceId: "new-install",
-			machine: FINGERPRINT,
+		const key = await paired(bob.userId, "home");
+		const caller = await host.admit(key, "sync");
+		expect(caller).toMatchObject({
+			...key,
+			device: { name: "home", homeHost: "https://studio.invalid" },
 		});
-		await expect(again()).rejects.toThrow(
-			"Night Shift on this computer is connected to Studio as LE2316. Quit it, then pair again.",
+		expect(await caller.spaces()).toContain(spaceId);
+		expect(await caller.roleIn(spaceId)).toBe("viewer");
+		expect(await caller.member("space-none")).toBe(false);
+		await expect(caller.may(spaceId, { run: ["start"] })).rejects.toMatchObject(
+			{
+				code: "FORBIDDEN",
+				message: ROLE_REFUSAL.message,
+			},
 		);
-		expect(await host.registry.get("new-install")).toBeNull();
-	}, 15_000);
+		const owner = await host.admit(await paired(ada.userId, "guest"), "sync");
+		await expect(
+			owner.may(spaceId, { run: ["start"] }),
+		).resolves.toBeUndefined();
+		await host.registry.revoke(key.deviceId);
+		await expect(host.admit(key, "sync")).rejects.toMatchObject({
+			code: "UNAUTHORIZED",
+		});
+	});
 });

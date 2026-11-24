@@ -7,11 +7,8 @@ import {
 	type Sandbox,
 } from "@nightshift/engine/testing";
 import { Refusal } from "@nightshift/refusal";
-import { ORPCError } from "@orpc/server";
 import {
 	type HostClient,
-	type SecretMove,
-	UNREADABLE_REQUEST,
 	type WorkReply,
 	type WorkRequest,
 	workRequestSchema,
@@ -23,17 +20,15 @@ import { admitEvery, partialHostClient } from "../testing";
 import { linksTo } from "../testing/host-in-memory";
 import { inMemoryHost } from "../testing/in-memory-host";
 import { createWorkHub, createWorkServer, type WorkHub } from "../work";
+import type { OwnSecrets } from "./moves";
 import {
-	createSecretMovesHost,
-	deviceSecretMoves,
 	NOT_HOME_FOR_MOVES,
 	NOT_YOUR_OTHER_DEVICE,
-	OLDER_HOST_MOVES,
 	ONLY_FOR_OWNER,
 	ONLY_FROM_HOME,
-	type OwnSecrets,
-	serveSecretCall,
-} from "./test-support";
+} from "./moves/domain/secret-moves";
+import { secretsOf } from "./test-support";
+import { wireSecrets } from "./wire";
 
 /**
  * A secret saved on another of the Person's Devices moves without anyone
@@ -170,7 +165,7 @@ async function laptop(options: { fail?: () => Error; personId?: string } = {}) {
 		projects: () => projects.port,
 	});
 	await store.setSecret("GH_TOKEN", "ghp_laptop");
-	const serve = serveSecretCall({
+	const { serve } = wireSecrets({
 		hostLinks: { home: async () => linkTo(HOST, options.personId) },
 		own: store,
 		ownerId: "local-ann",
@@ -212,13 +207,12 @@ async function until(check: () => boolean): Promise<void> {
 
 /** Ann's Mac, which asks through its Home Host with its own key. */
 function macThrough(client: HostClient) {
-	return deviceSecretMoves({
-		registry: { get: async () => null },
-		work: createWorkHub(),
+	return secretsOf({
+		db: sandbox.db,
 		hostLinks: { home: async () => linkTo(HOST) },
 		links: () => linksTo(new Map([[HOST, client]])),
 		ownerId: "local-ann",
-	});
+	}).ofDevices.moves;
 }
 
 /** The Home Host, with its hub and its router in memory. It is Ann's, and keeps secrets of its own (`own`). */
@@ -234,11 +228,14 @@ function homeHost(own?: OwnSecrets) {
 				? { device: { name: device.name, homeHost: device.homeHost } }
 				: {};
 		}),
-		secretMoves: createSecretMovesHost({
-			registry,
+		secretMoves: secretsOf({
+			db: sandbox.db,
+			devices: registry,
 			work: hub,
-			self: { id: "studio", ownerId: "ann", own },
-		}),
+			selfId: "studio",
+			ownerId: "ann",
+			own,
+		}).ofDevices.secretMoves,
 	});
 	return { hub, host };
 }
@@ -271,61 +268,6 @@ describe("moving a secret saved on another device", () => {
 			// Its own copy went after the save, and its document says so.
 			expect(device.keychain.values.has("GH_TOKEN")).toBe(false);
 			expect(device.names()).toEqual([]);
-		} finally {
-			detach();
-		}
-	});
-
-	test("into a project: the laptop saves it as its owner, then removes its copy", async () => {
-		const { hub, host } = homeHost();
-		const device = await laptop();
-		const detach = attach(hub, (request) =>
-			device.serve(request, { hostId: HOST }),
-		);
-		try {
-			await until(() => hub.online("laptop", "") === true);
-			const move: SecretMove = {
-				to: "project",
-				spaceId: "team",
-				projectId: "api",
-			};
-			await macThrough(host.client(keyOf("mac", "ann"))).move(
-				"laptop",
-				"GH_TOKEN",
-				move,
-			);
-			expect(device.projects.saved).toEqual([
-				{
-					project: { spaceId: "team", projectId: "api" },
-					name: "GH_TOKEN",
-					value: "ghp_laptop",
-					// The laptop's owner as the laptop knows them: its Host checks the role.
-					by: "local-ann",
-				},
-			]);
-			expect(device.keychain.values.has("GH_TOKEN")).toBe(false);
-			expect(device.names()).toEqual([]);
-		} finally {
-			detach();
-		}
-	});
-
-	test("Remove from the laptop: its copy and its name go", async () => {
-		const { hub, host } = homeHost();
-		const device = await laptop();
-		const detach = attach(hub, (request) =>
-			device.serve(request, { hostId: HOST }),
-		);
-		try {
-			await until(() => hub.online("laptop", "") === true);
-			await macThrough(host.client(keyOf("mac", "ann"))).move(
-				"laptop",
-				"GH_TOKEN",
-				{ to: "removed" },
-			);
-			expect(device.keychain.values.has("GH_TOKEN")).toBe(false);
-			expect(device.names()).toEqual([]);
-			expect(device.personal.kept.size).toBe(0);
 		} finally {
 			detach();
 		}
@@ -411,80 +353,6 @@ describe("moving a secret saved on another device", () => {
 		expect(device.keychain.values.get("GH_TOKEN")).toBe("ghp_laptop");
 		// A Walker's call of a run cannot carry one.
 		expect(workRequestSchema.safeParse(request).success).toBe(false);
-	});
-
-	test("an offline laptop is refused at once, in words for people", async () => {
-		const { host } = homeHost();
-		const mac = macThrough(host.client(keyOf("mac", "ann")));
-		expect(
-			await refusalOf(mac.move("laptop", "GH_TOKEN", { to: "personal" })),
-		).toBe("LE2316 is offline. Move it when LE2316 is online.");
-		expect(
-			await refusalOf(mac.move("laptop", "GH_TOKEN", { to: "removed" })),
-		).toBe("LE2316 is offline. Remove it when LE2316 is online.");
-	});
-
-	test("an older laptop cannot read the call: update it", async () => {
-		const { hub, host } = homeHost();
-		// A work server of an older version answers what it cannot read so.
-		const detach = attach(hub, async function* () {
-			yield { kind: "error", message: UNREADABLE_REQUEST };
-		});
-		try {
-			await until(() => hub.online("laptop", "") === true);
-			expect(
-				await refusalOf(
-					macThrough(host.client(keyOf("mac", "ann"))).move(
-						"laptop",
-						"GH_TOKEN",
-						{ to: "personal" },
-					),
-				),
-			).toBe("Update Night Shift on LE2316 to move its secrets from here.");
-		} finally {
-			detach();
-		}
-	});
-
-	test("an older Home Host does not know the call: update it", async () => {
-		const older = partialHostClient({
-			secrets: {
-				moveOnDevice: () =>
-					Promise.reject(new ORPCError("NOT_FOUND", { status: 404 })),
-			},
-		});
-		expect(
-			await refusalOf(
-				macThrough(older).move("laptop", "GH_TOKEN", { to: "personal" }),
-			),
-		).toBe(OLDER_HOST_MOVES);
-	});
-
-	test("on the Home Host itself, the call goes from its own hub", async () => {
-		const hub = createWorkHub();
-		const device = await laptop();
-		const detach = attach(hub, (request) =>
-			device.serve(request, { hostId: HOST }),
-		);
-		try {
-			await until(() => hub.online("laptop", "") === true);
-			const moves = deviceSecretMoves({
-				registry,
-				work: hub,
-				hostLinks: { home: async () => null },
-				links: () => linksTo(new Map()),
-				// The Host's owner, as its own registry knows them.
-				ownerId: "ann",
-			});
-			await moves.move("laptop", "GH_TOKEN", { to: "personal" });
-			expect(device.personal.kept.get("GH_TOKEN")).toBe("ghp_laptop");
-			// Bob's PC is not the owner's.
-			expect(
-				await refusalOf(moves.move("pc", "GH_TOKEN", { to: "personal" })),
-			).toBe(NOT_YOUR_OTHER_DEVICE);
-		} finally {
-			detach();
-		}
 	});
 
 	test("a secret on the Home Host computer moves there, for its owner only", async () => {

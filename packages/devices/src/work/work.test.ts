@@ -12,8 +12,8 @@ import { createSandbox, type Sandbox } from "@nightshift/engine/testing";
 import { now } from "@nightshift/time";
 import type { WorkReply, WorkRequest } from "../contract";
 import type { DeviceOffer } from "../devices/offers";
-import { createOfferAdmission } from "../devices/offers/test-support";
-import { selfOwnerId } from "../devices/registry/test-support";
+import { wireOffers } from "../devices/offers";
+import { wireRegistry } from "../devices/registry";
 import { httpsLink } from "../links/link";
 import { partialHostClient, withPeers } from "../testing";
 import { deviceDirectory } from "../wire-peers-directory";
@@ -244,9 +244,9 @@ describe("the work server", () => {
 				await ended;
 			},
 		} as unknown as Device;
-		const admission = createOfferAdmission({
+		const admission = wireOffers().createOfferAdmission({
 			db: sandbox.db,
-			selfOwnerId: () => selfOwnerId(sandbox.db),
+			selfOwnerId: () => wireRegistry({ db: sandbox.db }).readSelfOwner(),
 			device,
 			documents,
 			projects: engine.projects,

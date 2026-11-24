@@ -40,10 +40,7 @@ import { createHostLinks, type Link } from "../../links";
 import { httpsLink } from "../../links/link";
 import { type PairedReplicas, pairedReplicas } from "../../testing";
 import { MERGE_WORDS } from "./domain/words";
-import {
-	createHomeMembershipForTest as createHomeMembership,
-	type HomeMembershipDeps,
-} from "./test-support";
+import { type MembershipTestDeps, membershipOver } from "./test-support";
 
 const personalSpaceId = (
 	db: Parameters<typeof testSpaces>[0],
@@ -143,8 +140,8 @@ function online(options: { push?: boolean; synced?: () => boolean } = {}) {
 	return period;
 }
 
-function merger(link: Link, extra: Partial<HomeMembershipDeps> = {}) {
-	return createHomeMembership({
+function merger(link: Link, extra: Partial<MembershipTestDeps> = {}) {
+	return membershipOver({
 		db: b.db,
 		engine: paired.device,
 		links: {
@@ -167,7 +164,7 @@ function merger(link: Link, extra: Partial<HomeMembershipDeps> = {}) {
 }
 
 /** B's engine, with `before` called as a Space move puts its batch together. */
-function beforeBatch(before: () => void): HomeMembershipDeps["engine"] {
+function beforeBatch(before: () => void): MembershipTestDeps["engine"] {
 	return {
 		...paired.device,
 		moveProjects: (move) =>

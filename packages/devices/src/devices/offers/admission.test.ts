@@ -17,12 +17,12 @@ import type { WorkReply, WorkRequest } from "../../contract";
 import { createHostSpaces } from "../../links";
 import { deviceDirectory } from "../../wire-peers-directory";
 import { serveWork } from "../../work";
-import { selfOwnerId } from "../registry/test-support";
+import { wireRegistry } from "../registry";
 import type { OfferAdmission } from "./application/admit-offered-call";
 import { NO_STARTER } from "./domain/offered-call";
 import { createOfferedSessions } from "./domain/offered-sessions";
 import type { DeviceOffer } from "./domain/offers";
-import { createOfferAdmission } from "./test-support";
+import { wireOffers } from "./wire";
 
 /**
  * The offering Device's one admission, run against both paths a call of
@@ -174,9 +174,9 @@ beforeEach(async () => {
 	worktree = worktreeLocation(sandbox.repoPath, RUN.slice(0, 8)).worktreePath;
 	const runFolders = createRunFolders(sandbox.dataDir);
 	runFolder = runFolders.path(RUN);
-	admission = createOfferAdmission({
+	admission = wireOffers().createOfferAdmission({
 		db: sandbox.db,
-		selfOwnerId: () => selfOwnerId(sandbox.db),
+		selfOwnerId: () => wireRegistry({ db: sandbox.db }).readSelfOwner(),
 		device,
 		documents,
 		// Its Clone of the Space's project, and a project without a folder.

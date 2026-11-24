@@ -21,10 +21,18 @@ describe("findKeptDocumentOwner", () => {
 			homeHost: "https://h",
 			revokedAt: 1,
 		});
+		p.store.add({ id: "kept", ownerId: "person-ada", homeHost: "https://h" });
+		p.store.add({
+			id: "self",
+			self: true,
+			ownerId: "person-ada",
+			homeHost: "https://h",
+		});
 		const owner = findKeptDocumentOwner(p);
 		expect(await owner({ documentName: "device:guest" })).toBeNull();
 		expect(await owner({ documentName: "device:gone" })).toBeNull();
 		expect(await owner({ documentName: "device:nobody" })).toBeNull();
-		expect(await owner({ documentName: "space:b" })).toBeNull();
+		expect(await owner({ documentName: "device:self" })).toBeNull();
+		expect(await owner({ documentName: "spaces:kept" })).toBeNull();
 	});
 });

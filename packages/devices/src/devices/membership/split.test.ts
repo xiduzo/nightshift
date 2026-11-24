@@ -33,12 +33,8 @@ import { createDeviceExchange } from "../../exchange";
 import { createHostLinks, type Link } from "../../links";
 import { httpsLink } from "../../links/link";
 import { type PairedReplicas, pairedReplicas } from "../../testing";
-import { SPLIT_WORDS } from "./domain/words";
-import {
-	createHomeMembershipForTest as createHomeMembership,
-	type HomeMembershipDeps,
-	LEAVE_WORDS,
-} from "./test-support";
+import { LEAVE_WORDS, SPLIT_WORDS } from "./domain/words";
+import { type MembershipTestDeps, membershipOver } from "./test-support";
 
 const personalSpaceId = (
 	db: Parameters<typeof testSpaces>[0],
@@ -188,9 +184,9 @@ async function ready(link: Link) {
 /** B's membership of A, with `link` as its link to A. */
 function membershipOf(
 	link: Link | undefined,
-	extra: Partial<HomeMembershipDeps> = {},
+	extra: Partial<MembershipTestDeps> = {},
 ) {
-	return createHomeMembership({
+	return membershipOver({
 		db: b.db,
 		engine: paired.device,
 		links: {
@@ -213,7 +209,7 @@ function membershipOf(
 }
 
 /** B's membership without a link to A: A removed its access. */
-function splitter(extra: Partial<HomeMembershipDeps> = {}) {
+function splitter(extra: Partial<MembershipTestDeps> = {}) {
 	return membershipOf(undefined, extra);
 }
 
@@ -221,7 +217,7 @@ function splitter(extra: Partial<HomeMembershipDeps> = {}) {
 const home = { role: "home" } as const;
 
 /** B's engine, with `before` called as a Space move puts its batch together. */
-function beforeBatch(before: () => void): HomeMembershipDeps["engine"] {
+function beforeBatch(before: () => void): MembershipTestDeps["engine"] {
 	return {
 		...paired.device,
 		moveProjects: (move) =>

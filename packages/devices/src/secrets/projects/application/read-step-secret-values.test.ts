@@ -34,6 +34,23 @@ describe("readStepSecretValues", () => {
 		);
 	});
 
+	test("another Project or Space through this run is refused, with its step placed there", async () => {
+		const p = withRun();
+		p.work.placedRuns.add("device-a run-1");
+		p.places.projects.set("project-2", "space-1");
+		await p.store.set(step, "A_TOKEN", "value-a", "person-ada");
+		await expect(
+			readStepSecretValues(p)(callerOf(p.members), {
+				...step,
+				projectId: "project-2",
+			}),
+		).rejects.toThrow("This device has no step of that run now.");
+		p.places.runs.set("run-1", { walkerId: "device-a", ...step, spaceId: "x" });
+		await expect(
+			readStepSecretValues(p)(callerOf(p.members), step),
+		).rejects.toThrow("This device has no step of that run now.");
+	});
+
 	test("the Device that walks the run itself gets its Project's values, and the Space's wins", async () => {
 		const p = withRun();
 		p.places.runs.set("run-1", { walkerId: "device-a", ...step });
@@ -76,8 +93,11 @@ describe("readStepSecretValues", () => {
 	test("refuses a Project of a Space another Host keeps", async () => {
 		const p = withRun();
 		p.spaces.hosts.set("space-1", "host-2");
-		await expect(
-			readStepSecretValues(p)(callerOf(p.members), step),
-		).rejects.toBeInstanceOf(Refusal);
+		p.work.placedRuns.add("device-a run-1");
+		const refused = readStepSecretValues(p)(callerOf(p.members), step);
+		await expect(refused).rejects.toBeInstanceOf(Refusal);
+		await expect(refused).rejects.toThrow(
+			"This computer does not keep that project.",
+		);
 	});
 });

@@ -11,18 +11,18 @@ import { fsDatabaseCopy } from "./adapters/out/fs-database-copy";
 import {
 	createHomeMembership,
 	type HomeMembership,
-	type HomeMembershipDeps as RingHomeMembershipDeps,
+	type HomeMembershipDeps,
 } from "./application/create-home-membership";
-import type { MergeDeps } from "./application/merge-steps";
 import type { Batches } from "./application/ports";
-import type { SplitDeps } from "./application/split-steps";
 
 /**
- * Old factory shape for tests: pass `db` and the engine pieces; the
- * ports are built here.
+ * What a suite gives the membership: the database and the engine pieces.
+ * The ports are filled here as `wireMembership` fills them. The suites do
+ * not use `wireMembership`: it takes no waits (`syncWaitMs`, `pollMs`) and
+ * goes on with what stopped by itself.
  */
-export type LegacyHomeMembershipDeps = Omit<
-	RingHomeMembershipDeps,
+export type MembershipTestDeps = Omit<
+	HomeMembershipDeps,
 	| "record"
 	| "personalSpaces"
 	| "pairedDevices"
@@ -32,11 +32,7 @@ export type LegacyHomeMembershipDeps = Omit<
 	| "ids"
 	| "engineKernel"
 	| "isNotPaired"
-> & {
-	db: Database;
-	wait?: MergeDeps["wait"];
-	ids?: SplitDeps["ids"];
-};
+> & { db: Database };
 
 function batchesOf(db: Database): Batches {
 	return {
@@ -48,11 +44,9 @@ function batchesOf(db: Database): Batches {
 	};
 }
 
-/** Builds HomeMembership the way the old factory did, for the suite. */
-export function createHomeMembershipForTest(
-	deps: LegacyHomeMembershipDeps,
-): HomeMembership {
-	const { db, wait, ids, ...rest } = deps;
+/** The membership of this computer over `db`, with the waits of the test. */
+export function membershipOver(deps: MembershipTestDeps): HomeMembership {
+	const { db, ...rest } = deps;
 	const spaces = wireSpaces({ db });
 	return createHomeMembership({
 		...rest,
@@ -77,14 +71,14 @@ export function createHomeMembershipForTest(
 		},
 		databaseCopy: fsDatabaseCopy(db),
 		batches: batchesOf(db),
-		wait: wait ?? {
+		wait: {
 			sleep: (ms) =>
 				new Promise((resolve) => {
 					const timer = setTimeout(resolve, ms);
 					timer.unref?.();
 				}),
 		},
-		ids: ids ?? { spaceId: () => randomUUID() },
+		ids: { spaceId: () => randomUUID() },
 		engineKernel: {
 			nightShift: NIGHT_SHIFT,
 			isHostUnreachable: (error) => error instanceof HostUnreachableError,
@@ -92,8 +86,3 @@ export function createHomeMembershipForTest(
 		isNotPaired: (error) => error instanceof NotPairedError,
 	});
 }
-
-export type HomeMembershipDeps = LegacyHomeMembershipDeps;
-
-export { LEAVE_WORDS } from "./domain/words";
-export { createHomeMembership, type HomeMembership };
