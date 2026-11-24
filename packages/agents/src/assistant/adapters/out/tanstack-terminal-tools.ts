@@ -17,65 +17,30 @@
 import {
 	type Flow,
 	type FlowIssue,
-	type FlowPlace,
 	flowNameSchema,
 	flowSchema,
 	type JsonValue,
-	type ProjectFlowMap,
 	proposalIssues,
 } from "@nightshift/flows";
 import { toolDefinition } from "@tanstack/ai";
-import { type KnowledgePort, knowledgeTools } from "../../../knowledge";
+import { knowledgeTools } from "../../../knowledge";
 import type { BridgedTool } from "../../../port";
 import { asBridgedTools } from "../../../tools";
+import type { TerminalPort } from "../../application/terminal-resources";
 import { flowJson } from "../../catalog";
 import {
 	AUTHORING_TOOLS,
-	type AuthoringCliTool,
-	type AuthoringProfile,
-	type AuthoringSkill,
-	type AuthoringToolInfo,
 	errorsOf,
 	field,
 	flowRows,
 	issueLines,
 } from "../../domain/authoring";
-import type { TerminalRunPort } from "../../terminal";
 import {
 	chooseProject,
 	projectOfFolder,
 	type TerminalProject,
 } from "../../terminal";
 import { terminalRunTools } from "./terminal-run-tools";
-
-/** What the terminal tools read and write: Night Shift on this computer. */
-export type TerminalPort = TerminalRunPort &
-	KnowledgePort & {
-		/** The files of the project's knowledge, as its Space lists them: its MCP resources. */
-		knowledgeFiles(
-			projectId: string,
-		): Promise<{ path: string; size: number }[]>;
-		projects(): Promise<TerminalProject[]>;
-		flows(projectId: string): Promise<ProjectFlowMap>;
-		/** The profiles a node of the project may name, each on its Device. */
-		profiles(projectId: string): Promise<AuthoringProfile[]>;
-		tools(): Promise<{
-			clis: AuthoringCliTool[];
-			connections: AuthoringToolInfo[];
-		}>;
-		skills(projectId: string): Promise<AuthoringSkill[]>;
-		/** The place the project's flow `name` is checked in, as the editor checks it. */
-		place(projectId: string, name?: string): Promise<FlowPlace>;
-		/** Saves the flow as a new revision. Returns its issues as saved. */
-		saveFlow(projectId: string, name: string, flow: Flow): Promise<FlowIssue[]>;
-		startRun(
-			projectId: string,
-			flowName: string,
-			inputs: Record<string, JsonValue>,
-		): Promise<{ id: string; status: string }>;
-		/** Where a person opens the flow in Night Shift. */
-		flowLink(projectId: string, name: string): string;
-	};
 
 export type TerminalToolOptions = {
 	/** The project to work in: an id, a name or a folder. */

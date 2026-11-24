@@ -4,6 +4,7 @@
  */
 
 export type { AssistantVia } from "./application/explain-run";
+export type { TerminalPort } from "./application/terminal-resources";
 export type { ChatExchange } from "./catalog";
 export { chatCanUseTools, resumesOnAnotherModel } from "./catalog";
 export type {
@@ -12,6 +13,6 @@ export type {
 	AuthoringRunStep,
 } from "./domain/authoring";
 export type { HistoryPort } from "./domain/history-port";
-export type { TerminalPort, TerminalProject } from "./terminal";
+export type { TerminalProject } from "./terminal";
 export { chooseProject } from "./terminal";
 export { wireAssistant } from "./wire";

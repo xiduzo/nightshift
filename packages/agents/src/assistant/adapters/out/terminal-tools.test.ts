@@ -10,11 +10,12 @@ import {
 import { iso } from "@nightshift/time";
 import { utc } from "@nightshift/time/testing";
 import { serveTools, terminalResources } from "../../../bound-assistant";
+import type { TerminalPort } from "../../application/terminal-resources";
 import type {
 	TerminalGate,
 	TerminalRunSummary,
 } from "../../terminal/domain/terminal-runs";
-import { type TerminalPort, terminalTools } from "./tanstack-terminal-tools";
+import { terminalTools } from "./tanstack-terminal-tools";
 
 const flow: Flow = flowSchema.parse({
 	version: FLOW_VERSION,

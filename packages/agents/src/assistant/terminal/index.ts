@@ -7,7 +7,6 @@ export {
 	mimeOfKnowledgePath,
 	parseKnowledgeUri,
 } from "./domain/terminal-knowledge";
-export type { TerminalPort } from "./domain/terminal-port";
 export type { TerminalProject } from "./domain/terminal-project";
 export { chooseProject, projectOfFolder } from "./domain/terminal-project";
 export type { TerminalRunPort } from "./domain/terminal-runs";
