@@ -175,3 +175,18 @@ Each entry names its source. "Read" means found by reading and not reproduced.
   one in `tool-edits` that ran against the wrong test.
 - What stays, and what frees it, is in the ledger of the lane. The main causes are cycles
   (`knowledge/files`, map, secrets) and ports that the wire composes.
+
+### M0. Design of the data rewrite (read only, not built)
+
+- The whole flow upgrader is 684 source lines. The rewrite needs a job, undo files, three
+  doors for late rows and a report. The upgrader stays behind those doors after the strict
+  release. So the rewrite adds code until a last release that has no date.
+- An old row can arrive at any time from a computer that was offline. "Once" is not possible.
+- A full database restore on the Host is unsafe: the Walker counts again from a lower number,
+  and the peers drop its new events without a message.
+- `version < 9` is the wrong test for old data. Some version 9 values also need the migration.
+  Without it, a node with `tools: ["github"]` loses the tool without a message.
+- D0 said that projects without `folder` disappear. Too strong: the rows stay, but they stop
+  following the document, and a new Device gets none.
+- The orchestrator advised the rewrite before this design. Now it advises against it. The
+  owner has not answered yet, and nothing is built.
