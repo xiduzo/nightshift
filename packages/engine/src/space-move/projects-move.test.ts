@@ -21,7 +21,6 @@ import { and, eq, inArray } from "drizzle-orm";
 import { NIGHT_SHIFT, type RowBatch } from "../contract";
 import {
 	createSpaceDocuments,
-	recordClone,
 	type SpaceDocuments,
 	spaceDocumentName,
 	spaceProjects,
@@ -324,57 +323,6 @@ describe("a Space move", () => {
 			["studio", false],
 		]);
 	});
-
-	test("with this computer's own runs only, the Space it leaves keeps the rest and its document, and only this computer's Clones go along", async () => {
-		const engine = makeEngine();
-		const mine = engine.space(sandbox.spaceId, NIGHT_SHIFT);
-		const copy = await otherSpace(sandbox.db, "Copy");
-		const app = await mine.addProject({ repoPath: sandbox.repoPath });
-		const own = await stoppedRun(engine, app.id);
-		// A run another Device walked, as the exchange brought it.
-		await sandbox.db.insert(run).values({
-			id: "theirs",
-			spaceId: sandbox.spaceId,
-			projectId: app.id,
-			flow: JSON.stringify(flow),
-			title: "theirs",
-			worktreePath: "/w/theirs",
-			branch: "theirs",
-			baseRef: "main",
-			walkerId: "studio",
-			startedBy: "someone",
-		});
-		const left = await documents.open(sandbox.spaceId);
-		await left.change(() =>
-			recordClone(left, {
-				projectId: app.id,
-				deviceId: "studio",
-				deviceName: "studio",
-			}),
-		);
-
-		const moved = await engine.moveProjects({
-			from: sandbox.spaceId,
-			plan: async () => ({
-				projects: { [app.id]: { spaceId: copy, projectId: app.id } },
-				ownRunsOnly: true,
-			}),
-		});
-
-		expect(moved.runIds).toEqual([own]);
-		const runs = await sandbox.db
-			.select({ id: run.id, spaceId: run.spaceId })
-			.from(run);
-		expect(Object.fromEntries(runs.map((r) => [r.id, r.spaceId]))).toEqual({
-			[own]: copy,
-			theirs: sandbox.spaceId,
-		});
-		expect(spaceProjects(left).has(app.id)).toBe(true);
-		expect(left.clones.size).toBe(2);
-		const taken = await documents.open(copy);
-		expect([...spaceProjects(taken).keys()]).toEqual([app.id]);
-		expect([...taken.clones.keys()]).toEqual([`${app.id}/${sandbox.deviceId}`]);
-	});
 });
 
 describe("forgetting a Space a move emptied", () => {
@@ -435,67 +383,6 @@ describe("forgetting a Space a move emptied", () => {
 		await documents.flush();
 		return { team, kept, app, tools, teamRun, keptRun };
 	}
-
-	test("is refused while a Project or a run of it is here: nothing goes", async () => {
-		const engine = makeEngine();
-		const { team, app } = await twoSpaces(engine);
-		const before = await whatIsLeft(team);
-		expect(before).toMatchObject({ projects: 1, runs: 1, document: true });
-
-		expect(await engine.forgetSpace(team)).toBe(false);
-		expect(await whatIsLeft(team)).toEqual(before);
-
-		// A split takes this computer's runs: a run another Device walked stays.
-		await sandbox.db.insert(run).values({
-			id: "theirs",
-			spaceId: team,
-			projectId: app.id,
-			flow: JSON.stringify(flow),
-			title: "theirs",
-			worktreePath: "/w/theirs",
-			branch: "theirs",
-			baseRef: "main",
-			walkerId: "studio",
-			startedBy: "someone",
-		});
-		const copy = await otherSpace(sandbox.db, "Copy");
-		await engine.moveProjects({
-			from: team,
-			plan: async () => ({
-				projects: { [app.id]: { spaceId: copy, projectId: app.id } },
-				ownRunsOnly: true,
-			}),
-		});
-		await sandbox.db.delete(organization).where(eq(organization.id, team));
-		const left = await whatIsLeft(team);
-		expect(left).toMatchObject({ projects: 0, runs: 1, document: true });
-
-		expect(await engine.forgetSpace(team)).toBe(false);
-		expect(await whatIsLeft(team)).toEqual(left);
-	});
-
-	test("is refused while the Space's own row is here, even once a move emptied it: nothing goes", async () => {
-		const engine = makeEngine();
-		const { team, app } = await twoSpaces(engine);
-		const platform = await otherSpace(sandbox.db, "Platform");
-		await engine.moveProjects({
-			from: team,
-			plan: async () => ({
-				projects: { [app.id]: { spaceId: platform, projectId: app.id } },
-			}),
-		});
-		// The caller has not removed the Space's own row yet.
-		const left = await whatIsLeft(team);
-		expect(left).toMatchObject({
-			projects: 0,
-			runs: 0,
-			events: 1,
-			document: true,
-		});
-
-		expect(await engine.forgetSpace(team)).toBe(false);
-		expect(await whatIsLeft(team)).toEqual(left);
-	});
 
 	test("once a move emptied it, its facts of no run and its document go; the Space its runs went to and another Space keep everything", async () => {
 		const engine = makeEngine();

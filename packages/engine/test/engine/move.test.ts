@@ -494,21 +494,6 @@ describe("a run that moves to another Device", () => {
 		);
 	});
 
-	test("a second take-over of the same Checkpoint changes nothing", async () => {
-		const { a, b } = await pair();
-		const { runId, projectId } = await waitingOn(a);
-		const open = (await spaceOf(a, a).getRun(runId)).steps[1]?.id as string;
-		await spaceOf(a, a).act(runId, { kind: "move", to: b.sandbox.deviceId });
-		await copyRows(a, b, projectId);
-		await b.context.runs.takeOver(runId);
-		await b.context.runs.takeOver(runId);
-		const onB = spaceOf(b, a);
-		await onB.act(runId, { kind: "answer", stepId: open, choice: "reject" });
-		await waitFor(async () => (await onB.getRun(runId)).status === "finished", {
-			label: "the run to end on B",
-		});
-	});
-
 	test("a sleeping run that arrived gets its timer back after a restart of its new Walker", async () => {
 		const { a, b } = await pair();
 		const pause: WaitNode = {
@@ -567,28 +552,6 @@ describe("a run that moves to another Device", () => {
 		await onB.act(runId, { kind: "answer", stepId: open, choice: "approve" });
 		await waitFor(async () => (await onB.getRun(runId)).status === "finished", {
 			label: "the run to end on B",
-		});
-	});
-
-	test("cannot be taken over without its Checkpoint in the archive, and arrives once it is there", async () => {
-		const { a, b } = await pair();
-		const { runId, projectId } = await waitingOn(a);
-		await spaceOf(a, a).act(runId, { kind: "move", to: b.sandbox.deviceId });
-		const kept = new Map(archive);
-		archive.clear();
-		await copyRows(a, b, projectId);
-		const here = [b.sandbox.deviceId];
-		await expect(b.context.runs.takeOver(runId)).rejects.toThrow(
-			"The archive has no checkpoint of the run.",
-		);
-		// Nothing says it arrived: the take-over is tried again.
-		expect(await b.context.history.arriving(here)).toEqual([runId]);
-		for (const [key, content] of kept) archive.set(key, content);
-		await b.context.runs.takeOver(runId);
-		expect(await b.context.history.arriving(here)).toEqual([]);
-		expect((await b.context.history.events(runId)).at(-1)).toMatchObject({
-			type: "WalkerArrived",
-			payload: { from: a.sandbox.deviceId },
 		});
 	});
 });

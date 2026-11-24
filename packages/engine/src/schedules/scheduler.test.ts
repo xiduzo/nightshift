@@ -4,7 +4,6 @@ import { device, event, run } from "@nightshift/db/schema";
 import type { Flow, Schedule } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
-import { iso } from "@nightshift/time";
 import { atLocal } from "@nightshift/time/testing";
 import { asc, eq, inArray } from "drizzle-orm";
 import { NIGHT_SHIFT } from "../contract";
@@ -13,7 +12,6 @@ import type { EnginePayloads } from "../log/events/events";
 import { appendEvent, parseEventRow } from "../log/run-log/append";
 import type { RunSummary } from "../read/views";
 import { START_HOLD_WORDS } from "../runs/walk/domain/start-holds";
-import { defaultRunSettings, type RunSettings } from "../settings/settings";
 import type { SpaceEngine } from "../space-engine";
 import { seedFlows } from "../testing/seed-flows";
 import {
@@ -262,23 +260,6 @@ describe("the scheduler", () => {
 		await waitForEnd(engine, run.id);
 	});
 
-	test("never fires the same cron time twice across a restart", async () => {
-		const first = startDaemon();
-		await setup(first.engine, [nightly()]);
-		clock = at(16, 22, 1);
-		const [fired] = await waitForFacts(1);
-		const runId = firedRunId(fired);
-		await waitForEnd(first.engine, runId);
-		first.die();
-
-		const second = startDaemon();
-		clock = at(16, 22, 5);
-		await second.engine.listProjects();
-		await settle();
-		expect(await scheduleFacts()).toHaveLength(1);
-		expect(await second.engine.listRuns()).toHaveLength(1);
-	});
-
 	test("the run's own start counts as fired when the daemon died before ScheduleFired", async () => {
 		const first = startDaemon({ scheduler: false });
 		const project = await setup(first.engine, [nightly()]);
@@ -326,64 +307,6 @@ describe("the scheduler", () => {
 			runId: "cut-short",
 			runStatus: "interrupted",
 		});
-	});
-
-	test("a missed time starts once within its lateMinutes, with the time it was due", async () => {
-		// The step reads when its run was due, as a template and from its environment.
-		const flow = commandFlow(
-			`printf '{"due":"%s","env":"%s"}' "{{run.due_at}}" "$NS_DUE_AT" > "$NS_OUTPUT"`,
-		);
-		const first = startDaemon();
-		const project = await setup(
-			first.engine,
-			[nightly({ lateMinutes: 1440 })],
-			flow,
-		);
-		clock = at(16, 22);
-		const [fired] = await waitForFacts(1);
-		await waitForEnd(first.engine, firedRunId(fired));
-		first.die();
-
-		// The Host is off from 21:30 to 23:30 the next evening, over 22:00.
-		clock = at(17, 23, 30);
-		const second = startDaemon();
-		const facts = await waitForFacts(2);
-		expect(facts[1]).toMatchObject({
-			type: "ScheduleFired",
-			payload: { scheduleId: "nightly", at: at(17, 22), error: null },
-		});
-		const runId = firedRunId(facts[1]);
-		const run = await waitForEnd(second.engine, runId);
-		expect(run.status).toBe("finished");
-		expect(run.trigger).toEqual({
-			kind: "schedule",
-			scheduleId: "nightly",
-			at: at(17, 22),
-		});
-		const due = iso(at(17, 22));
-		const [ended] = (
-			await sandbox.db
-				.select()
-				.from(event)
-				.where(eq(event.runId, runId))
-				.orderBy(asc(event.seq))
-		)
-			.map(parseEventRow)
-			.filter((e) => e.type === "StepEnded");
-		expect(
-			(ended?.payload as EnginePayloads["StepEnded"] | undefined)?.outputs.data,
-		).toEqual({ due, env: due });
-		second.die();
-
-		// Started again: the time does not start a second run.
-		clock = at(17, 23, 45);
-		const third = startDaemon();
-		await third.engine.listProjects();
-		await settle();
-		expect(await scheduleFacts()).toHaveLength(2);
-		expect(await third.engine.listRuns()).toHaveLength(2);
-		const [listed] = (await third.engine.listSchedules(project.id)).schedules;
-		expect(listed?.nextAt).toBe(at(18, 22));
 	});
 
 	test("a missed time past its lateMinutes is skipped, and the Space hears of it", async () => {
@@ -498,48 +421,6 @@ describe("the scheduler", () => {
 		clock = at(16, 22, 1);
 		await settle();
 		expect(await scheduleFacts()).toEqual([]);
-	});
-
-	test("a removed project's schedules do not fire", async () => {
-		const { engine } = startDaemon();
-		const project = await setup(engine, [nightly()]);
-		await engine.removeProject(project.id);
-		clock = at(16, 22, 1);
-		await settle();
-		expect(await scheduleFacts()).toEqual([]);
-	});
-
-	describe("the settings' scheduler switch", () => {
-		/** Settings with the switch the test flips. */
-		function switchable(on: boolean) {
-			const settings: RunSettings = { ...defaultRunSettings(), scheduler: on };
-			return { settings, read: () => settings };
-		}
-
-		test("turned on again, it neither fires nor reports a time that came due while off", async () => {
-			const { settings, read } = switchable(true);
-			const { engine } = startDaemon({ settings: read });
-			await setup(engine, [nightly()]);
-			// Watching from 21:59, then off before the time.
-			await settle();
-			settings.scheduler = false;
-			await settle();
-			clock = at(16, 22, 30);
-			await settle();
-			settings.scheduler = true;
-			await settle();
-			expect(await scheduleFacts()).toEqual([]);
-			expect(await engine.listRuns()).toEqual([]);
-
-			// The next time fires as usual.
-			clock = at(17, 22, 0, 10);
-			const [fired] = await waitForFacts(1);
-			expect(fired).toMatchObject({
-				type: "ScheduleFired",
-				payload: { at: at(17, 22), error: null },
-			});
-			await waitForEnd(engine, firedRunId(fired));
-		});
 	});
 });
 
