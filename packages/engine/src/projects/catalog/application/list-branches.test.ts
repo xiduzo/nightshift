@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { allowing } from "../../../access/adapters/out/in-memory-access";
 import type { Actor } from "../../../contract";
 import { NOT_ON_THIS_COMPUTER, PROJECT_NOT_FOUND } from "../../keep";
 import { inMemoryCatalogPorts } from "../adapters/out/in-memory-neighbours";
@@ -50,5 +51,14 @@ describe("listBranches", () => {
 		await expect(
 			listBranches(ports)(ADA, { spaceId: "s2", projectId: "p1" }),
 		).rejects.toThrow(PROJECT_NOT_FOUND);
+	});
+
+	test("every Member of the Space may, whatever the role, and nobody else", async () => {
+		const ports = inMemoryCatalogPorts();
+		expect(
+			await ports.access.whoMay("s1", (actor) =>
+				listBranches(ports)(actor, { spaceId: "s1", projectId: "p1" }),
+			),
+		).toEqual(allowing("owner", "admin", "member", "viewer"));
 	});
 });

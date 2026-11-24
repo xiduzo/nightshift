@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { asDate } from "@nightshift/time";
+import { allowing } from "../../../access/adapters/out/in-memory-access";
 import type { Actor } from "../../../contract";
 import { inMemoryCatalogPorts } from "../adapters/out/in-memory-neighbours";
 import { listProjects } from "./list-projects";
@@ -37,5 +38,14 @@ describe("listProjects", () => {
 			{ deviceId: "studio", deviceName: "Studio", thisDevice: false },
 		]);
 		expect(listed[1]).toMatchObject({ repoPath: null, clones: [] });
+	});
+
+	test("every Member of the Space may, whatever the role, and nobody else", async () => {
+		const ports = inMemoryCatalogPorts();
+		expect(
+			await ports.access.whoMay("s1", (actor) =>
+				listProjects(ports)(actor, { spaceId: "s1" }),
+			),
+		).toEqual(allowing("owner", "admin", "member", "viewer"));
 	});
 });
