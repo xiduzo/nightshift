@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { createDb, type Database } from "@nightshift/db";
 import { migrateDb } from "@nightshift/db/migrate";
 import { answerCost } from "@nightshift/db/schema";
+import { inMemoryAccess } from "../access/adapters/out/in-memory-access";
 import { NIGHT_SHIFT } from "../contract";
 import type { AnswerCost } from "./domain/answer-costs";
 import { type Assistant, wireAssistant } from "./wire";
@@ -17,7 +18,7 @@ type Replica = { db: Database; cases: Assistant };
 async function replica(): Promise<Replica> {
 	const db = createDb({ DATABASE_URL: ":memory:" });
 	await migrateDb(db);
-	return { db, cases: wireAssistant({ db }) };
+	return { db, cases: wireAssistant({ db, access: inMemoryAccess() }) };
 }
 
 const cost = (fields: Partial<AnswerCost> = {}): AnswerCost => ({

@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Database } from "@nightshift/db";
+import type { Access } from "../access";
 import { drizzleAnswerCostShare } from "./adapters/out/drizzle-answer-cost-share";
 import { drizzleAnswerCostStore } from "./adapters/out/drizzle-answer-cost-store";
 import { ingestServedAnswerCosts } from "./application/ingest-served-answer-costs";
@@ -19,6 +20,8 @@ import { takeSentAnswerCosts } from "./application/take-sent-answer-costs";
 /** What the engine gives assistant: what the real adapters stand on. */
 export type AssistantDeps = {
 	db: Database;
+	/** Who may read what the answers of a Space cost. */
+	access: Pick<Access, "openSpace">;
 };
 
 /** The use cases of assistant, bound to their ports. */
@@ -43,6 +46,7 @@ export type Assistant = {
 
 export function wireAssistant(deps: AssistantDeps): Assistant {
 	const ports = {
+		access: deps.access,
 		answerCostStore: drizzleAnswerCostStore(deps.db),
 		answerCostShare: drizzleAnswerCostShare(deps.db),
 		newKey: () => randomUUID(),

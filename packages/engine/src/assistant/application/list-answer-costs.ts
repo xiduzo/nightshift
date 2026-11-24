@@ -1,8 +1,10 @@
+import type { Access } from "../../access";
 import type { Actor } from "../../contract";
 import { type AnswerCost, knownAnswerCosts } from "../domain/answer-costs";
 import type { AnswerCostStore } from "./ports";
 
 export type ListAnswerCostsPorts = {
+	access: Pick<Access, "openSpace">;
 	answerCostStore: Pick<AnswerCostStore, "list">;
 };
 
@@ -12,12 +14,14 @@ export type ListAnswerCosts = { spaceId: string; since?: number };
 /**
  * What the answers of a Space cost, the oldest first, as this Replica has
  * them. An answer of an agent this version does not know is left out.
- * Who asks: the Spend page of the Space. It checks no role, as before:
- * the door checks that the Person is in the Space.
+ * Who asks: the Spend page of the Space. A Member of the Space may,
+ * whatever the role (`access.openSpace`).
  */
 export const listAnswerCosts =
 	(ports: ListAnswerCostsPorts) =>
-	async (_actor: Actor, request: ListAnswerCosts): Promise<AnswerCost[]> =>
-		knownAnswerCosts(
+	async (actor: Actor, request: ListAnswerCosts): Promise<AnswerCost[]> => {
+		await ports.access.openSpace(actor, { spaceId: request.spaceId });
+		return knownAnswerCosts(
 			await ports.answerCostStore.list(request.spaceId, request.since),
 		);
+	};

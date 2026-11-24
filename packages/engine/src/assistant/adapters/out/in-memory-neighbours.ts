@@ -1,3 +1,4 @@
+import { inMemoryAccess } from "../../../access/adapters/out/in-memory-access";
 import { inMemoryAnswerCostShare } from "./in-memory-answer-cost-share";
 import {
 	answerCostRecords,
@@ -15,6 +16,7 @@ export function inMemoryAssistantPorts() {
 	const records = answerCostRecords();
 	let keys = 0;
 	return {
+		access: inMemoryAccess(),
 		records,
 		answerCostStore: inMemoryAnswerCostStore(records),
 		answerCostShare: inMemoryAnswerCostShare(records),

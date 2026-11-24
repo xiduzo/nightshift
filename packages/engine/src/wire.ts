@@ -443,7 +443,7 @@ export function createEngine(
 	const gates = wireEngineGates({ db, access, walk, artifacts, views, now });
 
 	// --- answer costs (AC): `wire-answer-costs.ts` ---
-	const answerCosts = wireEngineAnswerCosts({ db });
+	const answerCosts = wireEngineAnswerCosts({ db, access });
 
 	// --- actions (R4): `wire-actions.ts` ---
 	// gives: acts.actions (the Space view), acts.runs (the engine)

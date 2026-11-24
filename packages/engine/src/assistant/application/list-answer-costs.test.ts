@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { type Actor, NIGHT_SHIFT } from "../../contract";
+import { allowing } from "../../access/adapters/out/in-memory-access";
+import type { Actor } from "../../contract";
 import { inMemoryAssistantPorts } from "../adapters/out/in-memory-neighbours";
 import type { KeptAnswerCost } from "../domain/answer-costs";
 import { listAnswerCosts } from "./list-answer-costs";
@@ -25,6 +26,7 @@ const kept = (key: string, fields: Partial<KeptAnswerCost> = {}) => ({
 describe("listAnswerCosts", () => {
 	test("the answers of the Space this version knows, the oldest first, since a time", async () => {
 		const ports = inMemoryAssistantPorts();
+		ports.access.members.join("space-a", "ada", "viewer");
 		await ports.answerCostStore.add(kept("k1", { at: 3_000 }));
 		await ports.answerCostStore.add(kept("k2", { at: 2_000 }));
 		await ports.answerCostStore.add(kept("k3", { agent: "decider" }));
@@ -42,17 +44,12 @@ describe("listAnswerCosts", () => {
 		expect(await ats(2_500)).toEqual([3_000]);
 	});
 
-	test("checks no role, as before: Night Shift and a Person read the same", async () => {
+	test("every Member of the Space may, whatever the role, and nobody else", async () => {
 		const ports = inMemoryAssistantPorts();
-		await ports.answerCostStore.add(kept("k1"));
-		const list = listAnswerCosts(ports);
-		expect(await list(NIGHT_SHIFT, { spaceId: "space-a" })).toEqual(
-			await list(
-				{ personId: "anyone", door: "device-key" },
-				{
-					spaceId: "space-a",
-				},
+		expect(
+			await ports.access.whoMay("space-a", (actor) =>
+				listAnswerCosts(ports)(actor, { spaceId: "space-a" }),
 			),
-		);
+		).toEqual(allowing("owner", "admin", "member", "viewer"));
 	});
 });
