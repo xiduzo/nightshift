@@ -1,4 +1,11 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import {
+	afterAll,
+	beforeAll,
+	describe,
+	expect,
+	setDefaultTimeout,
+	test,
+} from "bun:test";
 import {
 	mkdirSync,
 	mkdtempSync,
@@ -26,6 +33,10 @@ import {
  * `nightshift flows` end to end: the command runs in a project's folder
  * and reads and saves that project's flows in Night Shift on this computer.
  */
+
+// A test starts the command up to five times, at more than a second each on a
+// busy runner. At the default 5 seconds Bun also stops the daemon of this file.
+setDefaultTimeout(60_000);
 
 const root = mkdtempSync(join(tmpdir(), "nightshift-flows-cli-"));
 let daemon: Daemon;
