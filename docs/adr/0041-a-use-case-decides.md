@@ -63,6 +63,7 @@ slice or another package.
 
 - A use case that a door reaches keeps its check beside its work. That adds lines.
 - A review still judges a mapping: a literal in the call is enough to pass the check.
-- The list starts with 11 files: 6 forwards, 3 tests and 2 twins.
+- The list starts with 11 files: 6 forwards, 3 tests and 2 twins. The 2 twins left the list on
+  the same day: each has simple behaviour of its own.
 - Two ids of one type can swap in a wire. Such a call takes an object, or has a test through
   the wire.

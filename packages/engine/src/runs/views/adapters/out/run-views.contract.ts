@@ -27,6 +27,8 @@ export type RunViewsUnderTest = {
 	startedAt(runId: string, at: number): Promise<void>;
 	/** Appends an event to the run's log, at now. */
 	append(event: Omit<RunEvent, "at">): Promise<void>;
+	/** Tells the watchers of the run that a step, or its status, changed. */
+	changed(runId: string, stepId?: string): void;
 	/** The run's row, as access gives it. */
 	row(runId: string): Promise<RunRow>;
 	close(): Promise<void>;
@@ -43,7 +45,6 @@ type Saved = {
 /** The neighbours both adapters read: every Walker is this computer, and `saved` holds the transcripts. */
 function neighbours(saved: Saved): Omit<RunViewsNeighbours, "deviceId"> {
 	return {
-		harnessOf: () => undefined,
 		walkers: async (_spaceId, ids) =>
 			new Map(ids.map((id) => [id, { id, name: null, thisDevice: true }])),
 		pendingCommands: async () => new Map(),
@@ -121,8 +122,44 @@ export function runViewsContract(
 		test("the run page shows the steps the run log keeps", async () => {
 			await under.append(stepStarted("s1"));
 			const detail = await views.getRun(await under.row("r1"));
-			expect(detail.steps.map((s) => s.id)).toEqual(["s1"]);
+			expect(detail.steps).toMatchObject([
+				{
+					id: "s1",
+					nodeId: "a",
+					nodeType: "agent",
+					visit: 1,
+					endedAt: null,
+					outcome: null,
+					outputs: {},
+					error: null,
+					scope: null,
+					costUsd: 0,
+					device: null,
+				},
+			]);
 			expect(detail.status).toBe("running");
+			expect(await views.getStep(await under.row("r1"), "s1")).toMatchObject({
+				id: "s1",
+				nodeId: "a",
+				sessions: [],
+				items: [],
+			});
+		});
+
+		test("a step that ended shows its outcome and its outputs", async () => {
+			await under.append(stepStarted("s1"));
+			await under.append({
+				type: "StepEnded",
+				runId: "r1",
+				stepId: "s1",
+				payload: { outcome: "pass", outputs: { summary: "Done" }, error: null },
+			});
+			const step = await views.getStep(await under.row("r1"), "s1");
+			expect(step).toMatchObject({
+				outcome: "pass",
+				outputs: { summary: "Done" },
+			});
+			expect(step.endedAt).not.toBeNull();
 		});
 
 		test("a run's status and place come from one row and the run log", async () => {
@@ -408,6 +445,99 @@ export function runViewsContract(
 		test("a run that waits at no Gate has none in the inbox, open or answered", async () => {
 			expect(await views.listGates(under.spaceId)).toEqual([]);
 			expect(await views.listAnsweredGates(under.spaceId, 0)).toEqual([]);
+		});
+
+		test("an open Gate is in the inbox until it is answered", async () => {
+			await under.append(stepStarted("s1"));
+			await under.append({
+				type: "GateOpened",
+				runId: "r1",
+				stepId: "s1",
+				payload: { question: "Go on?", choices: [{ name: "yes" }] },
+			});
+			const gate = {
+				spaceId: under.spaceId,
+				runId: "r1",
+				runTitle: "r1",
+				projectId: "p",
+				projectName: "p",
+				stepId: "s1",
+				nodeId: "a",
+				question: "Go on?",
+				choices: [{ name: "yes" }],
+				urgency: "today",
+			};
+			expect(await views.listGates(under.spaceId)).toMatchObject([
+				{
+					...gate,
+					lockScreen: false,
+					deadline: null,
+					form: null,
+					walker: { thisDevice: true },
+					answerPending: false,
+					branchesWork: false,
+				},
+			]);
+			expect(await views.listAnsweredGates(under.spaceId, 0)).toEqual([]);
+
+			await under.append({
+				type: "Scored",
+				runId: "r1",
+				stepId: "s1",
+				payload: {
+					score: "gate_decision",
+					value: 1,
+					label: "yes",
+					by: "person",
+				},
+			});
+			await under.append({
+				type: "StepEnded",
+				runId: "r1",
+				stepId: "s1",
+				payload: { outcome: "yes", outputs: { note: "Fine." }, error: null },
+			});
+			expect(await views.listGates(under.spaceId)).toEqual([]);
+			expect(await views.listAnsweredGates(under.spaceId, 0)).toMatchObject([
+				{ ...gate, answeredBy: "person", answer: "yes", note: "Fine." },
+			]);
+			expect(
+				await views.listAnsweredGates(under.spaceId, now() + 60_000),
+			).toEqual([]);
+		});
+
+		test("a watch sends the transcript after the cursor, then each change", async () => {
+			const entry = (seq: number): TranscriptEntry => ({
+				seq,
+				stepId: "s1",
+				sessionId: null,
+				at: seq,
+				event: { type: "command-output", stream: "stdout", text: `${seq}` },
+			});
+			await under.append(stepStarted("s1"));
+			saved.whole.set("s1", [entry(1), entry(2)]);
+			const controller = new AbortController();
+			controllers.push(controller);
+			const stream = views.watch(await under.row("r1"), controller.signal, 1);
+			const next = async () => (await stream.next()).value;
+			expect(await next()).toMatchObject({ kind: "status" });
+			expect(await next()).toMatchObject({ kind: "step" });
+			expect(await next()).toEqual({ kind: "transcript", entry: entry(2) });
+
+			await under.append(stepStarted("s2"));
+			under.changed("r1", "s2");
+			expect(await next()).toMatchObject({ kind: "step", step: { id: "s2" } });
+
+			await under.append({
+				type: "RunEnded",
+				runId: "r1",
+				payload: { status: "finished", reason: null },
+			});
+			under.changed("r1");
+			expect(await next()).toEqual({ kind: "status", status: "finished" });
+			const last = stream.next();
+			controller.abort();
+			expect((await last).done).toBe(true);
 		});
 
 		test("a watch sends the run's status, then its steps", async () => {

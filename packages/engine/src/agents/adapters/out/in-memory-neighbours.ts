@@ -162,10 +162,9 @@ export function inMemoryAgentSetupPorts(
 		programs?: Record<string, string>;
 		checks?: Array<"signed_in" | "signed_out" | "unknown">;
 		here?: Partial<SetupHere>;
-		onStart?: Parameters<typeof inMemorySetupProcesses>[0];
 	} = {},
 ) {
-	const processes = inMemorySetupProcesses(over.onStart);
+	const processes = inMemorySetupProcesses();
 	return {
 		computerAccess: inMemoryComputer(),
 		processes,
@@ -186,10 +185,9 @@ export function inMemoryDeciderSetupPorts(
 		ollama?: Parameters<typeof inMemoryLocalOllama>[0];
 		here?: Partial<SetupHere>;
 		programs?: Record<string, string>;
-		onStart?: Parameters<typeof inMemorySetupProcesses>[0];
 	} = {},
 ) {
-	const processes = inMemorySetupProcesses(over.onStart);
+	const processes = inMemorySetupProcesses();
 	return {
 		computerAccess: inMemoryComputer(),
 		processes,

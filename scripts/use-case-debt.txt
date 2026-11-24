@@ -13,5 +13,3 @@ forward packages/devices/src/devices/registry/application/read-self-owner.ts
 empty-test packages/devices/src/devices/membership/application/create-home-membership.test.ts
 empty-test packages/devices/src/devices/membership/application/merge-steps.test.ts
 empty-test packages/devices/src/devices/membership/application/split-steps.test.ts
-twin packages/engine/src/agents/adapters/out/in-memory-setup-processes.ts
-twin packages/engine/src/runs/views/adapters/out/in-memory-run-views.ts

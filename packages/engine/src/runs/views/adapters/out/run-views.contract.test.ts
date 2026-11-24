@@ -3,7 +3,12 @@ import { migratedDb } from "@nightshift/db/testing";
 import { asDate, now } from "@nightshift/time";
 import { eq } from "drizzle-orm";
 import { runRecord } from "../../../../access/adapters/out/in-memory-run-records";
-import { createRunBus, createRunLog, getRunRow } from "../../../../log";
+import {
+	createRunBus,
+	createRunLog,
+	getRunRow,
+	type RunBus,
+} from "../../../../log";
 import { ownDevice } from "../../../../testing/alone-directory";
 import { localSpaceId } from "../../../../testing/test-support";
 import { drizzleRunViews } from "./drizzle-run-views";
@@ -15,6 +20,11 @@ import { runViewsContract } from "./run-views.contract";
  * libsql in memory: a migrated database, the run log and the bus over
  * it, and no folder and no git.
  */
+
+const change = (stepId?: string): Parameters<RunBus["publish"]>[1] =>
+	stepId === undefined
+		? { kind: "status-changed" }
+		: { kind: "step-changed", stepId };
 
 runViewsContract("in memory", async (neighbours) => {
 	const views = inMemoryRunViews(neighbours, THIS_COMPUTER);
@@ -40,6 +50,7 @@ runViewsContract("in memory", async (neighbours) => {
 		append: async (event) => {
 			views.append(event);
 		},
+		changed: (runId, stepId) => views.bus.publish(runId, change(stepId)),
 		async row(runId) {
 			const row = views.row(runId);
 			if (!row) throw new Error(`No run ${runId}.`);
@@ -55,13 +66,15 @@ runViewsContract(
 		const db = await migratedDb();
 		const deviceId = (await ownDevice(db)).id;
 		const spaceId = await localSpaceId(db);
+		const bus = createRunBus();
 		const log = createRunLog(db, { walkerId: deviceId, dataDir: "/nowhere" });
 		return {
 			views: drizzleRunViews({
 				db,
 				log,
-				bus: createRunBus(),
+				bus,
 				deviceId,
+				harnessOf: () => undefined,
 				...neighbours,
 			}),
 			spaceId,
@@ -92,6 +105,7 @@ runViewsContract(
 			async append(event) {
 				await log.append(event);
 			},
+			changed: (runId, stepId) => bus.publish(runId, change(stepId)),
 			row: (runId) => getRunRow(db, runId),
 			close: async () => {},
 		};
