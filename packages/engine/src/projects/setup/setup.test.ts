@@ -9,7 +9,10 @@ import {
 import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { inMemoryComputer } from "../../access/computer/adapters/out/in-memory-computer";
+import {
+	inMemoryComputer,
+	ONLY_THE_OWNER,
+} from "../../access/computer/adapters/out/in-memory-computer";
 import { type Git, systemGit } from "../../git";
 import { mustGit } from "../../testing/test-support";
 import { type ProjectReadiness, STARTER_GITIGNORE } from "./domain/readiness";
@@ -163,5 +166,29 @@ describe("the programs of the knowledge sources", () => {
 			kind: "manual",
 			url: "https://curl.se/download.html",
 		});
+	});
+});
+
+describe("installGit", () => {
+	test("starts the installer for the owner of this computer, and for no other Person", async () => {
+		const computer = inMemoryComputer();
+		let started = 0;
+		const setup = wireSetup({
+			computerAccess: computer,
+			installer: {
+				install: async () => {
+					started += 1;
+					return { kind: "started" };
+				},
+			},
+		});
+		expect(
+			await computer.whoMay(
+				(actor) => setup.installGit(actor),
+				() => started,
+			),
+		).toEqual(ONLY_THE_OWNER);
+		// The owner and Night Shift.
+		expect(started).toBe(2);
 	});
 });

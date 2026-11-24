@@ -314,6 +314,28 @@ describe("a local decider", () => {
 		]);
 	});
 
+	test("another Person gets no status, no install, no choice and no cancel", async () => {
+		const { service, state } = fakeOllama({ installed: false, answers: false });
+		const spawned = fakeSpawn();
+		const s = make(service, {
+			which: (p) => (p === "brew" ? "/opt/homebrew/bin/brew" : null),
+			spawn: spawned.spawn,
+		});
+		const computer = inMemoryComputer();
+		const asks: Record<string, (caller: typeof HERE) => unknown> = {
+			status: (caller) => s.status(caller),
+			installOllama: (caller) => s.installOllama(caller),
+			useLocal: (caller) => s.useLocal(caller),
+			useTypesafe: (caller) => s.useTypesafe("k", caller),
+			cancel: (caller) => s.cancel(caller),
+		};
+		for (const [name, ask] of Object.entries(asks)) {
+			const may = await computer.whoMay((actor) => ask({ here: true, actor }));
+			expect([name, may.another, may.owner]).toEqual([name, "no", "yes"]);
+		}
+		expect(state.pulls).toEqual([]);
+	});
+
 	test("a cancel stops the download", async () => {
 		const ollama = fakeOllama();
 		const s = make(ollama.service);

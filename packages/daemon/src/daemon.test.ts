@@ -5,7 +5,11 @@ import { join } from "node:path";
 import { daemonLease, project as projectTable } from "@nightshift/db/schema";
 import { hostInMemory } from "@nightshift/devices/testing";
 import type { Knowledge } from "@nightshift/engine";
-import { NIGHT_SHIFT, SpaceNotFound } from "@nightshift/engine";
+import {
+	NIGHT_SHIFT,
+	type PersonActor,
+	SpaceNotFound,
+} from "@nightshift/engine";
 import type { AgentSetup } from "@nightshift/engine/agents";
 import {
 	createSandbox,
@@ -16,6 +20,7 @@ import type { Flow } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
 import { eq } from "drizzle-orm";
 import { createDaemon, type Daemon, type DaemonOutside } from "./daemon";
+import * as http from "./http";
 import { type DaemonEnv, hot, processDatabase } from "./runtime";
 import type { SocketData } from "./sync";
 
@@ -200,6 +205,92 @@ describe("the daemon, wired in one process", () => {
 				here: true,
 			}),
 		).toThrow("Only the owner of this computer can see or change this.");
+	});
+
+	test("the owner of this computer, and no other Person, gets past each service behind the procedures", async () => {
+		dir = await mkdtemp(join(tmpdir(), "nightshift-daemon-"));
+		// What the composition gives the procedures, before any door.
+		const given = spyOn(http, "createHttp");
+		const daemon = await start(envIn(dir));
+		const services = given.mock.calls[0]?.[0];
+		given.mockRestore();
+		if (!services) throw new Error("The daemon made no HTTP.");
+		const { you, space } = await rpc<{ you: string; space: { id: string } }>(
+			daemon,
+			"members/list",
+		);
+		await processDatabase(daemon.info.databaseUrl)
+			.insert(projectTable)
+			.values({ id: "p1", spaceId: space.id, name: "P1", folder: false });
+		const { deviceConfig, connections, projectSetup, configUse } = services;
+		const inSpace = { spaceId: space.id, projectId: "p1" };
+		const secret = { name: "TOKEN", value: "v" };
+
+		/** What only the owner of this computer may ask. */
+		const ofComputer: Record<string, (actor: PersonActor) => unknown> = {
+			viewSettings: (a) => deviceConfig.viewSettings(a),
+			listFoundPrograms: (a) => deviceConfig.listFoundPrograms(a),
+			saveCliTool: (a) =>
+				deviceConfig.saveCliTool(a, {
+					name: "tool",
+					description: "A tool",
+					program: "tool",
+				} as Parameters<typeof deviceConfig.saveCliTool>[1]),
+			removeProfile: (a) => deviceConfig.removeProfile(a, { id: "none" }),
+			saveSecret: (a) => deviceConfig.saveSecret(a, secret),
+			secrets: (a) => connections.secrets(a),
+			agentStatus: (a) => services.agentSetup.status({ actor: a, here: false }),
+			deciderStatus: (a) =>
+				services.deciderSetup.status({ actor: a, here: false }),
+			installGit: (a) => projectSetup.installGit(a),
+			gitHubAccess: (a) => projectSetup.gitHub.access(a),
+			gitHubRepos: (a) => projectSetup.gitHub.repos(a),
+		};
+		/** What every Member of the Space may ask. */
+		const ofSpace: Record<string, (actor: PersonActor) => unknown> = {
+			saveSpaceSecret: (a) =>
+				deviceConfig.saveSpaceSecret(a, { spaceId: space.id, ...secret }),
+			saveProjectSecret: (a) =>
+				deviceConfig.saveProjectSecret(a, { project: inSpace, ...secret }),
+			spaceSecrets: (a) => connections.spaceSecrets(a, space.id),
+			projectSecrets: (a) => connections.projectSecrets(a, inSpace),
+			profilesInUse: (a) => configUse.profiles({ spaceId: space.id, actor: a }),
+			cliToolsInUse: (a) => configUse.cliTools({ spaceId: space.id, actor: a }),
+			spaceSecretsInUse: (a) =>
+				configUse.sharedSecrets({ spaceId: space.id, actor: a }, "space"),
+		};
+		const answers = async (asks: typeof ofSpace, personId: string) => {
+			const answered: Record<string, string> = {};
+			for (const [name, ask] of Object.entries(asks)) {
+				try {
+					await ask({ personId, door: "session" });
+					answered[name] = "answered";
+				} catch (error) {
+					answered[name] = (error as Error).name;
+				}
+			}
+			return answered;
+		};
+		const each = (asks: object, answer: string) =>
+			Object.fromEntries(Object.keys(asks).map((name) => [name, answer]));
+
+		// No program starts here: an installer opens a dialog of the OS.
+		const spawn = spyOn(Bun, "spawn").mockImplementation((() => {
+			throw new Error("A program started.");
+		}) as never);
+		try {
+			expect(await answers(ofComputer, "stranger")).toEqual(
+				each(ofComputer, "NotComputerOwner"),
+			);
+			expect(await answers(ofSpace, "stranger")).toEqual(
+				each(ofSpace, "SpaceNotFound"),
+			);
+			expect(await answers(ofSpace, you)).toEqual(each(ofSpace, "answered"));
+			const byOwner = Object.values(await answers(ofComputer, you));
+			expect(byOwner).not.toContain("NotComputerOwner");
+		} finally {
+			spawn.mockRestore();
+		}
 	});
 
 	test("its stop stops every slot and frees the lease: the next daemon starts fresh", async () => {
