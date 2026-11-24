@@ -489,8 +489,6 @@ describe("the Web pages kit with the step's reader", () => {
 				NS_KNOWLEDGE: knowledge,
 				NS_OUTPUT: output,
 				NS_WEB_PAUSE: "0",
-				// Never the public reader.
-				NS_WEB_READER: "http://127.0.0.1:9/",
 			},
 			stdout: "pipe",
 			stderr: "pipe",

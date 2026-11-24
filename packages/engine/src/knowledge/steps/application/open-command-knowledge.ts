@@ -19,8 +19,8 @@ export type OpenCommandKnowledge = { projectId: string; secret?: ReaderSecret };
  * A Command step starts: it holds the folder (a reconcile first), makes
  * it, and gives its path in `NS_KNOWLEDGE` with the project's page reader
  * (ADR 39). A folder that cannot be made is left out. A page reader that
- * cannot open leaves the step without it: the kit reads as before. `done`
- * closes the reader, then ends the hold.
+ * cannot open leaves the step without it: the Web pages source then reads
+ * nothing and says so. `done` closes the reader, then ends the hold.
  */
 export const openCommandKnowledge =
 	(ports: OpenCommandKnowledgePorts) =>

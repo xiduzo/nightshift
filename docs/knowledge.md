@@ -452,9 +452,7 @@ With `follow` set to `true`, `kit:knowledge/web` treats each address in
    those pages, and follows no link.
 4. Otherwise the kit follows the links of each page, breadth first, up to
    `depth`: every link the page reader saw on the page (`links` of the
-   step's reader), the navigation too. Without a step's reader, the
-   markdown links (`[text](address)`) of the page: absolute and
-   root-relative links count, other relative links do not.
+   step's reader), the navigation too.
 
 A page reader with a map of a site (Firecrawl) lists the pages of each
 start page's folder before step 2. A site it mapped needs no sitemap.
@@ -469,9 +467,7 @@ The kit reads one page at a time. It waits `NS_WEB_PAUSE` seconds between
 two pages (default 3): without a key, Jina Reader takes 20 requests a
 minute, and a site deserves a polite reader. Every request has the
 User-Agent `NightShift-knowledge/1 (+https://github.com/xiduzo/nightshift)`.
-It names the product, never the person. Without a step's reader,
-`NS_WEB_READER` sets the address of the reader (default
-`https://r.jina.ai/`). The tests point it at a local `Bun.serve` site.
+It names the product, never the person.
 
 Pages that leave the crawl leave the folder, but only after a whole crawl.
 A crawl removes nothing when:
@@ -550,10 +546,10 @@ A step that ended gets 410. A wrong token gets 401. The listener is one
 `Bun.serve` per process, like the tool bridge of `@nightshift/agents`: it
 keeps its state on `globalThis` across `bun --hot`, checks itself before
 each step and every 2 seconds while steps are open, and opens again on the
-same port. Without `NS_READER_URL` (a computer of an older version), the
-kit reads through `r.jina.ai` as before readers. A reader that does not
-answer fails the page. The kit never falls back to a third party on its
-own.
+same port. When the route does not open, the step has no `NS_READER_URL`:
+the kit reads nothing, and the step fails with a message that says what to
+do. A reader that does not answer fails the page. The kit reads only through
+the reader that a person chose.
 
 #### Change detection
 

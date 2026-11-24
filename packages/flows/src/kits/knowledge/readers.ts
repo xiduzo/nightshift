@@ -79,8 +79,8 @@ export const DEFAULT_PAGE_READER: PageReaderSetting = { kind: "nightshift" };
 /**
  * The variables a Command step of a project with knowledge gets for its
  * page reader: the address of this computer's reader for the step, and the
- * step's own token for it. Without them (an older Device), the Web pages
- * source reads as it did before.
+ * step's own token for it. Without them (the reader did not open), the Web
+ * pages source reads nothing and says so.
  */
 export const PAGE_READER_ENV = {
 	url: "NS_READER_URL",

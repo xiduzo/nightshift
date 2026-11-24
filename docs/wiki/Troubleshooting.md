@@ -139,6 +139,10 @@ A schedule's run starts on the Host, so the Host needs the project. A Host copie
 
 Search by meaning needs Ollama and its model. The Knowledge page tells you when search by meaning stopped. Start Ollama, or open **Settings → Night Shift's agents** and click **Download** in the **Search** table. See [Search](Knowledge.md#search).
 
+### "The page reader on this computer did not open"
+
+The sync read no page, and the pages keep their last copy. Sync the source again. If it fails again, restart Night Shift on the computer that syncs.
+
 ## From source
 
 ### `nightshift: command not found`

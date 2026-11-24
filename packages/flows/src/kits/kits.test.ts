@@ -106,11 +106,6 @@ exit "$code"
  */
 const CURL_STUB = `#!/bin/sh
 printf '%s\\n' "curl $*" >> "$STUB_LOG"
-case "$*" in
-	*timeout.example*) exit 22 ;;
-	*gone.example*) printf 'Title: Page Not Found\\n\\nWarning: Target URL returned error 404: Not Found\\n\\nMarkdown Content:\\nGone.\\n'; exit 0 ;;
-	*bot.example*) printf 'Title: Just a moment...\\n\\nWarning: This page maybe requiring CAPTCHA, please make sure you are authorized to access this page.\\n\\nMarkdown Content:\\nWait.\\n'; exit 0 ;;
-esac
 cat "$STUB_FIXTURES/curl.out"
 `;
 
@@ -1132,77 +1127,14 @@ describe("the knowledge kits", () => {
 		});
 	});
 
-	test("web: each page through the reader, named after its address", async () => {
-		await writeFile(join(fixtures, "curl.out"), "Title: Docs\n\nThe docs.");
-		const ran = await step(kit("kit:knowledge/web"), "sync", {
-			urls: "https://example.com/docs?page=1\nhttps://example.org",
-		});
-		expect(ran.outcome).toBe("synced");
-		expect(ran.data).toEqual({ files: 2, skipped: "" });
-		expect(await read("web/example.com-docs-page-1.md")).toBe(
-			"Title: Docs\n\nThe docs.",
-		);
-		expect(await calls()).toEqual([
-			"curl -fsL --max-time 120 -A NightShift-knowledge/1 (+https://github.com/xiduzo/nightshift) https://r.jina.ai/https://example.com/docs?page=1",
-			"curl -fsL --max-time 120 -A NightShift-knowledge/1 (+https://github.com/xiduzo/nightshift) https://r.jina.ai/https://example.org",
-		]);
-	});
-
-	test("web: a page that cannot be read does not stop the others", async () => {
-		await writeFile(join(fixtures, "curl.out"), "Title: Docs\n\nThe docs.");
-		const ran = await step(kit("kit:knowledge/web"), "sync", {
-			urls: "https://timeout.example\nhttps://gone.example\nhttps://bot.example\nhttps://example.org",
-		});
-		expect(ran.outcome).toBe("synced");
-		expect(ran.data).toEqual({
-			files: 1,
-			skipped:
-				". Could not read: https://timeout.example https://gone.example https://bot.example",
-		});
-		expect(ran.log).toContain(
-			"Could not read https://timeout.example: the page did not load.",
-		);
-		expect(ran.log).toContain(
-			"Could not read https://gone.example: the page is gone or blocks readers.",
-		);
-		expect(await read("web/example.org.md")).toBe("Title: Docs\n\nThe docs.");
-		expect(await readdir(join(knowledge, "web"))).toEqual(["example.org.md"]);
-	});
-
-	test("web: a page that cannot be read keeps its last copy", async () => {
-		await mkdir(join(knowledge, "web"), { recursive: true });
-		await writeFile(join(knowledge, "web/gone.example.md"), "The last copy.");
-		await writeFile(join(fixtures, "curl.out"), "Title: Docs");
-		const ran = await step(kit("kit:knowledge/web"), "sync", {
-			urls: "https://gone.example\nhttps://example.org",
-		});
-		expect(ran.outcome).toBe("synced");
-		expect(await read("web/gone.example.md")).toBe("The last copy.");
-	});
-
-	test("web: fails when it reads no page, and says which ones", async () => {
-		const flow = kit("kit:knowledge/web");
-		const ran = await step(flow, "sync", {
-			urls: "https://timeout.example\nhttps://bot.example",
-		});
-		expect(ran.outcome).toBe("fail");
-		expect(ran.log).toContain("Could not read https://timeout.example");
-		expect(ran.log).toContain("Could not read https://bot.example");
-		const end = flow.nodes.find((node) => node.id === "not_synced");
-		expect(end).toMatchObject({
-			message: "Could not read any page. {{sync.log_tail}}",
-		});
-	});
-
 	/**
 	 * Follow links, against a small site on this computer: `Bun.serve`
-	 * answers as the site (robots.txt, sitemaps) and as the reader
-	 * (`/reader/<address>`, markdown in the reader's format). Real curl, no
-	 * stub: `NS_WEB_READER` points the kit at it.
+	 * answers as the site (robots.txt, sitemaps) and as the step's page
+	 * reader (`/reader/step/read`, `links` and `map`). Real curl, no stub.
 	 */
 	describe("web: follow links", () => {
 		type Site = {
-			/** Markdown by path. A path not here is gone: the reader warns. */
+			/** Markdown by path. A path not here is gone. */
 			pages: Record<string, string>;
 			/** Files the site serves itself, by path. */
 			files: Record<string, string>;
@@ -1210,7 +1142,7 @@ describe("the knowledge kits", () => {
 		let site: Site = { pages: {}, files: {} };
 		/** What the reader read, as paths. */
 		let reads: string[] = [];
-		/** Every User-Agent the server saw. */
+		/** Every User-Agent the site saw. */
 		let agents: Set<string> = new Set();
 		let server: ReturnType<typeof Bun.serve>;
 		let base = "";
@@ -1222,24 +1154,33 @@ describe("the knowledge kits", () => {
 				port: 0,
 				hostname: "127.0.0.1",
 				fetch(request) {
-					agents.add(request.headers.get("user-agent") ?? "");
-					const marker = "/reader/";
-					const at = request.url.indexOf(marker);
-					if (at >= 0) {
-						const target = request.url.slice(at + marker.length);
+					const url = new URL(request.url);
+					if (url.pathname.startsWith("/reader/step/")) {
+						const target = url.searchParams.get("url") ?? "";
 						const path = new URL(target).pathname;
-						reads.push(path);
-						const page = site.pages[path];
-						if (page === undefined) {
-							return new Response(
-								`Title: Not Found\n\nURL Source: ${target}\n\nWarning: Target URL returned error 404: Not Found\n\nMarkdown Content:\nGone.\n`,
-							);
+						const page = site.pages[path]?.replaceAll("BASE", base);
+						switch (url.pathname.replace("/reader/step/", "")) {
+							case "map":
+								return new Response(null, { status: 204 });
+							case "links":
+								return new Response(
+									[...(page ?? "").matchAll(/\]\(([^) ]+)/g)]
+										.map((match) => new URL(match[1] ?? "", target).href)
+										.join("\n"),
+								);
+							default:
+								reads.push(path);
+								return page === undefined
+									? new Response("The page is not there any more.", {
+											headers: { "x-nightshift-read": "gone" },
+										})
+									: new Response(`---\ntitle: "${path}"\n---\n\n${page}\n`, {
+											headers: { "x-nightshift-read": "read" },
+										});
 						}
-						return new Response(
-							`Title: ${path}\n\nURL Source: ${target}\n\nMarkdown Content:\n${page.replaceAll("BASE", base)}`,
-						);
 					}
-					const file = site.files[new URL(request.url).pathname];
+					agents.add(request.headers.get("user-agent") ?? "");
+					const file = site.files[url.pathname];
 					return file === undefined
 						? new Response("Not found", { status: 404 })
 						: new Response(file.replaceAll("BASE", base));
@@ -1267,7 +1208,8 @@ describe("the knowledge kits", () => {
 				{
 					env: {
 						PATH: process.env.PATH ?? "",
-						NS_WEB_READER: `${base}/reader/`,
+						NS_READER_URL: `${base}/reader/step`,
+						NS_READER_TOKEN: "step-token",
 					},
 				},
 			);
@@ -1298,9 +1240,9 @@ describe("the knowledge kits", () => {
 				`${host}-docs.md`,
 			]);
 			expect(await read(`web/${host}-docs-b.md`)).toContain(
-				"Markdown Content:\nB, no links.",
+				"---\n\nB, no links.",
 			);
-			// It names Night Shift, never the person, to the site and to the reader.
+			// It names Night Shift, never the person, to the site.
 			expect([...agents]).toEqual([
 				"NightShift-knowledge/1 (+https://github.com/xiduzo/nightshift)",
 			]);
@@ -1425,7 +1367,7 @@ describe("the knowledge kits", () => {
 				skipped: ". Could not read 1 pages",
 			});
 			expect(ran.log).toContain(
-				`Could not read ${base}/docs/gone: the page is gone or blocks readers.`,
+				`Could not read ${base}/docs/gone: The page is not there any more.`,
 			);
 			expect(await read(`web/${host}-docs-gone.md`)).toBe("Last copy.");
 			expect(await read(`web/${host}-docs-gone-child.md`)).toBe("Child.");
@@ -1514,8 +1456,6 @@ describe("the knowledge kits", () => {
 						PATH: process.env.PATH ?? "",
 						NS_READER_URL: `${base}/reader/step`,
 						NS_READER_TOKEN: TOKEN,
-						// Never the public reader: a test that reaches it fails.
-						NS_WEB_READER: "http://127.0.0.1:9/",
 					},
 				},
 			);
@@ -1567,6 +1507,38 @@ describe("the knowledge kits", () => {
 				"read url=https%3A%2F%2Fexample.com%2Fapp&fresh=",
 			]);
 			expect(await calls()).toEqual([]);
+		});
+
+		test("fails when it reads no page, and says which ones", async () => {
+			const ran = await sync({
+				urls: "https://gone.example\nhttps://old.example",
+			});
+			expect(ran.outcome).toBe("fail");
+			expect(ran.log).toContain("Could not read https://gone.example");
+			expect(ran.log).toContain("Could not read https://old.example");
+			const end = kit("kit:knowledge/web").nodes.find(
+				(node) => node.id === "not_synced",
+			);
+			expect(end).toMatchObject({
+				message: "Could not read any page. {{sync.log_tail}}",
+			});
+		});
+
+		test("a step without a page reader reads nothing, and says how to fix it", async () => {
+			await writeFile(join(fixtures, "curl.out"), "A page.");
+			for (const follow of ["false", "true"]) {
+				// The stub of curl logs every call: no call means no address left.
+				const ran = await step(kit("kit:knowledge/web"), "sync", {
+					urls: "https://example.com/docs",
+					follow,
+				});
+				expect(ran.outcome).toBe("fail");
+				expect(ran.log).toContain(
+					"The page reader on this computer did not open. Sync again. If it fails again, restart Night Shift on this computer.",
+				);
+			}
+			expect(await calls()).toEqual([]);
+			await expect(readdir(join(knowledge, "web"))).rejects.toThrow();
 		});
 
 		test("a reader that does not answer reads no page, and never falls back", async () => {
