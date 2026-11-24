@@ -34,7 +34,7 @@ import type {
 } from "../../src/read/views";
 import type { RunStatus } from "../../src/run-status";
 import type { SpaceEngine } from "../../src/space-engine";
-import { seedFlowFolder, seedFlows } from "../../src/testing/seed-flows";
+import { seedFlows } from "../../src/testing/seed-flows";
 import {
 	createSandbox,
 	expectRunLogsInSync,
@@ -186,13 +186,18 @@ function bodyFlow(nodes: Flow["nodes"], edges: FlowEdge[] = []): FlowInput {
 	};
 }
 
-/** Writes a called flow into the Clone's folder: the project brings it in when it is added. */
-async function saveBody(
+/** The called flows that the project has from its start. */
+let bodies: Record<string, unknown> = {};
+beforeEach(() => {
+	bodies = {};
+});
+
+function saveBody(
 	name: string,
 	nodes: Flow["nodes"],
 	edges: FlowEdge[] = [],
-): Promise<void> {
-	await seedFlowFolder(sandbox.repoPath, { [name]: bodyFlow(nodes, edges) });
+): void {
+	bodies[name] = bodyFlow(nodes, edges);
 }
 
 /** A command source that prints these items. */
@@ -204,7 +209,9 @@ function printItems(items: unknown[]): string {
 const commitItem = `echo "{{run.branch}}" > "item-{{item.id}}.txt" && git add -A && git -c user.name=t -c user.email=t@nightshift.invalid -c commit.gpgsign=false commit -q -m "item {{item.id}}"`;
 
 async function projectId(engine: SpaceEngine): Promise<string> {
-	return (await engine.addProject({ repoPath: sandbox.repoPath })).id;
+	const { id } = await engine.addProject({ repoPath: sandbox.repoPath });
+	await seedFlows(engine, id, bodies);
+	return id;
 }
 
 async function waitForStatus(
@@ -268,7 +275,7 @@ async function loggedEvents(runId: string) {
 
 describe("Call with each", () => {
 	test("runs the body per item, blockers first, each item on a branch stacked on the last done one", async () => {
-		await saveBody(
+		saveBody(
 			"build",
 			[agent("worker", "Build {{item.title}}"), command("commit", commitItem)],
 			[edge("b1", "worker", "pass", "commit")],
@@ -379,7 +386,7 @@ describe("Call with each", () => {
 	});
 
 	test("without a branch per item, all items share the current branch", async () => {
-		await saveBody("build", [command("commit", commitItem)]);
+		saveBody("build", [command("commit", commitItem)]);
 		const engine = makeEngine(fakeHarness());
 		const started = await engine.startRun({
 			projectId: await projectId(engine),
@@ -412,7 +419,7 @@ describe("Call with each", () => {
 	});
 
 	test("a failed item blocks its dependents, and the loop goes on with free work", async () => {
-		await saveBody("build", [
+		saveBody("build", [
 			command("check", `test "{{item.id}}" != 1 && ${commitItem}`),
 		]);
 		const engine = makeEngine(fakeHarness());
@@ -471,7 +478,7 @@ describe("Call with each", () => {
 	});
 
 	test("a body that ends on a haltOn label halts the loop", async () => {
-		await saveBody("build", [decision("ask", ["go", "halt"])]);
+		saveBody("build", [decision("ask", ["go", "halt"])]);
 		const decider = fakeDecider([{ label: "go" }, { label: "halt" }]);
 		const engine = makeEngine(fakeHarness(), { decider });
 		const started = await engine.startRun({
@@ -511,7 +518,7 @@ describe("Call with each", () => {
 	test("the source is read again before each item: an item added mid-run gets built", async () => {
 		const itemsFile = join(sandbox.root, "items.json");
 		await writeFile(itemsFile, JSON.stringify([{ id: "1", title: "a" }]));
-		await saveBody("build", [agent("worker", "Build {{item.title}}")]);
+		saveBody("build", [agent("worker", "Build {{item.title}}")]);
 		const harness = fakeHarness((_input, call) => {
 			if (call === 0) {
 				writeFileSync(
@@ -543,7 +550,7 @@ describe("Call with each", () => {
 	});
 
 	test("maxItems caps the items one visit starts", async () => {
-		await saveBody("build", [agent("worker", "Build {{item.title}}")]);
+		saveBody("build", [agent("worker", "Build {{item.title}}")]);
 		const harness = fakeHarness();
 		const engine = makeEngine(harness);
 		const started = await engine.startRun({
@@ -571,7 +578,7 @@ describe("Call with each", () => {
 	});
 
 	test("a source that prints no item list fails the step; a cycle too", async () => {
-		await saveBody("build", [agent("worker", "Build")]);
+		saveBody("build", [agent("worker", "Build")]);
 		const engine = makeEngine(fakeHarness());
 		const id = await projectId(engine);
 		const bad = await engine.startRun({
@@ -602,7 +609,7 @@ describe("Call with each", () => {
 	});
 
 	test("a dirty worktree fails the item instead of committing for it", async () => {
-		await saveBody("build", [command("scribble", "echo x > loose.txt")]);
+		saveBody("build", [command("scribble", "echo x > loose.txt")]);
 		const engine = makeEngine(fakeHarness());
 		const started = await engine.startRun({
 			projectId: await projectId(engine),
@@ -632,7 +639,7 @@ describe("Call with each", () => {
 
 	test("nested For Each: scopes nest, outputs and sessions stay per item, and the stack continues across outer items", async () => {
 		// Outer: features on the current branch. Inner: traces, a branch each.
-		await saveBody(
+		saveBody(
 			"feature",
 			[
 				callEach(
@@ -646,7 +653,7 @@ describe("Call with each", () => {
 			],
 			[edge("f1", "traces", "done", "worker")],
 		);
-		await saveBody(
+		saveBody(
 			"trace",
 			[
 				agent("worker", "Trace {{item.id}} on {{run.branch}}"),
@@ -760,7 +767,7 @@ describe("Call with each", () => {
 	});
 
 	test("stop inside an item, then resume continues the same item, and the loop after it", async () => {
-		await saveBody(
+		saveBody(
 			"build",
 			[agent("worker", "Build {{item.title}}"), command("commit", commitItem)],
 			[edge("b1", "worker", "pass", "commit")],
@@ -821,7 +828,7 @@ describe("Call with each", () => {
 	});
 
 	test("a Gate inside a body waits, and its answer continues the item", async () => {
-		await saveBody("build", [
+		saveBody("build", [
 			{
 				id: "ask",
 				type: "decision",
@@ -873,7 +880,7 @@ describe("Call with each", () => {
 	});
 
 	test("watchRun sends the For Each step as its items change", async () => {
-		await saveBody("build", [agent("worker", "Build {{item.title}}")]);
+		saveBody("build", [agent("worker", "Build {{item.title}}")]);
 		const engine = makeEngine(fakeHarness());
 		const started = await engine.startRun({
 			projectId: await projectId(engine),
@@ -918,7 +925,7 @@ describe("Call with each", () => {
 	});
 
 	test("a loop over 30 elements finishes in one drive: the graph's own super-step limit is out of the way", async () => {
-		await saveBody("build", [command("note", "echo {{item.title}}")]);
+		saveBody("build", [command("note", "echo {{item.title}}")]);
 		const items = Array.from({ length: 30 }, (_, i) => ({
 			id: String(i + 1),
 			title: `element ${i + 1}`,
@@ -1084,7 +1091,7 @@ describe("run policy", () => {
 	});
 
 	test("a sleep survives a restart: the new daemon rebuilds the timer and wakes the step inside its item", async () => {
-		await saveBody("build", [agent("worker", "Build {{item.title}}")]);
+		saveBody("build", [agent("worker", "Build {{item.title}}")]);
 		const first = fakeHarness(usageLimitScript());
 		const dying = new AbortController();
 		// Five real minutes: this daemon never wakes it.
@@ -1199,7 +1206,7 @@ describe("stop modes", () => {
 	});
 
 	test("stop after-step inside a For Each stops before the next item", async () => {
-		await saveBody("build", [agent("worker", "Build {{item.title}}")]);
+		saveBody("build", [agent("worker", "Build {{item.title}}")]);
 		const { harness, sessions } = scriptedHarness();
 		const engine = makeEngine(harness);
 		const started = await engine.startRun({
@@ -1228,7 +1235,7 @@ describe("stop modes", () => {
 	});
 
 	test("stop after-step in the middle of an item: the item no longer shows running, and resume continues it", async () => {
-		await saveBody(
+		saveBody(
 			"build",
 			[agent("worker", "Build {{item.title}}"), command("check", "true")],
 			[edge("b1", "worker", "pass", "check")],
@@ -1377,7 +1384,7 @@ describe("stop modes", () => {
 	});
 
 	test("the stop time takes a Call's stopped edge: the item ends failed, and the nodes after it run past the stop time", async () => {
-		await saveBody(
+		saveBody(
 			"build",
 			[agent("worker", "Build {{item.id}}"), command("commit", commitItem)],
 			[edge("b1", "worker", "pass", "commit")],
@@ -1427,7 +1434,7 @@ describe("stop modes", () => {
 	});
 
 	test("without a stopped edge, the stop time inside a Call still stops the run there", async () => {
-		await saveBody("build", [agent("worker", "Build {{item.id}}")]);
+		saveBody("build", [agent("worker", "Build {{item.id}}")]);
 		let clock = now();
 		const { harness, sessions } = scriptedHarness();
 		const engine = makeEngine(harness, {}, { now: () => clock });
@@ -1465,7 +1472,7 @@ describe("run inputs", () => {
 				{ name: "epic", required: true },
 			],
 		};
-		await seedFlowFolder(sandbox.repoPath, { body });
+		bodies.body = body;
 		const flow = flowOf(
 			[
 				command("hello", `echo "epic {{epic}} model {{model}}"`),

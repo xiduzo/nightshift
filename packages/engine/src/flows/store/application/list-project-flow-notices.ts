@@ -6,7 +6,7 @@ export type ListProjectFlowNoticesPorts = {
 	projects: ProjectSpaces;
 };
 
-/** What a person must know about the project's flows (the import on upgrade), oldest first. */
+/** What a person must know about the project's flows, oldest first. */
 export const listProjectFlowNotices =
 	(ports: ListProjectFlowNoticesPorts) =>
 	async (request: { projectId: string }): Promise<FlowNotice[]> => {

@@ -29,7 +29,7 @@ export type RevisionItem<Kind extends string = string> = {
 	id: string;
 	at: number;
 	kind: Kind;
-	/** Who saved it. Null for one that no Person saved (an import on upgrade, a merge). */
+	/** Who saved it. Null for one that no Person saved (an upgrade, a merge). */
 	person: RevisionName | null;
 	/** The Device it was saved on. */
 	device: RevisionName;

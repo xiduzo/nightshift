@@ -197,6 +197,23 @@ describe("the flow document", () => {
 		}
 	});
 
+	test("two Devices that create the same flow keep one, and a save of it leaves no copy", async () => {
+		for (const device of [laptop, desktop]) {
+			await device.flows.save(of, "build", twoNodes());
+		}
+		await sync(laptop, desktop);
+		for (const device of [laptop, desktop]) {
+			expect(await read(device)).toEqual({ build: twoNodes() });
+		}
+
+		const changed = withPrompt(twoNodes(), "a", "Changed");
+		await laptop.flows.save(of, "build", changed);
+		await sync(laptop, desktop);
+		for (const device of [laptop, desktop]) {
+			expect(await read(device)).toEqual({ build: changed });
+		}
+	});
+
 	test("a save of the suffixed name writes that name", async () => {
 		await laptop.flows.save(of, "build", twoNodes());
 		clock.at = 2_000;

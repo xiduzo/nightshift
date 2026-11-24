@@ -15,7 +15,6 @@ import {
 } from "../documents";
 import { createSandbox, type Sandbox } from "../testing/test-support";
 import { wireStore as createProjectFlows, type ProjectFlows } from "./store";
-import { addNotices } from "./store/adapters/out/yjs-notices";
 import { mergeFlows } from "./transfer/application/merge-flows";
 import { planFlowMerge } from "./transfer/application/plan-flow-merge";
 
@@ -129,9 +128,15 @@ describe("the flows and schedules of a project", () => {
 	});
 
 	test("a notice reads until a person dismisses it, on every Device", async () => {
-		await addNotices(await documents.open(P), [
-			{ kind: "folder-kept", message: "Kept.", deviceId: "laptop", at: 1 },
-		]);
+		const { current } = await documents.open(P);
+		await current.change(() => {
+			current.doc.getMap("notices").set("n1", {
+				kind: "folder-kept",
+				message: "Kept.",
+				deviceId: "laptop",
+				at: 1,
+			});
+		});
 		const [notice] = await flows.notices(P);
 		expect(notice).toMatchObject({ kind: "folder-kept", message: "Kept." });
 		await flows.dismissNotice(P, notice?.id ?? "");

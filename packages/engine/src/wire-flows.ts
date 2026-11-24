@@ -12,7 +12,6 @@ import {
 	wireStore,
 	wireTransfer,
 } from "./flows";
-import type { Git } from "./git";
 import type { RunLog } from "./log";
 import { forgetMemory, listMemory } from "./memory";
 import type { Projects } from "./projects";
@@ -24,13 +23,11 @@ import { listKeptValues, resetKeptValue } from "./variables";
  * The flows block of the engine's composition (`wire.ts`): the flows and
  * schedules of every project in its flow document (`flows/store/`), what
  * brings a flow of an older format to the current one
- * (`flows/migrations/`), and the moves of flows (`flows/transfer/`): the
- * import of a Clone's folder from before ADR 2, and a Person's export,
- * import and copy. It comes after the projects block
- * (`wire-projects.ts`), whose `projects` and `git` it takes.
+ * (`flows/migrations/`), and the moves of flows (`flows/transfer/`): a
+ * Person's export, import and copy. It comes after the projects block
+ * (`wire-projects.ts`), whose `projects` it takes.
  *
- * It gives `projectFlows` (with the merge of Personal), `cloneImports`
- * and `transfer`.
+ * It gives `projectFlows` (with the merge of Personal) and `transfer`.
  */
 export function wireEngineFlows(deps: {
 	db: Database;
@@ -39,7 +36,6 @@ export function wireEngineFlows(deps: {
 	flowDocuments: FlowDocuments;
 	directory: DeviceDirectory;
 	projects: Pick<Projects, "find">;
-	git: Git;
 	/** The engine is ready: a Person's verb waits for it. Made after this block. */
 	ready: () => Promise<unknown>;
 	/** This Device's name. */
@@ -70,7 +66,7 @@ export function wireEngineFlows(deps: {
 		spaces: documents,
 	});
 	/** The flows and schedules of every project: its flow document (ADR 2). */
-	const { imports, merges, ...stored } = wireStore({
+	const { merges, ...stored } = wireStore({
 		documents: flowDocuments,
 		project: (projectId) => projects.find(projectId),
 		deviceId: () => runLog.walkerId(),
@@ -80,15 +76,8 @@ export function wireEngineFlows(deps: {
 	const usage = deps.options.usage;
 	const transfer = wireTransfer({
 		access: deps.access,
-		db,
-		git: deps.git,
-		documents: imports,
-		saved: flowDocuments,
-		device: { device: thisDevice },
 		clock: now,
 		merges,
-		profiles: deps.options.profiles,
-		migrations,
 		projects: {
 			async inSpace(projectId, spaceId) {
 				await deps.ready();
@@ -126,12 +115,7 @@ export function wireEngineFlows(deps: {
 				...(options.persons ? { persons: options.persons } : {}),
 			}),
 	};
-	/** The import on upgrade: each Clone's `.nightshift/` folder, once. */
-	const cloneImports = {
-		all: () => transfer.importCloneFolders({}),
-		project: (projectId: string) => transfer.importCloneFolders({ projectId }),
-	};
-	return { projectFlows, cloneImports, transfer };
+	return { projectFlows, transfer };
 }
 
 /**

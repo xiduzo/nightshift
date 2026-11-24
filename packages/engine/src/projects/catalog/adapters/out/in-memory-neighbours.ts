@@ -1,11 +1,7 @@
 import { inMemoryAccess } from "../../../../access/adapters/out/in-memory-access";
 import type { RunStatus } from "../../../../run-status";
 import { inMemoryKeepPorts } from "../../../keep/adapters/out/in-memory-neighbours";
-import type {
-	CloneImports,
-	HostRelay,
-	ProjectRuns,
-} from "../../application/ports";
+import type { HostRelay, ProjectRuns } from "../../application/ports";
 
 /**
  * The in-memory adapters of the ports that another vertical fills
@@ -65,18 +61,6 @@ export function inMemoryProjectRuns() {
 	return twin satisfies ProjectRuns;
 }
 
-/** The imports of the flows of a Clone: the projects asked, in order. */
-export function inMemoryCloneImports() {
-	const imported: string[] = [];
-	const twin = {
-		imported,
-		async importClone(projectId: string) {
-			imported.push(projectId);
-		},
-	};
-	return twin satisfies CloneImports;
-}
-
 /**
  * Every port of the catalog in memory at once: where each use-case test
  * starts. `person-ada` is an admin of the Spaces `s1`, `s2` and `team`.
@@ -91,6 +75,5 @@ export function inMemoryCatalogPorts() {
 		...inMemoryKeepPorts(),
 		relay: inMemoryHostRelay(),
 		runs: inMemoryProjectRuns(),
-		cloneImports: inMemoryCloneImports(),
 	};
 }

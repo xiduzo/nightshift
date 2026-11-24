@@ -23,7 +23,7 @@ import {
 	type ThisDevice,
 } from "../../keep";
 import { alreadyHere, folderName, HOSTED_NEEDS_REMOTE } from "../domain/words";
-import type { CloneImports, HostRelay } from "./ports";
+import type { HostRelay } from "./ports";
 
 /** What a role must allow for this request. */
 const ADD_PROJECTS: Permissions = { project: ["add"] };
@@ -44,7 +44,6 @@ export type AddProjectPorts = {
 	directory: ProjectDirectory;
 	relay?: HostRelay;
 	ids: NewIds;
-	cloneImports: CloneImports;
 };
 
 /** The folder to add, in which Space, and the name a new project gets. */
@@ -53,8 +52,8 @@ export type AddProject = { spaceId: string; repoPath: string; name?: string };
 /**
  * Adds the git repository at `repoPath` as a project of the Space: the one
  * with a Clone there, else the one with its remote, else a new one. A
- * removed project comes back. A project of another Space is refused. A
- * folder from before ADR 2 brings its flows in. Refuses a Person who may not act (`access.openSpace`).
+ * removed project comes back. A project of another Space is refused.
+ * Refuses a Person who may not act (`access.openSpace`).
  */
 export const addProject =
 	(ports: AddProjectPorts) =>
@@ -64,7 +63,6 @@ export const addProject =
 			need: ADD_PROJECTS,
 		});
 		const row = await addFolder(ports, request);
-		await ports.cloneImports.importClone(row.id);
 		const [added] = await asProjects(
 			{
 				clones: (spaceId, ids) => ports.spaceProjects.clones(spaceId, ids),

@@ -40,7 +40,6 @@ import {
 	type RunSettings,
 } from "../../src/settings/settings";
 import type { SpaceEngine } from "../../src/space-engine";
-import { seedFlowFolder } from "../../src/testing/seed-flows";
 import {
 	cliToolsOf,
 	createSandbox,
@@ -374,36 +373,6 @@ describe("flows", () => {
 		expect((await engine.flows.get(id, "retry")).flow).toEqual(flow);
 		await engine.flows.remove(id, "retry");
 		expect(await engine.flows.list(id)).toEqual([]);
-	});
-
-	test("a folder from before flows were Night Shift data comes in when the project is added, with a notice a person dismisses", async () => {
-		await seedFlowFolder(sandbox.repoPath, { retry: retryFlow("true", 2) });
-		await mustGit(sandbox.repoPath, ["add", ".nightshift"]);
-		await mustGit(sandbox.repoPath, [
-			"-c",
-			"user.name=t",
-			"-c",
-			"user.email=t@nightshift.invalid",
-			"-c",
-			"commit.gpgsign=false",
-			"commit",
-			"-q",
-			"-m",
-			"flows",
-		]);
-		const engine = makeEngine(scriptedHarness().harness);
-
-		const id = await projectId(engine);
-
-		expect((await engine.flows.get(id, "retry")).flow).toEqual(
-			retryFlow("true", 2),
-		);
-		const notices = await engine.flows.notices(id);
-		expect(notices.map((notice) => notice.message)).toEqual([
-			"Night Shift imported the .nightshift folder on test. Git tracks that folder, so Night Shift left it in place. Remove it in a commit.",
-		]);
-		await engine.flows.dismissNotice(id, notices[0]?.id ?? "");
-		expect(await engine.flows.notices(id)).toEqual([]);
 	});
 });
 

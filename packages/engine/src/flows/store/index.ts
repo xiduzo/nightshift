@@ -8,7 +8,6 @@ export type { FlowMergePlan } from "./domain/flow-merge";
 export { flowNotFound } from "./domain/flow-save";
 export type { FlowNotice } from "./domain/notices";
 export {
-	type FlowImports,
 	type FlowMerges,
 	type ProjectFlows,
 	wireStore,

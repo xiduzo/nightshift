@@ -10,8 +10,8 @@ export type ListFlowNoticesPorts = {
 };
 
 /**
- * What a person must know about the flows of a project of the Space (the
- * import on upgrade), oldest first.
+ * What a person must know about the flows of a project of the Space,
+ * oldest first.
  * A Member of the Space may, whatever the role (`access.openSpace`).
  */
 export const listFlowNotices =

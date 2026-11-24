@@ -37,7 +37,7 @@ export type SpaceFlows = {
 	save(projectId: string, name: string, flow: Flow): Promise<FlowIssue[]>;
 	/** Removes the flow. Its revisions stay. */
 	remove(projectId: string, name: string): Promise<void>;
-	/** What a person must know about the project's flows (the import on upgrade), oldest first. */
+	/** What a person must know about the project's flows, oldest first. */
 	notices(projectId: string): Promise<FlowNotice[]>;
 	/** Removes a notice, on every Device of the Space. */
 	dismissNotice(projectId: string, noticeId: string): Promise<void>;

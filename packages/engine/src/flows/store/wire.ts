@@ -8,11 +8,7 @@ import type {
 import { now as timeNow } from "@nightshift/time";
 import type { FlowDocuments } from "../../documents";
 import type { FlowMigrations } from "../migrations";
-import {
-	type FlowImports,
-	yjsFlowImports,
-	yjsFlowStore,
-} from "./adapters/out/yjs-flow-store";
+import { yjsFlowStore } from "./adapters/out/yjs-flow-store";
 import { dismissProjectFlowNotice } from "./application/dismiss-project-flow-notice";
 import { keepFlowOutputTypes } from "./application/keep-flow-output-types";
 import { keepFlowShapes } from "./application/keep-flow-shapes";
@@ -34,8 +30,6 @@ import { upgradeProjectFlows } from "./application/upgrade-project-flows";
 import type { FlowRevision } from "./domain/flow-json";
 import type { OutputType, StepShapes } from "./domain/inferred";
 import type { FlowNotice } from "./domain/notices";
-
-export type { FlowImports } from "./adapters/out/yjs-flow-store";
 
 /**
  * The merge of one Project's flow documents into another's, as the store
@@ -110,7 +104,7 @@ export type ProjectFlows = {
 		projectId: string,
 		schedules: readonly Schedule[],
 	): Promise<ScheduleIssue[]>;
-	/** What a person must know about the project's flows (the import on upgrade), oldest first. */
+	/** What a person must know about the project's flows, oldest first. */
 	notices(projectId: string): Promise<FlowNotice[]>;
 	/** Removes a notice, on every Device of the Space. One that is gone already is no error. */
 	dismissNotice(projectId: string, noticeId: string): Promise<void>;
@@ -125,9 +119,8 @@ export type ProjectFlows = {
 
 /**
  * The flows of the Projects over their flow documents: the Yjs
- * `FlowStore`, and the use cases of Night Shift bound to it. `imports`
- * gives the flow documents to the import of a Clone's folder, and
- * `merges` the merge of the documents, to `flows/transfer/`.
+ * `FlowStore`, and the use cases of Night Shift bound to it. `merges`
+ * gives the merge of the documents to `flows/transfer/`.
  */
 export function wireStore(deps: {
 	documents: Pick<FlowDocuments, "open" | "openAll">;
@@ -147,7 +140,7 @@ export function wireStore(deps: {
 	 * Device name is to choose again, and nothing upgrades.
 	 */
 	migrations?: FlowMigrations;
-}): ProjectFlows & { imports: FlowImports; merges: FlowMerges } {
+}): ProjectFlows & { merges: FlowMerges } {
 	const clock = deps.now ?? timeNow;
 	const store = yjsFlowStore({
 		documents: deps.documents,
@@ -198,7 +191,6 @@ export function wireStore(deps: {
 			dismissNotice({ projectId, noticeId }),
 		// Without migrations nothing upgrades: no document is opened.
 		upgrade: deps.migrations ? (keeps) => upgrade({ keeps }) : async () => {},
-		imports: yjsFlowImports({ documents: deps.documents }),
 		merges: {
 			planMerge: (source, destination, persons) =>
 				store.planMerge(source, destination, persons),

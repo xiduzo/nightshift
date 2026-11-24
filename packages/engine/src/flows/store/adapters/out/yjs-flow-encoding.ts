@@ -27,8 +27,8 @@ import {
  *   different nodes merge and two edits of one node keep one of them. The
  *   order arrays keep the order of the flow's lists.
  * - `schedules`: schedule id → its JSON, and `scheduleOrder`.
- * - `notices`: what a person must know about the flows (the import).
- * - `meta`: the Project's id, the import markers, and `schedulesVersion`:
+ * - `notices`: what a person must know about the flows.
+ * - `meta`: the Project's id, the merge markers, and `schedulesVersion`:
  *   the format of the schedules (`SCHEDULES_VERSION`), 1 when it is unset.
  *
  * `flows-history:<projectId>` holds the revisions: one root array per flow
@@ -39,7 +39,7 @@ import {
  * name (two Devices that created it offline) both stay: the older keeps
  * the name, the newer reads with a suffix (`suffixedName`) until a save
  * writes that name. A newer one with the same content too (two Devices
- * that imported one Clone folder) does not read at all, and a save of
+ * that made the same flow) does not read at all, and a save of
  * the older removes it.
  *
  * The files `yjs-*.ts` of this folder are the only ones that know the Yjs
@@ -101,8 +101,8 @@ export function flowEntries(document: FlowDocument): FlowEntry[] {
 
 /**
  * The flows of the document, and the copies it leaves out: a flow with
- * the name and the content of an older one, as two Devices that import
- * the same Clone folder before they sync leave it. The older reads, the
+ * the name and the content of an older one, as two Devices that make
+ * the same flow before they sync leave it. The older reads, the
  * copy does not (`copies`: by the flow id of the one that reads).
  */
 export function scanFlows(document: FlowDocument): {

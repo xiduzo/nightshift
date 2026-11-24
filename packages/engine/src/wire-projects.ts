@@ -9,13 +9,7 @@ import type { EngineOptions } from "./engine-options";
 import { createWorktrees, systemGit } from "./git";
 import type { Runner } from "./graph";
 import { type EventWrites, type RunLog, runIdsOfProject } from "./log";
-import {
-	type CloneImports,
-	type HostRelay,
-	wireCatalog,
-	wireClones,
-	wireKeep,
-} from "./projects";
+import { type HostRelay, wireCatalog, wireClones, wireKeep } from "./projects";
 import { wireSpaces } from "./spaces";
 
 /**
@@ -39,8 +33,6 @@ export function wireEngineProjects(deps: {
 	options: Pick<EngineOptions, "git">;
 	/** The runner, made after this block: whether a run runs a step here. */
 	runner: () => Pick<Runner, "isActive">;
-	/** The import of a Clone's flows, made after this block (`wire-flows.ts`). */
-	cloneImports: () => CloneImports;
 	/** Who may act in a Space (`access`). */
 	access: Pick<Access, "openSpace">;
 }) {
@@ -84,9 +76,6 @@ export function wireEngineProjects(deps: {
 			runIds: (projectId) => runIdsOfProject(db, projectId),
 			isActive: (runId) => deps.runner().isActive(runId),
 			status: async (runId) => (await runLog.state(runId)).status,
-		},
-		cloneImports: {
-			importClone: (projectId) => deps.cloneImports().importClone(projectId),
 		},
 	});
 	const cloneRows = {

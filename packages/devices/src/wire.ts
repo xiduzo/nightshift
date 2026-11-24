@@ -103,7 +103,6 @@ async function startNow(deps: DevicesDeps): Promise<DevicesRuntime> {
 			profileFor: (ref) => deps.profiles.settingsFor(ref),
 			spaceDocuments: deps.spaces,
 			flowDocuments: deps.flows,
-			// The import on upgrade gives a Clone's project profiles to this Device.
 			profiles: deps.profiles,
 			scheduler: deps.scheduler,
 			github: systemGitHubCli(),

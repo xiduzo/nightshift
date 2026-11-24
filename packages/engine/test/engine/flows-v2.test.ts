@@ -24,7 +24,7 @@ import { appendEvent } from "../../src/log/run-log/append";
 import { createRunLog, type RunLog } from "../../src/log/run-log/run-log";
 import type { RunDetail, StepSummary } from "../../src/read/views";
 import type { SpaceEngine } from "../../src/space-engine";
-import { seedFlowFolder } from "../../src/testing/seed-flows";
+import { seedFlows } from "../../src/testing/seed-flows";
 import {
 	cliToolsOf,
 	createSandbox,
@@ -158,12 +158,20 @@ function flowOf(
 	};
 }
 
-async function saveFlow(name: string, flow: FlowInput | unknown) {
-	await seedFlowFolder(sandbox.repoPath, { [name]: flow });
+/** The flows that the project has from its start. */
+let saved: Record<string, unknown> = {};
+beforeEach(() => {
+	saved = {};
+});
+
+function saveFlow(name: string, flow: FlowInput) {
+	saved[name] = flow;
 }
 
 async function projectId(engine: SpaceEngine): Promise<string> {
-	return (await engine.addProject({ repoPath: sandbox.repoPath })).id;
+	const { id } = await engine.addProject({ repoPath: sandbox.repoPath });
+	await seedFlows(engine, id, saved);
+	return id;
 }
 
 async function waitForEnd(
@@ -238,7 +246,7 @@ describe("inputs at start", () => {
 	);
 
 	test("text and json values, defaults, and the title", async () => {
-		await saveFlow("show", flow);
+		saveFlow("show", flow);
 		const engine = makeEngine(fakeHarness());
 		const id = await projectId(engine);
 
@@ -300,7 +308,7 @@ describe("inputs at start", () => {
 
 describe("Call", () => {
 	test("binds inputs, runs the called flow in its own scope, and returns its outputs", async () => {
-		await saveFlow(
+		saveFlow(
 			"greet",
 			flowOf(
 				[
@@ -364,13 +372,13 @@ describe("Call", () => {
 	});
 
 	test("a called flow that fails makes the Subflow fail; an Agent's own outcome is `ended`", async () => {
-		await saveFlow(
+		saveFlow(
 			"broken",
 			flowOf([command("boom", "echo broke; exit 3")], [], {
 				outputs: [{ name: "why", value: "{{boom.log_tail}}" }],
 			}),
 		);
-		await saveFlow(
+		saveFlow(
 			"review",
 			flowOf([
 				agent("judge", "Judge it", {
@@ -424,7 +432,7 @@ describe("Call", () => {
 	});
 
 	test("an input binding that refuses is a step error", async () => {
-		await saveFlow(
+		saveFlow(
 			"needs",
 			flowOf([command("a", "true")], [], {
 				inputs: [{ name: "must", type: "text", required: true }],
@@ -449,7 +457,7 @@ describe("Call", () => {
 	});
 
 	test("nested Subflows pass outputs up through every level", async () => {
-		await saveFlow(
+		saveFlow(
 			"leaf",
 			flowOf([command("calc", `echo "leaf of {{n}}"`)], [], {
 				inputs: [{ name: "n", type: "json", required: true }],
@@ -459,7 +467,7 @@ describe("Call", () => {
 				],
 			}),
 		);
-		await saveFlow(
+		saveFlow(
 			"mid",
 			flowOf([callOnce("inner", "leaf", { n: "{{payload}}" })], [], {
 				inputs: [{ name: "payload", type: "json", required: true }],
@@ -495,7 +503,7 @@ describe("Call", () => {
 	});
 
 	test("a Gate inside a called flow waits, and its answer continues the caller", async () => {
-		await saveFlow(
+		saveFlow(
 			"ask",
 			flowOf(
 				[
@@ -543,7 +551,7 @@ describe("Call", () => {
 	});
 
 	test("stop inside a called flow, then resume continues there", async () => {
-		await saveFlow(
+		saveFlow(
 			"work",
 			flowOf([agent("worker", "Work on {{topic}}")], [], {
 				inputs: [{ name: "topic", type: "text", required: true }],
@@ -590,7 +598,7 @@ describe("Call", () => {
 	});
 
 	test("a run whose thread has no checkpoint (from before this engine) resumes from the log: the stopped step goes on, a later Subflow starts a new visit, templates and edge counts hold", async () => {
-		await saveFlow(
+		saveFlow(
 			"sub",
 			flowOf([command("say", `echo "note={{note}}"`)], [], {
 				inputs: [{ name: "note", type: "text", required: true }],
@@ -669,7 +677,7 @@ describe("Call", () => {
 
 describe("Call with each, over any list", () => {
 	test("a planner's data feeds a For Each; `as`, bindings, run fields and `results`", async () => {
-		await saveFlow(
+		saveFlow(
 			"task",
 			flowOf(
 				[agent("work", "Do {{task.title}} ({{task.id}}) for {{goal}}")],
@@ -798,7 +806,7 @@ describe("Call with each, over any list", () => {
 			"-m",
 			"files",
 		]);
-		await saveFlow(
+		saveFlow(
 			"lint",
 			flowOf([command("look", `head -c 8 "{{item.path}}"`)], [], {
 				inputs: [{ name: "item", type: "json", required: true }],
@@ -854,13 +862,13 @@ describe("Call with each, over any list", () => {
 	});
 
 	test("a command source of plain strings, and of objects with `dependsOn` and a parent", async () => {
-		await saveFlow(
+		saveFlow(
 			"echo",
 			flowOf([command("say", `echo "{{item}} {{run.index}}"`)], [], {
 				inputs: [{ name: "item", type: "json", required: true }],
 			}),
 		);
-		await saveFlow(
+		saveFlow(
 			"issue",
 			flowOf(
 				[
@@ -1310,7 +1318,7 @@ describe("flow format 1", () => {
 				await readFile(join(fixtures, `${name}.json`), "utf8"),
 			);
 		}
-		await seedFlowFolder(sandbox.repoPath, flows);
+		saved = flows;
 		// What the night's commands need: an ignored `.build/`, the script, and `gh`.
 		await writeFile(join(sandbox.repoPath, ".gitignore"), ".build/\n");
 		await mkdir(join(sandbox.repoPath, "tools", "night-shift"), {

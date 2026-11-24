@@ -82,11 +82,9 @@ export type EngineOptions = {
 	 */
 	flowDocuments?: FlowDocuments;
 	/**
-	 * This Device's profiles, where the import on upgrade puts the profiles
-	 * of a Clone's `.nightshift/profiles.json`. Without them, a Clone with
-	 * project profiles keeps its folder.
+	 * This Device's profiles, which a flow of an older format names by id.
 	 */
-	profiles?: Pick<ProfileStore, "list" | "save">;
+	profiles?: Pick<ProfileStore, "list">;
 	/**
 	 * The git port, for a new project's clone and remote and the branches
 	 * of a clone. Default: the git programs on this computer.

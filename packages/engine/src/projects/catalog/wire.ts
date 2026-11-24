@@ -11,7 +11,7 @@ import { addProject } from "./application/add-project";
 import { addProjectWithoutFolder } from "./application/add-project-without-folder";
 import { listBranches } from "./application/list-branches";
 import { listProjects } from "./application/list-projects";
-import type { CloneImports, HostRelay, ProjectRuns } from "./application/ports";
+import type { HostRelay, ProjectRuns } from "./application/ports";
 import { removeProject } from "./application/remove-project";
 import { renameProject } from "./application/rename-project";
 import { useProjectFolder } from "./application/use-project-folder";
@@ -33,7 +33,6 @@ export type CatalogDeps = Keep & {
 	relay?: HostRelay;
 	ids: NewIds;
 	runs: ProjectRuns;
-	cloneImports: CloneImports;
 };
 
 /** The use cases of the catalog, bound to their ports. */

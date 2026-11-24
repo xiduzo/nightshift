@@ -1,14 +1,8 @@
-import {
-	type FlowSources,
-	migrateFlow,
-	type Schedule,
-} from "@nightshift/flows";
+import { migrateFlow } from "@nightshift/flows";
 import type { FlowDocuments } from "../../../../documents";
 import type { FlowMigrations } from "../../../migrations";
 import type { FlowStore } from "../../application/ports";
 import { type FlowRevision, olderFormat } from "../../domain/flow-json";
-import type { FlowSave } from "../../domain/flow-save";
-import type { NewNotice } from "../../domain/notices";
 import { flowIdOf, flowRevisions, flowSources } from "./yjs-flow-encoding";
 import { mergeFlowDocuments, planFlowMerge } from "./yjs-flow-merge";
 import {
@@ -19,13 +13,7 @@ import {
 	upgradedSources,
 	upgradeFlows,
 } from "./yjs-flow-saves";
-import {
-	addNotices,
-	dismissNotice,
-	flowNotices,
-	mark,
-	marked,
-} from "./yjs-notices";
+import { dismissNotice, flowNotices } from "./yjs-notices";
 import {
 	readSchedules,
 	saveSchedules,
@@ -143,59 +131,6 @@ export function yjsFlowStore(deps: {
 				await open(destination),
 				merge,
 			);
-		},
-	};
-}
-
-/**
- * A Project's flow document as the import of a Clone's folder reads and
- * writes it. The reads are synchronous on the open document. Each write
- * is one change of the document, as a save of the store is.
- */
-export type ImportDocument = {
-	/** Whether the document holds this marker: a step done once per document. */
-	marked(marker: string): boolean;
-	/** Sets the marker, with these notices, in one change. */
-	mark(
-		marker: string,
-		at: number,
-		notices?: readonly NewNotice[],
-	): Promise<void>;
-	/** Adds the notices, in one change. */
-	addNotices(notices: readonly NewNotice[]): Promise<void>;
-	/** Every flow of the document as stored, with no older format brought up. */
-	flows(): FlowSources;
-	/** The schedules this Night Shift reads, in their order. */
-	schedules(): Schedule[];
-	/** Saves a flow with its revision. */
-	saveFlow(save: FlowSave): Promise<void>;
-	/** Saves the schedules: only those that differ. */
-	saveSchedules(schedules: readonly Schedule[]): Promise<void>;
-};
-
-/** The flow documents of this Replica's Projects, for the import of a Clone's folder. */
-export type FlowImports = {
-	open(projectId: string): Promise<ImportDocument>;
-};
-
-/** Each Project's flow document, opened once per import, over the `yjs-*.ts` files of this folder. */
-export function yjsFlowImports(deps: {
-	documents: Pick<FlowDocuments, "open">;
-}): FlowImports {
-	return {
-		async open(projectId) {
-			const document = await deps.documents.open(projectId);
-			return {
-				marked: (marker) => marked(document, marker),
-				mark: (marker, at, notices) => mark(document, marker, at, notices),
-				addNotices: (notices) => addNotices(document, notices),
-				flows: () => flowSources(document),
-				schedules: () => readSchedules(document).schedules,
-				async saveFlow(save) {
-					await saveFlow(document, save);
-				},
-				saveSchedules: (schedules) => saveSchedules(document, schedules),
-			};
 		},
 	};
 }

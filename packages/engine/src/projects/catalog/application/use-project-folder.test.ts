@@ -30,7 +30,6 @@ describe("useProjectFolder", () => {
 			repoPath: "/work/mine",
 		});
 		expect(used).toMatchObject({ id: "p1", repoPath: "/work/mine" });
-		expect(ports.cloneImports.imported).toEqual(["p1"]);
 		expect(ports.projectLog.facts.map((f) => f.type)).toEqual(["CloneAdded"]);
 	});
 
@@ -138,7 +137,7 @@ describe("useProjectFolder", () => {
 						projectId: "p1",
 						repoPath: "/work/mine",
 					}),
-				() => [ports.store.records.clones, ports.cloneImports.imported],
+				() => [ports.store.records.clones],
 			),
 		).toEqual(allowing("owner", "admin", "member"));
 	});

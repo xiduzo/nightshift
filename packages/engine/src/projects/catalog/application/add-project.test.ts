@@ -29,7 +29,6 @@ describe("addProject", () => {
 			ports.spaceProjects.documentOf("s1").projects.get("project-1"),
 		).toMatchObject({ name: "app", folder: true });
 		expect(ports.projectLog.facts.map((f) => f.type)).toEqual(["ProjectAdded"]);
-		expect(ports.cloneImports.imported).toEqual(["project-1"]);
 	});
 
 	test("a folder whose origin names a known project makes a Clone of it", async () => {

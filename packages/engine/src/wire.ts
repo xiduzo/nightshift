@@ -207,18 +207,16 @@ export function createEngine(
 		options,
 		access,
 		runner: () => runner,
-		cloneImports: () => ({ importClone: (id) => cloneImports.project(id) }),
 	});
 
 	// --- flows (phase 3): `wire-flows.ts` ---
-	const { projectFlows, cloneImports, transfer } = wireEngineFlows({
+	const { projectFlows, transfer } = wireEngineFlows({
 		db,
 		log: runLog,
 		documents,
 		flowDocuments,
 		directory,
 		projects,
-		git,
 		ready: () => ready,
 		deviceName: device.name,
 		options,
@@ -331,8 +329,6 @@ export function createEngine(
 			// leaves it for the next start.
 			projects.readRemotes().catch(() => {}),
 		)
-		// The flows of each Clone from before ADR 2, once: before a schedule fires.
-		.then(() => cloneImports.all())
 		// The flows of format 6 of the Spaces this Replica keeps, once (ADR 3).
 		.then(() => upgradeKeptFlows())
 		// Whose runs are this computer's own: another Person's take an Offer.

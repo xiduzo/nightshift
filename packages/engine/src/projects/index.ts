@@ -2,7 +2,6 @@
 
 export {
 	type Catalog,
-	type CloneImports,
 	type HostRelay,
 	wireCatalog,
 } from "./catalog";

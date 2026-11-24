@@ -17,7 +17,7 @@ import {
 	type ThisDevice,
 } from "../../keep";
 import { folderTaken, noActiveRun, otherRepository } from "../domain/words";
-import type { CloneImports, HostRelay, ProjectRuns } from "./ports";
+import type { HostRelay, ProjectRuns } from "./ports";
 
 /** What a role must allow for this request. */
 const ADD_PROJECTS: Permissions = { project: ["add"] };
@@ -32,7 +32,6 @@ export type UseProjectFolderPorts = {
 	directory: Pick<ProjectDirectory, "names">;
 	relay?: HostRelay;
 	runs: Pick<ProjectRuns, "runIds" | "isActive">;
-	cloneImports: CloneImports;
 };
 
 /** The project, and the folder on this computer that becomes its folder here. */
@@ -94,7 +93,6 @@ export const useProjectFolder =
 			);
 		}
 
-		await ports.cloneImports.importClone(used.id);
 		const [project] = await asProjects(
 			{
 				clones: (id, ids) => ports.spaceProjects.clones(id, ids),

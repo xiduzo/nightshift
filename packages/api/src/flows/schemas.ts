@@ -97,7 +97,7 @@ export const nodeMemorySchema = exact<NodeMemory>()(
 	}),
 );
 
-/** What a person must know about a project's flows: what the import on upgrade did. */
+/** What a person must know about a project's flows. */
 export const flowNoticeSchema = exact<FlowNotice>()(
 	z.object({
 		id: z.string(),

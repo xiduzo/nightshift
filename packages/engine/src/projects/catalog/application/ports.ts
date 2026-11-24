@@ -29,12 +29,3 @@ export type ProjectRuns = {
 	/** The run's status, as its log says. */
 	status(runId: string): Promise<RunStatus>;
 };
-
-/**
- * The import of the flows of a folder from before ADR 2.
- * @filledBy engine/flows
- */
-export type CloneImports = {
-	/** Imports the flows of this Device's Clone of the project, once. Never throws. */
-	importClone(projectId: string): Promise<void>;
-};

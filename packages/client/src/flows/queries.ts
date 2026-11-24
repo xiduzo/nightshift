@@ -14,7 +14,7 @@ export function createFlowQueries(orpc: ApiQueryUtils) {
 		/** One flow file: the flow and its issues. */
 		get: (projectId: string, name: string) =>
 			orpc.flows.get.queryOptions({ input: { projectId, name } }),
-		/** What the import of the project's flow folder did that a person must know. */
+		/** What a person must know about the project's flows. */
 		notices: (projectId: string) =>
 			orpc.flows.notices.queryOptions({ input: { projectId } }),
 		/** The revisions of a flow, newest first. */

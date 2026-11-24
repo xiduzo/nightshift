@@ -134,11 +134,10 @@ export const flows = {
 				input.scope,
 			),
 		),
-	/** What the import on upgrade did that a person must know, oldest first. */
+	/** What a person must know about the flows, oldest first. */
 	notices: protectedProcedure
 		.route({
-			summary:
-				"Lists the notices of a project's flows: what the import of its flow folder did.",
+			summary: "Lists the notices of a project's flows.",
 		})
 		.output(output(z.array(flowNoticeSchema)))
 		.input(z.object({ projectId: z.string() }))

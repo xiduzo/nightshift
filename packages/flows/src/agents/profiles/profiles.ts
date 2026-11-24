@@ -37,8 +37,7 @@ import {
  * decider and its model, for a Decision or a Value decided by a model. A
  * profile belongs to one Device (ADR 3): a node names it by the Device and
  * the profile's id (`ProfileRef`), and its name is a label. A project has
- * no profiles of its own: the import on upgrade gives the profiles of an
- * old project folder to the importing Device.
+ * no profiles of its own.
  *
  * A node that names a profile takes its settings unless it sets them
  * itself; CLI tools and connections add up. A run resolves the profiles of

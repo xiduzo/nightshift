@@ -54,7 +54,6 @@ function projectsOf(
 		options: {},
 		access: { openSpace: async () => {} },
 		runner: () => ({ isActive: () => false }),
-		cloneImports: () => ({ importClone: async () => {} }),
 	});
 	/** The project's row, with its folder here. */
 	const here = async (projectId: string, spaceId: string) =>
