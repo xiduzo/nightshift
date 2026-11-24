@@ -4,7 +4,12 @@
  */
 
 export type OllamaSettingsPort = {
-	current(): { embeddingModel: string; ollama: string };
+	current(): {
+		embeddingModel: string;
+		ollama: string;
+		/** This computer is a Host: Night Shift may start Ollama by itself. */
+		host: boolean;
+	};
 	view(): {
 		values: {
 			ollamaAddress: string;

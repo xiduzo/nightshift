@@ -10,7 +10,11 @@ import type { DeviceCopy } from "@nightshift/engine/settings";
  * @filledBy auth
  */
 export type SpacePeople = {
-	personInSpace(spaceId: string, personId: string): Promise<string>;
+	/** The Person as the Space's Host knows them. Null in, when nobody is known, may come back null. */
+	personInSpace<P extends string | null>(
+		spaceId: string,
+		personId: P,
+	): Promise<string | P>;
 	personalSpaceIdBySlug(personId: string): Promise<string | null>;
 	personNames(ids: readonly string[]): Promise<Map<string, string>>;
 	keptByHomeHost(spaceId: string): Promise<boolean>;

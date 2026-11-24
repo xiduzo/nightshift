@@ -77,13 +77,14 @@ export function inMemoryEngineKernel(
 }
 
 export function inMemoryDeviceCopies(): DeviceCopiesPort & {
-	kept: string[][];
+	kept: { id: string; name: string }[][];
 } {
-	const kept: string[][] = [];
+	const kept: { id: string; name: string }[][] = [];
 	return {
 		kept,
-		async keep(deviceIds) {
-			kept.push([...deviceIds]);
+		async keep(devices) {
+			kept.push([...devices]);
+			return [];
 		},
 	};
 }

@@ -87,7 +87,7 @@ export type SpaceMember = { name: string; role: string };
 
 /** The role of a Member as the document's mirror has it, or null for anyone else. */
 export function memberRole(
-	document: SpaceDocument,
+	document: Pick<SpaceDocument, "members">,
 	personId: string,
 ): string | null {
 	const entry = document.members.get(personId) as

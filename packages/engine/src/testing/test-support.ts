@@ -33,6 +33,7 @@ import { systemGit } from "../git";
 import { parseEventRow } from "../log/run-log/append";
 import type { RunLog } from "../log/run-log/run-log";
 import type { PeersFactory } from "../peers";
+import { wireSetup } from "../projects";
 import { clonePathOf } from "../projects/keep/adapters/out/drizzle-project-store";
 import type { RunDetail } from "../read/views";
 import { createRunFolders } from "../run-folders/run-folders";
@@ -135,6 +136,8 @@ export function withDevice(options: TestEngineOptions): EngineOptions {
 				// The runs' own folders in the engine's data folder, as on the daemon.
 				runFolders: runFolders ?? createRunFolders(engine.dataDir),
 				git,
+				// A project that is not ready stops a run, as on the daemon.
+				checkProject: wireSetup({ git }),
 				...(knowledge ? { knowledge } : {}),
 			},
 			deviceId,

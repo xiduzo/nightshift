@@ -8,6 +8,7 @@ import { expo } from "@better-auth/expo";
 import type { Database } from "@nightshift/db";
 import { authSchema as schema } from "@nightshift/db";
 import { Refusal } from "@nightshift/refusal";
+import { now } from "@nightshift/time";
 import { betterAuth } from "better-auth";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import { createAccessControl } from "better-auth/plugins/access";
@@ -204,6 +205,7 @@ export function createAuth(
 				if (ctx.path !== "/sign-up/email") return;
 				const refusal = await spaces.members.checkSignUp({
 					body: ctx.body ?? {},
+					now: now(),
 				});
 				if (refusal) refuse(refusal);
 			}),
@@ -232,7 +234,10 @@ export function createAuth(
 							...session,
 							activeOrganizationId: await spaces.findActiveSpace({
 								personId: session.userId,
-								activeSpaceId: session.activeOrganizationId,
+								activeSpaceId:
+									typeof session.activeOrganizationId === "string"
+										? session.activeOrganizationId
+										: null,
 							}),
 						},
 					}),

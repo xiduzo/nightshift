@@ -33,7 +33,7 @@ export type DeviceMcpExpansion =
 export type DeviceConnectionsPort = {
 	names(): ReadonlySet<string>;
 	mcpServersFor(
-		node: { connections: string[] },
+		node: { connections?: string[] },
 		use?: SecretUse,
 	): Promise<DeviceMcpExpansion>;
 	secretEnv(names: readonly string[], use?: SecretUse): Promise<SecretEnv>;

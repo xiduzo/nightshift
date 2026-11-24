@@ -35,19 +35,12 @@ export const MAY = {
  * a role that does not allow the request is ROLE_REFUSAL (403), a Space
  * they are not a Member of is not found.
  */
-async function mapKnowledgeRole({ next }: { next: () => Promise<unknown> }) {
-	try {
-		return await next();
-	} catch (error) {
-		if (error instanceof RoleRefusal) throw refusalError(ROLE_REFUSAL);
-		if (error instanceof SpaceNotFound) {
-			throw new ORPCError("NOT_FOUND", {
-				message: error.message,
-				cause: error,
-			});
-		}
-		throw error;
+function knowledgeRefusal(error: unknown): unknown {
+	if (error instanceof RoleRefusal) return refusalError(ROLE_REFUSAL);
+	if (error instanceof SpaceNotFound) {
+		return new ORPCError("NOT_FOUND", { message: error.message, cause: error });
 	}
+	return error;
 }
 
 /**
@@ -58,7 +51,13 @@ async function mapKnowledgeRole({ next }: { next: () => Promise<unknown> }) {
 export function knowledgeProcedure<
 	TInput extends z.ZodType<{ projectId: string }>,
 >(input: TInput) {
-	return projectProcedure(input).use(mapKnowledgeRole);
+	return projectProcedure(input).use(async ({ next }) => {
+		try {
+			return await next();
+		} catch (error) {
+			throw knowledgeRefusal(error);
+		}
+	});
 }
 
 /**

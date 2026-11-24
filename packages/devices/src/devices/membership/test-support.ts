@@ -4,6 +4,7 @@ import type { Database } from "@nightshift/db";
 import { device } from "@nightshift/db/schema";
 import { HostUnreachableError, NIGHT_SHIFT } from "@nightshift/engine";
 import { and, eq, isNull } from "drizzle-orm";
+import type { BatchItem } from "drizzle-orm/batch";
 import { NotPairedError } from "../../links";
 import { drizzleMembershipRecord } from "./adapters/out/drizzle-membership-record";
 import { fsDatabaseCopy } from "./adapters/out/fs-database-copy";
@@ -13,6 +14,7 @@ import {
 	type HomeMembershipDeps as RingHomeMembershipDeps,
 } from "./application/create-home-membership";
 import type { MergeDeps } from "./application/merge-steps";
+import type { Batches } from "./application/ports";
 import type { SplitDeps } from "./application/split-steps";
 
 /**
@@ -35,6 +37,16 @@ export type LegacyHomeMembershipDeps = Omit<
 	wait?: MergeDeps["wait"];
 	ids?: SplitDeps["ids"];
 };
+
+function batchesOf(db: Database): Batches {
+	return {
+		async run(batch) {
+			// The adapter that runs an opaque batch reads it back (`RowBatch`).
+			const [first, ...rest] = batch as unknown as BatchItem<"sqlite">[];
+			if (first) await db.batch([first, ...rest]);
+		},
+	};
+}
 
 /** Builds HomeMembership the way the old factory did, for the suite. */
 export function createHomeMembershipForTest(
@@ -64,9 +76,7 @@ export function createHomeMembershipForTest(
 			},
 		},
 		databaseCopy: fsDatabaseCopy(db),
-		batches: {
-			run: (batch) => db.batch(batch as Parameters<Database["batch"]>[0]),
-		},
+		batches: batchesOf(db),
 		wait: wait ?? {
 			sleep: (ms) =>
 				new Promise((resolve) => {

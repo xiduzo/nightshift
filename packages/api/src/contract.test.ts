@@ -138,6 +138,7 @@ describe("replies of a real engine", () => {
 		// The personal Space has one Member: this computer's owner.
 		const { members } = await testSpaces(sandbox.db).members.listMembers({
 			spaceId: sandbox.spaceId,
+			now: now(),
 		});
 		const personId = members[0]?.personId ?? "";
 		const document = await sandbox.openDocument();

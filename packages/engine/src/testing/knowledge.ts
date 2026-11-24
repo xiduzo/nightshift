@@ -53,12 +53,19 @@ export function testKnowledge(
 			row: async () => {
 				throw new Error("unused");
 			},
-			walkedHere: () => false,
+			walkedHere: async () => false,
 		},
 		members: {
 			db: sandbox.db,
 			documentRole: async (spaceId, personId) =>
-				memberRole(await synced.open(spaceId), personId),
+				memberRole(
+					{
+						members: (
+							await synced.open(documentName("space", spaceId))
+						).doc.getMap("members"),
+					},
+					personId,
+				),
 		},
 	});
 	const knowledge = wireKnowledge({

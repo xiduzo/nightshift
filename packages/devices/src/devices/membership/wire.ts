@@ -9,6 +9,7 @@ import {
 } from "@nightshift/engine";
 import type { DeviceCopies } from "@nightshift/engine/settings";
 import { and, eq, isNull } from "drizzle-orm";
+import type { BatchItem } from "drizzle-orm/batch";
 import type { DevicesDeps } from "../../devices-runtime";
 import {
 	type DeviceKeyStore,
@@ -67,7 +68,11 @@ function pairedDevicesOf(db: Database): PairedDevices {
 
 function batchesOf(db: Database): Batches {
 	return {
-		run: (batch) => db.batch(batch as Parameters<Database["batch"]>[0]),
+		async run(batch) {
+			// The adapter that runs an opaque batch reads it back (`RowBatch`).
+			const [first, ...rest] = batch as unknown as BatchItem<"sqlite">[];
+			if (first) await db.batch([first, ...rest]);
+		},
 	};
 }
 

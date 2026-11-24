@@ -17,6 +17,7 @@ import {
 } from "../testing";
 import { testLocalPerson, testLocalSession } from "../testing/wires";
 import { LOCAL_EMAIL } from "./personal/domain/personal-space";
+import { runBatch } from "./personal/test-support";
 
 let sandbox: AuthSandbox;
 let authSpaces: ReturnType<typeof testSpaces>;
@@ -318,7 +319,7 @@ describe("adopting the personal Space of the Home Host", () => {
 				from: own,
 				to: hosted,
 			});
-			await sandbox.db.batch(statements);
+			await runBatch(sandbox.db, statements);
 
 			expect(await authSpaces.listSpaces({ personId: ada.userId })).toEqual([
 				{ id: hosted, name: "Personal", personal: true, role: "owner" },
@@ -342,7 +343,7 @@ describe("adopting the personal Space of the Home Host", () => {
 			from: own,
 			to: hosted,
 		});
-		await sandbox.db.batch(statements);
+		await runBatch(sandbox.db, statements);
 		const sessions = await sandbox.db
 			.select({ active: session.activeOrganizationId })
 			.from(session)
@@ -383,7 +384,8 @@ describe("splitting a personal Space off the Home Host's", () => {
 		if (!own) throw new Error("no personal Space");
 		const hosted = "space-on-host";
 		await authSpaces.mirrorHostSpace({ id: hosted, name: "Personal" });
-		await sandbox.db.batch(
+		await runBatch(
+			sandbox.db,
 			await authSpaces.personal.adoptPersonalSpace({
 				personId: ada.userId,
 				from: own,
@@ -396,7 +398,8 @@ describe("splitting a personal Space off the Home Host's", () => {
 	test("a new Space becomes the one personal Space, and the Host's is no longer hers here", async () => {
 		const { ada, hosted } = await merged();
 
-		await sandbox.db.batch(
+		await runBatch(
+			sandbox.db,
 			await authSpaces.personal.splitPersonalSpace({
 				personId: ada.userId,
 				from: hosted,

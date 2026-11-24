@@ -1,6 +1,7 @@
 import { ROLE_REFUSAL, RoleRefusal, wireSpaces } from "@nightshift/auth";
 import { SpaceNotFound } from "@nightshift/engine";
 import { Refusal } from "@nightshift/refusal";
+import { now } from "@nightshift/time";
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 import { output } from "../output";
@@ -100,7 +101,7 @@ export const members = {
 		.handler(async ({ context }) => {
 			const bound = wireSpaces({ db: context.db });
 			const [listed, spaces, invite, remove, changeRole] = await Promise.all([
-				bound.members.listMembers({ spaceId: context.spaceId }),
+				bound.members.listMembers({ spaceId: context.spaceId, now: now() }),
 				bound.listSpaces({ personId: context.session.user.id }),
 				context.access.can({ member: ["invite"] }),
 				context.access.can({ member: ["remove"] }),
@@ -171,7 +172,7 @@ export const invitations = {
 		.handler(async ({ context, input }) => {
 			const found = await wireSpaces({
 				db: context.db,
-			}).members.viewInvitation({ id: input.invitationId });
+			}).members.viewInvitation({ id: input.invitationId, now: now() });
 			if (!found) {
 				throw new Refusal(
 					"not-found",

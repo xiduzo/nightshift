@@ -1,33 +1,62 @@
-import { describe, test } from "bun:test";
+import { afterAll, beforeAll, describe, test } from "bun:test";
+import { existsSync } from "node:fs";
+import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { bunSetupProcesses } from "./bun-setup-processes";
 import { inMemorySetupProcesses } from "./in-memory-setup-processes";
 import { setupProcessesContract } from "./setup-processes.contract";
 
-const memory = setupProcessesContract("in-memory", () => {
-	const processes = inMemorySetupProcesses();
-	return {
-		processes,
-		finishInstall: (code) => processes.started.at(-1)?.exit(code),
-		finishSignIn: (code) => processes.started.at(-1)?.exit(code),
-	};
+/**
+ * The real side starts a tiny program of a temp folder, never an installer
+ * or a sign-in: it waits for the file `go`, and exits with its content.
+ */
+let dir: string;
+let program: string;
+beforeAll(async () => {
+	dir = await mkdtemp(join(tmpdir(), "nightshift-setup-contract-"));
+	program = join(dir, "fake-cli");
+	await writeFile(
+		program,
+		'#!/bin/sh\nwhile [ ! -s "$GO" ]; do sleep 0.02; done\nexit "$(cat "$GO")"\n',
+	);
+	await chmod(program, 0o755);
 });
+afterAll(() => rm(dir, { recursive: true, force: true }));
 
-const bun = setupProcessesContract("bun over a fake spawn", () => {
-	const processes = inMemorySetupProcesses();
-	return {
-		processes,
-		finishInstall: (code) => processes.started.at(-1)?.exit(code),
-		finishSignIn: (code) => processes.started.at(-1)?.exit(code),
-	};
-});
+const suites = [
+	setupProcessesContract("in-memory", () => {
+		const processes = inMemorySetupProcesses();
+		const exit = (code: number) => processes.started.at(-1)?.exit(code);
+		return {
+			processes,
+			program: "claude",
+			command: "curl -fsSL https://claude.ai/install.sh | bash",
+			home: "/home/ada",
+			env: { PATH: "/usr/bin" },
+			finish: (code) => exit(code),
+		};
+	}),
+	setupProcessesContract("bun", () => {
+		const go = join(dir, crypto.randomUUID());
+		return {
+			processes: bunSetupProcesses(),
+			program,
+			command: program,
+			home: dir,
+			env: { PATH: "/usr/bin:/bin", GO: go },
+			finish: async (code) => {
+				if (!existsSync(go)) await writeFile(go, `${code}`);
+			},
+		};
+	}),
+];
 
-for (const suite of [memory, bun]) {
+for (const suite of suites) {
 	describe(`SetupProcesses (${suite.name})`, () => {
 		for (const c of suite.cases) {
 			test(c.name, c.run);
 		}
 	});
 }
-
-void bunSetupProcesses;

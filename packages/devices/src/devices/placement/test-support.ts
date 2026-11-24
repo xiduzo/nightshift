@@ -5,7 +5,10 @@ import type {
 } from "./application/create-placement";
 import { wirePlacement } from "./wire";
 
-export type LegacyPlacementDeps = Omit<PlacementDeps, "spacePeople"> & {
+export type LegacyPlacementDeps = Omit<
+	PlacementDeps,
+	"spacePeople" | "engineFns"
+> & {
 	db: Database;
 };
 

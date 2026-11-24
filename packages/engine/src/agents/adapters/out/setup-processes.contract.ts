@@ -20,8 +20,13 @@ export function setupProcessesContract(
 	name: string,
 	make: () => {
 		processes: SetupProcesses;
-		finishInstall: (code: number) => void;
-		finishSignIn: (code: number) => void;
+		/** The installer's command and the CLI: each runs until `finish`. */
+		command: string;
+		program: string;
+		home: string;
+		env: Record<string, string>;
+		/** The program that started last exits with this code. */
+		finish: (code: number) => void | Promise<void>;
 	},
 ) {
 	return {
@@ -30,24 +35,24 @@ export function setupProcessesContract(
 			{
 				name: "an install that exits 0 is done",
 				run: async () => {
-					const { processes, finishInstall } = make();
+					const { processes, finish, command, home, env } = make();
 					const run = processes.startInstall({
-						command: "curl -fsSL https://claude.ai/install.sh | bash",
-						home: "/home/ada",
-						env: { PATH: "/usr/bin" },
+						command,
+						home,
+						env,
 					});
-					finishInstall(0);
+					await finish(0);
 					expect(await run.ended).toMatchObject({ kind: "done" });
 				},
 			},
 			{
 				name: "a stop ends an install as stopped",
 				run: async () => {
-					const { processes } = make();
+					const { processes, command, home, env } = make();
 					const run = processes.startInstall({
-						command: "true",
-						home: "/h",
-						env: {},
+						command,
+						home,
+						env,
 					});
 					run.stop();
 					expect(await run.ended).toEqual({ kind: "stopped" });
@@ -56,15 +61,15 @@ export function setupProcessesContract(
 			{
 				name: "a sign-in that exits is exited",
 				run: async () => {
-					const { processes, finishSignIn } = make();
+					const { processes, finish, program, home, env } = make();
 					const run = processes.startSignIn({
-						program: "claude",
+						program,
 						setup: SETUP,
-						home: "/home/ada",
-						env: {},
+						home,
+						env,
 						onSight: () => {},
 					});
-					finishSignIn(0);
+					await finish(0);
 					expect(await run.ended).toEqual({ kind: "exited", code: 0 });
 				},
 			},

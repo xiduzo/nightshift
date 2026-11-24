@@ -415,7 +415,11 @@ export function NativeLoadingRow({ label }: NativeLoadingRowProps) {
 }
 
 export function NativeCustomRow({ children }: NativeCustomRowProps) {
-	return <RNHostView matchContents={{ vertical: true }}>{children}</RNHostView>;
+	return (
+		<RNHostView matchContents={{ vertical: true }}>
+			<>{children}</>
+		</RNHostView>
+	);
 }
 
 /**

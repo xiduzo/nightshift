@@ -52,7 +52,6 @@ export type SpaceMove = {
 
 export function wireSpaceMove(deps: SpaceMoveDeps): SpaceMove {
 	const ports = {
-		access: deps.access,
 		...deps,
 		moveStore: drizzleMoveStore(deps.db),
 		spaceEntries: yjsSpaceEntries(deps.documents),

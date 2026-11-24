@@ -38,7 +38,7 @@ function spacePeopleOf(db: Database): SpacePeople {
 export function wirePlacement() {
 	return {
 		createPlacement(
-			deps: Omit<PlacementDeps, "spacePeople"> & { db: Database },
+			deps: Omit<PlacementDeps, "spacePeople" | "engineFns"> & { db: Database },
 		): PlacementModule {
 			const { db, ...rest } = deps;
 			const placement = createPlacement({

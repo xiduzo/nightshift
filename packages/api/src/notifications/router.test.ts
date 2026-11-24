@@ -36,6 +36,7 @@ beforeEach(async () => {
 	inApp = createInAppChannel();
 	notifications = createNotifications({
 		db: sandbox.db,
+		auth: sandbox.auth,
 		events: fakeRunEvents().source,
 		sendsFor: async () => true,
 		inApp,

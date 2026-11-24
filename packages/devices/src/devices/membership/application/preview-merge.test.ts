@@ -5,7 +5,7 @@ describe("previewMerge", () => {
 	test("calls membership.preview with the join list", async () => {
 		const seen: { join?: readonly string[] }[] = [];
 		const run = previewMerge({
-			preview: async (input) => {
+			preview: async (input = {}) => {
 				seen.push(input);
 				return { host: { id: "h", name: "Host" }, projects: [], runs: 0 };
 			},

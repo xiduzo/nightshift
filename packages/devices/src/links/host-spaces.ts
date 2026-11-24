@@ -192,21 +192,11 @@ export function createHostSpaces(db: Database) {
  * names that Person, so every Replica of the Space reads the same
  * `started_by`.
  */
-export async function personInSpace(
+export async function personInSpace<P extends string | null>(
 	db: Database,
 	spaceId: string,
-	personId: string,
-): Promise<string>;
-export async function personInSpace(
-	db: Database,
-	spaceId: string,
-	personId: string | null,
-): Promise<string | null>;
-export async function personInSpace(
-	db: Database,
-	spaceId: string,
-	personId: string | null,
-): Promise<string | null> {
+	personId: P,
+): Promise<string | P> {
 	return (await personOnHost(db, spaceId)) ?? personId;
 }
 

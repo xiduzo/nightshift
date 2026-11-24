@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { user } from "@nightshift/db/schema";
+import { invitation, user } from "@nightshift/db/schema";
+import { asDate, HOUR_MS, now } from "@nightshift/time";
 import { eq } from "drizzle-orm";
 import type { MemberChange, Permissions } from "../index";
 import { testRequestAccess, testSpaces } from "../testing";
@@ -134,9 +135,29 @@ describe("invitation-only signup", () => {
 			invitationId: id,
 		});
 		expect(canceled.status).toBe(403);
-		expect((await spaces.members.viewInvitation({ id: id }))?.status).toBe(
-			"canceled",
-		);
+		expect(
+			(await spaces.members.viewInvitation({ id, now: now() }))?.status,
+		).toBe("canceled");
+	});
+});
+
+describe("an invitation past its time", () => {
+	test("shows as expired and makes no account", async () => {
+		const ada = await sandbox.signUp("Ada");
+		const platform = await platformOf(ada.headers);
+		const id = await invite(ada.headers, platform, "carol@example.com");
+		await sandbox.db
+			.update(invitation)
+			.set({ expiresAt: asDate(now() - HOUR_MS) })
+			.where(eq(invitation.id, id));
+		expect(
+			(await spaces.members.viewInvitation({ id, now: now() }))?.status,
+		).toBe("expired");
+		const refused = await signUpEmail({
+			email: "carol@example.com",
+			invitationId: id,
+		});
+		expect(refused.status).toBe(403);
 	});
 });
 
@@ -146,7 +167,7 @@ describe("invite, accept, member", () => {
 		const platform = await platformOf(ada.headers);
 		const id = await invite(ada.headers, platform, "Carol@Example.com");
 
-		expect(await spaces.members.viewInvitation({ id: id })).toEqual({
+		expect(await spaces.members.viewInvitation({ id, now: now() })).toEqual({
 			id,
 			spaceName: "Platform",
 			email: "carol@example.com",
@@ -156,7 +177,8 @@ describe("invite, accept, member", () => {
 			hasAccount: false,
 		});
 		expect(
-			(await spaces.members.listMembers({ spaceId: platform })).invitations,
+			(await spaces.members.listMembers({ spaceId: platform, now: now() }))
+				.invitations,
 		).toEqual([expect.objectContaining({ id, email: "carol@example.com" })]);
 
 		const signedUp = await signUpEmail({
@@ -184,15 +206,18 @@ describe("invite, accept, member", () => {
 		expect(await access.can({ run: ["start"] })).toBe(true);
 		expect(await access.can({ member: ["invite"] })).toBe(false);
 
-		const listed = await spaces.members.listMembers({ spaceId: platform });
+		const listed = await spaces.members.listMembers({
+			spaceId: platform,
+			now: now(),
+		});
 		expect(listed.members.map((m) => [m.name, m.role])).toEqual([
 			["Ada", "owner"],
 			["Carol", "member"],
 		]);
 		expect(listed.invitations).toEqual([]);
-		expect((await spaces.members.viewInvitation({ id: id }))?.status).toBe(
-			"accepted",
-		);
+		expect(
+			(await spaces.members.viewInvitation({ id, now: now() }))?.status,
+		).toBe("accepted");
 		expect(changes).toContainEqual({
 			kind: "joined",
 			spaceId: platform,
@@ -213,7 +238,7 @@ describe("invite, accept, member", () => {
 			body: { invitationId: id },
 		});
 		const [membership] = (
-			await spaces.members.listMembers({ spaceId: platform })
+			await spaces.members.listMembers({ spaceId: platform, now: now() })
 		).members.filter((m) => m.personId === bob.userId);
 
 		await sandbox.auth.api.updateMemberRole({

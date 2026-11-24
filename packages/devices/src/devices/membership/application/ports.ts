@@ -1,4 +1,5 @@
 import type { Actor, RowBatch } from "@nightshift/engine";
+import type { DeviceCopies } from "@nightshift/engine/settings";
 import type {
 	MergeRow,
 	MergeTarget,
@@ -160,6 +161,4 @@ export type EngineKernel = {
  * The copies of the Person's other Devices on this computer.
  * @filledBy engine/settings
  */
-export type DeviceCopiesPort = {
-	keep(deviceIds: readonly string[]): Promise<void>;
-};
+export type DeviceCopiesPort = Pick<DeviceCopies, "keep">;
