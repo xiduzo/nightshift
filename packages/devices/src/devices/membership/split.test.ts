@@ -549,6 +549,8 @@ describe("leaving and joining the same Host again", () => {
 		await joinAgain();
 		await membershipOf(undefined).beforeJoin();
 		expect((await b.db.select().from(spaceSplit))[0]?.state).toBe("done");
+		// Personal is this computer's own: on here, they would fire here too.
+		expect((await ownSchedules(projectId))[0]?.enabled).toBe(false);
 		await rejoined();
 		expect(await syncedSchedules(projectId)).toEqual(before);
 	});
@@ -581,16 +583,31 @@ describe("leaving and joining the same Host again", () => {
 		);
 	});
 
-	test("the record of another Host, or of another Person there, turns none on", async () => {
-		const { projectId } = await merged();
-		for (const other of [{ hostId: "other" }, { hostPersonId: "other" }]) {
+	for (const other of [
+		{ hostId: "other" },
+		{ hostPersonId: "other" },
+		{ fromSpace: "other" },
+	]) {
+		test(`the record of another leave turns none on: ${Object.keys(other)}`, async () => {
+			const { projectId } = await merged();
 			await revoke();
 			await splitter().revoked(home);
 			await b.db.update(spaceSplit).set(other);
 			const paused = await ownSchedules(projectId);
 			await rejoined();
 			expect(await syncedSchedules(projectId)).toEqual(paused);
-		}
+		});
+	}
+
+	test("a schedule that a person changes and turns on while a split waits comes back as they left it", async () => {
+		const { projectId, before } = await plannedSplit();
+		const [nightly, off] = before;
+		if (!nightly || !off) throw new Error("No schedules.");
+		const changed = [{ ...nightly, cron: "0 5 * * *" }, off];
+		await paired.device.flows.saveSchedules(projectId, changed);
+		await splitter().revoked(home);
+		await rejoined();
+		expect(await syncedSchedules(projectId)).toEqual(changed);
 	});
 });
 

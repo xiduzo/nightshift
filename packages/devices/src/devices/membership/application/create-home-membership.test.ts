@@ -411,6 +411,27 @@ describe("a split that waits", () => {
 		expect(world.record.mergesRows.map((m) => m.fromSpace)).toEqual(["fresh"]);
 	});
 
+	test("that a run held back before it was planned holds a merge into another Host too", async () => {
+		const { world, membership } = setUp();
+		world.joined();
+		world.leave = async () => {
+			world.run("late", { spaceId: "theirs", status: "running" });
+			return undefined;
+		};
+		await membership.leave();
+		expect(world.record.splitsRows).toEqual([]);
+		const [first] = world.hosts;
+		if (!first) throw new Error("No Host.");
+		world.hosts = [first, { ...first, hostId: "second", revokedAt: null }];
+		world.linked.add("second");
+		world.online.add("second");
+		world.listed = [{ id: "there", name: "Personal", personal: true }];
+		world.listedBy = "second";
+		world.run("done");
+		await expect(membership.merge()).rejects.toThrow(MERGE_WORDS.leaving);
+		expect(world.record.mergesRows).toEqual([]);
+	});
+
 	test("that cannot go on now holds a merge, and the page says why", async () => {
 		const { world, membership } = await waiting();
 		const [first] = world.hosts;

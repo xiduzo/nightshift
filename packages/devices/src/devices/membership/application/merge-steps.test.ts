@@ -260,6 +260,25 @@ describe("Projects that change on the way", () => {
 		expect(world.projects.map((p) => p.spaceId)).toEqual(["theirs", "theirs"]);
 	});
 
+	test("one that takes the place of another is asked for too", async () => {
+		const { world, steps, goOn } = setUp();
+		world.projects = [moving("p1"), moving("p2")];
+		world.batchFails = new Error("disk full");
+		await expect(steps.start({})).rejects.toThrow("disk full");
+		world.batchFails = null;
+		world.projects = [
+			moving("p1"),
+			moving("p2", { spaceId: "other" }),
+			moving("p3"),
+		];
+		expect(await goOn()).toMatchObject({ state: "pushed", projects: 2 });
+		expect(world.projects.map((p) => p.spaceId)).toEqual([
+			"theirs",
+			"other",
+			"theirs",
+		]);
+	});
+
 	test("one that comes under the hold each time ends the merge, and no row moves", async () => {
 		const { world, steps, state } = setUp();
 		let next = 0;

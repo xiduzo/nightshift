@@ -143,4 +143,4 @@ Each step above has a command too. See [Terminal and MCP](Terminal-and-MCP.md).
 - `nightshift join <host-address>` pairs this computer with a Host. `nightshift pair <code>` on the Host allows it.
 - `nightshift merge` shows what moves into your Personal on the Host, before it moves.
 - `nightshift join <host-address> --guest` joins the Host of another person. A guest Host never gets your Personal.
-- `nightshift leave` ends the pairing. The Host keeps everything. This computer keeps its own Personal. Night Shift pauses its schedules, because the Host still runs them.
+- `nightshift leave` ends the pairing. The Host keeps everything. This computer keeps its own Personal. Night Shift pauses its schedules, because the Host still runs them. When you join the same Host again, the schedules that you did not change are on again.

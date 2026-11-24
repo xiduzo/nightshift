@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import type { HostClient, PhoneView } from "../../contract";
+import { implement } from "@orpc/server";
+import { RPCHandler } from "@orpc/server/fetch";
+import { type HostClient, hostContract, type PhoneView } from "../../contract";
 import { createDevices } from "./adapters/in/devices-page";
 
 /** This computer's Devices, with a link to one Host that lists `phones`, and a clock. */
@@ -70,6 +72,67 @@ describe("the phones on a Host this computer joined", () => {
 		await expect(devices.phonesAt("h2")).rejects.toThrow();
 		await expect(devices.phonesAt("h2")).rejects.toThrow();
 	});
+});
+
+test("a join ends what an earlier leave left before its link starts", async () => {
+	const served = implement(hostContract);
+	const handler = new RPCHandler({
+		pairing: {
+			start: served.pairing.start.handler(() => ({
+				deviceCode: "device-code",
+				userCode: "ABCD1234",
+				verificationUri: "http://127.0.0.1/devices",
+				verificationUriComplete: "http://127.0.0.1/devices",
+				expiresIn: 600,
+				interval: 0,
+				fingerprint: null,
+			})),
+			redeem: served.pairing.redeem.handler(() => ({
+				status: "joined" as const,
+				key: "key",
+				personId: "person",
+				host: { id: "host", name: "Studio", addresses: [] },
+				deviceId: "me",
+			})),
+		},
+	});
+	const server = Bun.serve({
+		hostname: "127.0.0.1",
+		port: 0,
+		fetch: async (request) =>
+			(await handler.handle(request, { prefix: "/rpc" })).response ??
+			new Response("no", { status: 404 }),
+	});
+	const steps: string[] = [];
+	const devices = createDevices({
+		self: { id: "me", name: "Laptop", platform: "darwin" },
+		hostLinks: {
+			home: async () => null,
+			save: async (link: object) => {
+				steps.push("saved");
+				return link;
+			},
+		},
+		keys: { kind: "file", set: async () => {} },
+		links: { add: async () => steps.push("link") },
+		membership: {
+			beforeJoin: async () => {
+				await Bun.sleep(5);
+				steps.push("ended");
+			},
+			async *joined() {},
+		},
+	} as unknown as Parameters<typeof createDevices>[0]);
+	try {
+		for await (const _step of devices.join({
+			url: `http://127.0.0.1:${server.port}`,
+			role: "home",
+		})) {
+		}
+	} finally {
+		server.stop(true);
+	}
+	expect(steps).toEqual(["saved", "ended", "link"]);
 });
 
 describe("the owner's other Devices", () => {
