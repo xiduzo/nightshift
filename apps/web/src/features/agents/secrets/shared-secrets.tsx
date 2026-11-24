@@ -17,15 +17,7 @@ import {
 } from "@nightshift/ui/components/alert-dialog";
 import { Button } from "@nightshift/ui/components/button";
 import { Card, CardContent } from "@nightshift/ui/components/card";
-import {
-	Dialog,
-	DialogClose,
-	DialogContent,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from "@nightshift/ui/components/dialog";
+import { Dialog, DialogContent } from "@nightshift/ui/components/dialog";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -40,14 +32,6 @@ import {
 	EmptyMedia,
 	EmptyTitle,
 } from "@nightshift/ui/components/empty";
-import {
-	Field,
-	FieldDescription,
-	FieldError,
-	FieldGroup,
-	FieldLabel,
-} from "@nightshift/ui/components/field";
-import { Input } from "@nightshift/ui/components/input";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import {
@@ -65,14 +49,15 @@ import {
 	Trash2Icon,
 	UserIcon,
 } from "lucide-react";
-import { useId, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { orpc, type ProjectSecretRow } from "@/shared/api";
 import { DataTable, dataTableColumns } from "@/shared/data-table";
 import { useNow } from "@/shared/format";
 import { PageSection } from "@/shared/page";
 import type { SharedSecretActions } from "../queries";
-import { Ago, SCOPE, SECRET_NAME, UsedBy } from "./secret-parts";
+import { SecretForm } from "./secret-form";
+import { Ago, SCOPE, UsedBy } from "./secret-parts";
 
 /** What a list of shared secrets says: for a project, or for the Space. */
 export type SharedSecretWords = {
@@ -359,11 +344,14 @@ function SharedSecretDialog({
 		<Dialog open={name !== null} onOpenChange={onOpenChange}>
 			<DialogContent className="sm:max-w-md">
 				{name !== null ? (
-					<SharedSecretForm
-						actions={actions}
-						words={words}
+					<SecretForm
 						fixedName={name || null}
+						addTitle={`Add a secret to ${words.owner}`}
+						description={words.trust}
+						placeholder="DATABASE_URL"
 						saved={saved}
+						valueHint="Paste it once. Nobody sees it again."
+						save={actions.set}
 						onDone={() => {
 							onDone();
 							onOpenChange(false);
@@ -372,115 +360,6 @@ function SharedSecretDialog({
 				) : null}
 			</DialogContent>
 		</Dialog>
-	);
-}
-
-function SharedSecretForm({
-	actions,
-	words,
-	fixedName,
-	saved,
-	onDone,
-}: {
-	actions: SharedSecretActions;
-	words: SharedSecretWords;
-	fixedName: string | null;
-	saved: boolean;
-	onDone: () => void;
-}) {
-	const id = useId();
-	const [name, setName] = useState(fixedName ?? "");
-	const [value, setValue] = useState("");
-	const set = useMutation({
-		mutationFn: actions.set,
-		onSuccess: () => {
-			toast.success(`Saved ${name}`);
-			onDone();
-		},
-	});
-	const trimmedName = name.trim();
-	const nameInvalid = trimmedName !== "" && !SECRET_NAME.test(trimmedName);
-	const canSave = SECRET_NAME.test(trimmedName) && value !== "";
-
-	return (
-		<form
-			className="contents"
-			onSubmit={(event) => {
-				event.preventDefault();
-				if (!canSave) return;
-				set.mutate({ name: trimmedName, value });
-			}}
-		>
-			<DialogHeader>
-				<DialogTitle>
-					{fixedName ? (
-						<>
-							Set <span className="font-mono">{fixedName}</span>
-						</>
-					) : (
-						`Add a secret to ${words.owner}`
-					)}
-				</DialogTitle>
-				<DialogDescription>{words.trust}</DialogDescription>
-			</DialogHeader>
-			<FieldGroup className="gap-5">
-				{fixedName ? null : (
-					<Field data-invalid={nameInvalid || undefined}>
-						<FieldLabel htmlFor={`${id}-name`}>Name</FieldLabel>
-						<Input
-							id={`${id}-name`}
-							value={name}
-							onChange={(event) => setName(event.target.value)}
-							placeholder="DATABASE_URL"
-							className="font-mono"
-							autoComplete="off"
-							spellCheck={false}
-							autoFocus
-							aria-invalid={nameInvalid || undefined}
-						/>
-						{nameInvalid ? (
-							<FieldError>
-								Start with a letter or _. Use letters, digits and _.
-							</FieldError>
-						) : null}
-					</Field>
-				)}
-				<Field>
-					<FieldLabel htmlFor={`${id}-value`}>Value</FieldLabel>
-					<Input
-						id={`${id}-value`}
-						type="password"
-						value={value}
-						onChange={(event) => setValue(event.target.value)}
-						className="font-mono"
-						autoComplete="off"
-						spellCheck={false}
-						autoFocus={Boolean(fixedName)}
-					/>
-					<FieldDescription>
-						{saved
-							? "A new value replaces the saved one."
-							: "Paste it once. Nobody sees it again."}
-					</FieldDescription>
-				</Field>
-				{set.error ? (
-					<Alert variant="destructive">
-						<CircleAlertIcon />
-						<AlertTitle>Not saved</AlertTitle>
-						<AlertDescription>{set.error.message}</AlertDescription>
-					</Alert>
-				) : null}
-			</FieldGroup>
-			<DialogFooter>
-				<DialogClose render={<Button variant="outline" type="button" />}>
-					Cancel
-				</DialogClose>
-				<Button type="submit" disabled={!canSave || set.isPending}>
-					{set.isPending ? <Spinner data-icon="inline-start" /> : null}
-					{set.isPending ? "Saving…" : "Save"}
-				</Button>
-			</DialogFooter>
-		</form>
 	);
 }
 
