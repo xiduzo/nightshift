@@ -448,7 +448,6 @@ export function AgentFields({
 							? "A prompt that you write."
 							: `A skill that ${harness.label} already has, with optional arguments.`
 					}
-					describedBy={`${id}-task-hint`}
 					value={taskKind}
 					choices={TASK_KINDS}
 					onChange={(next) => {

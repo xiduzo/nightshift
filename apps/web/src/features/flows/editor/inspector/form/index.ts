@@ -9,7 +9,6 @@ export {
 	InspectorSection,
 	Note,
 	Optional,
-	PositiveIntInput,
 } from "./fields";
 export { type InspectorTab, InspectorTabs } from "./inspector-tabs";
 export { NumberField } from "./number-field";

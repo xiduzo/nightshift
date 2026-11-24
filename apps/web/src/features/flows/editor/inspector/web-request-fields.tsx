@@ -28,7 +28,7 @@ import {
 	Field,
 	InspectorSection,
 	Note,
-	PositiveIntInput,
+	NumberField,
 	withOptional,
 } from "./form";
 import { TemplateField } from "./template";
@@ -287,52 +287,44 @@ export function WebRequestFields({
 			<DataShapeSection node={node} onChange={onChange} label="Body shape" />
 
 			<InspectorSection title="Answer" tab="setup" defaultOpen={false}>
-				<Field
+				<NumberField
 					id={`${id}-timeout`}
 					label="Time limit (seconds)"
 					optional
 					hint={`Default ${DEFAULT_WEB_REQUEST_TIMEOUT_SECONDS} seconds.`}
-				>
-					<PositiveIntInput
-						id={`${id}-timeout`}
-						value={node.timeoutSeconds}
-						placeholder={String(DEFAULT_WEB_REQUEST_TIMEOUT_SECONDS)}
-						onChange={(timeoutSeconds) =>
-							onChange((current) =>
-								withOptional(
-									current,
-									"timeoutSeconds",
-									timeoutSeconds && Math.min(timeoutSeconds, 600),
-								),
-							)
-						}
-					/>
-				</Field>
-				<Field
+					value={node.timeoutSeconds}
+					placeholder={String(DEFAULT_WEB_REQUEST_TIMEOUT_SECONDS)}
+					onChange={(timeoutSeconds) =>
+						onChange((current) =>
+							withOptional(
+								current,
+								"timeoutSeconds",
+								timeoutSeconds && Math.min(timeoutSeconds, 600),
+							),
+						)
+					}
+				/>
+				<NumberField
 					id={`${id}-size`}
 					label="Size limit (MB)"
 					optional
 					hint={`Default ${DEFAULT_WEB_REQUEST_MAX_BYTES / MB} MB, at most ${MAX_WEB_REQUEST_BYTES / MB} MB. A larger answer ends the step fail.`}
-				>
-					<PositiveIntInput
-						id={`${id}-size`}
-						value={
-							node.maxBytes === undefined
-								? undefined
-								: Math.max(1, Math.round(node.maxBytes / MB))
-						}
-						placeholder={String(DEFAULT_WEB_REQUEST_MAX_BYTES / MB)}
-						onChange={(megabytes) =>
-							onChange((current) =>
-								withOptional(
-									current,
-									"maxBytes",
-									megabytes && Math.min(megabytes * MB, MAX_WEB_REQUEST_BYTES),
-								),
-							)
-						}
-					/>
-				</Field>
+					value={
+						node.maxBytes === undefined
+							? undefined
+							: Math.max(1, Math.round(node.maxBytes / MB))
+					}
+					placeholder={String(DEFAULT_WEB_REQUEST_MAX_BYTES / MB)}
+					onChange={(megabytes) =>
+						onChange((current) =>
+							withOptional(
+								current,
+								"maxBytes",
+								megabytes && Math.min(megabytes * MB, MAX_WEB_REQUEST_BYTES),
+							),
+						)
+					}
+				/>
 			</InspectorSection>
 		</>
 	);

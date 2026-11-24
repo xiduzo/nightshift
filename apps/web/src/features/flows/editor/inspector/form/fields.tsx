@@ -99,6 +99,19 @@ export function Field({
 	);
 }
 
+/** The id of a Field's hint or error, for the control's `aria-describedby`. */
+export function hintId({
+	id,
+	hint,
+	error,
+}: {
+	id: string;
+	hint?: ReactNode;
+	error?: string | null;
+}): string | undefined {
+	return hint || error ? `${id}-hint` : undefined;
+}
+
 const NOTE =
 	"text-muted-foreground text-xs leading-relaxed [&_code]:rounded-sm [&_code]:bg-muted [&_code]:px-1 [&_code]:py-px [&_code]:font-mono [&_code]:text-foreground";
 

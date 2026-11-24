@@ -153,7 +153,6 @@ export function CommandFields({
 							</>
 						)
 					}
-					describedBy={`${id}-stdout-hint`}
 					value={node.stdout}
 					choices={COMMAND_OUTPUTS}
 					onChange={(stdout) => onChange((current) => ({ ...current, stdout }))}

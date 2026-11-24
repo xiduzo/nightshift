@@ -3,7 +3,7 @@ import {
 	ToggleGroupItem,
 } from "@nightshift/ui/components/toggle-group";
 import type { ReactNode } from "react";
-import { Field } from "./fields";
+import { Field, hintId } from "./fields";
 
 export type Choice<T extends string> = {
 	value: T;
@@ -58,7 +58,7 @@ export function ChoiceToggle<T extends string>({
 	);
 }
 
-/** A labelled `ChoiceToggle`. */
+/** A labelled `ChoiceToggle`. A screen reader reads its hint or its error with it. */
 export function ChoiceField<T extends string>({
 	id,
 	label,
@@ -70,14 +70,17 @@ export function ChoiceField<T extends string>({
 	label: string;
 	hint?: ReactNode;
 	error?: string | null;
-	describedBy?: string;
 	value: T;
 	choices: readonly Choice<T>[];
 	onChange: (value: T) => void;
 }) {
 	return (
 		<Field id={id} label={label} hint={hint} error={error}>
-			<ChoiceToggle label={label} {...toggle} />
+			<ChoiceToggle
+				label={label}
+				describedBy={hintId({ id, hint, error })}
+				{...toggle}
+			/>
 		</Field>
 	);
 }

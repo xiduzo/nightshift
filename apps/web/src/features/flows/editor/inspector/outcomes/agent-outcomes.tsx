@@ -54,7 +54,6 @@ export function AgentOutcomeSection({
 					? "Night Shift asks you the questions of the agent. The agent continues with your answer. Stop makes the step fail."
 					: "The run takes the needs input edge."
 			}
-			describedBy={`${id}-ask-hint`}
 			value={onNeedsInput}
 			choices={ON_NEEDS_INPUT}
 			onChange={(next) =>

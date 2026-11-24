@@ -1,5 +1,5 @@
 import type { ComponentProps } from "react";
-import { Field, PositiveIntInput } from "./fields";
+import { Field, hintId, PositiveIntInput } from "./fields";
 
 /** A labelled number above 0, or empty for "not set". */
 export function NumberField({
@@ -8,16 +8,19 @@ export function NumberField({
 	optional,
 	hint,
 	error,
-	describedBy = hint || error ? `${id}-hint` : undefined,
 	...input
 }: Pick<
 	ComponentProps<typeof Field>,
 	"id" | "label" | "optional" | "hint" | "error"
 > &
-	ComponentProps<typeof PositiveIntInput>) {
+	Omit<ComponentProps<typeof PositiveIntInput>, "describedBy">) {
 	return (
 		<Field id={id} label={label} optional={optional} hint={hint} error={error}>
-			<PositiveIntInput id={id} describedBy={describedBy} {...input} />
+			<PositiveIntInput
+				id={id}
+				describedBy={hintId({ id, hint, error })}
+				{...input}
+			/>
 		</Field>
 	);
 }
