@@ -2,21 +2,21 @@ import { describe, expect, test } from "bun:test";
 import { asDate } from "@nightshift/time";
 import { runRecord } from "../../../access/adapters/out/in-memory-run-records";
 import { NIGHT_SHIFT } from "../../../contract";
-import { inMemoryViewsPorts } from "../adapters/out/in-memory-neighbours";
+import { viewsPorts } from "../test-support";
 import { listProjectRuns } from "./list-project-runs";
 
-/** How the runs of each project stand, for an actor, on in-memory adapters. */
+/** How the runs of each project stand, for an actor, over a database in memory. */
 
 const SPACE = "space-1";
 const ADA = { personId: "person-ada", door: "session" as const };
 const AT = 10 * 86_400_000;
 
-function setup() {
-	const ports = inMemoryViewsPorts();
-	ports.addRun(
+async function setup() {
+	const ports = await viewsPorts();
+	await ports.addRun(
 		runRecord({ id: "run-1", spaceId: SPACE, createdAt: asDate(AT - 1_000) }),
 	);
-	ports.addRun(
+	await ports.addRun(
 		runRecord({
 			id: "run-2",
 			spaceId: SPACE,
@@ -24,8 +24,8 @@ function setup() {
 			createdAt: asDate(AT),
 		}),
 	);
-	ports.addRun(runRecord({ id: "run-3", spaceId: "space-2" }));
-	ports.views.append({
+	await ports.addRun(runRecord({ id: "run-3", spaceId: "space-2" }));
+	await ports.append({
 		type: "RunStarted",
 		runId: "run-2",
 		payload: { projectId: "project-1", flowName: "f", title: "t", start: "a" },
@@ -35,7 +35,7 @@ function setup() {
 
 describe("listProjectRuns", () => {
 	test("each project of the Space with its runs counted and its newest run", async () => {
-		const { list } = setup();
+		const { list } = await setup();
 		const counts = await list(NIGHT_SHIFT, {
 			spaceId: SPACE,
 			read: { now: AT, timeZone: "UTC" },
@@ -48,7 +48,7 @@ describe("listProjectRuns", () => {
 	});
 
 	test("a Member reads them; a Person who is not one does not find the Space", async () => {
-		const { ports, list } = setup();
+		const { ports, list } = await setup();
 		await expect(list(ADA, { spaceId: SPACE })).rejects.toMatchObject({
 			kind: "not-found",
 		});

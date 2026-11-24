@@ -1,11 +1,5 @@
-import { inMemoryAccess } from "../../../../access/adapters/out/in-memory-access";
 import { type Actor, personOf } from "../../../../contract";
 import type { PrivatePaths } from "../../application/ports";
-import {
-	inMemoryRunViews,
-	type RunViewsNeighbours,
-	THIS_COMPUTER,
-} from "./in-memory-run-views";
 
 /**
  * The private paths in memory: a test says which Person owns which Device
@@ -49,27 +43,3 @@ export function inMemoryPrivatePaths() {
 }
 
 export type InMemoryPrivatePaths = ReturnType<typeof inMemoryPrivatePaths>;
-
-/**
- * Every port of the views in memory, and the use cases of access over
- * the same runs: what each test of a use case starts from. A run a test
- * adds (`addRun`) is a row of both the views and access.
- */
-export function inMemoryViewsPorts(given: Partial<RunViewsNeighbours> = {}) {
-	const access = inMemoryAccess();
-	const views = inMemoryRunViews(given, THIS_COMPUTER);
-	const paths = inMemoryPrivatePaths();
-	return {
-		views,
-		paths,
-		/** The runs and the Members that access reads. */
-		access,
-		openRun: access.openRun,
-		openSpace: access.openSpace,
-		/** Adds a run's row to the views and to access. */
-		addRun(row: Parameters<typeof views.add>[0]) {
-			views.add(row);
-			access.runs.add(row);
-		},
-	};
-}

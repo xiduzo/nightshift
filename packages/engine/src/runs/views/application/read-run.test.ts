@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { runRecord } from "../../../access/adapters/out/in-memory-run-records";
 import { NIGHT_SHIFT } from "../../../contract";
-import { inMemoryViewsPorts } from "../adapters/out/in-memory-neighbours";
+import { viewsPorts } from "../test-support";
 import { readRun } from "./read-run";
 
-/** The run page for an actor, on in-memory adapters. */
+/** The run page for an actor, over a database in memory. */
 
 const SPACE = "space-1";
 const OTHER = "space-2";
@@ -15,10 +15,9 @@ const NOT_FOUND = {
 };
 
 /** One run of `SPACE` on a Device of Ada's, with one step, and one run of `OTHER`. */
-function setup() {
-	const ports = inMemoryViewsPorts();
-	ports.views.project("project-1");
-	ports.addRun(
+async function setup() {
+	const ports = await viewsPorts();
+	await ports.addRun(
 		runRecord({
 			id: "run-1",
 			spaceId: SPACE,
@@ -26,8 +25,8 @@ function setup() {
 			deviceId: "ada-laptop",
 		}),
 	);
-	ports.addRun(runRecord({ id: "run-2", spaceId: OTHER }));
-	ports.views.append({
+	await ports.addRun(runRecord({ id: "run-2", spaceId: OTHER }));
+	await ports.append({
 		type: "StepStarted",
 		runId: "run-1",
 		stepId: "step-1",
@@ -44,7 +43,7 @@ function setup() {
 
 describe("readRun", () => {
 	test("Night Shift reads the run page of any run, with its path", async () => {
-		const { read } = setup();
+		const { read } = await setup();
 		const detail = await read(NIGHT_SHIFT, { runId: "run-1" });
 		expect(detail.id).toBe("run-1");
 		expect(detail.steps.map((s) => s.id)).toEqual(["step-1"]);
@@ -52,7 +51,7 @@ describe("readRun", () => {
 	});
 
 	test("a Member reads it; the path only on a Device they own", async () => {
-		const { ports, read } = setup();
+		const { ports, read } = await setup();
 		ports.access.members.join(SPACE, ADA.personId, "viewer");
 		expect((await read(ADA, { runId: "run-1" })).worktreePath).toBe("");
 		ports.paths.own("ada-laptop", ADA.personId);
@@ -62,7 +61,7 @@ describe("readRun", () => {
 	});
 
 	test("a run of a Space the Person is not a Member of is not found", async () => {
-		const { ports, read } = setup();
+		const { ports, read } = await setup();
 		ports.access.members.join(OTHER, ADA.personId, "owner");
 		await expect(read(ADA, { runId: "run-1" })).rejects.toMatchObject(
 			NOT_FOUND,
@@ -70,7 +69,7 @@ describe("readRun", () => {
 	});
 
 	test("a run of another Space than the view's is not found", async () => {
-		const { read } = setup();
+		const { read } = await setup();
 		await expect(
 			read(NIGHT_SHIFT, { runId: "run-2", spaceId: SPACE }),
 		).rejects.toMatchObject(NOT_FOUND);

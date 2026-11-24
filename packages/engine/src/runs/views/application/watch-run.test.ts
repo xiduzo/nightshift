@@ -2,18 +2,18 @@ import { describe, expect, test } from "bun:test";
 import { runRecord } from "../../../access/adapters/out/in-memory-run-records";
 import { NIGHT_SHIFT } from "../../../contract";
 import type { RunStreamItem } from "../../../read";
-import { inMemoryViewsPorts } from "../adapters/out/in-memory-neighbours";
+import { viewsPorts } from "../test-support";
 import { watchRun } from "./watch-run";
 
-/** The watch of a run for an actor, on in-memory adapters. */
+/** The watch of a run for an actor, over a database in memory. */
 
 const SPACE = "space-1";
 const ADA = { personId: "person-ada", door: "session" as const };
 
-function setup() {
-	const ports = inMemoryViewsPorts();
-	ports.addRun(runRecord({ id: "run-1", spaceId: SPACE }));
-	ports.views.append({
+async function setup() {
+	const ports = await viewsPorts();
+	await ports.addRun(runRecord({ id: "run-1", spaceId: SPACE }));
+	await ports.append({
 		type: "RunStarted",
 		runId: "run-1",
 		payload: { projectId: "project-1", flowName: "f", title: "t", start: "a" },
@@ -30,7 +30,7 @@ async function firstOf(stream: AsyncGenerator<RunStreamItem>) {
 
 describe("watchRun", () => {
 	test("Night Shift and a Member watch the run: its status comes first", async () => {
-		const { ports, watch } = setup();
+		const { ports, watch } = await setup();
 		const stop = new AbortController();
 		expect(
 			await firstOf(
@@ -52,7 +52,7 @@ describe("watchRun", () => {
 	});
 
 	test("a run the Person may not see is refused before the stream begins", async () => {
-		const { watch } = setup();
+		const { watch } = await setup();
 		await expect(
 			watch(ADA, { runId: "run-1", signal: new AbortController().signal }),
 		).rejects.toMatchObject({
@@ -62,7 +62,7 @@ describe("watchRun", () => {
 	});
 
 	test("a watch that was stopped before it began sends nothing", async () => {
-		const { watch } = setup();
+		const { watch } = await setup();
 		const stop = new AbortController();
 		stop.abort();
 		const stream = await watch(NIGHT_SHIFT, {
