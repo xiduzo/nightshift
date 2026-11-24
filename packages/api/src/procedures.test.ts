@@ -164,7 +164,7 @@ let onResolve: () => void;
 let calls: Call[];
 /**
  * The knowledge door's role check, set for each request. A source route
- * checks here, before `knowledge.sources` is recorded: the save, the
+ * checks here, before its call is recorded: the save, the
  * remove and the sync each need a different role.
  */
 let openTheSpace: (spaceId: string, need?: Permissions) => Promise<void> =
@@ -172,22 +172,22 @@ let openTheSpace: (spaceId: string, need?: Permissions) => Promise<void> =
 let theSpace: string | null = null;
 
 /**
- * `knowledge.sources`, after the role `need` allows it. The call is
+ * `knowledge.sources`, with members that answer after the role `need` allows it. The call is
  * recorded when a member (`save`, `remove`, `sync`) runs, so a refusal
  * records nothing. The object comes back at once: the handler calls the
  * member on it.
  */
 function sourcesOf(need: Permissions) {
-	return (...args: unknown[]) => {
+	return () => {
 		const allowed = (async () => {
 			if (theSpace) await openTheSpace(theSpace, need);
-			calls.push({ method: "knowledge.sources", args });
 		})();
 		return new Proxy(() => {}, {
 			get(_, key) {
 				if (typeof key !== "string" || key === "then") return undefined;
-				return async () => {
+				return async (...args: unknown[]) => {
 					await allowed;
+					calls.push({ method: `knowledge.sources.${key}`, args });
 					return anything;
 				};
 			},
@@ -637,9 +637,9 @@ const ROUTES: Route[] = [
 	route("knowledge.settleNote", { ...project, learningId: "l1", index: 1, note: "One.", decision: "keep" }, START, "knowledge.settleNote", [ASKING, { spaceId: SPACE, projectId: "p1", note: { id: "l1", index: 1, note: "One." }, decision: "keep", by: like({ id: PERSON }) }]),
 	route("knowledge.tell", { ...project, note: " Two. " }, START, "knowledge.tellLearning", [ASKING, { spaceId: SPACE, projectId: "p1", note: "Two.", by: like({ id: PERSON }) }]),
 	route("knowledge.tell", { ...project, note: "Two.", replaces: { learningId: "l1", index: 0 } }, START, "knowledge.tellLearning", [ASKING, { spaceId: SPACE, projectId: "p1", note: "Two.", by: like({ id: PERSON }), replaces: { id: "l1", index: 0 } }]),
-	route("knowledge.saveSource", { ...project, source: webSource }, SAVE, "knowledge.sources", [any], { given: { knowledge: { sources: sourcesOf(SAVE) } } }),
-	route("knowledge.removeSource", { ...flowRef, removeFiles: false }, { flow: ["remove"] }, "knowledge.sources", [any], { given: { knowledge: { sources: sourcesOf({ flow: ["remove"] }) } } }),
-	route("knowledge.syncSource", flowRef, START, "knowledge.sources", [any], { given: { knowledge: { sources: sourcesOf(START) } } }),
+	route("knowledge.saveSource", { ...project, source: webSource }, SAVE, "knowledge.sources.save", [ASKING, { spaceId: SPACE, projectId: "p1", source: webSource, may: any }], { given: { knowledge: { sources: sourcesOf(SAVE) } } }),
+	route("knowledge.removeSource", { ...flowRef, removeFiles: false }, { flow: ["remove"] }, "knowledge.sources.remove", [ASKING, { spaceId: SPACE, projectId: "p1", name: "night", files: false, may: any }], { given: { knowledge: { sources: sourcesOf({ flow: ["remove"] }) } } }),
+	route("knowledge.syncSource", flowRef, START, "knowledge.sources.sync", [ASKING, { spaceId: SPACE, projectId: "p1", name: "night", startedBy: PERSON }], { given: { knowledge: { sources: sourcesOf(START) } } }),
 	route("knowledge.search", { ...project, query: "docs" }, "session", "knowledge.search", ["p1", "docs", {}]),
 	route("knowledge.meaning", project, "session", "knowledge.meaning", ["p1"]),
 	route("knowledge.read", { ...project, path: "a.md" }, "session", "knowledge.read", ["p1", "a.md", { maxBytes: 1024 * 1024 }]),
