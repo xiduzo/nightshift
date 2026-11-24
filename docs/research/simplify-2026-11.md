@@ -225,3 +225,13 @@ Each entry names its source. "Read" means found by reading and not reproduced.
 - None of create-placement, create-home-membership, merge-steps and split-steps is a use
   case. The proposed shape: five requests for placement, seven for membership, shared steps
   in `domain/`. Not built.
+
+### FW. The forwards are gone (509afb22b, e74421514, d67a7c453, a36231366)
+
+- 27 of 29 listed use cases and their tests are deleted: 87 files, +374/-1,698. None held a
+  check of who may act. Complexity does not change, as the plan said.
+- Two of the list were mappings and stay. The three role writes of auth stay.
+- About 65 mutants. Four calls that take ids of one type have a case through the real wire.
+  Two survive: the bindings of `readRunTrace` and `findTargets` in a wire. No test that
+  asserts them was found on the base. Nothing proves that `take` is one document change.
+- AskedQuestions stays. It is not as small as lane F3 wrote.
