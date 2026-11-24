@@ -8,6 +8,7 @@ import {
 	type Scope,
 	sessionCost,
 } from "../log";
+import type { RunStatus } from "../run-status";
 import { runEvents as log } from "../testing/run-events";
 import { deriveScores } from "./run-metrics";
 import { runFacts } from "./run-summary";
@@ -22,6 +23,7 @@ import {
 	deriveTraversals,
 	deriveVariables,
 	deriveWorktrees,
+	isOpenStatus,
 	lastHarnessSession,
 	lastHarnessSessionOfNode,
 	parkedSteps,
@@ -203,6 +205,23 @@ test("sumCost adds the cost of each ended session once", () => {
 		.sessionEnded("s2", "c", "finished", 0.5)
 		.sessionEnded("s2", "c", "finished", 9);
 	expect(sumCost(foldRun(events)).usd).toBe(0.75);
+});
+
+test("isOpenStatus: a run at work, at a Gate or asleep is open; an ended one is not", () => {
+	const statuses: RunStatus[] = [
+		"running",
+		"waiting",
+		"sleeping",
+		"finished",
+		"failed",
+		"stopped",
+		"interrupted",
+	];
+	expect(statuses.filter(isOpenStatus)).toEqual([
+		"running",
+		"waiting",
+		"sleeping",
+	]);
 });
 
 test("sumCost and step costs include what a step spent itself", () => {
