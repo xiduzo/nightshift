@@ -20,7 +20,7 @@ import {
 	withOutputSchema,
 	withWrites,
 } from "../../flows";
-import { type VariableWrite, waitCommandOf } from "../../nodes";
+import type { VariableWrite } from "../../nodes";
 import { typedOutput } from "../../shapes";
 import type {
 	SuggestedOutcome,
@@ -29,37 +29,79 @@ import type {
 	TextRange,
 } from "../contract";
 
+/** A text field of a node that a suggestion rewrites: its text, and the node with another. */
+type TextField = { text: string; with(text: string): FlowNode };
+
 /**
- * The prompt a `prompt` suggestion rewrites: an Agent's prompt, or the
- * prompt of a Decision or a Value node. Undefined: the node has no prompt
- * field (a Command, a Call), so it takes no prompt suggestion.
+ * An Agent's prompt, or the prompt of a Decision or a Value node. Undefined:
+ * the node has no prompt field (a Command, a Call), so it takes no prompt
+ * suggestion.
  */
-export function promptOf(node: FlowNode): string | undefined {
+function promptField(node: FlowNode): TextField | undefined {
 	switch (node.type) {
 		case "agent":
 		case "decision":
-			return node.prompt;
 		case "value":
-			return node.prompt ?? "";
+			return {
+				text: node.prompt ?? "",
+				with: (prompt) => ({ ...node, prompt }),
+			};
 		default:
 			return undefined;
 	}
 }
 
 /**
- * The command a `command` suggestion rewrites: a Command's, the one a Wait
- * runs until it passes, or the one that prints a Call node's list.
- * Undefined: the node has no such field, so it takes no command
- * suggestion. An Agent's check and a Service's commands take none either.
+ * A Command's command, the one a Wait runs until it passes, or the one that
+ * prints a Call node's list. Undefined: the node has no such field, so it
+ * takes no command suggestion. An Agent's check and a Service's commands take
+ * none either.
  */
-export function suggestedCommandOf(node: FlowNode): string | undefined {
-	if (node.type === "command") return node.command;
-	if (node.type === "wait") return waitCommandOf(node.until)?.command;
-	if (node.type === "call" && node.each?.source.kind === "command") {
-		return node.each.source.command;
+function commandField(node: FlowNode): TextField | undefined {
+	switch (node.type) {
+		case "command":
+			return {
+				text: node.command,
+				with: (command) => ({ ...node, command }),
+			};
+		case "wait": {
+			const { until } = node;
+			if (until.kind === "command") {
+				return {
+					text: until.command,
+					with: (command) => ({ ...node, until: { ...until, command } }),
+				};
+			}
+			if (until.kind !== "any") return undefined;
+			return {
+				text: until.command.command,
+				with: (command) => ({
+					...node,
+					until: { ...until, command: { ...until.command, command } },
+				}),
+			};
+		}
+		case "call": {
+			const { each } = node;
+			if (each?.source.kind !== "command") return undefined;
+			return {
+				text: each.source.command,
+				with: (command) => ({
+					...node,
+					each: { ...each, source: { kind: "command", command } },
+				}),
+			};
+		}
+		default:
+			return undefined;
 	}
-	return undefined;
 }
+
+/** The prompt a `prompt` suggestion rewrites. Undefined: the node takes none. */
+export const promptOf = (node: FlowNode) => promptField(node)?.text;
+
+/** The command a `command` suggestion rewrites. Undefined: the node takes none. */
+export const suggestedCommandOf = (node: FlowNode) => commandField(node)?.text;
 
 /** `text` with `range` replaced by `replacement`. A range past the end is cut to the text. */
 export function replaceRange(
@@ -74,32 +116,77 @@ export function replaceRange(
 }
 
 /**
+ * What a suggestion of a kind does to a node that takes it. A node that
+ * does not take it gives undefined.
+ */
+const NODE_KINDS: {
+	[K in SuggestionKind]?: (
+		node: FlowNode,
+	) =>
+		| ((
+				suggestion: Extract<Suggestion, { kind: K }>,
+				selection?: TextRange,
+		  ) => FlowNode)
+		| undefined;
+} = {
+	prompt(node) {
+		const field = promptField(node);
+		return (
+			field &&
+			(({ text }, selection) =>
+				field.with(replaceRange(field.text, selection, text)))
+		);
+	},
+	command(node) {
+		const field = commandField(node);
+		return field && (({ command }) => field.with(command));
+	},
+	// A person applies it: the schema counts as confirmed.
+	output: (node) =>
+		typedOutput(node) === null
+			? undefined
+			: ({ output }) => withOutputSchema(node, output),
+	set:
+		(node) =>
+		({ set }) =>
+			withWrites(node, set),
+	outcomes: (node) =>
+		node.type === "agent" || node.type === "decision" ? () => node : undefined,
+	rules: (node) =>
+		node.type === "decision" && node.by === "rule"
+			? ({ rules }) => ({ ...node, options: withRules(node.options, rules) })
+			: undefined,
+	expression: (node) =>
+		node.type === "value" && node.by === "rule"
+			? ({ expression }) => ({ ...node, expression })
+			: undefined,
+	arguments: (node) =>
+		node.type === "tool" && node.tool.trim() !== ""
+			? (suggestion) => ({ ...node, arguments: suggestion.arguments })
+			: undefined,
+};
+
+/** The options with the rule of each one that `rules` names. An empty rule goes. */
+function withRules(
+	options: readonly NodeOption[],
+	rules: Extract<Suggestion, { kind: "rules" }>["rules"],
+): NodeOption[] {
+	const byOption = new Map(rules.map((rule) => [rule.option, rule.when]));
+	return options.map((option) => {
+		const when = byOption.get(option.name)?.trim();
+		if (when === undefined) return option;
+		const { when: _, ...rest } = option;
+		return when === "" ? rest : { ...rest, when };
+	});
+}
+
+/**
  * Whether `node` has the field a suggestion of `kind` fills, as
  * `applySuggestion` applies it. A kind of the flow (`description`,
  * `inputs`) takes no node.
  */
 export function takesSuggestion(node: FlowNode, kind: SuggestionKind): boolean {
-	switch (kind) {
-		case "prompt":
-			return promptOf(node) !== undefined;
-		case "output":
-			return typedOutput(node) !== null;
-		case "set":
-			return true;
-		case "outcomes":
-			return node.type === "agent" || node.type === "decision";
-		case "rules":
-			return node.type === "decision" && node.by === "rule";
-		case "expression":
-			return node.type === "value" && node.by === "rule";
-		case "command":
-			return suggestedCommandOf(node) !== undefined;
-		case "arguments":
-			return node.type === "tool" && node.tool.trim() !== "";
-		case "description":
-		case "inputs":
-			return false;
-	}
+	return NODE_KINDS[kind]?.(node) !== undefined;
 }
 
 /**
@@ -131,93 +218,23 @@ export function applySuggestion(
 	}
 	if (suggestion.kind === "inputs") return setInputs(flow, suggestion.inputs);
 	const node = flow.nodes.find((candidate) => candidate.id === nodeId);
-	if (!node || nodeId === undefined || !takesSuggestion(node, suggestion.kind))
-		return flow;
-	switch (suggestion.kind) {
-		case "prompt": {
-			const before = promptOf(node);
-			if (before === undefined) return flow;
-			const prompt = replaceRange(before, selection, suggestion.text);
-			return updateNode(flow, nodeId, (current) =>
-				current.type === "agent" ||
-				current.type === "decision" ||
-				current.type === "value"
-					? { ...current, prompt }
-					: current,
-			);
-		}
-		case "output":
-			// A person applies it: the schema counts as confirmed.
-			return updateNode(flow, nodeId, (current) =>
-				withOutputSchema(current, suggestion.output),
-			);
-		case "set": {
-			const withSet = updateNode(flow, nodeId, (current) =>
-				withWrites(current, suggestion.set),
-			);
-			const added = newVariables(flow, suggestion.variables);
-			return added.length === 0
-				? withSet
-				: setVariables(withSet, [...(withSet.variables ?? []), ...added]);
-		}
-		case "outcomes":
-			return applyOutcomes(flow, nodeId, suggestion.outcomes);
-		case "rules": {
-			const rules = new Map(suggestion.rules.map((r) => [r.option, r.when]));
-			return updateNode(flow, nodeId, (current) => {
-				if (current.type !== "decision") return current;
-				const options = current.options.map((option) => {
-					const when = rules.get(option.name)?.trim();
-					if (when === undefined) return option;
-					const { when: _, ...rest } = option;
-					return when === "" ? rest : { ...rest, when };
-				});
-				return { ...current, options };
-			});
-		}
-		case "expression":
-			return updateNode(flow, nodeId, (current) =>
-				current.type === "value"
-					? { ...current, expression: suggestion.expression }
-					: current,
-			);
-		case "command":
-			return updateNode(flow, nodeId, (current) => {
-				if (current.type === "command")
-					return { ...current, command: suggestion.command };
-				if (current.type === "wait" && current.until.kind === "command")
-					return {
-						...current,
-						until: { ...current.until, command: suggestion.command },
-					};
-				if (current.type === "wait" && current.until.kind === "any")
-					return {
-						...current,
-						until: {
-							...current.until,
-							command: {
-								...current.until.command,
-								command: suggestion.command,
-							},
-						},
-					};
-				if (current.type === "call" && current.each?.source.kind === "command")
-					return {
-						...current,
-						each: {
-							...current.each,
-							source: { kind: "command", command: suggestion.command },
-						},
-					};
-				return current;
-			});
-		case "arguments":
-			return updateNode(flow, nodeId, (current) =>
-				current.type === "tool"
-					? { ...current, arguments: suggestion.arguments }
-					: current,
-			);
+	const apply = node && NODE_KINDS[suggestion.kind]?.(node);
+	if (!apply) return flow;
+	if (suggestion.kind === "outcomes") {
+		return applyOutcomes(flow, node.id, suggestion.outcomes);
 	}
+	const changed = updateNode(flow, node.id, () =>
+		// The table gives the rule of the suggestion's own kind.
+		(apply as (s: Suggestion, range?: TextRange) => FlowNode)(
+			suggestion,
+			selection,
+		),
+	);
+	if (suggestion.kind !== "set") return changed;
+	const added = newVariables(flow, suggestion.variables);
+	return added.length === 0
+		? changed
+		: setVariables(changed, [...(changed.variables ?? []), ...added]);
 }
 
 /**
@@ -342,43 +359,27 @@ export function outputChanges(
 	before: Schema | undefined,
 	after: Schema,
 ): OutputFieldChange[] {
-	const old = new Map(propertiesOf(before));
-	const oldRequired = requiredOf(before);
-	const required = requiredOf(after);
-	const fields = propertiesOf(after);
-	const kept = new Set(fields.map(([name]) => name));
-	const row = (
-		name: string,
-		field: Schema,
-		isRequired: boolean,
-		change: Change,
-	): OutputFieldChange => ({
+	const fieldsOf = (schema: Schema | undefined) => {
+		const required = requiredOf(schema);
+		return propertiesOf(schema).map(([name, field]) => ({
+			name,
+			field,
+			required: required.has(name),
+		}));
+	};
+	return namedChanges(
+		fieldsOf(before),
+		fieldsOf(after),
+		({ name }) => name,
+	).map(({ name, item: { field, required }, change }) => ({
 		name,
 		type: typeWords(field),
 		...(typeof field.description === "string"
 			? { description: field.description }
 			: {}),
-		required: isRequired,
+		required,
 		change,
-	});
-	return [
-		...fields.map(([name, field]) => {
-			const previous = old.get(name);
-			const change: Change =
-				previous === undefined
-					? "new"
-					: JSON.stringify(previous) !== JSON.stringify(field) ||
-							oldRequired.has(name) !== required.has(name)
-						? "changed"
-						: "same";
-			return row(name, field, required.has(name), change);
-		}),
-		...[...old]
-			.filter(([name]) => !kept.has(name))
-			.map(([name, field]) =>
-				row(name, field, oldRequired.has(name), "removed"),
-			),
-	];
+	}));
 }
 
 /** One variable write of a `set` suggestion, in a preview. */

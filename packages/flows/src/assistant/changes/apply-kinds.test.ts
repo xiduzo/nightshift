@@ -2,6 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { FLOW_VERSION, type Flow, flowSchema } from "../../flow";
 import {
 	isFlowSuggestion,
+	type Suggestion,
+	type SuggestionKind,
 	suggestionRequestSchema,
 } from "../contract/assistant";
 import {
@@ -10,6 +12,7 @@ import {
 	inputChanges,
 	outcomeChanges,
 	ruleChanges,
+	suggestedCommandOf,
 	takesSuggestion,
 } from "./apply";
 
@@ -49,6 +52,45 @@ const flow: Flow = flowSchema.parse({
 			type: "wait",
 			position: { x: 0, y: 0 },
 			until: { kind: "command", command: "true", everyMinutes: 5 },
+		},
+		{
+			id: "either",
+			type: "wait",
+			position: { x: 0, y: 0 },
+			until: {
+				kind: "any",
+				signal: { name: "done" },
+				command: { command: "true", everyMinutes: 10 },
+			},
+		},
+		{
+			id: "signal",
+			type: "wait",
+			position: { x: 0, y: 0 },
+			until: { kind: "signal", name: "done" },
+		},
+		{
+			id: "asked",
+			type: "decision",
+			position: { x: 0, y: 0 },
+			prompt: "Ship it?",
+			by: "person",
+			options: [{ name: "yes" }, { name: "no" }],
+		},
+		{
+			id: "named",
+			type: "value",
+			position: { x: 0, y: 0 },
+			by: "person",
+			prompt: "Which one?",
+			output: { type: "object" },
+		},
+		{
+			id: "no_tool",
+			type: "tool",
+			position: { x: 0, y: 0 },
+			connection: "linear",
+			tool: " ",
 		},
 		{
 			id: "pick",
@@ -102,15 +144,29 @@ const flow: Flow = flowSchema.parse({
 const nodeOf = (next: Flow, id: string) =>
 	next.nodes.find((node) => node.id === id);
 
+/** The kinds of a node's own field that node `id` takes. */
+const takes = (id: string) =>
+	(["outcomes", "rules", "expression", "command", "arguments"] as const).filter(
+		(kind) => takesKind(id, kind),
+	);
+
+function takesKind(id: string, kind: SuggestionKind) {
+	const node = nodeOf(flow, id);
+	return node ? takesSuggestion(node, kind) : undefined;
+}
+
+const suggestions = {
+	prompt: { kind: "prompt", text: "New.", note: "" },
+	output: { kind: "output", output: { type: "string" }, note: "" },
+	rules: { kind: "rules", rules: [{ option: "yes", when: "1" }], note: "" },
+	expression: { kind: "expression", expression: "2", note: "" },
+	command: { kind: "command", command: "make", note: "" },
+	arguments: { kind: "arguments", arguments: { title: "y" }, note: "" },
+	outcomes: { kind: "outcomes", outcomes: [{ name: "x" }], note: "" },
+} satisfies { [K in SuggestionKind]?: Suggestion };
+
 describe("takesSuggestion", () => {
 	test("each kind fits the nodes that have its field", () => {
-		const takes = (id: string) =>
-			(
-				["outcomes", "rules", "expression", "command", "arguments"] as const
-			).filter((kind) => {
-				const node = nodeOf(flow, id);
-				return node ? takesSuggestion(node, kind) : false;
-			});
 		expect(takes("review")).toEqual(["outcomes"]);
 		expect(takes("gate")).toEqual(["outcomes", "rules"]);
 		expect(takes("check")).toEqual(["command"]);
@@ -121,6 +177,59 @@ describe("takesSuggestion", () => {
 		expect(takes("listed")).toEqual([]);
 		// Suggest writes no Agent check and no Service command.
 		expect(takes("app")).toEqual([]);
+	});
+
+	test.each([
+		["a prompt", "prompt", "check"],
+		["an output", "output", "asked"],
+		["outcomes", "outcomes", "pick"],
+		["rules, for a person decides", "rules", "asked"],
+		["rules, for it has no options", "rules", "review"],
+		["an expression, for a person writes it", "expression", "named"],
+		["an expression, for it is no Value", "expression", "gate"],
+		["a command, for it waits for a signal", "command", "signal"],
+		["a command, for its list is written out", "command", "listed"],
+		["arguments, for it has no tool yet", "arguments", "no_tool"],
+		["arguments, for it is no Tool", "arguments", "check"],
+	] as const)("a node does not take %s", (_, kind, id) => {
+		expect(takesKind(id, kind)).toBe(false);
+		expect(applySuggestion(flow, id, suggestions[kind])).toBe(flow);
+	});
+
+	test.each([
+		["prompt", "review"],
+		["prompt", "named"],
+		["output", "check"],
+		["output", "named"],
+	] as const)("a %s fits %s", (kind, id) => {
+		expect(takesKind(id, kind)).toBe(true);
+	});
+
+	test("a Value without a prompt starts from an empty one", () => {
+		const next = applySuggestion(flow, "pick", suggestions.prompt, {
+			start: 0,
+			end: 0,
+		});
+		expect(nodeOf(next, "pick")).toMatchObject({ prompt: "New." });
+	});
+
+	test("the description and the inputs take no node", () => {
+		expect(takesKind("review", "description")).toBe(false);
+		expect(takesKind("review", "inputs")).toBe(false);
+	});
+
+	test("a Wait for a signal or a command takes the command, and keeps the signal", () => {
+		const either = nodeOf(flow, "either");
+		expect(either && suggestedCommandOf(either)).toBe("true");
+		expect(takes("either")).toEqual(["command"]);
+		const next = applySuggestion(flow, "either", suggestions.command);
+		expect(nodeOf(next, "either")).toMatchObject({
+			until: {
+				kind: "any",
+				signal: { name: "done" },
+				command: { command: "make", everyMinutes: 10 },
+			},
+		});
 	});
 
 	test("the description and the inputs belong to the flow, without a node", () => {

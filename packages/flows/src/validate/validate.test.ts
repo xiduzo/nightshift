@@ -1309,6 +1309,25 @@ describe("validateFlow: names and inputs", () => {
 		]);
 	});
 
+	test("an input has a valid name that is not the id of a node", () => {
+		const f = withInputs(flow([agent("worker")], []), [
+			{ name: "not valid", type: "text" },
+			{ name: "worker", type: "text" },
+		]);
+		expect(errors(validateFlow(f))).toEqual([
+			expect.objectContaining({
+				message: expect.stringContaining(
+					'The input "not valid" is not a valid name: ',
+				),
+			}),
+			expect.objectContaining({
+				nodeId: "worker",
+				message:
+					'The input "worker" has the same name as the node "worker". Rename one of them.',
+			}),
+		]);
+	});
+
 	test("run is reserved for inputs and node ids", () => {
 		const f = withInputs(flow([agent("worker")], []), [
 			{ name: "run", type: "text" },
@@ -2793,6 +2812,29 @@ describe("validateFlow: variables", () => {
 		);
 		expect(found).toContain(
 			'error: The variable "check" has the same name as the node "check". Rename one of them.',
+		);
+	});
+
+	test("a variable has a valid name, and its clash with a node names the node", () => {
+		const found = validateFlow(
+			withVariables({}, [
+				{ name: "not valid", type: "text" },
+				{ name: "check", type: "text" },
+			]),
+		);
+		expect(found).toContainEqual(
+			expect.objectContaining({
+				message: expect.stringContaining(
+					'The variable "not valid" is not a valid name: ',
+				),
+			}),
+		);
+		expect(found).toContainEqual(
+			expect.objectContaining({
+				nodeId: "check",
+				message:
+					'The variable "check" has the same name as the node "check". Rename one of them.',
+			}),
 		);
 	});
 
