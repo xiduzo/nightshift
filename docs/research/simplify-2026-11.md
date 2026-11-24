@@ -151,3 +151,15 @@ Each entry names its source. "Read" means found by reading and not reproduced.
 - Kept whole: placement, merge, split, admission, offers and work. Their ring tests prove
   too little, so these suites are the only integration proof.
 - The whole devices suite did not run in the lane. The check of the combined tip runs it.
+
+### G. Guards (a799b726e, bc810c194, ab9c198a4)
+
+- One check, "CI passed", needs the four CI jobs. Nightly and release read it before they
+  build or tag. CI also runs on `arch/**`.
+- A rule in `check-verticals` fails a relative import that names no file. On 044ca498c it
+  finds 36 problems in 23 files. On the tip it finds 0.
+- A pre-push hook runs the types and Biome: 14 s warm, 60 s for the types in a new worktree.
+- Incident: for 53 seconds `core.bare` was true in the shared Git configuration. A test ran
+  `git init` inside a hook and inherited `GIT_DIR`. It is repaired, and the test drops `GIT_*`.
+  Other tests that run `git init` are not checked for this fault.
+- Gap: `insights-image.yml` does not read the check when a person starts it.
