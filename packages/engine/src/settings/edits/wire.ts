@@ -1,4 +1,5 @@
 import type { HarnessName } from "@nightshift/flows";
+import type { ComputerAccess } from "../../access";
 import type { CliToolStore } from "../cli-tools";
 import type { ConnectionStore } from "../connections";
 import type { ProfileStore } from "../profiles";
@@ -33,6 +34,7 @@ export type Edits = {
  * root of device-config gives them.
  */
 export function wireEdits(deps: {
+	computerAccess: Pick<ComputerAccess, "openComputer">;
 	settings: Pick<SettingsStore, "current" | "save">;
 	profiles: Pick<ProfileStore, "get" | "byName" | "list" | "save">;
 	connections: Pick<ConnectionStore, "get" | "save" | "remove">;

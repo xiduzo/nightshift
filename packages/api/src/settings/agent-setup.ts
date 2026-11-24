@@ -1,7 +1,7 @@
+import type { PersonActor } from "@nightshift/engine";
 import { harnessNameSchema } from "@nightshift/flows";
 import { z } from "zod";
 
-import type { Context } from "../context";
 import { output } from "../output";
 import { ownerProcedure } from "../procedures";
 import { agentSetupStatusSchema, agentSetupViewSchema } from "./schemas";
@@ -16,8 +16,12 @@ import { agentSetupStatusSchema, agentSetupViewSchema } from "./schemas";
 
 const harnessInput = z.object({ harness: harnessNameSchema });
 
-/** Where the request comes from: setup acts only on this computer itself. */
-const callerOf = (context: Pick<Context, "fromThisComputer">) => ({
+/** Who asks, and where the request comes from: setup acts only on this computer itself. */
+const callerOf = (context: {
+	actor: PersonActor;
+	fromThisComputer: boolean;
+}) => ({
+	actor: context.actor,
 	here: context.fromThisComputer,
 });
 

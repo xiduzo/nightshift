@@ -1,4 +1,5 @@
 import { now as timeNow } from "@nightshift/time";
+import type { ComputerAccess } from "../../access";
 import { type Actor, NIGHT_SHIFT } from "../../contract";
 import type { Git } from "../../git";
 import { type GitHubCli, parseGitHubRepo } from "../../github";
@@ -9,7 +10,6 @@ import { nodeGitHubClones } from "./adapters/out/node-git-hub-clones";
 import { copyProjectHere } from "./application/copy-project-here";
 import { listGitHubRepos } from "./application/list-git-hub-repos";
 import { listProjectCopies } from "./application/list-project-copies";
-import type { GitHubClones } from "./application/ports";
 import { readGitHubAccess } from "./application/read-git-hub-access";
 import { readGitHubClone } from "./application/read-git-hub-clone";
 import { startGitHubClone } from "./application/start-git-hub-clone";
@@ -31,6 +31,8 @@ import {
 
 /** What the daemon gives the copies. */
 export type CopiesDeps = {
+	/** Who may ask of this computer: its owner. */
+	computerAccess: Pick<ComputerAccess, "openComputer">;
 	dataDir: string;
 	/** The clones that run, kept across a `bun --hot` reload. */
 	tracker: CloneTracker;
@@ -68,7 +70,19 @@ export type ProjectCopies = {
 	stop(): void;
 };
 
-export type Copies = { gitHub: GitHubClones; copies: ProjectCopies };
+/** The clones from GitHub, as a person asks for them. */
+export type GitHubAsks = {
+	/** The GitHub CLI on this computer: missing, signed out or signed in. */
+	access: ReturnType<typeof readGitHubAccess>;
+	/** The person's repositories, when the GitHub CLI is signed in. Else none. */
+	repos: ReturnType<typeof listGitHubRepos>;
+	/** Starts a clone of the repository a person entered, or joins the one that runs. */
+	start: ReturnType<typeof startGitHubClone>;
+	/** The clone of the repository, or null when none started since this daemon did. */
+	status: ReturnType<typeof readGitHubClone>;
+};
+
+export type Copies = { gitHub: GitHubAsks; copies: ProjectCopies };
 
 export function wireCopies(deps: CopiesDeps): Copies {
 	const clones = nodeGitHubClones({
@@ -80,6 +94,7 @@ export function wireCopies(deps: CopiesDeps): Copies {
 	});
 	const now = deps.now ?? timeNow;
 	const ports = {
+		computerAccess: deps.computerAccess,
 		gitHub: clones,
 		origins: gitCloneOrigins(deps.git),
 		ground: {
@@ -107,17 +122,12 @@ export function wireCopies(deps: CopiesDeps): Copies {
 		sweep,
 		intervalMs: deps.intervalMs ?? SWEEP_INTERVAL_MS,
 	});
-	const start = startGitHubClone(ports);
-	const status = readGitHubClone(ports);
-	const access = readGitHubAccess(ports);
-	const repos = listGitHubRepos(ports);
 	return {
 		gitHub: {
-			access: () => access(),
-			repos: () => repos(),
-			start: (repo) => start({ repo }),
-			status: (repo) => status({ repo }),
-			copy: (repo) => clones.copy(repo),
+			access: readGitHubAccess(ports),
+			repos: listGitHubRepos(ports),
+			start: startGitHubClone(ports),
+			status: readGitHubClone(ports),
 		},
 		copies: {
 			copy: (space, projectId) => copy({ space, projectId }),

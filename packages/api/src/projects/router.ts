@@ -199,7 +199,7 @@ export const projects = {
 				"Starts the git installer of this computer, or says what to run.",
 		})
 		.output(output(gitInstallSchema))
-		.handler(({ context }) => context.projectSetup.installGit()),
+		.handler(({ context }) => context.projectSetup.installGit(context.actor)),
 	/** Opens the native folder picker on this computer (macOS only, see `sources`). Null when cancelled. */
 	chooseFolder: ownerProcedure
 		.route({
@@ -231,7 +231,7 @@ export const projects = {
 		.output(output(projectSourcesSchema))
 		.handler(async ({ context }) => ({
 			folderPicker: context.projectSetup.folderPicker,
-			gitHub: await context.projectSetup.gitHub.access(),
+			gitHub: await context.projectSetup.gitHub.access(context.actor),
 		})),
 	/** The person's GitHub repositories, through the GitHub CLI on this computer. */
 	gitHubRepos: ownerProcedure
@@ -240,7 +240,7 @@ export const projects = {
 				"Lists the GitHub repositories the GitHub CLI on this computer can open.",
 		})
 		.output(output(z.array(gitHubRepoSchema)))
-		.handler(({ context }) => context.projectSetup.gitHub.repos()),
+		.handler(({ context }) => context.projectSetup.gitHub.repos(context.actor)),
 	/**
 	 * Starts a clone of a GitHub repository into Night Shift's projects
 	 * folder, or uses the clone that is there. Returns at once: poll
@@ -254,7 +254,7 @@ export const projects = {
 		.output(output(gitHubCloneSchema))
 		.input(z.object({ repo: z.string().trim().min(1).max(300) }))
 		.handler(({ context, input }) =>
-			context.projectSetup.gitHub.start(input.repo),
+			context.projectSetup.gitHub.start(context.actor, { repo: input.repo }),
 		),
 	/** How the clone of a GitHub repository goes. Null: none started. */
 	gitHubClone: ownerProcedure
@@ -264,7 +264,7 @@ export const projects = {
 		.output(output(gitHubCloneSchema.nullable()))
 		.input(z.object({ repo: z.string().trim().min(1).max(300) }))
 		.handler(({ context, input }) =>
-			context.projectSetup.gitHub.status(input.repo),
+			context.projectSetup.gitHub.status(context.actor, { repo: input.repo }),
 		),
 	/** The copies of the Space's projects to this computer that run or failed. */
 	copies: protectedProcedure

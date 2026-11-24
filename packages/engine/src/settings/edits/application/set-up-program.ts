@@ -1,3 +1,4 @@
+import type { ComputerAccess } from "../../../access";
 import type { Actor } from "../../../contract";
 import { type CliToolStore, programOf } from "../../cli-tools";
 import type { ConnectionStore } from "../../connections";
@@ -12,6 +13,7 @@ import { agentProfileOn } from "../domain/profile-edits";
 import type { Programs } from "./ports";
 
 export type SetUpProgramPorts = {
+	computerAccess: Pick<ComputerAccess, "openComputer">;
 	settings: Pick<SettingsStore, "current" | "save">;
 	profiles: Pick<ProfileStore, "get" | "byName" | "list" | "save">;
 	cliTools: Pick<CliToolStore, "get" | "list" | "save">;
@@ -24,13 +26,12 @@ export type SetUpProgramPorts = {
  * Agent Profile on it, named after the program, with the harness's default
  * model and the night's permission mode. A CLI tool: a tool of its name.
  * Refused for a program that is not found, or is set up already.
+ * Only the owner of this computer may (`computerAccess.openComputer`).
  */
 export const setUpProgram =
 	(ports: SetUpProgramPorts) =>
-	async (
-		_actor: Actor,
-		request: { program: string },
-	): Promise<SetUpProgram> => {
+	async (actor: Actor, request: { program: string }): Promise<SetUpProgram> => {
+		ports.computerAccess.openComputer(actor);
 		const found = programToSetUp(
 			foundPrograms(
 				{

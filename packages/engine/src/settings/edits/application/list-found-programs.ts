@@ -1,3 +1,4 @@
+import type { ComputerAccess } from "../../../access";
 import type { Actor } from "../../../contract";
 import { type CliToolStore, programOf } from "../../cli-tools";
 import type { ProfileStore } from "../../profiles";
@@ -6,6 +7,7 @@ import { type FoundProgram, foundPrograms } from "../domain/found-programs";
 import type { Programs } from "./ports";
 
 export type ListFoundProgramsPorts = {
+	computerAccess: Pick<ComputerAccess, "openComputer">;
 	settings: Pick<SettingsStore, "current">;
 	profiles: Pick<ProfileStore, "list">;
 	cliTools: Pick<CliToolStore, "list">;
@@ -14,12 +16,14 @@ export type ListFoundProgramsPorts = {
 
 /**
  * The programs Night Shift knows how to use, found on this computer and
- * not set up yet: agents first. Only reads.
+ * not set up yet: agents first. Only reads. Only the owner of this computer
+ * may (`computerAccess.openComputer`).
  */
 export const listFoundPrograms =
 	(ports: ListFoundProgramsPorts) =>
-	(_actor: Actor): FoundProgram[] =>
-		foundPrograms(
+	(actor: Actor): FoundProgram[] => {
+		ports.computerAccess.openComputer(actor);
+		return foundPrograms(
 			{
 				bin: (harness) =>
 					String(ports.settings.current()[HARNESS_BIN[harness]]),
@@ -28,3 +32,4 @@ export const listFoundPrograms =
 			},
 			ports.programs.where,
 		);
+	};

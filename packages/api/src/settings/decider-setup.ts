@@ -1,6 +1,6 @@
+import type { PersonActor } from "@nightshift/engine";
 import { z } from "zod";
 
-import type { Context } from "../context";
 import { output } from "../output";
 import { ownerProcedure } from "../procedures";
 import { deciderSetupStatusSchema } from "./schemas";
@@ -13,8 +13,12 @@ import { deciderSetupStatusSchema } from "./schemas";
  * the screen polls `status` while a job runs. No reply holds the key.
  */
 
-/** Where the request comes from: the setup acts only on this computer itself. */
-const callerOf = (context: Pick<Context, "fromThisComputer">) => ({
+/** Who asks, and where the request comes from: the setup acts only on this computer itself. */
+const callerOf = (context: {
+	actor: PersonActor;
+	fromThisComputer: boolean;
+}) => ({
+	actor: context.actor,
 	here: context.fromThisComputer,
 });
 

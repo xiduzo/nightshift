@@ -1,6 +1,7 @@
 import type { HarnessName } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { now } from "@nightshift/time";
+import type { ComputerAccess } from "../../access";
 import type { Actor } from "../../contract";
 import { HARNESS_BIN, type SettingsStore } from "../../settings";
 import type { AgentSetupView } from "../domain/agent-status";
@@ -22,6 +23,7 @@ import type {
 import { readAgentSetup } from "./read-agent-setup";
 
 export type InstallAgentPorts = {
+	computerAccess: Pick<ComputerAccess, "openComputer">;
 	catalog: AgentCatalog;
 	settings: Pick<SettingsStore, "current">;
 	programs: Pick<Programs, "found" | "where" | "putBinsOnPath" | "pathInHome">;
@@ -30,13 +32,17 @@ export type InstallAgentPorts = {
 	jobs: AgentJobs;
 };
 
-/** Starts the vendor's installer. The job tells how it goes. */
+/**
+ * Starts the vendor's installer. The job tells how it goes.
+ * Only the owner of this computer may (`computerAccess.openComputer`).
+ */
 export const installAgent =
 	(ports: InstallAgentPorts) =>
 	(
 		actor: Actor,
 		request: { harness: HarnessName; here: boolean },
 	): AgentSetupView => {
+		ports.computerAccess.openComputer(actor);
 		const setup = allowedSetup(
 			request.here,
 			ports.here,

@@ -6,6 +6,7 @@ import { daemonLease, project as projectTable } from "@nightshift/db/schema";
 import { hostInMemory } from "@nightshift/devices/testing";
 import type { Knowledge } from "@nightshift/engine";
 import { NIGHT_SHIFT, SpaceNotFound } from "@nightshift/engine";
+import type { AgentSetup } from "@nightshift/engine/agents";
 import {
 	createSandbox,
 	type Sandbox,
@@ -176,6 +177,25 @@ describe("the daemon, wired in one process", () => {
 			.values({ id: "p1", spaceId: space.id, name: "P1" });
 		await expect(turnOff("stranger")).rejects.toThrow(SpaceNotFound);
 		await turnOff(you);
+	});
+
+	test("its owner reaches its settings, its secrets and its guided setup, and another Person is refused inside", async () => {
+		dir = await mkdtemp(join(tmpdir(), "nightshift-daemon-"));
+		const daemon = await start(envIn(dir));
+		for (const path of [
+			"settings/get",
+			"connections/list",
+			"agentSetup/status",
+		]) {
+			await rpc(daemon, path);
+		}
+		const setup = hot.nightshiftAgentSetup as AgentSetup;
+		expect(() =>
+			setup.status({
+				actor: { personId: "stranger", door: "session" },
+				here: true,
+			}),
+		).toThrow("Only the owner of this computer can see or change this.");
 	});
 
 	test("its stop stops every slot and frees the lease: the next daemon starts fresh", async () => {

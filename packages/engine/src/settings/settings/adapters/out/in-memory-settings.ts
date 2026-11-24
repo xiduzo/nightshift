@@ -1,3 +1,4 @@
+import { inMemoryComputer } from "../../../../access/computer/adapters/out/in-memory-computer";
 import { NIGHT_SHIFT } from "../../../../contract";
 import { saveSettings } from "../../application/save-settings";
 import type { SettingKey, SettingsPatch } from "../../domain/setting-defs";
@@ -17,7 +18,11 @@ export function inMemorySettings(
 		Object.entries(initial) as [SettingKey, unknown][],
 	);
 	const ground = { env: {}, embeddingModel: "embedder" };
-	const save = saveSettings({ saved, ground });
+	const save = saveSettings({
+		computerAccess: inMemoryComputer(),
+		saved,
+		ground,
+	});
 	const bound = {
 		view: () => settingsView(saved.read(), ground),
 		current: () => currentSettings(saved.read(), ground),

@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import type { AgentProfile } from "@nightshift/flows";
+import {
+	inMemoryComputer,
+	ONLY_THE_OWNER,
+} from "../../../access/computer/adapters/out/in-memory-computer";
 import { NIGHT_SHIFT } from "../../../contract";
 import { inMemoryConnections } from "../../connections/adapters/out/in-memory-connections";
 import { inMemoryProfiles } from "../../profiles/adapters/out/in-memory-profiles";
@@ -26,7 +30,10 @@ describe("saveConnection", () => {
 			profiles: inMemoryProfiles(),
 		};
 		const fast = await ports.profiles.save(profile({ connections: ["gh"] }));
-		const save = saveConnection(ports);
+		const save = saveConnection({
+			...ports,
+			computerAccess: inMemoryComputer(),
+		});
 		await save(NIGHT_SHIFT, {
 			connection: { name: "github", server },
 			previousName: "gh",
@@ -43,12 +50,24 @@ describe("saveConnection", () => {
 			profiles: inMemoryProfiles(),
 		};
 		await expect(
-			saveConnection(ports)(NIGHT_SHIFT, {
-				connection: { name: "gh", server },
-				previousName: "other",
-			}),
+			saveConnection({ ...ports, computerAccess: inMemoryComputer() })(
+				NIGHT_SHIFT,
+				{
+					connection: { name: "gh", server },
+					previousName: "other",
+				},
+			),
 		).rejects.toThrow(
 			'A connection named "gh" already exists. Pick another name.',
 		);
 	});
+});
+
+test("only the owner of this computer may, and nothing happens before the check", async () => {
+	const computerAccess = inMemoryComputer();
+	// The other ports are not there: a use of one before the check fails.
+	const act = saveConnection({ computerAccess } as never);
+	expect(
+		await computerAccess.whoMay((actor) => act(actor, {} as never)),
+	).toEqual(ONLY_THE_OWNER);
 });

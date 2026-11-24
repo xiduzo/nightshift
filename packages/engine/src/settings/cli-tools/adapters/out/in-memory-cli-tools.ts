@@ -1,3 +1,4 @@
+import { inMemoryComputer } from "../../../../access/computer/adapters/out/in-memory-computer";
 import { NIGHT_SHIFT } from "../../../../contract";
 import { saveCliTool } from "../../application/save-cli-tool";
 import type { CliToolStore } from "../../wire";
@@ -10,7 +11,11 @@ import { inMemorySavedCliTools } from "./in-memory-saved-cli-tools";
  */
 export function inMemoryCliTools() {
 	const saved = inMemorySavedCliTools();
-	const save = saveCliTool({ saved, now: () => 1 });
+	const save = saveCliTool({
+		computerAccess: inMemoryComputer(),
+		saved,
+		now: () => 1,
+	});
 	const bound = {
 		list: () =>
 			[...saved.read().values()].sort((a, b) => a.name.localeCompare(b.name)),

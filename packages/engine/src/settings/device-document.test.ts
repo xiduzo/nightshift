@@ -11,6 +11,7 @@ import {
 } from "@nightshift/db/schema";
 import { asDate } from "@nightshift/time";
 import * as Y from "yjs";
+import { inMemoryComputer } from "../access/computer/adapters/out/in-memory-computer";
 import {
 	type DeviceDocument,
 	deviceDocumentName,
@@ -44,14 +45,24 @@ const noSecrets: SecretBackend = {
 /** The four stores a daemon builds over one document. */
 function stores(document: DeviceDocument) {
 	return {
-		profiles: createProfileStore({ document }),
-		cliTools: createCliToolStore({ document }),
+		profiles: createProfileStore({
+			computerAccess: inMemoryComputer(),
+			document,
+		}),
+		cliTools: createCliToolStore({
+			computerAccess: inMemoryComputer(),
+			document,
+		}),
 		connections: createConnectionStore({
 			document,
 			env: {},
 			secrets: noSecrets,
 		}),
-		settings: createSettingsStore({ document, env: {} }),
+		settings: createSettingsStore({
+			computerAccess: inMemoryComputer(),
+			document,
+			env: {},
+		}),
 	};
 }
 

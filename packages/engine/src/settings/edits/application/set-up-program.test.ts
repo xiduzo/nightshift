@@ -1,4 +1,8 @@
 import { describe, expect, test } from "bun:test";
+import {
+	inMemoryComputer,
+	ONLY_THE_OWNER,
+} from "../../../access/computer/adapters/out/in-memory-computer";
 import { NIGHT_SHIFT } from "../../../contract";
 import { inMemoryCliTools } from "../../cli-tools/adapters/out/in-memory-cli-tools";
 import { inMemoryConnections } from "../../connections/adapters/out/in-memory-connections";
@@ -19,7 +23,10 @@ function wired(found: string[]) {
 		connections: inMemoryConnections(),
 		programs: inMemoryPrograms(found),
 	};
-	return { ports, setUp: setUpProgram(ports) };
+	return {
+		ports,
+		setUp: setUpProgram({ ...ports, computerAccess: inMemoryComputer() }),
+	};
 }
 
 describe("setUpProgram", () => {
@@ -64,4 +71,13 @@ describe("setUpProgram", () => {
 			"set up already",
 		);
 	});
+});
+
+test("only the owner of this computer may, and nothing happens before the check", async () => {
+	const computerAccess = inMemoryComputer();
+	// The other ports are not there: a use of one before the check fails.
+	const act = setUpProgram({ computerAccess } as never);
+	expect(
+		await computerAccess.whoMay((actor) => act(actor, {} as never)),
+	).toEqual(ONLY_THE_OWNER);
 });

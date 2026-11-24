@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { setting } from "@nightshift/db/schema";
+import { inMemoryComputer } from "../access/computer/adapters/out/in-memory-computer";
 import type { DeviceDocument } from "../documents";
 import { createSandbox, type Sandbox } from "../testing/test-support";
 import {
@@ -24,6 +25,7 @@ async function store(
 	document?: DeviceDocument,
 ) {
 	const s = createSettingsStore({
+		computerAccess: inMemoryComputer(),
 		document: document ?? (await sandbox.openDocument()),
 		env,
 	});

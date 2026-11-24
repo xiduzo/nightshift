@@ -1,4 +1,8 @@
 import { describe, expect, test } from "bun:test";
+import {
+	inMemoryComputer,
+	ONLY_THE_OWNER,
+} from "../../access/computer/adapters/out/in-memory-computer";
 import { NIGHT_SHIFT } from "../../contract";
 import { inMemoryDeciderSetupPorts } from "../adapters/out/in-memory-neighbours";
 import { createDeciderJob } from "../domain/setup-jobs";
@@ -44,4 +48,13 @@ describe("useTypesafeDecider", () => {
 			"jev_2",
 		]);
 	});
+});
+
+test("only the owner of this computer may, and nothing happens before the check", async () => {
+	const computerAccess = inMemoryComputer();
+	// The other ports are not there: a use of one before the check fails.
+	const act = useTypesafeDecider({ computerAccess } as never);
+	expect(
+		await computerAccess.whoMay((actor) => act(actor, {} as never)),
+	).toEqual(ONLY_THE_OWNER);
 });

@@ -13,6 +13,7 @@ import {
 	createSyncedDocuments,
 	type PersonalSecrets,
 	type ProjectSecrets,
+	wireComputer,
 } from "@nightshift/engine";
 import { createTelemetry } from "@nightshift/telemetry";
 import { instant } from "@nightshift/time";
@@ -241,6 +242,8 @@ async function makeDaemon(
 	/** The Person who owns this computer, and their personal Space. */
 	const owner = await openOwner({ db, auth, self: registry.owner });
 	const { person, localSession } = owner;
+	/** Who may ask of this computer, its settings and its programs: its owner. */
+	const computerAccess = wireComputer({ id: () => person.userId });
 
 	// Every Space's document, before the relay serves them: the Projects of a
 	// Replica from before them are imported here, once.
@@ -250,6 +253,7 @@ async function makeDaemon(
 	let personalSecrets: PersonalSecrets | null = null;
 	let projectSecrets: ProjectSecrets | null = null;
 	const { config, keyStore, toolLaunchers } = await wireDaemonConfig({
+		computerAccess,
 		env,
 		dataDir,
 		document,
@@ -335,6 +339,7 @@ async function makeDaemon(
 			learningsChanged(spaceId, projectId),
 	});
 	const { harnesses, decider, local } = wireLocalDevice({
+		computerAccess,
 		id: device.id,
 		name: device.name,
 		config,
@@ -471,6 +476,7 @@ async function makeDaemon(
 	void keepAwake.start();
 
 	const projectSetup = await wireProjectCopies({
+		computerAccess,
 		slots,
 		dataDir,
 		spaceIds: () => spaceIds(),
@@ -483,6 +489,7 @@ async function makeDaemon(
 	const asked = (at: { spaceId: string; personId: string }) =>
 		engine.space(at.spaceId, { personId: at.personId, door: "session" });
 	const setups = await wireSetups({
+		computerAccess,
 		slots,
 		config,
 		toolLaunchers,

@@ -1,4 +1,5 @@
 import type { Profile } from "@nightshift/flows";
+import type { ComputerAccess } from "../../../access";
 import type { Actor } from "../../../contract";
 import type { CliToolStore } from "../../cli-tools";
 import type { ConnectionStore } from "../../connections";
@@ -9,6 +10,7 @@ import {
 } from "../domain/profile-edits";
 
 export type SaveProfilePorts = {
+	computerAccess: Pick<ComputerAccess, "openComputer">;
 	connections: Pick<ConnectionStore, "get">;
 	cliTools: Pick<CliToolStore, "get">;
 	profiles: Pick<ProfileStore, "get" | "byName" | "list" | "save">;
@@ -19,15 +21,18 @@ export type SaveProfilePorts = {
  * the id. Refused when the name is taken, when the profile of `id` is
  * gone, or when an Agent Profile names a connection or a CLI tool that
  * does not exist.
+ * Only the owner of this computer may (`computerAccess.openComputer`).
  */
 export const saveProfile =
 	(ports: SaveProfilePorts) =>
-	(
-		_actor: Actor,
+	async (
+		actor: Actor,
 		request: { profile: Profile; id?: string },
-	): Promise<ProfileView> =>
-		saveProfileStep(
+	): Promise<ProfileView> => {
+		ports.computerAccess.openComputer(actor);
+		return saveProfileStep(
 			ports,
 			request.profile,
 			request.id === undefined ? {} : { id: request.id },
 		);
+	};

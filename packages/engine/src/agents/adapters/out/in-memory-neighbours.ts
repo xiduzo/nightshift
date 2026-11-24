@@ -1,6 +1,7 @@
 import type { HarnessName } from "@nightshift/flows";
 import { now } from "@nightshift/time";
 
+import { inMemoryComputer } from "../../../access/computer/adapters/out/in-memory-computer";
 import { inMemoryCliTools } from "../../../settings/cli-tools/adapters/out/in-memory-cli-tools";
 import { inMemoryConnections } from "../../../settings/connections/adapters/out/in-memory-connections";
 import { inMemoryProfiles } from "../../../settings/profiles/adapters/out/in-memory-profiles";
@@ -166,6 +167,7 @@ export function inMemoryAgentSetupPorts(
 ) {
 	const processes = inMemorySetupProcesses(over.onStart);
 	return {
+		computerAccess: inMemoryComputer(),
 		processes,
 		programs: inMemoryPrograms({
 			programs: over.programs ?? { curl: "/usr/bin/curl" },
@@ -189,6 +191,7 @@ export function inMemoryDeciderSetupPorts(
 ) {
 	const processes = inMemorySetupProcesses(over.onStart);
 	return {
+		computerAccess: inMemoryComputer(),
 		processes,
 		programs: inMemoryPrograms({ programs: over.programs ?? {} }),
 		...inMemoryStores(),

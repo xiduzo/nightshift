@@ -1,6 +1,7 @@
 import type { DeciderName } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { now } from "@nightshift/time";
+import type { ComputerAccess } from "../../access";
 import type { Actor } from "../../contract";
 import {
 	type CliToolStore,
@@ -18,6 +19,7 @@ import type { LocalOllama, Programs, SetupHere, Wait } from "./ports";
 import { readDeciderSetup } from "./read-decider-setup";
 
 export type UseLocalDeciderPorts = {
+	computerAccess: Pick<ComputerAccess, "openComputer">;
 	settings: Pick<SettingsStore, "view" | "current" | "save">;
 	profiles: Pick<ProfileStore, "get" | "byName" | "list" | "save">;
 	connections: Pick<ConnectionStore, "get" | "secretSource" | "setSecret">;
@@ -31,13 +33,17 @@ export type UseLocalDeciderPorts = {
 	typesafeKey: string;
 };
 
-/** Starts Ollama when it does not answer, downloads the model, and makes it the decider. */
+/**
+ * Starts Ollama when it does not answer, downloads the model, and makes it the decider.
+ * Only the owner of this computer may (`computerAccess.openComputer`).
+ */
 export const useLocalDecider =
 	(ports: UseLocalDeciderPorts) =>
 	async (
 		actor: Actor,
 		request: { here: boolean },
 	): Promise<DeciderSetupStatus> => {
+		ports.computerAccess.openComputer(actor);
 		refuseBlocked(request.here, ports.here, DECIDER_BLOCKED);
 		refuseDeciderBusy(ports.job.busy());
 		const o = await ports.ollama.status(ports.localModel.name);

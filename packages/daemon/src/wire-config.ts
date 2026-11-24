@@ -40,19 +40,24 @@ export function openDeviceConfig(
  * launchers of the CLI tools. The lanes of `device-config` and
  * `agent-setup` edit this file, not `daemon.ts`.
  */
-export async function wireDaemonConfig(deps: {
-	env: DaemonEnv;
-	dataDir: string;
-	document: ConfigOptions["document"];
-	/**
-	 * The Person's Personal secrets (ADR 13): at the Home Host, else kept
-	 * here. The devices give them; a use before that reads a Personal name
-	 * as one that cannot be read now.
-	 */
-	personal: ConfigOptions["personal"];
-	/** The secrets of the Projects (ADR 13): at the Host of their Space, else kept here. The devices give them too. */
-	projects: ConfigOptions["projects"];
-}) {
+/** Who may ask of this computer: its owner (`wireComputer`). */
+type OfThisComputer = Pick<ConfigOptions, "computerAccess">;
+
+export async function wireDaemonConfig(
+	deps: OfThisComputer & {
+		env: DaemonEnv;
+		dataDir: string;
+		document: ConfigOptions["document"];
+		/**
+		 * The Person's Personal secrets (ADR 13): at the Home Host, else kept
+		 * here. The devices give them; a use before that reads a Personal name
+		 * as one that cannot be read now.
+		 */
+		personal: ConfigOptions["personal"];
+		/** The secrets of the Projects (ADR 13): at the Host of their Space, else kept here. The devices give them too. */
+		projects: ConfigOptions["projects"];
+	},
+) {
 	const { env, dataDir } = deps;
 	/**
 	 * The environment is the fallback of every setting and every `${NAME}`.
@@ -69,6 +74,7 @@ export async function wireDaemonConfig(deps: {
 		env.NIGHTSHIFT_KEY_STORE === "file" ? { prefer: "file" as const } : {};
 
 	const config = wireSettings({
+		computerAccess: deps.computerAccess,
 		document: deps.document,
 		env: fallbacks,
 		secrets: await secretStore({ dataDir, ...keyStore }),
@@ -95,16 +101,18 @@ export async function wireDaemonConfig(deps: {
  * setups of an agent CLI and of a decider, and the configuration the
  * flows of a Space use.
  */
-export async function wireSetups(deps: {
-	slots: Pick<HotSlots<HotRegistry>, "replace">;
-	config: DeviceConfig;
-	toolLaunchers: ConfigUseDeps["toolLaunchers"];
-	deviceId: string;
-	/** The Space view for the session's Person. */
-	space: ConfigUseDeps["space"];
-	ollama: DeciderSetupDeps["ollama"];
-	usage: Pick<Telemetry, "note">;
-}) {
+export async function wireSetups(
+	deps: OfThisComputer & {
+		slots: Pick<HotSlots<HotRegistry>, "replace">;
+		config: DeviceConfig;
+		toolLaunchers: ConfigUseDeps["toolLaunchers"];
+		deviceId: string;
+		/** The Space view for the session's Person. */
+		space: ConfigUseDeps["space"];
+		ollama: DeciderSetupDeps["ollama"];
+		usage: Pick<Telemetry, "note">;
+	},
+) {
 	const { slots, config } = deps;
 	/** The read-only checks of programs. A harness's check notes `agent-checked`. */
 	const checks: Context["checks"] = {
@@ -128,6 +136,7 @@ export async function wireSetups(deps: {
 		"nightshiftAgentSetup",
 		() =>
 			wireAgents({
+				computerAccess: deps.computerAccess,
 				stores: config,
 				check: (harness, bin) => checks.harness(harness, bin),
 				container: inContainer(),
@@ -143,6 +152,7 @@ export async function wireSetups(deps: {
 		"nightshiftDeciderSetup",
 		() =>
 			wireAgents({
+				computerAccess: deps.computerAccess,
 				stores: config,
 				check: async () => ({ signIn: "unknown", account: null }),
 				ollama: deps.ollama,

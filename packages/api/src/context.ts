@@ -15,12 +15,13 @@ import type {
 	GitInstall,
 	Knowledge,
 	OllamaService,
+	PersonActor,
 	ToolLaunchers,
 	UsageMoment,
 } from "@nightshift/engine";
 import type { AgentSetup, DeciderSetup } from "@nightshift/engine/agents";
 import type {
-	GitHubClones,
+	GitHubAsks,
 	ProjectCopies,
 	ProjectReadiness,
 } from "@nightshift/engine/projects";
@@ -146,7 +147,7 @@ export type Services = {
 			name?: string;
 			email?: string;
 		}): Promise<ProjectReadiness>;
-		installGit(): Promise<GitInstall>;
+		installGit(actor: PersonActor): Promise<GitInstall>;
 		/**
 		 * Opens the native folder picker on the daemon's computer and waits
 		 * for a choice. Null when the person cancels.
@@ -155,7 +156,7 @@ export type Services = {
 		/** This computer can open a folder picker (`chooseFolder`). */
 		folderPicker: boolean;
 		/** Clones from GitHub into Night Shift's own projects folder, and the GitHub CLI on this computer. */
-		gitHub: GitHubClones;
+		gitHub: GitHubAsks;
 		/** Copies of the Space's projects to this computer, from GitHub: a Host's, and the ones a person asks for. */
 		copies: ProjectCopies;
 	};

@@ -10,8 +10,8 @@ export { type Projects, wireClones } from "./clones";
 export {
 	type CloneTracker,
 	createCloneTracker,
+	type GitHubAsks,
 	type GitHubClone,
-	type GitHubClones,
 	type ProjectCopies,
 	type ProjectCopy,
 	wireCopies,

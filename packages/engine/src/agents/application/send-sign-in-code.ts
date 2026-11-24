@@ -1,5 +1,6 @@
 import type { HarnessName } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
+import type { ComputerAccess } from "../../access";
 import type { Actor } from "../../contract";
 import type { SettingsStore } from "../../settings";
 import { type AgentSetupView, MAX_CODE } from "../domain/agent-status";
@@ -13,6 +14,7 @@ import type { AgentCatalog, Programs, SetupHere } from "./ports";
 import { readAgentSetup } from "./read-agent-setup";
 
 export type SendSignInCodePorts = {
+	computerAccess: Pick<ComputerAccess, "openComputer">;
 	catalog: AgentCatalog;
 	settings: Pick<SettingsStore, "current">;
 	programs: Pick<Programs, "found">;
@@ -20,13 +22,17 @@ export type SendSignInCodePorts = {
 	jobs: AgentJobs;
 };
 
-/** Gives the waiting sign-in the code the browser shows. */
+/**
+ * Gives the waiting sign-in the code the browser shows.
+ * Only the owner of this computer may (`computerAccess.openComputer`).
+ */
 export const sendSignInCode =
 	(ports: SendSignInCodePorts) =>
 	(
 		actor: Actor,
 		request: { harness: HarnessName; code: string; here: boolean },
 	): AgentSetupView => {
+		ports.computerAccess.openComputer(actor);
 		allowedSetup(
 			request.here,
 			ports.here,

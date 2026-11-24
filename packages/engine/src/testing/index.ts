@@ -17,13 +17,15 @@ export { placedRun } from "../log/run-row/run-row";
 export { createRunBus, type RunBus } from "../log/transcript/bus";
 export type { LandedChange } from "../read/landed-facts";
 export { openRunBundle } from "../read/run-bundle";
-export { wireCliTools as createCliToolStore } from "../settings/cli-tools";
-export { wireConnections as createConnectionStore } from "../settings/connections";
-export { wireProfiles as createProfileStore } from "../settings/profiles";
-export { wireSettings as createSettingsStore } from "../settings/settings";
 
 export { answerCostsOn } from "./answer-costs";
-export { openConfigStores } from "./config-stores";
+export {
+	createCliToolStore,
+	createConnectionStore,
+	createProfileStore,
+	createSettingsStore,
+	openConfigStores,
+} from "./config-stores";
 export { dashboardOver } from "./dashboard";
 export { deviceRowsOn, placesOn } from "./device-rows";
 export { testInbox } from "./gates";

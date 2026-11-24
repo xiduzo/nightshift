@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Profile, ProfileSettings } from "@nightshift/flows";
 import { now as timeNow } from "@nightshift/time";
+import type { ComputerAccess } from "../../access";
 import { NIGHT_SHIFT } from "../../contract";
 import type { DeviceDocument } from "../../documents";
 import { yjsSavedProfiles } from "./adapters/out/yjs-saved-profiles";
@@ -41,10 +42,12 @@ export type Profiles = ProfileStore & {
 /**
  * The profiles of this computer over its Device document. It binds the
  * use cases `writeProfile` and `removeProfile` behind the store that the
- * readers and the edits use today. The store acts as Night Shift: the
- * doors check the owner of this computer first.
+ * readers and the edits use today. The use case asks for the owner of
+ * this computer. The store acts as Night Shift.
  */
 export function wireProfiles(deps: {
+	/** Who may ask of this computer. */
+	computerAccess: Pick<ComputerAccess, "openComputer">;
 	document: DeviceDocument;
 	/** A random value for a new profile's id. Default: a UUID. */
 	random?: () => string;
@@ -55,7 +58,7 @@ export function wireProfiles(deps: {
 		now: timeNow,
 		random: deps.random ?? randomUUID,
 	});
-	const remove = removeProfile({ saved });
+	const remove = removeProfile({ computerAccess: deps.computerAccess, saved });
 	const list = () => profilesInOrder(saved.read());
 	return {
 		// The document is read when it opens; a remote edit applies at once.

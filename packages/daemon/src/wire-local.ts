@@ -32,6 +32,8 @@ export function wireLocalDevice(
 		"id" | "name" | "toolLaunchers" | "clonePath" | "knowledge" | "flows"
 	> & {
 		config: ConfigStores;
+		/** Who may ask of this computer: its owner. */
+		computerAccess: Parameters<typeof wireSetup>[0]["computerAccess"];
 		dataDir: string;
 		/** How the pi harness starts pi-acp. */
 		piAcp: string[] | undefined;
@@ -87,7 +89,7 @@ export function wireLocalDevice(
 		cliTools,
 		profiles,
 		// Project readiness before a worktree: projects capability, as a port.
-		checkProject: wireSetup(),
+		checkProject: wireSetup({ computerAccess: deps.computerAccess }),
 		toolLaunchers: deps.toolLaunchers,
 		clonePath: deps.clonePath,
 		// A run of a project without a folder works in a folder of its own

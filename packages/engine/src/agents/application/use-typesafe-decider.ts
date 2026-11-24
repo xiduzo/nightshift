@@ -19,6 +19,7 @@ export type UseTypesafeDeciderPorts = UseLocalDeciderPorts;
 /**
  * Saves the TypeSafe key, and makes TypeSafe Jev the decider. Null keeps
  * the key that is saved already.
+ * Only the owner of this computer may (`computerAccess.openComputer`).
  */
 export const useTypesafeDecider =
 	(ports: UseTypesafeDeciderPorts) =>
@@ -26,6 +27,7 @@ export const useTypesafeDecider =
 		actor: Actor,
 		request: { key: string | null; here: boolean },
 	): Promise<DeciderSetupStatus> => {
+		ports.computerAccess.openComputer(actor);
 		refuseBlocked(request.here, ports.here, DECIDER_BLOCKED);
 		refuseDeciderBusy(ports.job.busy());
 		const line = request.key?.trim() ?? "";

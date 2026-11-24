@@ -20,13 +20,17 @@ export type InstallOllamaPorts = UseLocalDeciderPorts & {
 	processes: Pick<SetupProcesses, "startInstall">;
 };
 
-/** Installs Ollama with Homebrew, then sets up the local decider. */
+/**
+ * Installs Ollama with Homebrew, then sets up the local decider.
+ * Only the owner of this computer may (`computerAccess.openComputer`).
+ */
 export const installOllama =
 	(ports: InstallOllamaPorts) =>
 	async (
 		actor: Actor,
 		request: { here: boolean },
 	): Promise<DeciderSetupStatus> => {
+		ports.computerAccess.openComputer(actor);
 		refuseBlocked(request.here, ports.here, DECIDER_BLOCKED);
 		refuseDeciderBusy(ports.job.busy());
 		const o = await ports.ollama.status(ports.localModel.name);

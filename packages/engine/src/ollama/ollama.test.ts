@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { inMemoryComputer } from "../access/computer/adapters/out/in-memory-computer";
 import { wireSettings as createSettingsStore } from "../settings/settings";
 import { createConnectionStore } from "../testing";
 import { createSandbox, type Sandbox } from "../testing/test-support";
@@ -96,7 +97,11 @@ async function harness(
 ) {
 	const env = options.env ?? {};
 	const document = await sandbox.openDocument();
-	const settings = createSettingsStore({ document, env });
+	const settings = createSettingsStore({
+		computerAccess: inMemoryComputer(),
+		document,
+		env,
+	});
 	const values = new Map<string, string>();
 	const connections = createConnectionStore({
 		document,

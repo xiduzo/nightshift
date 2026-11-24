@@ -1,5 +1,6 @@
 import { HARNESS_LABELS } from "@nightshift/agents/harness-facts";
 import { findProgram } from "@nightshift/agents/types";
+import type { ComputerAccess } from "../access";
 import type { DeviceDocument } from "../documents";
 import type { PersonalSecrets, ProjectSecrets } from "../secrets";
 import { type CliToolStore, wireCliTools } from "./cli-tools";
@@ -27,8 +28,7 @@ export type ConfigStores = {
 
 /**
  * What a person asks of this computer's configuration: each a use case
- * that takes who asks. The doors check the owner of this computer, or the
- * person's role in the Space, first.
+ * that takes who asks, and decides whether they may.
  */
 export type DeviceConfigUseCases = Edits &
 	SecretEdits &
@@ -52,6 +52,8 @@ export type DeviceConfig = ConfigStores & {
  * stores are not loaded yet: call `load` of each before the first read.
  */
 export function wireSettings(deps: {
+	/** Who may ask of this computer: its owner. */
+	computerAccess: Pick<ComputerAccess, "openComputer">;
 	document: DeviceDocument;
 	/** The fallback of every setting and every `${NAME}`: the environment. */
 	env: Readonly<Record<string, string | undefined>>;
@@ -70,9 +72,10 @@ export function wireSettings(deps: {
 	/** Where a program is on this computer, or null. Default: a search of the PATH. */
 	programs?: (program: string) => string | null;
 }): DeviceConfig {
-	const { document, env, secrets, personal, projects } = deps;
+	const { document, env, secrets, personal, projects, computerAccess } = deps;
 	const where = deps.programs ?? ((program: string) => findProgram(program));
 	const { viewSettings, saveSettings, ...settings } = wireSettingsStore({
+		computerAccess,
 		document,
 		env,
 	});
@@ -86,9 +89,16 @@ export function wireSettings(deps: {
 			...(personal ? { personal } : {}),
 			...(projects ? { projects } : {}),
 		});
-	const { saveCliTool, ...cliTools } = wireCliTools({ document });
-	const { removeProfile, ...profiles } = wireProfiles({ document });
+	const { saveCliTool, ...cliTools } = wireCliTools({
+		computerAccess,
+		document,
+	});
+	const { removeProfile, ...profiles } = wireProfiles({
+		computerAccess,
+		document,
+	});
 	const edits = wireEdits({
+		computerAccess,
 		settings,
 		profiles,
 		connections,

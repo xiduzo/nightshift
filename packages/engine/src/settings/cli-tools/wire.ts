@@ -1,5 +1,6 @@
 import { cliHelp } from "@nightshift/agents/tools";
 import { now as timeNow } from "@nightshift/time";
+import type { ComputerAccess } from "../../access";
 import { NIGHT_SHIFT } from "../../contract";
 import type { DeviceDocument } from "../../documents";
 import { yjsSavedCliTools } from "./adapters/out/yjs-saved-cli-tools";
@@ -36,17 +37,23 @@ export type CliTools = CliToolStore & {
 /**
  * The CLI tools of this computer over its Device document. It binds the
  * use cases `saveCliTool` and `readCliToolGuides` behind the store that
- * the readers and the edits use today. The store acts as Night Shift: the
- * doors check the owner of this computer first.
+ * the readers and the edits use today. The use case asks for
+ * the owner of this computer. The store acts as Night Shift.
  */
 export function wireCliTools(deps: {
+	/** Who may ask of this computer. */
+	computerAccess: Pick<ComputerAccess, "openComputer">;
 	document: DeviceDocument;
 	/** A program's own help (`--help`), or null. Default: `cliHelp`. */
 	help?: (program: string) => Promise<string | null>;
 }): CliTools {
 	const saved = yjsSavedCliTools(deps.document);
 	const help = deps.help ?? ((program: string) => cliHelp(program));
-	const save = saveCliTool({ saved, now: timeNow });
+	const save = saveCliTool({
+		computerAccess: deps.computerAccess,
+		saved,
+		now: timeNow,
+	});
 	const guides = readCliToolGuides({ saved, programs: { help } });
 	return {
 		// The document is read when it opens; a remote edit applies at once.

@@ -69,6 +69,8 @@ export function wireDaemonProjects(deps: {
  * API's project setup routes call.
  */
 export async function wireProjectCopies(deps: {
+	/** Who may ask of this computer: its owner. */
+	computerAccess: CopiesDeps["computerAccess"];
 	slots: Pick<HotSlots<HotRegistry>, "keep" | "replace">;
 	dataDir: string;
 	spaceIds: CopiesDeps["spaceIds"];
@@ -76,8 +78,8 @@ export async function wireProjectCopies(deps: {
 	settings: Settings;
 	usage: CopiesDeps["usage"];
 }): Promise<Context["projectSetup"]> {
-	const { slots, settings } = deps;
-	const setup = wireSetup();
+	const { slots, settings, computerAccess } = deps;
+	const setup = wireSetup({ computerAccess });
 	// A clone from GitHub outlives a `bun --hot` reload: keep who tracks it.
 	const tracker = await slots.keep("nightshiftCloneTracker", () =>
 		createCloneTracker(),
@@ -88,6 +90,7 @@ export async function wireProjectCopies(deps: {
 	 * engine. A clone it started goes on in the tracker.
 	 */
 	const { gitHub, copies } = wireCopies({
+		computerAccess,
 		dataDir: deps.dataDir,
 		tracker,
 		spaceIds: deps.spaceIds,
@@ -107,7 +110,7 @@ export async function wireProjectCopies(deps: {
 	return {
 		check: (path) => setup.check(path),
 		setUpGit: (input) => setup.setUpGit(input),
-		installGit: () => setup.installGit(),
+		installGit: (actor) => setup.installGit(actor),
 		chooseFolder: (prompt) => chooseFolder(prompt),
 		folderPicker: canChooseFolder(),
 		gitHub,

@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { isAgentProfile } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
+import {
+	COMPUTER_OWNER,
+	inMemoryComputer,
+} from "../access/computer/adapters/out/in-memory-computer";
 import type { OllamaStatus } from "../ollama";
 import type { ConfigStores } from "../settings";
 import type { SecretBackend } from "../settings/connections";
@@ -17,7 +21,7 @@ import { type DeciderSetup, type DeciderSetupDeps, wireAgents } from "./wire";
 
 const MODEL = "llama3.2:latest";
 const KEY = "TYPESAFE_API_KEY";
-const HERE = { here: true };
+const HERE = { here: true, actor: COMPUTER_OWNER };
 
 let sandbox: Sandbox;
 let stores: ConfigStores;
@@ -114,6 +118,7 @@ function make(
 	deps: Partial<DeciderSetupDeps> = {},
 ) {
 	setup = wireAgents({
+		computerAccess: inMemoryComputer(),
 		stores,
 		check: async () => ({ signIn: "unknown", account: null }),
 		ollama,
@@ -220,12 +225,16 @@ describe("the status of the setup of a decider", () => {
 	test("refused from another computer and in a container, with what to do instead", async () => {
 		const { service } = fakeOllama({ installed: false, answers: false });
 		const elsewhere = make(service);
-		expect(await elsewhere.status({ here: false })).toMatchObject({
+		expect(
+			await elsewhere.status({ here: false, actor: COMPUTER_OWNER }),
+		).toMatchObject({
 			available: false,
 			reason: "elsewhere",
 			message: "Open Night Shift on that computer to set up a decider there.",
 		});
-		expect(await refusal(elsewhere.useLocal({ here: false }))).toEqual([
+		expect(
+			await refusal(elsewhere.useLocal({ here: false, actor: COMPUTER_OWNER })),
+		).toEqual([
 			"forbidden",
 			"Open Night Shift on that computer to set up a decider there.",
 		]);

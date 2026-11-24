@@ -1,15 +1,20 @@
+import type { ComputerAccess } from "../../../access";
 import type { Actor } from "../../../contract";
 import type { SavedProfiles } from "./ports";
 
-export type RemoveProfilePorts = { saved: Pick<SavedProfiles, "remove"> };
+export type RemoveProfilePorts = {
+	computerAccess: Pick<ComputerAccess, "openComputer">;
+	saved: Pick<SavedProfiles, "remove">;
+};
 
 /**
  * Removes a profile. Flows that name it do not start until they name
- * another. The owner of this computer may remove it: its door checks that
- * (`ownerProcedure`), so the actor is not read here.
+ * another. Only the owner of this computer may remove it
+ * (`computerAccess.openComputer`).
  */
 export const removeProfile =
 	(ports: RemoveProfilePorts) =>
-	async (_actor: Actor, request: { id: string }): Promise<void> => {
+	async (actor: Actor, request: { id: string }): Promise<void> => {
+		ports.computerAccess.openComputer(actor);
 		await ports.saved.remove(request.id);
 	};

@@ -1,4 +1,8 @@
 import { describe, expect, test } from "bun:test";
+import {
+	inMemoryComputer,
+	ONLY_THE_OWNER,
+} from "../../../access/computer/adapters/out/in-memory-computer";
 import { NIGHT_SHIFT } from "../../../contract";
 import { inMemorySavedSettings } from "../adapters/out/in-memory-saved-settings";
 import type { SettingKey, SettingsPatch } from "../domain/setting-defs";
@@ -12,6 +16,7 @@ function saving(
 ) {
 	const saved = inMemorySavedSettings(initial);
 	const save = saveSettings({
+		computerAccess: inMemoryComputer(),
 		saved,
 		ground: { env, embeddingModel: "embed:1" },
 	});
@@ -152,4 +157,13 @@ describe("anonymous usage", () => {
 			},
 		]);
 	});
+});
+
+test("only the owner of this computer may, and nothing happens before the check", async () => {
+	const computerAccess = inMemoryComputer();
+	// The other ports are not there: a use of one before the check fails.
+	const act = saveSettings({ computerAccess } as never);
+	expect(
+		await computerAccess.whoMay((actor) => act(actor, {} as never)),
+	).toEqual(ONLY_THE_OWNER);
 });

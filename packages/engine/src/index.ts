@@ -8,7 +8,7 @@
  * able to name it. Remove a name that no other workspace's code imports.
  */
 
-export { RunNotFound, SpaceNotFound, wireAccess } from "./access";
+export { RunNotFound, SpaceNotFound, wireAccess, wireComputer } from "./access";
 export {
 	type ArchiveHost,
 	type ArchiveRef,

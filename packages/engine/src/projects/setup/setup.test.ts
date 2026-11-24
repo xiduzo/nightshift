@@ -9,6 +9,7 @@ import {
 import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { inMemoryComputer } from "../../access/computer/adapters/out/in-memory-computer";
 import { type Git, systemGit } from "../../git";
 import { mustGit } from "../../testing/test-support";
 import { type ProjectReadiness, STARTER_GITIGNORE } from "./domain/readiness";
@@ -23,13 +24,15 @@ const checkProjectFolder = (
 	} = {},
 ) =>
 	wireSetup({
+		computerAccess: inMemoryComputer(),
 		...(options.git ? { git: options.git } : {}),
 		...(options.tools ? { programs: options.tools } : {}),
 	}).check(path);
 const setUpGit = (
 	input: { path: string; name?: string; email?: string },
 	options: { git?: Git } = {},
-) => wireSetup(options).setUpGit(input);
+) =>
+	wireSetup({ ...options, computerAccess: inMemoryComputer() }).setUpGit(input);
 
 /** The steps a run needs: the tools step has tests of its own. */
 const statuses = (readiness: ProjectReadiness) =>

@@ -1,3 +1,4 @@
+import type { ComputerAccess } from "../../access";
 import { NIGHT_SHIFT } from "../../contract";
 import type { DeviceDocument } from "../../documents";
 import { DEFAULT_EMBEDDING_MODEL } from "../../knowledge";
@@ -35,20 +36,23 @@ export type WiredSettings = SettingsStore & {
  * The settings of this computer over its Device document. Each one is
  * saved there, else read from the environment (`env`), else its default.
  * It binds the use cases `viewSettings` and `saveSettings` behind the
- * store that the readers and the doors use today. The doors check the
- * owner of this computer first, so the store acts as Night Shift.
+ * store that the readers and the doors use today. The use cases ask
+ * for the owner of this computer. The store acts as Night Shift.
  */
 export function wireSettings(deps: {
+	/** Who may ask of this computer. */
+	computerAccess: Pick<ComputerAccess, "openComputer">;
 	document: DeviceDocument;
 	env: Readonly<Record<string, string | undefined>>;
 }): WiredSettings {
+	const { computerAccess } = deps;
 	const saved = yjsSavedSettings(deps.document);
 	const ground: SettingsGround = {
 		env: deps.env,
 		embeddingModel: DEFAULT_EMBEDDING_MODEL,
 	};
-	const view = viewSettings({ saved, ground });
-	const save = saveSettings({ saved, ground });
+	const view = viewSettings({ computerAccess, saved, ground });
+	const save = saveSettings({ computerAccess, saved, ground });
 	const current = () => currentSettings(saved.read(), ground);
 	return {
 		// The document is read when it opens; a remote edit applies at once.

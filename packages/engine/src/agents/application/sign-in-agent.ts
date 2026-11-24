@@ -1,6 +1,7 @@
 import type { HarnessName } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { now } from "@nightshift/time";
+import type { ComputerAccess } from "../../access";
 import type { Actor } from "../../contract";
 import {
 	agentProfileOn,
@@ -29,6 +30,7 @@ import type {
 import { readAgentSetup } from "./read-agent-setup";
 
 export type SignInAgentPorts = {
+	computerAccess: Pick<ComputerAccess, "openComputer">;
 	catalog: AgentCatalog;
 	settings: Pick<SettingsStore, "current" | "save">;
 	profiles: Pick<ProfileStore, "get" | "byName" | "list" | "save">;
@@ -41,13 +43,17 @@ export type SignInAgentPorts = {
 	jobs: AgentJobs;
 };
 
-/** Checks the sign-in, and starts the CLI's own sign-in when it is needed. */
+/**
+ * Checks the sign-in, and starts the CLI's own sign-in when it is needed.
+ * Only the owner of this computer may (`computerAccess.openComputer`).
+ */
 export const signInAgent =
 	(ports: SignInAgentPorts) =>
 	(
 		actor: Actor,
 		request: { harness: HarnessName; here: boolean },
 	): AgentSetupView => {
+		ports.computerAccess.openComputer(actor);
 		const setup = allowedSetup(
 			request.here,
 			ports.here,

@@ -1,3 +1,4 @@
+import type { ComputerAccess } from "../../access";
 import type { Actor } from "../../contract";
 import {
 	type ConnectionStore,
@@ -11,6 +12,7 @@ import { DECIDER_BLOCKED, setupBlock } from "../domain/setup-place";
 import type { LocalOllama, Programs, SetupHere } from "./ports";
 
 export type ReadDeciderSetupPorts = {
+	computerAccess: Pick<ComputerAccess, "openComputer">;
 	settings: Pick<SettingsStore, "view">;
 	connections: Pick<ConnectionStore, "secretSource">;
 	ollama: Pick<LocalOllama, "status">;
@@ -21,13 +23,17 @@ export type ReadDeciderSetupPorts = {
 	typesafeKey: string;
 };
 
-/** Says which decider new Decision nodes start on, and how a setup goes. */
+/**
+ * Says which decider new Decision nodes start on, and how a setup goes.
+ * Only the owner of this computer may (`computerAccess.openComputer`).
+ */
 export const readDeciderSetup =
 	(ports: ReadDeciderSetupPorts) =>
 	async (
-		_actor: Actor,
+		actor: Actor,
 		request: { here: boolean },
 	): Promise<DeciderSetupStatus> => {
+		ports.computerAccess.openComputer(actor);
 		const reason = setupBlock(request.here, ports.here);
 		const o = await ports.ollama.status(ports.localModel.name);
 		const view = ports.settings.view();

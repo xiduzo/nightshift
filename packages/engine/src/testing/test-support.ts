@@ -14,6 +14,7 @@ import { device, event, organization } from "@nightshift/db/schema";
 import type { AgentHarnessName } from "@nightshift/flows";
 import { asDate, now } from "@nightshift/time";
 import { asc, eq, sql } from "drizzle-orm";
+import { inMemoryComputer } from "../access/computer/adapters/out/in-memory-computer";
 import type { DeviceDirectory } from "../contract/directory";
 import {
 	type DeviceCliTools,
@@ -137,7 +138,7 @@ export function withDevice(options: TestEngineOptions): EngineOptions {
 				runFolders: runFolders ?? createRunFolders(engine.dataDir),
 				git,
 				// A project that is not ready stops a run, as on the daemon.
-				checkProject: wireSetup({ git }),
+				checkProject: wireSetup({ computerAccess: inMemoryComputer(), git }),
 				...(knowledge ? { knowledge } : {}),
 			},
 			deviceId,

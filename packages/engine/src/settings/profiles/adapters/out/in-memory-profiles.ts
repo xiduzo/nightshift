@@ -1,4 +1,5 @@
 import type { Profile } from "@nightshift/flows";
+import { inMemoryComputer } from "../../../../access/computer/adapters/out/in-memory-computer";
 import { NIGHT_SHIFT } from "../../../../contract";
 import { removeProfile } from "../../application/remove-profile";
 import { writeProfile } from "../../application/write-profile";
@@ -19,7 +20,7 @@ export function inMemoryProfiles() {
 		now: () => 1,
 		random: () => `p-${next++}`,
 	});
-	const remove = removeProfile({ saved });
+	const remove = removeProfile({ computerAccess: inMemoryComputer(), saved });
 	const list = () => profilesInOrder(saved.read());
 	const bound = {
 		list,

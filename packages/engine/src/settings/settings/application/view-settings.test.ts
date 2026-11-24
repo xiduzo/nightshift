@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { DEFAULT_POLICY } from "@nightshift/flows";
+import {
+	inMemoryComputer,
+	ONLY_THE_OWNER,
+} from "../../../access/computer/adapters/out/in-memory-computer";
 import { NIGHT_SHIFT } from "../../../contract";
 import { inMemorySavedSettings } from "../adapters/out/in-memory-saved-settings";
 import type { SettingKey } from "../domain/setting-defs";
@@ -12,6 +16,7 @@ function view(
 	env: Record<string, string | undefined> = {},
 ) {
 	return viewSettings({
+		computerAccess: inMemoryComputer(),
 		saved: inMemorySavedSettings(saved),
 		ground: { env, embeddingModel: "embed:1" },
 	})(NIGHT_SHIFT);
@@ -216,4 +221,13 @@ describe("load", () => {
 		expect(fields.agentModel.source).toBe("saved");
 		expect(fields.maxConcurrentRuns.source).toBe("default");
 	});
+});
+
+test("only the owner of this computer may, and nothing happens before the check", async () => {
+	const computerAccess = inMemoryComputer();
+	// The other ports are not there: a use of one before the check fails.
+	const act = viewSettings({ computerAccess } as never);
+	expect(await computerAccess.whoMay((actor) => act(actor))).toEqual(
+		ONLY_THE_OWNER,
+	);
 });

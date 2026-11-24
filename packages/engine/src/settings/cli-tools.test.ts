@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { agentProfile } from "@nightshift/db/schema";
+import { inMemoryComputer } from "../access/computer/adapters/out/in-memory-computer";
 import { createSandbox, type Sandbox } from "../testing/test-support";
 import { wireCliTools as createCliToolStore } from "./cli-tools";
 import { cliToolsInstruction } from "./cli-tools/domain/cli-tool-guides";
@@ -16,7 +17,10 @@ afterEach(async () => {
 describe("createCliToolStore", () => {
 	test("saves, lists sorted, changes a description, and removes", async () => {
 		const document = await sandbox.openDocument();
-		const store = createCliToolStore({ document });
+		const store = createCliToolStore({
+			computerAccess: inMemoryComputer(),
+			document,
+		});
 		await store.load();
 		await store.save({ name: "gh", description: "GitHub" });
 		await store.save({ name: "aws" });
@@ -24,6 +28,7 @@ describe("createCliToolStore", () => {
 
 		// After a restart.
 		const again = createCliToolStore({
+			computerAccess: inMemoryComputer(),
 			document: await sandbox.openDocument(),
 		});
 		await again.load();
@@ -36,6 +41,7 @@ describe("createCliToolStore", () => {
 		await again.remove("aws");
 		expect(again.get("aws")).toBeNull();
 		const third = createCliToolStore({
+			computerAccess: inMemoryComputer(),
 			document: await sandbox.openDocument(),
 		});
 		expect([...third.names()]).toEqual(["gh"]);
@@ -44,6 +50,7 @@ describe("createCliToolStore", () => {
 	test("a tool's program and guide: its own program, else its name; a name no tool has is a program", async () => {
 		const asked: string[] = [];
 		const store = createCliToolStore({
+			computerAccess: inMemoryComputer(),
 			document: await sandbox.openDocument(),
 			help: async (program) => {
 				asked.push(program);
@@ -77,6 +84,7 @@ describe("createCliToolStore", () => {
 
 	test("keeps a tool's program, login and git host", async () => {
 		const store = createCliToolStore({
+			computerAccess: inMemoryComputer(),
 			document: await sandbox.openDocument(),
 		});
 		await store.save({
@@ -97,6 +105,7 @@ describe("createCliToolStore", () => {
 			},
 		});
 		const again = createCliToolStore({
+			computerAccess: inMemoryComputer(),
 			document: await sandbox.openDocument(),
 		});
 		expect(again.get("gh-work")).toMatchObject({
@@ -128,6 +137,7 @@ describe("profiles saved with the GitHub tool set", () => {
 			}),
 		});
 		const profiles = createProfileStore({
+			computerAccess: inMemoryComputer(),
 			document: await sandbox.openDocument(),
 		});
 		await profiles.load();

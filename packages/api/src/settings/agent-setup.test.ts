@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { wireComputer } from "@nightshift/engine";
 import { wireAgents } from "@nightshift/engine/agents";
 import { call, ORPCError } from "@orpc/server";
 
@@ -19,6 +20,7 @@ type SetupDeps = Parameters<typeof wireAgents>[0];
 /** The engine's setup on a Mac, with no CLI found and nothing it may run. */
 function engineSetup(more: Partial<SetupDeps> = {}) {
 	return wireAgents({
+		computerAccess: wireComputer({ id: () => OWNER }),
 		stores: {
 			settings: {
 				current: () => ({ claudeBin: "claude", codexBin: "codex" }),

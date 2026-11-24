@@ -1,4 +1,5 @@
 import type { HarnessName } from "@nightshift/flows";
+import type { Actor } from "../../contract";
 import type { AgentSetupJob } from "./setup-jobs";
 import type { AgentSetupBlock } from "./setup-place";
 import type { SetupFacts } from "./setup-runs";
@@ -30,8 +31,8 @@ export type AgentSetupStatus = {
 	agents: AgentSetupView[];
 };
 
-/** Where a request comes from: setup acts only for one from this computer. */
-export type AgentSetupCaller = { here: boolean };
+/** Who asks, and whether they are at this computer. */
+export type AgentSetupCaller = { actor: Actor; here: boolean };
 
 export function agentViewOf(input: {
 	harness: HarnessName;

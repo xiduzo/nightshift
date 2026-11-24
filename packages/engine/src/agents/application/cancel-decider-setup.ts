@@ -15,13 +15,17 @@ export type CancelDeciderSetupPorts = UseLocalDeciderPorts & {
 	localModel: { name: string };
 };
 
-/** Stops the install, the start or the download that runs. */
+/**
+ * Stops the install, the start or the download that runs.
+ * Only the owner of this computer may (`computerAccess.openComputer`).
+ */
 export const cancelDeciderSetup =
 	(ports: CancelDeciderSetupPorts) =>
 	async (
 		actor: Actor,
 		request: { here: boolean },
 	): Promise<DeciderSetupStatus> => {
+		ports.computerAccess.openComputer(actor);
 		refuseBlocked(request.here, ports.here, DECIDER_BLOCKED);
 		const downloading = ports.job.cancel(now());
 		if (downloading) await ports.ollama.cancelPull(ports.localModel.name);

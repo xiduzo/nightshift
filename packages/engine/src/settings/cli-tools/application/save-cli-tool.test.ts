@@ -1,11 +1,19 @@
 import { describe, expect, test } from "bun:test";
+import {
+	inMemoryComputer,
+	ONLY_THE_OWNER,
+} from "../../../access/computer/adapters/out/in-memory-computer";
 import { NIGHT_SHIFT } from "../../../contract";
 import { inMemorySavedCliTools } from "../adapters/out/in-memory-saved-cli-tools";
 import { saveCliTool } from "./save-cli-tool";
 
 function saving() {
 	const saved = inMemorySavedCliTools();
-	const save = saveCliTool({ saved, now: () => 1000 });
+	const save = saveCliTool({
+		computerAccess: inMemoryComputer(),
+		saved,
+		now: () => 1000,
+	});
 	return {
 		saved,
 		save: (input: Parameters<typeof save>[1]) => save(NIGHT_SHIFT, input),
@@ -75,4 +83,13 @@ describe("saveCliTool", () => {
 		).rejects.toThrow("Use a host name only, for example github.com.");
 		expect(saved.writes).toEqual([]);
 	});
+});
+
+test("only the owner of this computer may, and nothing happens before the check", async () => {
+	const computerAccess = inMemoryComputer();
+	// The other ports are not there: a use of one before the check fails.
+	const act = saveCliTool({ computerAccess } as never);
+	expect(
+		await computerAccess.whoMay((actor) => act(actor, {} as never)),
+	).toEqual(ONLY_THE_OWNER);
 });

@@ -1,4 +1,6 @@
 import { findProgram } from "@nightshift/agents/types";
+import type { ComputerAccess } from "../../access";
+import type { Actor } from "../../contract";
 import {
 	type Git,
 	type GitInstall,
@@ -21,6 +23,8 @@ import type { ProjectReadiness } from "./domain/readiness";
 
 /** What the setup stands on. Each has the one of this computer as default. */
 export type SetupDeps = {
+	/** Who may ask of this computer: its owner. */
+	computerAccess: Pick<ComputerAccess, "openComputer">;
 	git?: Git;
 	programs?: Programs;
 	installer?: GitInstaller;
@@ -37,10 +41,10 @@ export type Setup = {
 		email?: string;
 	}): Promise<ProjectReadiness>;
 	/** Starts the git installer of this computer, or says what to run. */
-	installGit(): Promise<GitInstall>;
+	installGit(actor: Actor): Promise<GitInstall>;
 };
 
-export function wireSetup(deps: SetupDeps = {}): Setup {
+export function wireSetup(deps: SetupDeps): Setup {
 	const folders = nodeProjectFolders(deps.git ?? systemGit());
 	const programs = deps.programs ?? {
 		which: (name: string) => findProgram(name),
@@ -49,11 +53,12 @@ export function wireSetup(deps: SetupDeps = {}): Setup {
 	const check = checkProjectFolder({ folders, programs });
 	const setUp = setUpGit({ folders, check });
 	const install = installGit({
+		computerAccess: deps.computerAccess,
 		installer: deps.installer ?? systemGitInstaller(),
 	});
 	return {
 		check: (path) => check({ path }),
 		setUpGit: (input) => setUp(input),
-		installGit: () => install(),
+		installGit: (actor) => install(actor),
 	};
 }

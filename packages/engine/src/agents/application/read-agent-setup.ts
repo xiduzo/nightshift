@@ -1,3 +1,4 @@
+import type { ComputerAccess } from "../../access";
 import type { Actor } from "../../contract";
 import { HARNESS_BIN, type SettingsStore } from "../../settings";
 import { type AgentSetupStatus, agentViewOf } from "../domain/agent-status";
@@ -7,6 +8,7 @@ import { installCommand } from "../domain/setup-runs";
 import type { AgentCatalog, Programs, SetupHere } from "./ports";
 
 export type ReadAgentSetupPorts = {
+	computerAccess: Pick<ComputerAccess, "openComputer">;
 	catalog: AgentCatalog;
 	settings: Pick<SettingsStore, "current">;
 	programs: Pick<Programs, "found">;
@@ -14,10 +16,14 @@ export type ReadAgentSetupPorts = {
 	jobs: AgentJobs;
 };
 
-/** Lists the agents Night Shift can install and sign in here, and how each setup goes. */
+/**
+ * Lists the agents Night Shift can install and sign in here, and how each setup goes.
+ * Only the owner of this computer may (`computerAccess.openComputer`).
+ */
 export const readAgentSetup =
 	(ports: ReadAgentSetupPorts) =>
-	(_actor: Actor, request: { here: boolean }): AgentSetupStatus => {
+	(actor: Actor, request: { here: boolean }): AgentSetupStatus => {
+		ports.computerAccess.openComputer(actor);
 		const reason = setupBlock(request.here, ports.here);
 		return {
 			available: reason === null,

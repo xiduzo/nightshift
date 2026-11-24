@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import * as Y from "yjs";
+import { inMemoryComputer } from "../access/computer/adapters/out/in-memory-computer";
 import { createSyncedDocuments } from "../documents";
 import { createSandbox, type Sandbox } from "../testing";
 import { wireCopies } from "./copies";
@@ -23,7 +24,10 @@ afterEach(async () => {
 async function laptopDocument() {
 	const other = await createSandbox();
 	const document = await other.openDocument();
-	await createProfileStore({ document }).save({
+	await createProfileStore({
+		computerAccess: inMemoryComputer(),
+		document,
+	}).save({
 		name: "builder",
 		harness: "claude-code",
 		model: "sonnet",

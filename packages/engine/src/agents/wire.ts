@@ -8,7 +8,7 @@ import { findProgram } from "@nightshift/agents/types";
 import type { HarnessName } from "@nightshift/flows";
 import { now } from "@nightshift/time";
 
-import { NIGHT_SHIFT } from "../contract";
+import type { ComputerAccess } from "../access";
 import type { OllamaService } from "../ollama";
 import { type ConfigStores, HARNESS_BIN } from "../settings";
 import {
@@ -79,6 +79,8 @@ export type DeciderSetup = {
 };
 
 export type AgentSetupDeps = {
+	/** Who may set up this computer: its owner. */
+	computerAccess: Pick<ComputerAccess, "openComputer">;
 	stores: Pick<
 		ConfigStores,
 		"settings" | "profiles" | "connections" | "cliTools"
@@ -95,6 +97,8 @@ export type AgentSetupDeps = {
 };
 
 export type DeciderSetupDeps = {
+	/** Who may set up this computer: its owner. */
+	computerAccess: Pick<ComputerAccess, "openComputer">;
 	stores: Pick<
 		ConfigStores,
 		"settings" | "profiles" | "connections" | "cliTools"
@@ -226,8 +230,9 @@ export function wireAgents(deps: AgentSetupWireDeps): {
 	const deciderJob = createDeciderJob();
 	const cat = catalog();
 	const checks: SignInChecks = { check: deps.check };
-	const actor = NIGHT_SHIFT;
+	const { computerAccess } = deps;
 	const agentPorts = {
+		computerAccess,
 		catalog: cat,
 		...deps.stores,
 		programs,
@@ -244,12 +249,12 @@ export function wireAgents(deps: AgentSetupWireDeps): {
 	const stopAgents = stopAgentSetups({ jobs: agentJobs });
 
 	const agent: AgentSetup = {
-		status: (caller) => readAgent(actor, caller),
-		install: (harness, caller) => install(actor, { harness, ...caller }),
-		signIn: (harness, caller) => signIn(actor, { harness, ...caller }),
-		sendCode: (harness, code, caller) =>
-			sendCode(actor, { harness, code, ...caller }),
-		cancel: (harness, caller) => cancelAgent(actor, { harness, ...caller }),
+		status: ({ actor, here }) => readAgent(actor, { here }),
+		install: (harness, { actor, here }) => install(actor, { harness, here }),
+		signIn: (harness, { actor, here }) => signIn(actor, { harness, here }),
+		sendCode: (harness, code, { actor, here }) =>
+			sendCode(actor, { harness, code, here }),
+		cancel: (harness, { actor, here }) => cancelAgent(actor, { harness, here }),
 		stop: () => stopAgents({}),
 	};
 
@@ -267,6 +272,7 @@ export function wireAgents(deps: AgentSetupWireDeps): {
 		refresh: async () => {},
 	};
 	const deciderPorts = {
+		computerAccess,
 		...deps.stores,
 		ollama,
 		programs,
@@ -285,11 +291,11 @@ export function wireAgents(deps: AgentSetupWireDeps): {
 	const stopDeciders = stopDeciderSetups({ job: deciderJob });
 
 	const decider: DeciderSetup = {
-		status: (caller) => readDecider(actor, caller),
-		installOllama: (caller) => installOllamaBound(actor, caller),
-		useLocal: (caller) => useLocal(actor, caller),
-		useTypesafe: (key, caller) => useTypesafe(actor, { key, ...caller }),
-		cancel: (caller) => cancelDecider(actor, caller),
+		status: ({ actor, here }) => readDecider(actor, { here }),
+		installOllama: ({ actor, here }) => installOllamaBound(actor, { here }),
+		useLocal: ({ actor, here }) => useLocal(actor, { here }),
+		useTypesafe: (key, { actor, here }) => useTypesafe(actor, { key, here }),
+		cancel: ({ actor, here }) => cancelDecider(actor, { here }),
 		stop: () => stopDeciders({}),
 	};
 

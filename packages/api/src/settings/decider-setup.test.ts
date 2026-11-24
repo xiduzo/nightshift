@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { wireComputer } from "@nightshift/engine";
 import { wireAgents } from "@nightshift/engine/agents";
 import { createSandbox, createSettingsStore } from "@nightshift/engine/testing";
 import { call, ORPCError } from "@orpc/server";
@@ -81,6 +82,7 @@ function engineSetup(
 	more: Partial<SetupDeps> = {},
 ) {
 	return wireAgents({
+		computerAccess: wireComputer({ id: () => OWNER }),
 		stores: {
 			settings: stores.settings,
 			connections: stores.connections,

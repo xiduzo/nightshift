@@ -4,6 +4,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { HarnessName } from "@nightshift/flows";
 import { isAgentProfile } from "@nightshift/flows";
+import {
+	COMPUTER_OWNER,
+	inMemoryComputer,
+} from "../access/computer/adapters/out/in-memory-computer";
 
 import type { ConfigStores } from "../settings";
 import type { SecretBackend } from "../settings/connections";
@@ -51,7 +55,7 @@ afterEach(async () => {
 	await rm(home, { recursive: true, force: true });
 });
 
-const HERE = { here: true };
+const HERE = { here: true, actor: COMPUTER_OWNER };
 const ADA = "ada@example.com";
 
 /** A computer with these programs on its PATH. */
@@ -79,6 +83,7 @@ function make(
 	deps: Partial<AgentSetupDeps> & { spawn: AgentSetupDeps["spawn"] },
 ) {
 	setup = wireAgents({
+		computerAccess: inMemoryComputer(),
 		stores,
 		check: checks("signed_out").check,
 		container: false,
@@ -150,7 +155,9 @@ describe("the status of the guided setup", () => {
 
 	test("is not available for a request from elsewhere, in a container, or on Windows", () => {
 		const { spawn } = fakeSpawn();
-		expect(make({ spawn }).status({ here: false })).toMatchObject({
+		expect(
+			make({ spawn }).status({ here: false, actor: COMPUTER_OWNER }),
+		).toMatchObject({
 			available: false,
 			reason: "elsewhere",
 			message: "Open Night Shift on that computer to set up an agent there.",
@@ -228,7 +235,10 @@ describe("installing an agent CLI", () => {
 	test("is refused from elsewhere, in a container, for pi, twice at once, and without curl", () => {
 		const { spawn, started } = fakeSpawn();
 		expect(() =>
-			make({ spawn }).install("claude-code", { here: false }),
+			make({ spawn }).install("claude-code", {
+				here: false,
+				actor: COMPUTER_OWNER,
+			}),
 		).toThrow("Open Night Shift on that computer to set up an agent there.");
 		expect(() =>
 			make({ spawn, container: true }).install("claude-code", HERE),
