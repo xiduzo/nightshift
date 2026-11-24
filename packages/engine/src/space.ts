@@ -379,7 +379,7 @@ export function createSpaces(deps: SpacesDeps) {
 			},
 
 			// It reads no row: it does not wait for the engine to be ready.
-			previewCron: (input) => deps.schedules.previewCron(actor, input),
+			previewCron: (input) => deps.schedules.previewCron(input),
 		};
 	};
 }

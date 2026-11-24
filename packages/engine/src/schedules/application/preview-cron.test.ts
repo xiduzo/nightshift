@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test";
 import { atLocal, utc } from "@nightshift/time/testing";
-import { NIGHT_SHIFT } from "../../contract";
 import { inMemoryClock } from "../adapters/out/in-memory-neighbours";
 import { previewCron } from "./preview-cron";
 
@@ -14,7 +13,7 @@ function at(day: number, hours: number, minutes = 0): number {
 describe("the preview of a cron line", () => {
 	test("says how the line reads, and gives its next three times from now", async () => {
 		const preview = previewCron({ clock: inMemoryClock(at(16, 12)) });
-		expect(await preview(NIGHT_SHIFT, { cron: "0 22 * * 1-5" })).toEqual({
+		expect(await preview({ cron: "0 22 * * 1-5" })).toEqual({
 			error: null,
 			description: "weekdays at 22:00",
 			// Friday, then Monday and Tuesday.
@@ -24,7 +23,7 @@ describe("the preview of a cron line", () => {
 
 	test("gives as many times as asked", async () => {
 		const preview = previewCron({ clock: inMemoryClock(at(16, 12)) });
-		const { times } = await preview(NIGHT_SHIFT, {
+		const { times } = await preview({
 			cron: "0 22 * * *",
 			count: 5,
 		});
@@ -41,7 +40,7 @@ describe("the preview of a cron line", () => {
 		const preview = previewCron({
 			clock: inMemoryClock(utc(2026, 9, 16, 12)),
 		});
-		const { times } = await preview(NIGHT_SHIFT, {
+		const { times } = await preview({
 			cron: "0 22 * * *",
 			count: 1,
 			timeZone: "Asia/Tokyo",
@@ -53,16 +52,16 @@ describe("the preview of a cron line", () => {
 	test("counts from the clock: a time that passed is not next", async () => {
 		const clock = inMemoryClock(at(16, 21, 59));
 		const preview = previewCron({ clock });
-		const first = await preview(NIGHT_SHIFT, { cron: "0 22 * * *", count: 1 });
+		const first = await preview({ cron: "0 22 * * *", count: 1 });
 		expect(first.times).toEqual([at(16, 22)]);
 		clock.set(at(16, 22));
-		const second = await preview(NIGHT_SHIFT, { cron: "0 22 * * *", count: 1 });
+		const second = await preview({ cron: "0 22 * * *", count: 1 });
 		expect(second.times).toEqual([at(17, 22)]);
 	});
 
 	test("a line that is not valid comes back with the reason, and no times", async () => {
 		const preview = previewCron({ clock: inMemoryClock(at(16, 12)) });
-		const read = await preview(NIGHT_SHIFT, { cron: "every night" });
+		const read = await preview({ cron: "every night" });
 		expect(read.error).toEqual(expect.any(String));
 		expect(read.error).not.toBe("");
 		expect(read.description).toBeNull();

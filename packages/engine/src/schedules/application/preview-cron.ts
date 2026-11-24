@@ -1,5 +1,4 @@
 import { cronError, describeCron, nextCronTimes } from "@nightshift/flows";
-import type { Actor } from "../../contract";
 import type { Clock } from "./ports";
 
 export type PreviewCronPorts = { clock: Clock };
@@ -26,12 +25,12 @@ export type CronPreview = {
 /**
  * Reads a cron line for the person who types it: how it reads, and its
  * next times from now on the given clock. It never refuses: a line that
- * is not valid comes back with the reason. It reads nothing of a Space,
- * so it asks no role.
+ * is not valid comes back with the reason. It reads nothing of a
+ * Space, so it takes no actor.
  */
 export const previewCron =
 	(ports: PreviewCronPorts) =>
-	async (_actor: Actor, request: PreviewCron): Promise<CronPreview> => {
+	async (request: PreviewCron): Promise<CronPreview> => {
 		const error = cronError(request.cron);
 		return {
 			error,
