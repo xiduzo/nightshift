@@ -1,32 +1,23 @@
 import { describe, expect, test } from "bun:test";
 import { Refusal } from "@nightshift/refusal";
-import { asDate } from "@nightshift/time";
 import { allowing } from "../../access/adapters/out/in-memory-access";
 import { NIGHT_SHIFT } from "../../contract";
-import { inMemorySpaceMovePorts } from "../adapters/out/in-memory-neighbours";
 import { STILL_RUNNING } from "../domain/move";
+import { spaceMovePorts } from "../test-support";
 import { moveProject } from "./move-project";
 
-/** The use case moveProject, on in-memory adapters. */
+/** The use case moveProject, over a database in memory. */
 
 /** `app` in Space `from`, with run r1. Spaces `from` and `to`. */
-function seeded() {
-	const ports = inMemorySpaceMovePorts();
+async function seeded() {
+	const ports = await spaceMovePorts();
 	for (const id of ["from", "to"]) {
-		ports.rows.spaces.add(id);
+		await ports.rows.space(id);
 		ports.projectLookup.spaces.add(id);
 	}
 	ports.projectLookup.projects.set("app", "from");
-	ports.rows.projects.set("app", {
-		id: "app",
-		spaceId: "from",
-		name: "App",
-		remote: null,
-		folder: true,
-		createdAt: asDate(0),
-		removedAt: null,
-	});
-	ports.rows.runs.push({
+	await ports.rows.project({ id: "app", spaceId: "from" });
+	await ports.rows.run({
 		id: "r1",
 		spaceId: "from",
 		projectId: "app",
@@ -38,14 +29,14 @@ function seeded() {
 
 describe("moveProject", () => {
 	test("moves the project and its runs as one Space move under the holds, then logs the move", async () => {
-		const ports = seeded();
+		const ports = await seeded();
 		await moveProject(ports)(NIGHT_SHIFT, {
 			spaceId: "from",
 			projectId: "app",
 			toSpaceId: "to",
 		});
-		expect(ports.rows.runs[0]?.spaceId).toBe("to");
-		expect(ports.rows.projects.get("app")?.spaceId).toBe("to");
+		expect((await ports.rows.runs())[0]?.spaceId).toBe("to");
+		expect((await ports.rows.projects())[0]?.spaceId).toBe("to");
 		expect(ports.steps.slice(0, 5)).toEqual([
 			"find app",
 			"refuse move app",
@@ -57,7 +48,7 @@ describe("moveProject", () => {
 	});
 
 	test("a move into a Space that another move holds is refused, and no row moves", async () => {
-		const ports = seeded();
+		const ports = await seeded();
 		ports.holds.held.add("to");
 		await expect(
 			moveProject(ports)(NIGHT_SHIFT, {
@@ -66,7 +57,7 @@ describe("moveProject", () => {
 				toSpaceId: "to",
 			}),
 		).rejects.toThrow("held");
-		expect(ports.rows.projects.get("app")?.spaceId).toBe("from");
+		expect((await ports.rows.projects())[0]?.spaceId).toBe("from");
 		expect(ports.steps.slice(-2)).toEqual([
 			"release starts from",
 			"release schedules",
@@ -74,7 +65,7 @@ describe("moveProject", () => {
 	});
 
 	test("a move to its own Space does nothing", async () => {
-		const ports = seeded();
+		const ports = await seeded();
 		await moveProject(ports)(NIGHT_SHIFT, {
 			spaceId: "from",
 			projectId: "app",
@@ -84,7 +75,7 @@ describe("moveProject", () => {
 	});
 
 	test("a project that is not in the Space is not found, and nothing moves", async () => {
-		const ports = seeded();
+		const ports = await seeded();
 		const refused = await moveProject(ports)(NIGHT_SHIFT, {
 			spaceId: "to",
 			projectId: "app",
@@ -96,7 +87,7 @@ describe("moveProject", () => {
 	});
 
 	test("a Space that does not take the move refuses it before any hold", async () => {
-		const ports = seeded();
+		const ports = await seeded();
 		await expect(
 			moveProject(ports)(NIGHT_SHIFT, {
 				spaceId: "from",
@@ -108,7 +99,7 @@ describe("moveProject", () => {
 	});
 
 	test("a run of the project that runs a step refuses the move under the hold: nothing moves, nothing is logged", async () => {
-		const ports = seeded();
+		const ports = await seeded();
 		ports.projectRuns.active.add("r1");
 		const refused = await moveProject(ports)(NIGHT_SHIFT, {
 			spaceId: "from",
@@ -118,7 +109,7 @@ describe("moveProject", () => {
 		expect(refused).toBeInstanceOf(Refusal);
 		expect((refused as Refusal).kind).toBe("conflict");
 		expect((refused as Refusal).message).toBe(STILL_RUNNING);
-		expect(ports.rows.runs[0]?.spaceId).toBe("from");
+		expect((await ports.rows.runs())[0]?.spaceId).toBe("from");
 		expect(ports.steps).not.toContain("log moved app from to");
 		expect(ports.steps.slice(-2)).toEqual([
 			"release starts from",
@@ -127,7 +118,7 @@ describe("moveProject", () => {
 	});
 
 	test("owners and admins of the Space it leaves may, and nobody else", async () => {
-		const ports = seeded();
+		const ports = await seeded();
 		for (const person of [
 			"a-stranger",
 			"the-viewer",
@@ -152,7 +143,7 @@ describe("moveProject", () => {
 	});
 
 	test("owners and admins of the Space it goes to may, and nobody else", async () => {
-		const ports = seeded();
+		const ports = await seeded();
 		for (const person of [
 			"a-stranger",
 			"the-viewer",

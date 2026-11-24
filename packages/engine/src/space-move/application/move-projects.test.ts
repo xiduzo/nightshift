@@ -1,31 +1,23 @@
 import { describe, expect, spyOn, test } from "bun:test";
 import type { Schedule } from "@nightshift/flows";
-import { asDate } from "@nightshift/time";
 import type { RowBatch } from "../../contract";
-import { inMemorySpaceMovePorts } from "../adapters/out/in-memory-neighbours";
+import { spaceMovePorts } from "../test-support";
 import { moveProjects } from "./move-projects";
 
-/** The use case moveProjects, on in-memory adapters. */
+/** The use case moveProjects, over a database in memory. */
 
 /** Spaces `from`, `platform` and `studio`. In `from`: `app` (run r1, walked by this computer) and `tools` (run r2, walked by `b`). */
-function seeded() {
-	const ports = inMemorySpaceMovePorts();
-	for (const id of ["from", "platform", "studio"]) ports.rows.spaces.add(id);
+async function seeded() {
+	const ports = await spaceMovePorts();
+	for (const id of ["from", "platform", "studio"]) await ports.rows.space(id);
 	for (const id of ["app", "tools"]) {
-		ports.rows.projects.set(id, {
-			id,
-			spaceId: "from",
-			name: id,
-			remote: null,
-			folder: true,
-			createdAt: asDate(0),
-			removedAt: null,
-		});
+		await ports.rows.project({ id, spaceId: "from" });
 	}
-	ports.rows.runs.push(
+	for (const row of [
 		{ id: "r1", spaceId: "from", projectId: "app", walkerId: "this-computer" },
 		{ id: "r2", spaceId: "from", projectId: "tools", walkerId: "b" },
-	);
+	])
+		await ports.rows.run(row);
 	ports.entries.documents.set("from", {
 		projects: new Map([
 			["app", { name: "App", remote: null }],
@@ -44,7 +36,7 @@ const schedule = (name: string, enabled: boolean) =>
 
 describe("moveProjects", () => {
 	test("moves each Project to its Space in one batch with the rows above the engine and the caller's own; the run log and the documents follow", async () => {
-		const ports = seeded();
+		const ports = await seeded();
 		const moved = await moveProjects(ports)({
 			from: "from",
 			plan: async () => {
@@ -94,14 +86,15 @@ describe("moveProjects", () => {
 		// One batch: the rows of each Space, then the rows above, then the caller's.
 		expect(ports.rows.committed).toHaveLength(1);
 		const batch = ports.rows.committed[0] ?? [];
-		expect(batch.filter((item) => typeof item === "string")).toEqual([
+		const kinds = batch.map((i) => (typeof i === "string" ? i : "rows"));
+		expect(kinds.filter((kind, at) => kind !== kinds[at - 1])).toEqual([
+			"rows",
 			"commands platform",
+			"rows",
 			"commands studio",
 			"own rows",
 		]);
-		expect(batch.indexOf("commands platform")).toBe(3);
-		expect(batch.at(-1)).toBe("own rows");
-		expect(ports.rows.runs.map((r) => [r.id, r.spaceId])).toEqual([
+		expect((await ports.rows.runs()).map((r) => [r.id, r.spaceId])).toEqual([
 			["r1", "platform"],
 			["r2", "studio"],
 		]);
@@ -121,7 +114,7 @@ describe("moveProjects", () => {
 	});
 
 	test("while it plans, the holds are on; one that fails before its batch moves nothing and frees the Space", async () => {
-		const ports = seeded();
+		const ports = await seeded();
 		await expect(
 			moveProjects(ports)({
 				from: "from",
@@ -140,7 +133,7 @@ describe("moveProjects", () => {
 	});
 
 	test("schedules change before the batch, and the caller's rows see how many", async () => {
-		const ports = seeded();
+		const ports = await seeded();
 		await ports.movedSchedules.saveSchedules("app", [
 			schedule("nightly", true),
 			schedule("weekly", false),
@@ -174,7 +167,7 @@ describe("moveProjects", () => {
 	});
 
 	test("with this computer's own runs only, the Space it leaves keeps the rest and its document, and only this computer's Clones go along", async () => {
-		const ports = seeded();
+		const ports = await seeded();
 		await moveProjects(ports)({
 			from: "from",
 			plan: async () => ({
@@ -185,7 +178,7 @@ describe("moveProjects", () => {
 				ownRunsOnly: true,
 			}),
 		});
-		expect(ports.rows.runs.map((r) => [r.id, r.spaceId])).toEqual([
+		expect((await ports.rows.runs()).map((r) => [r.id, r.spaceId])).toEqual([
 			["r1", "platform"],
 			["r2", "from"],
 		]);
@@ -196,8 +189,8 @@ describe("moveProjects", () => {
 	});
 
 	test("a group with no runs asks no rows above the engine", async () => {
-		const ports = seeded();
-		ports.rows.runs.length = 0;
+		const ports = await seeded();
+		await ports.rows.clearRuns();
 		await moveProjects(ports)({
 			from: "from",
 			plan: async () => ({
@@ -208,7 +201,7 @@ describe("moveProjects", () => {
 	});
 
 	test("what follows the moved Projects may fail: the move is done, and the failure is logged", async () => {
-		const ports = seeded();
+		const ports = await seeded();
 		ports.projectsMoved.failNext();
 		const warn = spyOn(console, "warn").mockImplementation(() => {});
 		try {
@@ -226,7 +219,7 @@ describe("moveProjects", () => {
 	});
 
 	test("no Projects: the documents and what follows them are not asked", async () => {
-		const ports = seeded();
+		const ports = await seeded();
 		await moveProjects(ports)({
 			from: "from",
 			plan: async () => ({ projects: {} }),

@@ -1,63 +1,56 @@
 import { describe, expect, test } from "bun:test";
-import { asDate } from "@nightshift/time";
-import { inMemorySpaceMovePorts } from "../adapters/out/in-memory-neighbours";
+import { spaceMovePorts } from "../test-support";
 import { forgetSpace } from "./forget-space";
 
-/** The use case forgetSpace, on in-memory adapters. */
+/** The use case forgetSpace, over a database in memory. */
 
 /** Space `gone`, its row removed, with two facts of no run, a fact of a run that is gone and an answer cost. */
-function emptied() {
-	const ports = inMemorySpaceMovePorts();
-	ports.rows.events.push(
-		{ spaceId: "gone", runId: null },
-		{ spaceId: "gone", runId: null },
-		{ spaceId: "gone", runId: "moved-away" },
-		{ spaceId: "kept", runId: null },
-	);
-	ports.rows.answerCosts.push({ spaceId: "gone" }, { spaceId: "kept" });
+async function emptied() {
+	const ports = await spaceMovePorts();
+	await ports.rows.event("gone", null);
+	await ports.rows.event("gone", null);
+	await ports.rows.event("gone", "moved-away");
+	await ports.rows.event("kept", null);
+	await ports.rows.answerCost("gone");
+	await ports.rows.answerCost("kept");
 	ports.entries.documents.set("gone", { projects: new Map(), clones: [] });
 	return ports;
 }
 
 describe("forgetSpace", () => {
 	test("once a move emptied it, its facts of no run, its answer costs and its document go; another Space keeps everything", async () => {
-		const ports = emptied();
+		const ports = await emptied();
 		expect(await forgetSpace(ports)({ spaceId: "gone" })).toBe(true);
-		expect(ports.rows.events).toEqual([{ spaceId: "kept", runId: null }]);
-		expect(ports.rows.answerCosts).toEqual([{ spaceId: "kept" }]);
+		expect(await ports.rows.events()).toEqual([
+			{ spaceId: "kept", runId: null },
+		]);
+		expect(await ports.rows.answerCosts()).toEqual([{ spaceId: "kept" }]);
 		expect(ports.entries.documents.has("gone")).toBe(false);
 		expect(ports.entries.calls).toEqual(["forget gone"]);
 	});
 
 	test("is refused while the Space's own row is here: nothing goes", async () => {
-		const ports = emptied();
-		ports.rows.spaces.add("gone");
+		const ports = await emptied();
+		await ports.rows.space("gone");
 		expect(await forgetSpace(ports)({ spaceId: "gone" })).toBe(false);
-		expect(ports.rows.events).toHaveLength(4);
+		expect(await ports.rows.events()).toHaveLength(4);
 		expect(ports.entries.calls).toEqual([]);
 	});
 
 	test("is refused while a Project or a run of it is here: nothing goes", async () => {
-		const ports = emptied();
-		ports.rows.runs.push({
+		const ports = await emptied();
+		await ports.rows.project({ id: "other", spaceId: "kept" });
+		await ports.rows.run({
 			id: "r1",
 			spaceId: "gone",
-			projectId: "app",
+			projectId: "other",
 			walkerId: "a",
 		});
 		expect(await forgetSpace(ports)({ spaceId: "gone" })).toBe(false);
-		ports.rows.runs.length = 0;
-		ports.rows.projects.set("app", {
-			id: "app",
-			spaceId: "gone",
-			name: "App",
-			remote: null,
-			folder: true,
-			createdAt: asDate(0),
-			removedAt: null,
-		});
+		await ports.rows.clearRuns();
+		await ports.rows.project({ id: "app", spaceId: "gone" });
 		expect(await forgetSpace(ports)({ spaceId: "gone" })).toBe(false);
-		expect(ports.rows.answerCosts).toHaveLength(2);
+		expect(await ports.rows.answerCosts()).toHaveLength(2);
 		expect(ports.entries.calls).toEqual([]);
 	});
 });

@@ -13,7 +13,6 @@ import type {
 	ThisWalker,
 } from "../../application/ports";
 import type { MovedRuns, ProjectsMoved } from "../../domain/move";
-import { inMemoryMoveStore, moveRecords } from "./in-memory-move-store";
 import { entryRecords, inMemorySpaceEntries } from "./in-memory-space-entries";
 
 /**
@@ -168,38 +167,16 @@ export function inMemoryMoveLog(steps: string[]): MoveLog {
 export function inMemorySpaceMovePorts() {
 	const access = inMemoryAccess();
 	const steps: string[] = [];
-	const rows = moveRecords();
 	const entries = entryRecords();
-	const store = inMemoryMoveStore(rows);
 	const spaceEntries = inMemorySpaceEntries(entries);
 	const commands = inMemoryMoveRows(steps, "commands");
 	return {
 		access,
 
 		steps,
-		rows,
 		entries,
 		holds: inMemoryMoveHolds(steps),
 		walker: inMemoryThisWalker(steps),
-		moveStore: {
-			...store,
-			async runIds(...args: Parameters<typeof store.runIds>) {
-				steps.push(`run ids ${args[0]} ${args[1].join(",")}`);
-				return store.runIds(...args);
-			},
-			async projectRows(ids: readonly string[]) {
-				steps.push("project rows");
-				return store.projectRows(ids);
-			},
-			async batchOf(move: Parameters<typeof store.batchOf>[0]) {
-				steps.push(`batch ${move.to}`);
-				return store.batchOf(move);
-			},
-			async commit(batches: Parameters<typeof store.commit>[0]) {
-				steps.push("commit");
-				return store.commit(batches);
-			},
-		},
 		movedSchedules: movedSchedules(steps, { app: "from" }),
 		spaceEntries: {
 			...spaceEntries,
