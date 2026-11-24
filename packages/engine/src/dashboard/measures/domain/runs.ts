@@ -21,15 +21,10 @@ export type NeededYouReason = (typeof NEEDED_YOU_REASONS)[number];
 export type NeededYou = {
 	reason: NeededYouReason;
 	at: number;
-	planned?: boolean;
+	planned: boolean;
 	nodeId?: string;
 	question?: string;
 };
-
-/** Whether a step-in was planned. An older Host does not say: its Gates and Asks count as planned. */
-export function isPlanned(act: NeededYou): boolean {
-	return act.planned ?? (act.reason === "gate" || act.reason === "ask");
-}
 
 /** Whether a run with this status is still open: at work, waiting at a Gate, or asleep. */
 export function isOpenStatus(status: RunStatus): boolean {
@@ -77,7 +72,7 @@ export type RunIn = {
 	trigger: { kind: "manual" } | { kind: "schedule" | "webhook"; at: number };
 	status: RunStatus;
 	reason: string | null;
-	endReason?: string | null;
+	endReason: string | null;
 	result: RunResult | null;
 	wakeAt: number | null;
 	stopAt: number | null;
@@ -108,10 +103,10 @@ export type RunIn = {
 		closedAt: number | null;
 		answeredBy: "person" | "deadline" | null;
 	}[];
-	neededYou?: NeededYou[];
+	neededYou: NeededYou[];
 	report?: { stepId: string; excerpt: string; more: boolean };
-	sleeps?: { from: number; to: number | null }[];
-	metrics?: {
+	sleeps: { from: number; to: number | null }[];
+	metrics: {
 		wallMs: number | null;
 		agentMs: number;
 		gateWaitMs: number;

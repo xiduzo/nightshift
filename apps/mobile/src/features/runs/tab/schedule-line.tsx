@@ -30,39 +30,37 @@ export const ScheduleLine = memo(function ScheduleLine({
 	const nudges = useScheduleNudges(entry.projectId, entry.schedule);
 
 	const actions: RowAction[] = [];
-	if (!nudges.hidden) {
-		if (line.action === "pause" && !nudges.pausing) {
-			actions.push({
-				label: "Pause tonight",
-				icon: PAUSE_ICON,
-				color: ORANGE,
-				onPress: nudges.pause,
-			});
-		} else if (line.action === "undo" && !nudges.resuming) {
-			actions.push({
-				label: "Undo pause",
-				icon: UNDO_ICON,
-				color: ORANGE,
-				onPress: nudges.resume,
-			});
-		}
-		if (line.runNow === "yes" && !nudges.starting) {
-			actions.push({
-				label: "Run now",
-				icon: RUN_ICON,
-				color: BLUE,
-				edge: "leading",
-				onPress: () =>
-					Alert.alert(
-						`Run ${title} now?`,
-						"The run starts at once, with the inputs of this schedule. A pause tonight stays.",
-						[
-							{ text: "Cancel", style: "cancel" },
-							{ text: "Run now", onPress: nudges.runNow },
-						],
-					),
-			});
-		}
+	if (line.action === "pause" && !nudges.pausing) {
+		actions.push({
+			label: "Pause tonight",
+			icon: PAUSE_ICON,
+			color: ORANGE,
+			onPress: nudges.pause,
+		});
+	} else if (line.action === "undo" && !nudges.resuming) {
+		actions.push({
+			label: "Undo pause",
+			icon: UNDO_ICON,
+			color: ORANGE,
+			onPress: nudges.resume,
+		});
+	}
+	if (line.runNow === "yes" && !nudges.starting) {
+		actions.push({
+			label: "Run now",
+			icon: RUN_ICON,
+			color: BLUE,
+			edge: "leading",
+			onPress: () =>
+				Alert.alert(
+					`Run ${title} now?`,
+					"The run starts at once, with the inputs of this schedule. A pause tonight stays.",
+					[
+						{ text: "Cancel", style: "cancel" },
+						{ text: "Run now", onPress: nudges.runNow },
+					],
+				),
+		});
 	}
 
 	return (

@@ -9,12 +9,7 @@ import type {
 	SpaceWatch,
 	WatchedFlow,
 } from "./flow-health-types";
-import {
-	isPlanned,
-	type NeededYou,
-	type NeededYouReason,
-	type RunIn,
-} from "./runs";
+import type { NeededYou, NeededYouReason, RunIn } from "./runs";
 import { hasEnded, spreadOf } from "./stats";
 
 /**
@@ -68,7 +63,7 @@ function workMsOf(run: RunIn, now: number): number {
 	const end = run.endedAt ?? now;
 	const idle = [
 		...run.gates.map((gate) => ({ from: gate.openedAt, to: gate.closedAt })),
-		...(run.sleeps ?? []),
+		...run.sleeps,
 	].reduce((sum, span) => sum + Math.max((span.to ?? end) - span.from, 0), 0);
 	return Math.max(end - run.createdAt - idle, 0);
 }
@@ -83,7 +78,7 @@ export function toWatchRun(run: RunIn, now: number): WatchRun {
 		costUsd: run.costUsd,
 		costKnown: run.costCalls > 0 && run.costMissing === 0,
 		workMs: workMsOf(run, now),
-		acts: run.neededYou ?? [],
+		acts: run.neededYou,
 	};
 }
 
@@ -119,7 +114,7 @@ function levelSince(
 }
 
 function countActs(acts: readonly NeededYou[]) {
-	const planned = acts.filter(isPlanned).length;
+	const planned = acts.filter((act) => act.planned).length;
 	return { planned, unplanned: acts.length - planned };
 }
 
@@ -127,7 +122,7 @@ function countActs(acts: readonly NeededYou[]) {
 function perWeekOf(acts: readonly NeededYou[], now: number): number[] {
 	const weeks = Array.from({ length: ATTENTION_WEEKS }, () => 0);
 	for (const act of acts) {
-		if (isPlanned(act)) continue;
+		if (act.planned) continue;
 		const ago = Math.floor((now - act.at) / WEEK_MS);
 		if (ago >= 0 && ago < ATTENTION_WEEKS) {
 			weeks[ATTENTION_WEEKS - 1 - ago] =
@@ -141,7 +136,7 @@ function perWeekOf(acts: readonly NeededYou[], now: number): number[] {
 function causesOf(acts: readonly NeededYou[]): AttentionCause[] {
 	const byKey = new Map<string, AttentionCause & { at: number }>();
 	for (const act of acts) {
-		const planned = isPlanned(act);
+		const { planned } = act;
 		const key = `${act.reason}\n${planned}\n${act.nodeId ?? ""}`;
 		const row = byKey.get(key) ?? {
 			reason: act.reason as NeededYouReason,

@@ -1,4 +1,4 @@
-import { changeSummary, isMissingOnHost } from "@nightshift/client";
+import { changeSummary } from "@nightshift/client";
 import {
 	Alert,
 	AlertDescription,
@@ -56,15 +56,9 @@ export function FlowChanges({
 				<Alert>
 					<CircleAlertIcon />
 					<AlertTitle>
-						{isMissingOnHost(changes.error)
-							? "Update Night Shift on your Host to see this"
-							: "Night Shift could not compare the runs of this flow"}
+						Night Shift could not compare the runs of this flow
 					</AlertTitle>
-					<AlertDescription>
-						{isMissingOnHost(changes.error)
-							? "Your Host runs an older Night Shift."
-							: "Open the row again in a moment."}
-					</AlertDescription>
+					<AlertDescription>Open the row again in a moment.</AlertDescription>
 				</Alert>
 			</div>
 		);

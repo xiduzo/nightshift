@@ -14,10 +14,7 @@ import type {
 	RunRung as ReadRunRung,
 	RUNGS,
 } from "../../read/ladder";
-import {
-	NEEDED_YOU_REASONS as READ_REASONS,
-	isPlanned as readIsPlanned,
-} from "../../read/needed-you";
+import { NEEDED_YOU_REASONS as READ_REASONS } from "../../read/needed-you";
 import { isOpenStatus as readIsOpenStatus } from "../../read/run-views";
 import type { RunDetail, RunSummary } from "../../read/views";
 import { NIGHT_RANGES as READ_NIGHT_RANGES } from "../../read/views";
@@ -25,7 +22,6 @@ import type { RunStatus } from "../../run-status";
 import { NIGHT_RANGES } from "./domain/measure-types";
 import {
 	isOpenStatus,
-	isPlanned,
 	type Ladder,
 	NEEDED_YOU_REASONS,
 	type RevisionIn,
@@ -56,16 +52,6 @@ describe("the shapes the dashboard reads", () => {
 	});
 
 	test("answer as their writers do", () => {
-		for (const reason of READ_REASONS) {
-			for (const planned of [true, false, undefined]) {
-				const act = {
-					reason,
-					at: 0,
-					...(planned === undefined ? {} : { planned }),
-				};
-				expect(isPlanned(act)).toBe(readIsPlanned(act));
-			}
-		}
 		const statuses: RunStatus[] = [
 			"running",
 			"waiting",

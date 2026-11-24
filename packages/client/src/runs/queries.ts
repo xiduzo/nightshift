@@ -17,47 +17,17 @@ export type RunCursor = Pick<RunSummary, "createdAt" | "id" | "lastActivityAt">;
 /** The order of a run list, newest first: by start, or by when each run last did something. */
 type RunOrder = "started" | "activity";
 
-/**
- * When a run last did something. A Host from before it names none: the
- * run's start stands in, which is the order that Host sends.
- */
-export function lastActivityAt(
-	run: Pick<RunSummary, "createdAt" | "lastActivityAt">,
-): number {
-	return run.lastActivityAt ?? run.createdAt;
-}
-
-/**
- * The cursor of the page after `page`, or none when it was the last. An
- * older Host sends every run whatever the input: a page longer than asked,
- * or one that does not start after its cursor, is the last.
- */
+/** The cursor of the page after `page`, or none when it was the last. */
 export function nextRunCursor(
 	page: readonly RunCursor[],
 	pageSize: number,
-	cursor: RunCursor | undefined,
-	order: RunOrder = "started",
 ): RunCursor | undefined {
-	if (page.length !== pageSize) return undefined;
-	const at = (run: RunCursor) =>
-		order === "activity" ? lastActivityAt(run) : run.createdAt;
-	const first = page[0];
-	if (
-		cursor &&
-		first &&
-		(at(first) > at(cursor) ||
-			(at(first) === at(cursor) && first.id >= cursor.id))
-	) {
-		return undefined;
-	}
 	const last = page.at(-1);
-	if (!last) return undefined;
+	if (!last || page.length < pageSize) return undefined;
 	return {
 		createdAt: last.createdAt,
 		id: last.id,
-		...(order === "activity" && last.lastActivityAt !== undefined
-			? { lastActivityAt: last.lastActivityAt }
-			: {}),
+		lastActivityAt: last.lastActivityAt,
 	};
 }
 
@@ -152,8 +122,7 @@ export function createRunQueries(orpc: ApiQueryUtils) {
 					...(cursor ? { cursor } : {}),
 				}),
 				initialPageParam: undefined as RunCursor | undefined,
-				getNextPageParam: (page, _pages, cursor) =>
-					nextRunCursor(page, pageSize, cursor, filter.order),
+				getNextPageParam: (page) => nextRunCursor(page, pageSize),
 				meta: { quietRefetchErrors: true },
 			}),
 		/**
@@ -200,8 +169,7 @@ export function createRunQueries(orpc: ApiQueryUtils) {
 		useful: () => orpc.runs.useful.mutationOptions(),
 		/**
 		 * Records that you took the run over by hand: you copied or shared
-		 * its take-over command. Call it without waiting and ignore an
-		 * error: an older Host does not know it.
+		 * its take-over command. Call it without waiting and ignore an error.
 		 */
 		takeOver: () => orpc.runs.takeOver.mutationOptions(),
 		/** The person's own Devices the run can move to now, from the run's own Space ("Move to…"). */

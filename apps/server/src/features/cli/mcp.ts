@@ -117,8 +117,7 @@ export function apiPort(
 					id: p.id,
 					name: p.name,
 					path: p.repoPath,
-					// An older Host sends no `folder`: its projects have one.
-					...(p.folder === false ? { folder: false as const } : {}),
+					...(!p.folder ? { folder: false as const } : {}),
 				})),
 			),
 		flows: (projectId) => g(() => client.flows.map({ projectId })),
@@ -227,8 +226,7 @@ export function apiPort(
 						program: t.program,
 						signsIn: t.login !== null,
 					})),
-					// An older Host sends no `folder`: its projects have one.
-					folder: projects.find((p) => p.id === projectId)?.folder !== false,
+					folder: projects.find((p) => p.id === projectId)?.folder ?? true,
 				};
 			}),
 		saveFlow: (projectId, name, flow) =>

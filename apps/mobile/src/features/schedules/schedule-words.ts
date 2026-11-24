@@ -1,4 +1,5 @@
 import {
+	HOST_OUTDATED,
 	isPausedTonight,
 	type NudgeProblem,
 	type ScheduleSummary,
@@ -25,8 +26,8 @@ const TITLES: Record<Nudge, string> = {
 
 /**
  * What to say when a nudge did not work: what happened, and how to fix
- * it. The Host's own words say why, except for an older Host, which does
- * not know the nudge at all.
+ * it. The Host's own words say why, except for a Host that does not know
+ * the nudge at all.
  */
 export function problemCopy(
 	nudge: Nudge,
@@ -37,10 +38,8 @@ export function problemCopy(
 	switch (problem) {
 		case "host-outdated":
 			return {
-				title: "Your Host cannot do this yet",
-				message:
-					"Pause tonight and Run now need a newer Night Shift on your Host.",
-				fix: "Update Night Shift on your Host. Until then, change schedules on your computer.",
+				title,
+				message: HOST_OUTDATED,
 			};
 		case "busy":
 			return { title, message, fix: "Open Runs to follow that run." };

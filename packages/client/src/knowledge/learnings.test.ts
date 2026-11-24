@@ -10,6 +10,7 @@ function learning(projectId: string, id: string): WaitingLearning {
 		stepId: "s1",
 		notes: ["The tests run with bun test."],
 		proposedAt: 0,
+		mayDecide: true,
 	};
 }
 

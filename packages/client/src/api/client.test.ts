@@ -11,15 +11,11 @@ import {
 
 /**
  * A fake `fetch` that records each request and answers `[]` the oRPC way,
- * a batch with `[]` for each of its calls. `reads`: what it says it
- * reads, as a Night Shift of this version does.
+ * a batch with `[]` for each of its calls.
  */
-function fakeFetch(reads?: string) {
+function fakeFetch() {
 	const requests: Request[] = [];
-	const headers = {
-		"content-type": "application/json",
-		...(reads ? { "x-nightshift-reads": reads } : {}),
-	};
+	const headers = { "content-type": "application/json" };
 	const fetch = async (request: Request) => {
 		requests.push(request);
 		if (new URL(request.url).pathname.endsWith("/__batch__")) {
@@ -66,12 +62,11 @@ describe("the client of a Night Shift", () => {
 });
 
 describe("calls made together", () => {
-	test("go in one request to a Night Shift of this version", async () => {
+	test("go in one request", async () => {
 		const { fetch, paths } = fakeFetch();
 		const client = createApiClient({
 			baseUrl: "http://localhost:3000",
 			fetch,
-			batch: true,
 		});
 		const replies = await Promise.all([
 			client.projects.list(),
@@ -82,33 +77,11 @@ describe("calls made together", () => {
 		expect(paths()).toEqual(["/rpc/__batch__"]);
 	});
 
-	test("go one by one to a Host until it says it reads batches", async () => {
-		const older = fakeFetch();
-		const toOlder = createApiClient({
-			baseUrl: "https://host.example",
-			fetch: older.fetch,
-		});
-		await Promise.all([toOlder.projects.list(), toOlder.runs.list({})]);
-		await Promise.all([toOlder.projects.list(), toOlder.runs.list({})]);
-		expect(older.paths()).not.toContain("/rpc/__batch__");
-		expect(older.paths()).toHaveLength(4);
-
-		const newer = fakeFetch("batch, gzip");
-		const toNewer = createApiClient({
-			baseUrl: "https://host.example",
-			fetch: newer.fetch,
-		});
-		await toNewer.projects.list();
-		await Promise.all([toNewer.projects.list(), toNewer.runs.list({})]);
-		expect(newer.paths()).toEqual(["/rpc/projects/list", "/rpc/__batch__"]);
-	});
-
 	test("leave a stream out of the batch", async () => {
 		const { fetch, paths } = fakeFetch();
 		const client = createApiClient({
 			baseUrl: "http://localhost:3000",
 			fetch,
-			batch: true,
 		});
 		const stop = new AbortController();
 		const watching = client.notifications
@@ -172,7 +145,6 @@ describe("calls made together", () => {
 			const client = createApiClient({
 				baseUrl: "http://localhost:3000",
 				fetch,
-				batch: true,
 			});
 			const settled = await Promise.allSettled([
 				client.runs.get({ runId: "gone" }),
@@ -201,7 +173,7 @@ describe("calls made together", () => {
 		})) {
 			expect(reason).not.toBeInstanceOf(ORPCError);
 		}
-		// A Host of an older version that knows no batch.
+		// A server that knows no batch.
 		for (const reason of await errors(
 			async () => new Response("Not Found", { status: 404 }),
 		)) {

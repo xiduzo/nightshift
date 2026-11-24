@@ -2,5 +2,5 @@
 
 export { deadlineSoon, deadlineText, deadlineWhen } from "./deadline";
 export { gateRun, waitedText, waitingForYou } from "./inbox";
-export { gateOrder, mayAnswer, URGENCY_LABEL, urgencyOf } from "./queue";
+export { gateOrder, mayAnswer, URGENCY_LABEL } from "./queue";
 export type { AnsweredGate, GateChoice, OpenGate } from "./types";

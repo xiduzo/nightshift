@@ -21,7 +21,7 @@ export function inMemorySync() {
 	const hold = holdFolder(bound);
 	const unlessHeld = reconcileUnlessHeld(bound);
 	const removeFolder = removeSourceFolder(bound);
-	const { older, spaces, now } = ports;
+	const { spaces } = ports;
 	/** Each hold of a folder, its start and its end, in order. */
 	const holds: string[] = [];
 	return {
@@ -57,9 +57,6 @@ export function inMemorySync() {
 		status: {
 			spaceOf: spaces.spaceOf,
 			isShared: spaces.isShared,
-			isOlder: (spaceId: string) => older.isOlder(spaceId, now()),
-			heard: (spaceId: string, error: unknown) =>
-				older.heard(spaceId, error, now()),
 		},
 		reconciler: {
 			reconcileUnlessHeld: (projectId: string) => unlessHeld({ projectId }),

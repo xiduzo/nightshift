@@ -38,18 +38,6 @@ export const answerRefusals = {
 /** The declared errors of the Gate the handler gives. */
 type AnswerRefusals = ORPCErrorConstructorMap<typeof answerRefusals>;
 
-type Via = "web" | "phone" | "lock_screen" | "_OTHER";
-
-/**
- * Where the answer comes from, in the words the engine keeps:
- * `lock-screen` is the older name of `lock_screen`, an unknown or absent
- * place is `_OTHER`. The answer always names one.
- */
-export function viaOf(raw: z.output<typeof gateAnswerSchema>["via"]): Via {
-	if (raw === "lock-screen" || raw === "lock_screen") return "lock_screen";
-	return raw === "web" || raw === "phone" ? raw : "_OTHER";
-}
-
 /**
  * Answers the open Gate of a run in the run's own Space, as the session's
  * Person. The engine's `answerGate` finds the run, checks the Person's
@@ -64,9 +52,9 @@ export async function answerGate(
 	input: z.output<typeof gateAnswerSchema>,
 	errors: AnswerRefusals,
 ): Promise<void> {
-	const { via, ...answer } = input;
+	const { via = "_OTHER", ...answer } = input;
 	try {
-		await gates.answer(actor, { ...answer, via: viaOf(via) });
+		await gates.answer(actor, { ...answer, via });
 	} catch (error) {
 		if (error instanceof GateClosedError) {
 			throw errors.GATE_CLOSED({ cause: error });

@@ -23,10 +23,7 @@ type ReportSource = {
 	warnings: readonly { kind: string; stepId: string | null }[];
 };
 
-/**
- * The run's report, or null when the run has none. An older Host sends
- * no report, so its runs have none here.
- */
+/** The run's report, or null when the run has none. */
 export function runReport(detail: ReportSource): RunReport | null {
 	const glance = detail.report;
 	if (!glance) return null;

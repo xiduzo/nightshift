@@ -19,7 +19,6 @@ function step(
 		agentMs?: number;
 		gateWaitMs?: number;
 		tokens?: ReturnType<typeof tokens>;
-		noMetrics?: boolean;
 	} = {},
 ) {
 	return {
@@ -29,16 +28,14 @@ function step(
 		costUsd: extra.costUsd ?? 0,
 		costEstimated: extra.costEstimated ?? false,
 		costMissing: extra.costMissing ?? 0,
-		metrics: extra.noMetrics
-			? undefined
-			: {
-					wallMs: endedAt === null ? null : endedAt - startedAt,
-					agentMs: extra.agentMs ?? 0,
-					gateWaitMs: extra.gateWaitMs ?? 0,
-					tokens: extra.tokens ?? tokens(0, 0),
-					costBasis: "billed" as const,
-					prUrl: null,
-				},
+		metrics: {
+			wallMs: endedAt === null ? null : endedAt - startedAt,
+			agentMs: extra.agentMs ?? 0,
+			gateWaitMs: extra.gateWaitMs ?? 0,
+			tokens: extra.tokens ?? tokens(0, 0),
+			costBasis: "billed" as const,
+			prUrl: null,
+		},
 	};
 }
 
@@ -75,16 +72,5 @@ describe("metricsByNode", () => {
 			step("build", 100, null),
 		]);
 		expect(node).toMatchObject({ visits: 2, wallMs: 100, open: true });
-	});
-
-	test("reads the time of a step from an older Host from its start and end", () => {
-		const [node] = metricsByNode([
-			step("build", 0, 40, { noMetrics: true, costMissing: 1 }),
-		]);
-		expect(node).toMatchObject({
-			wallMs: 40,
-			tokens: tokens(0, 0),
-			cost: { costUsd: 0, costEstimated: false, costMissing: 1 },
-		});
 	});
 });

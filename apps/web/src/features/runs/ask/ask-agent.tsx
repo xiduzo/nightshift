@@ -1,8 +1,4 @@
-import {
-	askWhyMutation,
-	explainRun,
-	isMissingOnHost,
-} from "@nightshift/client";
+import { askWhyMutation, explainRun } from "@nightshift/client";
 import {
 	Alert,
 	AlertDescription,
@@ -35,8 +31,6 @@ export type AgentAsk = {
 	ask: (pick: PickedAnswer) => void;
 	last: LastAsk | undefined;
 	activity: string | null;
-	/** The computer that answers does not have it (an older Host). */
-	missing: boolean;
 };
 
 /**
@@ -67,7 +61,6 @@ export function useAgentAsk(runId: string): AgentAsk {
 		ask: (pick) => mutation.mutate(pick),
 		last,
 		activity,
-		missing: Boolean(last?.error && isMissingOnHost(last.error)),
 	};
 }
 
@@ -78,7 +71,6 @@ export function useAgentAsk(runId: string): AgentAsk {
  */
 export function AskAgentButton({ agent }: { agent: AgentAsk }) {
 	const pick = useBuiltinPick("explainer");
-	if (agent.missing) return null;
 	const pending = agent.last?.status === "pending";
 	const asked = agent.last !== undefined && agent.last.status !== "idle";
 	return (
@@ -108,7 +100,7 @@ export function AgentAnswer({
 	failed: boolean;
 }) {
 	const { last, activity } = agent;
-	if (!last || last.status === "idle" || agent.missing) return null;
+	if (!last || last.status === "idle") return null;
 
 	if (last.status === "pending") {
 		return (

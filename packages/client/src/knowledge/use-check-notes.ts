@@ -93,7 +93,7 @@ export function notesToCheck(
 				index,
 				note,
 				nearTo: learning.nearTo?.[index] ?? [],
-				mayDecide: learning.mayDecide ?? false,
+				mayDecide: learning.mayDecide,
 				proposedAt: learning.proposedAt,
 			};
 			return checked.has(keyOf(one)) ? [] : [one];

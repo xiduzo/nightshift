@@ -55,7 +55,6 @@ describe("listKnowledgeSources", () => {
 			proposed: 2,
 			reviews: [],
 			shared: false,
-			olderHost: false,
 			learnsFromRuns: true,
 			reader: { kind: "firecrawl" },
 			readerReady: false,

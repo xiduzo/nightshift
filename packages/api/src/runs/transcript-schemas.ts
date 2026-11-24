@@ -224,7 +224,7 @@ const stepEventSchema = z.discriminatedUnion("type", [
 		type: z.literal("end"),
 		status: runResultSchema,
 		message: z.string().nullable(),
-		/** The End wrote a report. `cut`: Night Shift kept only its start. Older Hosts send none. */
+		/** The End wrote a report. `cut`: Night Shift kept only its start. Absent: no report. */
 		report: z.object({ cut: z.boolean() }).optional(),
 	}),
 	z.object({

@@ -199,22 +199,19 @@ export const flowHealthRowSchema = z.object({
 	}),
 	unknownCost: z.number(),
 	freeRuns: z.number(),
-	scores: z.array(flowScoreRowSchema).optional(),
-	useful: flowUsefulSchema.optional(),
-	neededYou: flowNeededYouSchema.optional(),
-	/** The newest report of its own runs. Absent: none, or an older Host. */
+	scores: z.array(flowScoreRowSchema),
+	useful: flowUsefulSchema,
+	neededYou: flowNeededYouSchema,
+	/** The newest report of its own runs. Absent: none. */
 	report: latestReportSchema.optional(),
-	/** Where the work of its own runs landed. Older Hosts send none. */
-	ladders: flowLaddersSchema.optional(),
-	/** Older Hosts send none. */
-	watch: flowWatchSchema.optional(),
-	/** How steady what a finished run costs and how long it works are. Older Hosts send none. */
-	steady: z
-		.object({
-			cost: z.enum(COST_STEADINESS).nullable(),
-			time: z.enum(COST_STEADINESS).nullable(),
-		})
-		.optional(),
+	/** Where the work of its own runs landed. */
+	ladders: flowLaddersSchema,
+	watch: flowWatchSchema,
+	/** How steady what a finished run costs and how long it works are. */
+	steady: z.object({
+		cost: z.enum(COST_STEADINESS).nullable(),
+		time: z.enum(COST_STEADINESS).nullable(),
+	}),
 });
 
 const flowRunSchema = z.object({
@@ -249,8 +246,8 @@ export const flowHealthDetailSchema = exact<FlowHealthDetail>()(
 				length: spreadSchema.nullable(),
 				spent: knownCostSchema,
 				spentTokens: z.number(),
-				// Test runs: only the spend counts them. Older Hosts send none.
-				tests: z.number().optional(),
+				// Test runs: only the spend counts them.
+				tests: z.number(),
 				spentUnfinished: knownCostSchema,
 				unfinishedTokens: z.number(),
 				dearest: z
@@ -262,20 +259,15 @@ export const flowHealthDetailSchema = exact<FlowHealthDetail>()(
 					.nullable(),
 				warnings: z.number(),
 				statuses: z.array(statusCountSchema),
-				/** Older Hosts send only `night` and `counts`. */
 				perNight: z.array(
 					nightCountsSchema.extend({
-						spent: knownCostSchema.optional(),
-						needed: z
-							.object({ runs: z.number(), needed: z.number() })
-							.optional(),
+						spent: knownCostSchema,
+						needed: z.object({ runs: z.number(), needed: z.number() }),
 						/** Per metric name: the sum its runs wrote that day, and how many runs wrote it. */
-						metrics: z
-							.record(
-								z.string(),
-								z.object({ sum: z.number(), runs: z.number() }),
-							)
-							.optional(),
+						metrics: z.record(
+							z.string(),
+							z.object({ sum: z.number(), runs: z.number() }),
+						),
 					}),
 				),
 				endedRuns: z.array(
@@ -306,13 +298,11 @@ export const flowHealthDetailSchema = exact<FlowHealthDetail>()(
 						last: z.object({ runId: z.string(), at: z.number() }),
 					}),
 				),
-				scores: z.array(flowScoreRowSchema).optional(),
-				useful: flowUsefulSchema.optional(),
-				neededYou: flowNeededYouSchema.optional(),
-				/** Where the work of its own runs landed. Older Hosts send none. */
-				ladders: flowLaddersSchema
-					.extend({ nodes: topRows(nodeLadderSchema) })
-					.optional(),
+				scores: z.array(flowScoreRowSchema),
+				useful: flowUsefulSchema,
+				neededYou: flowNeededYouSchema,
+				/** Where the work of its own runs landed. */
+				ladders: flowLaddersSchema.extend({ nodes: topRows(nodeLadderSchema) }),
 				latest: z.array(flowRunSchema),
 			}),
 		),

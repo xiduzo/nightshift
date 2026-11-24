@@ -53,15 +53,6 @@ describe("a Host of an older version", () => {
 		const client = createApiClient({
 			baseUrl: "http://localhost:3000",
 			fetch: async (request: Request) => {
-				// The first answer says the Host reads batches.
-				if (!new URL(request.url).pathname.endsWith("/__batch__")) {
-					return new Response(JSON.stringify({ json: [] }), {
-						headers: {
-							"content-type": "application/json",
-							"x-nightshift-reads": "batch",
-						},
-					});
-				}
 				batched = true;
 				const calls = (await request.clone().json()) as unknown[];
 				const replies = calls.map((_, index) => ({
@@ -76,7 +67,6 @@ describe("a Host of an older version", () => {
 				});
 			},
 		});
-		await client.projects.list();
 		const error = await Promise.all([
 			client.knowledge.learnings({}),
 			client.knowledge.learnings({ projectId: "p1" }),

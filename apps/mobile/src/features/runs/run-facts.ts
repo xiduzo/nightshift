@@ -41,7 +41,7 @@ function costFact(
 	>,
 ): RunFact {
 	const known = costLabel(run);
-	const tokens = tokensLabel(run.metrics?.tokens);
+	const tokens = tokensLabel(run.metrics.tokens);
 	if (known === null) return { label: "Cost", value: UNKNOWN };
 	const note =
 		run.costMissing > 0
@@ -76,7 +76,7 @@ export function runFacts(
 	>,
 	{ status, now }: { status: RunStatus; now: number },
 ): RunFact[] {
-	const tokens = run.metrics?.tokens;
+	const tokens = run.metrics.tokens;
 	const split = tokensSplit(tokens);
 	const known = costLabel(run);
 	const ended = hasEnded(status);

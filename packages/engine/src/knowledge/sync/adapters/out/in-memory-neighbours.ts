@@ -7,7 +7,6 @@ import type {
 import type { ContentRef } from "../../domain/entry";
 import { createKnowledgeFolderLocks } from "../../domain/folder-locks";
 import type { KnowledgeReconciled } from "../../domain/merge";
-import { createOlderHosts } from "../../domain/older-hosts";
 import { inMemoryKnowledgeDocuments } from "./in-memory-knowledge-documents";
 import { inMemoryProjectSpaces } from "./in-memory-project-spaces";
 import { inMemoryWorkingCopy } from "./in-memory-working-copy";
@@ -132,7 +131,6 @@ export function inMemorySyncPorts() {
 		hosts: inMemorySpaceHosts(),
 		listener: inMemoryReconcileListener(),
 		notes: inMemoryMeasureNotes(),
-		older: createOlderHosts(),
 		now: () => clock,
 		/** Sets the clock. */
 		setNow(at: number) {

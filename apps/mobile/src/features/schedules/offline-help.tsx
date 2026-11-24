@@ -33,18 +33,16 @@ function PauseForComputer({ notice }: { notice: OfflineNotice }) {
 			<Text className="text-sm text-muted-foreground">
 				{`${notice.sentence} Turn it on before then, or pause the flow for tonight.`}
 			</Text>
-			{nudges.hidden ? null : (
-				<Button
-					size="lg"
-					variant="secondary"
-					disabled={nudges.pausing}
-					className="h-auto min-h-11 py-2"
-					onPress={nudges.pause}
-				>
-					<Icon as={Moon} />
-					<Text>{`Pause ${scheduleName(entry.schedule)} tonight`}</Text>
-				</Button>
-			)}
+			<Button
+				size="lg"
+				variant="secondary"
+				disabled={nudges.pausing}
+				className="h-auto min-h-11 py-2"
+				onPress={nudges.pause}
+			>
+				<Icon as={Moon} />
+				<Text>{`Pause ${scheduleName(entry.schedule)} tonight`}</Text>
+			</Button>
 			{nudges.copy ? (
 				<ErrorAlert
 					title={nudges.copy.title}

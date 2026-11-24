@@ -69,8 +69,8 @@ export type Change = DocumentKind | StreamChange | SaveChange;
 type Stale = {
 	/**
 	 * Reads that only this change changes. They stay fresh until it comes,
-	 * 10 minutes at most: a Host of an older version does not tell. Only a
-	 * synced document holds reads, because the stream says when it changes.
+	 * 10 minutes at most. Only a synced document holds reads, because the
+	 * stream says when it changes.
 	 */
 	holds?: readonly QueryPath[];
 	/** Reads that change in other ways too. They stay fresh for a minute. */

@@ -58,8 +58,7 @@ export function withPause(
 /**
  * Why Pause tonight, Resume tonight or Run now did not work:
  *
- * - `host-outdated`: the Host does not know the procedure (an older Host
- *   answers a plain 404, not an error of its own).
+ * - `host-outdated`: the Host does not know the procedure (`isMissingOnHost`).
  * - `busy`: an earlier run of the schedule is still open (CONFLICT).
  * - `refused`: the schedule cannot do it now: off, on a webhook, no next
  *   start (BAD_REQUEST).

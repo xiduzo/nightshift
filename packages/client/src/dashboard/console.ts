@@ -14,13 +14,13 @@ type Totals = Omit<NightsRange["totals"], "perNight">;
 /**
  * The share of runs started that needed you, in whole percent: a person
  * answered a Gate or an Ask, resumed, stopped, or took one over. Null
- * without runs, and from an older Host that does not count it.
+ * without runs.
  */
 function neededShare(totals: {
 	runs: number;
-	neededYou?: number;
+	neededYou: number;
 }): number | null {
-	if (totals.neededYou === undefined || totals.runs === 0) return null;
+	if (totals.runs === 0) return null;
 	return Math.round((totals.neededYou / totals.runs) * 100);
 }
 

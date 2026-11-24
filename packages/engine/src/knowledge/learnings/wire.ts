@@ -5,7 +5,7 @@ import type { CloseNotes } from "../search";
 import type {
 	KnowledgeDocuments,
 	KnowledgeReconciler,
-	SpaceHostStatus,
+	SpaceStatus,
 } from "../sync";
 import { followEndedRuns } from "./adapters/in/follow-ended-runs";
 import { fsLearningFolder } from "./adapters/out/fs-learning-folder";
@@ -45,7 +45,7 @@ export type LearningsDeps = {
 	documents: Pick<KnowledgeDocuments, "open">;
 	/** The content by hash: here, and at the Space's Host. */
 	archive: ListedReads["archive"];
-	status: Pick<SpaceHostStatus, "spaceOf" | "heard">;
+	status: Pick<SpaceStatus, "spaceOf">;
 	/** Holds the folder as a step does: `settle` changes it, and the reconcile at `done` publishes that. */
 	holds: Pick<KnowledgeReconciler, "startStep">;
 	notifications: LearningsNotifications;

@@ -61,8 +61,7 @@ export function SpendPage({
 						<CircleAlertIcon />
 						<AlertTitle>Night Shift could not load the spend</AlertTitle>
 						<AlertDescription>
-							Update Night Shift on the computer that runs your flows. Then open
-							this page again.
+							Open this page again in a moment.
 						</AlertDescription>
 					</Alert>
 				) : !days ? (

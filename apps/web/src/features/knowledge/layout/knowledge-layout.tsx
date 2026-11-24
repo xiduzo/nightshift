@@ -8,7 +8,7 @@ import { Button } from "@nightshift/ui/components/button";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
 import { useQuery } from "@tanstack/react-query";
 import { useMatchRoute } from "@tanstack/react-router";
-import { CircleAlertIcon, PlusIcon, TriangleAlertIcon } from "lucide-react";
+import { CircleAlertIcon, PlusIcon } from "lucide-react";
 import {
 	createContext,
 	type ReactNode,
@@ -221,7 +221,6 @@ export function KnowledgeSection({
 	children: ReactNode;
 }) {
 	const id = useId();
-	const { knowledge } = useKnowledge();
 	return (
 		<section aria-labelledby={id} className="flex flex-col gap-6">
 			<PageHeading
@@ -230,17 +229,6 @@ export function KnowledgeSection({
 				description={description}
 				actions={actions}
 			/>
-			{knowledge.olderHost ? (
-				<Alert>
-					<TriangleAlertIcon />
-					<AlertTitle>This knowledge stays on this computer for now</AlertTitle>
-					<AlertDescription>
-						The computer that keeps this Space runs an older version of Night
-						Shift. Update Night Shift there to share this knowledge with your
-						other devices.
-					</AlertDescription>
-				</Alert>
-			) : null}
 			{children}
 		</section>
 	);

@@ -38,7 +38,6 @@ export {
 	mayAnswer,
 	type OpenGate,
 	URGENCY_LABEL,
-	urgencyOf,
 	waitedText,
 	waitingForYou,
 } from "./inbox";

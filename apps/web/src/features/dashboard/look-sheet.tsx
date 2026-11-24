@@ -144,7 +144,6 @@ function SignalCard({ signal }: { signal: FlowSignal }) {
 /** An agent reads the failed run and says what went wrong. It changes nothing. */
 function AskWhy({ runId }: { runId: string }) {
 	const agent = useAgentAsk(runId);
-	if (agent.missing) return null;
 	return (
 		<div className="flex flex-col gap-3 rounded-xl border bg-muted/40 p-4">
 			<p className="text-sm text-muted-foreground">

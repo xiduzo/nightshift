@@ -44,6 +44,10 @@ export function isHostUnreachable(error: unknown): boolean {
 	);
 }
 
+/** What a person reads when the Host does not have a procedure. The words of `OlderHostError` of the engine. */
+export const HOST_OUTDATED =
+	"This Host runs an older version of Night Shift. Update Night Shift there.";
+
 /**
  * Whether the Host does not have the procedure at all: a Night Shift of
  * an older version, which a redeploy brings up to date. It answers a

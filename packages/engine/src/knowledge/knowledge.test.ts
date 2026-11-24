@@ -367,33 +367,20 @@ describe("a step's knowledge", () => {
 });
 
 describe("a Host of an older version", () => {
-	test("gets a plain message, not a failed sync: the Device works on its own copy and does not ask again for a while", async () => {
-		let calls = 0;
+	test("takes no knowledge: the Device works on its own copy, and a file it must fetch says why", async () => {
 		const older: ArchiveHost = {
 			async archivePut() {
-				calls++;
-				throw new OlderHostError();
+				throw new OlderHostError(OLDER_HOST);
 			},
 			async archiveGet() {
-				calls++;
-				throw new OlderHostError();
+				throw new OlderHostError(OLDER_HOST);
 			},
 		};
 		const a = await device(older);
 		await a.put("wiki/Home.md", "# Home\n");
 		const first = await a.knowledge.listing("p1");
-		expect(first.olderHost).toBe(true);
-		// The step goes on: its files are in the document of this Device.
 		expect(first.files.map((f) => f.path)).toEqual(["wiki/Home.md"]);
-		expect(calls).toBe(1);
 
-		await a.put("wiki/Next.md", "# Next\n");
-		const step = await a.knowledge.forCommand("p1");
-		await step.done();
-		expect(calls).toBe(1);
-		expect(await a.paths()).toContain("wiki/Next.md");
-
-		// A file another Device listed cannot come from that Host: it says why.
 		const b = await device(older);
 		applyUpdate(
 			(await b.persisted("p1")).doc,

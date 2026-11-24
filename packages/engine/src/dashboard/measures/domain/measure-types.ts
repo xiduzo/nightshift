@@ -54,7 +54,7 @@ export type DashboardRun = {
 	group: string;
 	/**
 	 * A test run (`isTestRun`): the nodes its start pinned and skipped, as
-	 * on its run summary. Absent: no test run, or an older Host.
+	 * on its run summary. Absent: no test run.
 	 */
 	test?: { pinned: string[]; skipped: string[] };
 };

@@ -28,6 +28,7 @@ import {
 	runFacts,
 	runTrace,
 	shownRunFlow,
+	stepMetrics,
 	toSummary,
 } from "../../../../read";
 import { isTestRun } from "../../../../run-status";
@@ -90,6 +91,8 @@ const pageOf = (step: DerivedStep, device: RunWalker | null): Page => ({
 	...costFields(step.cost),
 	device,
 	gate: null,
+	sleeps: [],
+	metrics: stepMetrics(step),
 });
 
 /** The row as a Gate names its run. */

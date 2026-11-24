@@ -1,5 +1,5 @@
 import { Refusal } from "@nightshift/refusal";
-import { OLDER_HOST } from "../../../contract";
+import { OlderHostError } from "../../../contract";
 import { NOT_FETCHED, ON_ANOTHER_DEVICE } from "../domain/listing";
 import { cleanPath } from "../domain/paths";
 import type { KnowledgeText, ReadFrom } from "../domain/text";
@@ -13,7 +13,7 @@ import type {
 
 export type ReadKnowledgeFilePorts = {
 	folders: Pick<KnowledgeFolders, "read">;
-	status: Pick<SpaceStatus, "spaceOf" | "isOlder" | "heard">;
+	status: Pick<SpaceStatus, "spaceOf">;
 	documents: KnowledgeEntries;
 	archive: ContentArchive;
 	texts: ContentTexts;
@@ -58,12 +58,9 @@ export const readKnowledgeFile =
 		const content = await ports.archive
 			.read({ kind: "content", spaceId, sha256: entry.sha256 })
 			.catch((error: unknown) => {
-				ports.status.heard(spaceId, error);
+				if (error instanceof OlderHostError) throw error;
 				return null;
 			});
-		if (!content && ports.status.isOlder(spaceId)) {
-			throw new Refusal("unavailable", OLDER_HOST);
-		}
 		if (!content) throw new Refusal("unavailable", NOT_FETCHED);
 		return ports.texts.text(clean, content, maxBytes, from);
 	};

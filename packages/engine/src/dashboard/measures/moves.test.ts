@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { RunDetail } from "../../read";
+import { NO_METRICS } from "../adapters/out/in-memory-neighbours";
 import { nextMoves } from "./domain/moves";
 
 /*
@@ -87,6 +88,7 @@ function run(
 		status: "finished",
 		result: "done",
 		endReason: "finished",
+		metrics: NO_METRICS,
 		createdAt: clock,
 		trigger: { kind: "manual" },
 		warnings: [],

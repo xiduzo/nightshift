@@ -27,7 +27,7 @@ export {
 	usefulView,
 } from "./ended";
 export { useRunPrefetch } from "./prefetch";
-export { createRunQueries, lastActivityAt } from "./queries";
+export { createRunQueries } from "./queries";
 export {
 	type FlowUse,
 	hostOwnerHint,

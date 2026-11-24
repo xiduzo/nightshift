@@ -17,7 +17,6 @@ import {
 	NativeToggleRow,
 } from "@/shared/native-list";
 import {
-	DEFAULT_PUSH_URGENCIES,
 	HOURS,
 	isLastPushUrgency,
 	phoneTimeZone,
@@ -133,7 +132,7 @@ function TellMeSection({ value, onChange }: SectionProps) {
  * Gates still show in Needs you and count on the badge.
  */
 function PushForSection({ value, onChange }: SectionProps) {
-	const levels = value.pushUrgencies ?? DEFAULT_PUSH_URGENCIES;
+	const levels = value.pushUrgencies;
 	const off = !value.events.gateOpened;
 	return (
 		<NativeSection

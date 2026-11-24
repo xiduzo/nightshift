@@ -1,15 +1,13 @@
 import { describe, expect, test } from "bun:test";
-import { gateOrder, mayAnswer, URGENCY_LABEL, urgencyOf } from "./queue";
+import { gateOrder, mayAnswer, URGENCY_LABEL } from "./queue";
 import type { OpenGate } from "./types";
 
 const MIN = 60_000;
 
-type Queued = Pick<OpenGate, "runId" | "openedAt" | "deadline"> & {
-	urgency?: OpenGate["urgency"];
-};
+type Queued = Pick<OpenGate, "runId" | "urgency" | "openedAt" | "deadline">;
 
 function gate(runId: string, fields: Partial<Queued> = {}): Queued {
-	return { runId, openedAt: 0, deadline: null, ...fields };
+	return { runId, urgency: "today", openedAt: 0, deadline: null, ...fields };
 }
 
 const due = (minutes: number) => ({ at: minutes * MIN, choose: "keep" });
@@ -22,11 +20,6 @@ describe("the urgency of a Gate", () => {
 			today: "Today",
 			later: "When you have time",
 		});
-	});
-
-	test("a Host older than the brief sends none: today", () => {
-		expect(urgencyOf({})).toBe("today");
-		expect(urgencyOf({ urgency: "now" })).toBe("now");
 	});
 });
 
@@ -61,15 +54,6 @@ describe("gateOrder: the one queue order", () => {
 			gate("old", { deadline: due(10), openedAt: 1 }),
 		];
 		expect(ids(gateOrder(gates))).toEqual(["old", "new"]);
-	});
-
-	test("a Gate without an urgency sorts as today", () => {
-		const gates = [
-			gate("later", { urgency: "later" }),
-			gate("old-host", { openedAt: 5 }),
-			gate("today", { urgency: "today", openedAt: 1 }),
-		];
-		expect(ids(gateOrder(gates))).toEqual(["today", "old-host", "later"]);
 	});
 
 	test("Gates that tie keep the order the Host sent, and the input stays", () => {

@@ -26,7 +26,7 @@ export const itemSummarySchema = z.object({
 	id: z.string(),
 	title: z.string(),
 	url: z.string().nullable(),
-	/** Only in the step's detail (`runs.step`). Older Hosts send it in every summary. */
+	/** Only in the step's detail (`runs.step`). */
 	value: z.json().optional(),
 	state: z.enum(["done", "running", "failed", "blocked", "halted"]),
 	branch: z.string().nullable(),
@@ -39,7 +39,7 @@ export const itemSummarySchema = z.object({
 const sessionSummarySchema = z.object({
 	id: z.string(),
 	harnessSessionId: z.string().nullable(),
-	/** Only in the step's detail (`runs.step`). Older Hosts send it in every summary. */
+	/** Only in the step's detail (`runs.step`). */
 	prompt: z.string().optional(),
 	createdAt: z.number(),
 	outcome: z.enum(["failed", "finished", "stopped", "interrupted"]).nullable(),
@@ -89,9 +89,9 @@ export const stepSummarySchema = z.object({
 			form: askFormSchema.optional(),
 		})
 		.nullable(),
-	sleeps: z.array(sleepSchema).optional(),
-	metrics: metricsSchema.optional(),
-	/** The knowledge files its agents used: read, or at the top of a search. Older Hosts send none. */
+	sleeps: z.array(sleepSchema),
+	metrics: metricsSchema,
+	/** The knowledge files its agents used: read, or at the top of a search. Absent: none. */
 	sources: z
 		.array(
 			z.object({
@@ -103,7 +103,7 @@ export const stepSummarySchema = z.object({
 			}),
 		)
 		.optional(),
-	/** A step of a test run that stood in for its node. Older Hosts send none. */
+	/** A step of a test run that stood in for its node. Absent: the node ran. */
 	test: z.enum(["pinned", "skipped"]).optional(),
 	/** A pinned step: the step of an earlier run its output comes from. */
 	pinnedFrom: z

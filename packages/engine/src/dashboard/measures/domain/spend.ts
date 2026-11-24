@@ -78,7 +78,7 @@ function nodeCosts(
 		string,
 		{ nodeId: string; via?: string; cost: number; landed: number }
 	>();
-	for (const row of run.metrics?.ladder ?? []) {
+	for (const row of run.metrics.ladder ?? []) {
 		const key = `${row.via ?? ""}/${row.nodeId}`;
 		const node = nodes.get(key) ?? {
 			nodeId: row.nodeId,

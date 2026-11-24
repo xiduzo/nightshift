@@ -32,10 +32,12 @@ test("a pause or resume on its way wins over the list", () => {
 });
 
 describe("problemCopy", () => {
-	test("an older Host gets its own words, not the Host's", () => {
-		const copy = problemCopy("pause", "host-outdated", "Not Found");
-		expect(copy.title).toBe("Your Host cannot do this yet");
-		expect(copy.message).not.toContain("Not Found");
+	test("a Host that does not know the nudge is one to update", () => {
+		expect(problemCopy("pause", "host-outdated", "Not Found")).toEqual({
+			title: "Pause tonight did not work",
+			message:
+				"This Host runs an older version of Night Shift. Update Night Shift there.",
+		});
 	});
 
 	test("the Host's reason stays, with the nudge as the title", () => {

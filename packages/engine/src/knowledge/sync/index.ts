@@ -15,6 +15,6 @@ export {
 export type { KnowledgeReconciled } from "./domain/merge";
 export {
 	type KnowledgeReconciler,
-	type SpaceHostStatus,
+	type SpaceStatus,
 	wireSync,
 } from "./wire";

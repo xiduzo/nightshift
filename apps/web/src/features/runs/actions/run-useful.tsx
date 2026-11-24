@@ -51,7 +51,7 @@ export function RunUseful({
 	const [, setSaved] = useState(0);
 	const busy = useRef(false);
 	const mark = useMutation(runMutations.useful());
-	const known = knownUseful(run.metrics?.scores, rememberedUseful(run.id));
+	const known = knownUseful(run.metrics.scores, rememberedUseful(run.id));
 	const view = usefulView(status, known, run);
 	if (view === "hidden") return null;
 

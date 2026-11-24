@@ -61,7 +61,7 @@ export const notificationItemSchema = exact<InAppItem>()(
 			stepId: z.string(),
 			at: z.number(),
 		}),
-		/** A step no longer waits for its Device. An older screen reads everything again. */
+		/** A step no longer waits for its Device. */
 		z.object({
 			kind: z.literal("wait-ended"),
 			key: z.string(),
@@ -71,8 +71,7 @@ export const notificationItemSchema = exact<InAppItem>()(
 		}),
 		/**
 		 * A run started, slept or woke, moved, stopped or ended, or a step
-		 * started or ended. No key and no `alert`: an older screen reads
-		 * everything again and shows nothing.
+		 * started or ended. No key and no `alert`.
 		 */
 		z.object({
 			kind: z.literal("run-changed"),
@@ -82,7 +81,7 @@ export const notificationItemSchema = exact<InAppItem>()(
 		}),
 		/**
 		 * A project's schedules changed without a run: a pause tonight began
-		 * or ended. Quiet: an older screen reads everything again.
+		 * or ended. Quiet.
 		 */
 		z.object({
 			kind: z.literal("schedules-changed"),
@@ -92,7 +91,7 @@ export const notificationItemSchema = exact<InAppItem>()(
 		}),
 		/**
 		 * A person kept or deleted learnings that waited in a project. No
-		 * key and no `alert`: an older screen reads everything again.
+		 * key and no `alert`.
 		 */
 		z.object({
 			kind: z.literal("learnings-changed"),
@@ -102,7 +101,7 @@ export const notificationItemSchema = exact<InAppItem>()(
 		}),
 		/**
 		 * The projects of a Space changed: its Host added, renamed or
-		 * removed one. Quiet: an older screen reads everything again.
+		 * removed one. Quiet.
 		 */
 		z.object({
 			kind: z.literal("projects-changed"),
@@ -110,8 +109,7 @@ export const notificationItemSchema = exact<InAppItem>()(
 			at: z.number(),
 		}),
 		/**
-		 * A synced document was written. Quiet: an older screen reads
-		 * everything again. `spaceId` is null for this computer's document.
+		 * A synced document was written. Quiet. `spaceId` is null for this computer's document.
 		 */
 		z.object({
 			kind: z.literal("document-changed"),
@@ -123,7 +121,7 @@ export const notificationItemSchema = exact<InAppItem>()(
 	]),
 );
 
-/** Who follows the stream. Optional, so an older screen sends nothing. */
+/** Who follows the stream. Absent: a browser. */
 export const watchInputSchema = z
 	.object({
 		/** The phone app: it counts as closed once it leaves the front. */

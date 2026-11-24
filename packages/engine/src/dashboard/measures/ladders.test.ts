@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { parseInstant } from "@nightshift/time";
 import type { RunSummary } from "../../read";
+import { NO_METRICS } from "../adapters/out/in-memory-neighbours";
 import { flowHealthRows, summarizeFlow } from "./domain/flow-health";
 import { flowLadders, flowRangeLadders } from "./domain/ladders";
 import type { RunRung } from "./domain/runs";
@@ -73,6 +74,10 @@ function aRun(
 		subflows: [],
 		gates: [],
 		sleeps: [],
+		neededYou: [],
+		metrics: NO_METRICS,
+		lastActivityAt: NOW - HOUR,
+		endReason: "finished",
 		...(ladder
 			? {
 					metrics: {
@@ -277,7 +282,7 @@ describe("Flow health", () => {
 		const runs = [
 			aRun([rung({ tier: "Sonnet", landed: 2 })]),
 			aRun([rung({ tier: "Opus", rung: "later" })]),
-			// An older Host's run: no ladder rows.
+			// A run with no ladder rows.
 			aRun(undefined),
 			// The flow as a subflow: its landings are in the calling run.
 			aRun([rung({ nodeId: "outer", landed: 5 })], {
@@ -353,7 +358,7 @@ describe("a flow's days", () => {
 					score("leads", 1),
 					score("useful", 1),
 				]),
-				neededYou: [{ reason: "gate", at: NOW }],
+				neededYou: [{ reason: "gate", at: NOW, planned: true }],
 			}),
 			aRun(undefined, {
 				costUsd: 1,

@@ -30,8 +30,7 @@ const NO_TOKENS: TokenCounts = {
 
 /**
  * The metrics of a run's steps per node, in the order the nodes first
- * ran: what the run's per-node rows show. A step from an older Host,
- * without metrics, counts its time from its start and end, and no tokens.
+ * ran: what the run's per-node rows show.
  */
 export function metricsByNode(
 	steps: readonly Pick<
@@ -58,17 +57,14 @@ export function metricsByNode(
 			cost: { costUsd: 0, costEstimated: false, costMissing: 0 },
 		};
 		const { metrics } = step;
-		const wallMs =
-			metrics?.wallMs ??
-			(step.endedAt === null ? null : step.endedAt - step.startedAt);
-		const tokens = metrics?.tokens ?? NO_TOKENS;
+		const { tokens } = metrics;
 		byNode.set(step.nodeId, {
 			...node,
 			visits: node.visits + 1,
-			wallMs: node.wallMs + (wallMs ?? 0),
+			wallMs: node.wallMs + (metrics.wallMs ?? 0),
 			open: node.open || step.endedAt === null,
-			agentMs: node.agentMs + (metrics?.agentMs ?? 0),
-			gateWaitMs: node.gateWaitMs + (metrics?.gateWaitMs ?? 0),
+			agentMs: node.agentMs + metrics.agentMs,
+			gateWaitMs: node.gateWaitMs + metrics.gateWaitMs,
 			tokens: {
 				input: node.tokens.input + tokens.input,
 				output: node.tokens.output + tokens.output,

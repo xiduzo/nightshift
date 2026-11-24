@@ -2095,7 +2095,7 @@ describe("the Needs-you inbox", () => {
 			runId,
 			stepId: `step-${runId}`,
 			choice: "yes",
-			via: "lock-screen" as const,
+			via: "lock_screen" as const,
 		});
 
 		await call(appRouter.gates.resolve, fromLockScreen("marked-run"), {

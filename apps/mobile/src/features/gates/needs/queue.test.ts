@@ -10,6 +10,7 @@ function gate(fields: Partial<OpenGate>): OpenGate {
 	return {
 		runId: "r1",
 		stepId: "s1",
+		urgency: "today",
 		openedAt: 0,
 		deadline: null,
 		canAnswer: true,

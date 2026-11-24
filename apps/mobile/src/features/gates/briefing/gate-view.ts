@@ -3,7 +3,6 @@ import {
 	deadlineWhen,
 	type GateLink,
 	type OpenGate,
-	urgencyOf,
 	waitedText,
 } from "@nightshift/client";
 
@@ -127,7 +126,7 @@ export function urgentText(
 			: `Night Shift picks ${deadline.choose}`;
 		return { title, description: `If you do not, ${takes}.` };
 	}
-	if (urgencyOf(gate) === "now") {
+	if (gate.urgency === "now") {
 		return {
 			title: "This needs you now",
 			description: "The run waits until you answer.",

@@ -74,25 +74,26 @@ export type FlowHealthRow = {
 	unknownCost: number;
 	/** Finished runs that asked no agent or model: not in `cost`. */
 	freeRuns: number;
-	/** Its runs' scores in the last days, the most scored first. Empty when none scored. Older Hosts send none. */
-	scores?: FlowScoreRow[];
-	/** What people answered to "Was this run useful?" in the last days. Older Hosts send none. */
-	useful?: FlowUseful;
-	/** How often its runs needed you in the last days, and why. Older Hosts send none. */
-	neededYou?: FlowNeededYou;
+	/** Its runs' scores in the last days, the most scored first. Empty when none scored. */
+	scores: FlowScoreRow[];
+	/** What people answered to "Was this run useful?" in the last days. */
+	useful: FlowUseful;
+	/** How often its runs needed you in the last days, and why. */
+	neededYou: FlowNeededYou;
 	/**
 	 * The newest report of its own runs, of any day, like `lastRuns`. Absent:
-	 * no run of its own wrote one, or an older Host.
+	 * no run of its own wrote one.
 	 */
 	report?: LatestReport;
-	/** Where the work of its own runs landed in the last days. Older Hosts send none. */
-	ladders?: FlowLadders;
-	/** Its level, how often it needed a person, and its signals. Older Hosts send none. */
-	watch?: FlowWatch /**
+	/** Where the work of its own runs landed in the last days. */
+	ladders: FlowLadders;
+	/** Its level, how often it needed a person, and its signals. */
+	watch: FlowWatch;
+	/**
 	 * How steady its finished runs are: what one costs, and how long one
-	 * works. Null with too few of them. Older Hosts send none.
-	 */;
-	steady?: { cost: CostSteadiness | null; time: CostSteadiness | null };
+	 * works. Null with too few of them.
+	 */
+	steady: { cost: CostSteadiness | null; time: CostSteadiness | null };
 };
 
 /** The level of a flow: how much a person is still in its runs. */
@@ -255,18 +256,18 @@ export type FlowRangeLadders = FlowLadders & {
 
 /**
  * One day of a flow: its runs per status, and what the Metrics tab charts.
- * `night` is the start of the day. Older Hosts send only `night` and `counts`.
+ * `night` is the start of the day.
  */
 export type FlowDay = NightCounts & {
 	/** What its runs that started this day spent, on its own and as a subflow. */
-	spent?: KnownCost;
+	spent: KnownCost;
 	/** Its own runs that started this day, and how many of them needed you. */
-	needed?: { runs: number; needed: number };
+	needed: { runs: number; needed: number };
 	/**
 	 * Per metric name (a score of its own runs): what its runs that started
 	 * this day wrote, added up, and how many runs wrote it.
 	 */
-	metrics?: Record<string, { sum: number; runs: number }>;
+	metrics: Record<string, { sum: number; runs: number }>;
 };
 
 /**
@@ -388,9 +389,9 @@ export type FlowRange = {
 	spentTokens: number;
 	/**
 	 * The test runs in the days (`isTestRun`). Only `spent`, `spentTokens`
-	 * and the spend per day count them. Older Hosts send none.
+	 * and the spend per day count them.
 	 */
-	tests?: number;
+	tests: number;
 	spentUnfinished: KnownCost;
 	/** Tokens of the runs in `spentUnfinished`. */
 	unfinishedTokens: number;
@@ -415,14 +416,14 @@ export type FlowRange = {
 	whyUnfinished: TopRows<UnfinishedReason>;
 	/** The most common first. */
 	warningRows: TopRows<FlowWarning>;
-	/** The most scored first. Empty when no run scored. Older Hosts send none. */
-	scores?: FlowScoreRow[];
-	/** What people answered to "Was this run useful?". Older Hosts send none. */
-	useful?: FlowUseful;
-	/** How often its runs needed you, and why. Older Hosts send none. */
-	neededYou?: FlowNeededYou;
-	/** Where the work of its own runs landed. Older Hosts send none. */
-	ladders?: FlowRangeLadders;
+	/** The most scored first. Empty when no run scored. */
+	scores: FlowScoreRow[];
+	/** What people answered to "Was this run useful?". */
+	useful: FlowUseful;
+	/** How often its runs needed you, and why. */
+	neededYou: FlowNeededYou;
+	/** Where the work of its own runs landed. */
+	ladders: FlowRangeLadders;
 	/** The newest first. */
 	latest: FlowRun[];
 };

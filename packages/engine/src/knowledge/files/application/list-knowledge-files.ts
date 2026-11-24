@@ -12,7 +12,7 @@ export type ListKnowledgeFilesPorts = {
 	wait: Wait;
 	/** How long the page waits for its reconcile, in ms. */
 	pageWaitMs: number;
-	status: Pick<SpaceStatus, "spaceOf" | "isShared" | "isOlder">;
+	status: Pick<SpaceStatus, "spaceOf" | "isShared">;
 	documents: KnowledgeEntries;
 	notes: WaitingNotes;
 };
@@ -43,7 +43,6 @@ export const listKnowledgeFiles =
 			files: listedFiles((await ports.documents.open(projectId)).entries()),
 			proposed: await ports.notes.count({ projectId }),
 			shared: spaceId ? await ports.status.isShared(spaceId) : false,
-			olderHost: spaceId ? ports.status.isOlder(spaceId) : false,
 			...(await ports.documents.open(projectId).then((document) => ({
 				learnsFromRuns: document.learnsFromRunsOn(),
 				reader: document.reader(),

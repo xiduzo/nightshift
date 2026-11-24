@@ -15,7 +15,7 @@ import { type Nudge, problemCopy } from "./schedule-words";
  * Pause tonight, Resume tonight and Run now of one schedule. A pause
  * shows at once in the schedule list. Run now opens the run it started,
  * after it closes the sheet it was in. `copy` says what happened when a
- * nudge did not work. `hidden`: the Host is too old for the nudges.
+ * nudge did not work.
  */
 export function useScheduleNudges(
 	projectId: string,
@@ -86,6 +86,5 @@ export function useScheduleNudges(
 			failed && problem
 				? problemCopy(failed.nudge, problem, failed.error.message)
 				: null,
-		hidden: problem === "host-outdated",
 	};
 }

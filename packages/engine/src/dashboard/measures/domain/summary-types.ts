@@ -327,10 +327,9 @@ export type NightTotals = {
 	gates: number;
 	/**
 	 * The runs that started this day and needed you: a person answered a
-	 * Gate or an Ask, resumed, stopped, or took one over. Older Hosts send
-	 * none.
+	 * Gate or an Ask, resumed, stopped, or took one over.
 	 */
-	neededYou?: number;
+	neededYou: number;
 };
 
 /** The headline numbers of a period, and per day, oldest first. */
@@ -349,13 +348,13 @@ export type NightsRange = {
 	spend: SpendRange;
 	runs: RunsRange;
 	gates: GatesRange;
-	/** How often the runs needed you, and why. Older Hosts send none. */
-	needed?: NeededRange;
+	/** How often the runs needed you, and why. */
+	needed: NeededRange;
 	/**
 	 * The newest report of each flow whose own runs started in these days
-	 * wrote one, the newest end first. Older Hosts send none.
+	 * wrote one, the newest end first.
 	 */
-	reports?: TopRows<FlowReport>;
+	reports: TopRows<FlowReport>;
 	/** The headline numbers over these days. */
 	totals: PeriodTotals;
 	/**
@@ -382,7 +381,7 @@ export type NightOutput<Run extends RunIn = RunIn> = {
 	tokens: number;
 	/**
 	 * Of `runs`, the test runs (`isTestRun`): every count but the spend
-	 * leaves them out. Absent: none, or an older Host.
+	 * leaves them out. Absent: none.
 	 */
 	tests?: number;
 	/**
@@ -428,6 +427,6 @@ export type DashboardSummaryOf<Run extends RunIn> = {
 	upNext: UpcomingRun[];
 	/** The busiest flows of a project. Null over all projects. */
 	flowHealth: TopRows<FlowHealthRow> | null;
-	/** The watch over every flow of the dashboard. Older Hosts send none. */
-	watch?: SpaceWatch;
+	/** The watch over every flow of the dashboard. */
+	watch: SpaceWatch;
 };

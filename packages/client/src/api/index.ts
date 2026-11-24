@@ -7,6 +7,7 @@ export {
 } from "./client";
 export { createQueryClient } from "./query-client";
 export {
+	HOST_OUTDATED,
 	isHostUnreachable,
 	isMissingOnHost,
 	isSignInRequired,

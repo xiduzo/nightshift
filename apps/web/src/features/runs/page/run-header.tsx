@@ -36,7 +36,7 @@ export function RunTitle({
 	steps: StepSummary[];
 }) {
 	const time = useWorkTime(steps, run.createdAt);
-	const tokens = tokensLabel(run.metrics?.tokens);
+	const tokens = tokensLabel(run.metrics.tokens);
 
 	return (
 		<div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 px-3 pt-3 lg:px-5 lg:pt-4">

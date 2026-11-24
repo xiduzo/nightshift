@@ -51,9 +51,6 @@ export function inMemorySpaceStatus() {
 	const spaces = new Map<string, string>([["p1", "s1"]]);
 	const twin = {
 		shared: true,
-		older: false,
-		/** Each failed call to the Host, in order. */
-		heardErrors: [] as unknown[],
 		setSpace(projectId: string, spaceId: string | null) {
 			if (spaceId === null) spaces.delete(projectId);
 			else spaces.set(projectId, spaceId);
@@ -63,10 +60,6 @@ export function inMemorySpaceStatus() {
 		},
 		async isShared() {
 			return twin.shared;
-		},
-		isOlder: () => twin.older,
-		heard(_spaceId: string, error: unknown) {
-			twin.heardErrors.push(error);
 		},
 	};
 	return twin satisfies SpaceStatus;

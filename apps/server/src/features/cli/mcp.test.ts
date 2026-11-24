@@ -304,24 +304,19 @@ describe("nightshift mcp", () => {
 		expect(await port.run("p1", "nope")).toBeNull();
 	});
 
-	test("a project without a folder says so, and an older Host's projects have one", async () => {
-		const project = (id: string, folder?: boolean) => ({
+	test("a project without a folder says so", async () => {
+		const project = (id: string, folder: boolean) => ({
 			id,
 			name: id,
 			repoPath: null,
 			remote: null,
-			...(folder === undefined ? {} : { folder }),
+			folder,
 			createdAt: 1,
 			clones: [],
 		});
 		const client = {
 			projects: {
-				// An older Host sends no `folder`: that project has one.
-				list: async () => [
-					project("notes", false),
-					project("app", true),
-					project("old"),
-				],
+				list: async () => [project("notes", false), project("app", true)],
 			},
 		} as unknown as AppRouterClient;
 		const projects = await apiPort(client, {
@@ -330,7 +325,6 @@ describe("nightshift mcp", () => {
 		expect(projects).toEqual([
 			{ id: "notes", name: "notes", path: null, folder: false },
 			{ id: "app", name: "app", path: null },
-			{ id: "old", name: "old", path: null },
 		]);
 	});
 
@@ -366,8 +360,7 @@ describe("nightshift mcp", () => {
 			projects: {
 				list: async () => [
 					{ id: "notes", folder: false },
-					// An older Host sends no `folder`: that project has one.
-					{ id: "app" },
+					{ id: "app", folder: true },
 				],
 			},
 		} as unknown as AppRouterClient;

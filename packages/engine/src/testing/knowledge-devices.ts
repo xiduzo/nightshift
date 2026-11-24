@@ -9,7 +9,6 @@ import { fsKnowledgeFolders } from "../knowledge/files/adapters/out/fs-knowledge
 import { wireLearnings } from "../knowledge/learnings";
 import { isMarkdown, markdownHeadings } from "../knowledge/search";
 import { createKnowledgeFolderLocks, wireSync } from "../knowledge/sync";
-import { createOlderHosts } from "../knowledge/sync/domain/older-hosts";
 import { createSandbox, type Sandbox } from "./test-support";
 
 /**
@@ -61,8 +60,6 @@ export async function knowledgeDevice(
 	const archive = createSpaceArchive(sandbox.dataDir);
 	if (host) archive.connect(host);
 	const locks = createKnowledgeFolderLocks();
-	/** Which Hosts run an older version: every instance of this Device shares it. */
-	const older = createOlderHosts();
 	/** One more instance over this Device's folder and documents. */
 	const newSync = (
 		options: { locks?: typeof locks; inStep?(): Promise<unknown> } = {},
@@ -74,7 +71,6 @@ export async function knowledgeDevice(
 			archive,
 			locks: options.locks ?? locks,
 			deviceId: sandbox.deviceId,
-			older,
 			listener: { reconciled: (change) => learnings.reconciled(change) },
 			...(options.inStep ? { hosts: { inStep: options.inStep } } : {}),
 		});

@@ -1,5 +1,4 @@
 import { describe, expect, test } from "bun:test";
-import { OlderHostError } from "../../../contract";
 import { fakeMeaning } from "../../search/adapters/out/in-memory-neighbours";
 import { inMemoryLearningsPorts } from "../adapters/out/in-memory-neighbours";
 import { listWaitingLearnings } from "./list-waiting-learnings";
@@ -74,11 +73,9 @@ describe("listWaitingLearnings", () => {
 			},
 		});
 		ports.archive.down = true;
-		ports.archive.failWith = new OlderHostError();
 		const list = await listWaitingLearnings(ports)({ projectId: "p1" });
 		expect(list.map((learning) => learning.notes)).toEqual([[], []]);
 		expect(ports.archive.calls).toHaveLength(1);
-		expect(ports.status.isOlder("s1")).toBe(true);
 	});
 
 	test("only here: the Host is not asked, what is not here has no notes, and nothing is compared", async () => {

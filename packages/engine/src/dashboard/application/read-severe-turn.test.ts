@@ -2,7 +2,10 @@ import { describe, expect, test } from "bun:test";
 
 import { NIGHT_SHIFT } from "../../contract";
 import type { RunDetail, RunSummary } from "../../read";
-import { inMemoryDashboardPorts } from "../adapters/out/in-memory-neighbours";
+import {
+	inMemoryDashboardPorts,
+	NO_METRICS,
+} from "../adapters/out/in-memory-neighbours";
 import { readSevereTurn } from "./read-severe-turn";
 
 /*
@@ -51,6 +54,10 @@ function aRun(
 		subflows: [],
 		gates: [],
 		sleeps: [],
+		neededYou: [],
+		metrics: NO_METRICS,
+		lastActivityAt: createdAt,
+		endReason: "finished",
 		...fields,
 	};
 }

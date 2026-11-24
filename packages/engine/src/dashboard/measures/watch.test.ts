@@ -112,12 +112,6 @@ describe("how often a flow needed a person", () => {
 		expect(attention.perWeek.at(-1)).toBe(2);
 		expect(attention.perWeek.at(-6)).toBe(1);
 	});
-
-	test("a Gate of an older Host counts as planned", () => {
-		const runs = [run(1, { acts: [{ reason: "gate", at: NOW - DAY_MS }] })];
-		const { attention } = flowWatch(runs, NOW, FIRST);
-		expect(attention).toMatchObject({ planned: 1, unplanned: 0 });
-	});
 });
 
 describe("the signals of a flow", () => {

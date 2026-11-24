@@ -30,7 +30,6 @@ import { reconcileUnlessHeld } from "./application/reconcile-unless-held";
 import { removeSourceFolder } from "./application/remove-source-folder";
 import { retryPendingFolders } from "./application/retry-pending-folders";
 import type { KnowledgeFolderLocks } from "./domain/folder-locks";
-import { createOlderHosts, type OlderHosts } from "./domain/older-hosts";
 
 /**
  * The wiring of knowledge/sync: the one place that builds its real adapters
@@ -56,26 +55,19 @@ export type SyncDeps = {
 	listener?: ReconcileListener;
 	/** Where the size of each knowledge document goes, once a day. */
 	usage?: MeasureNotes;
-	/** Which Hosts run an older version. Default: its own. A test gives one to share it between two wires. */
-	older?: OlderHosts;
 	/** The clock. Default `now`. */
 	now?: () => number;
 };
 
 /**
- * What the knowledge knows about a Project's Space and its Host: which
- * Space, and whether its Host can take this knowledge now. The merge, the
- * reader and the learnings ask the same questions.
+ * What the knowledge knows about a Project's Space. The merge, the reader
+ * and the learnings ask the same questions.
  */
-export type SpaceHostStatus = {
+export type SpaceStatus = {
 	/** The Space of a Project. Null for a Project this Replica does not have. */
 	spaceOf(projectId: string): Promise<string | null>;
 	/** Whether a Space has Members besides one Person: it is not a personal Space. */
 	isShared(spaceId: string): Promise<boolean>;
-	/** Whether the Space's Host runs an older version of Night Shift, as far as this Device knows now. */
-	isOlder(spaceId: string): boolean;
-	/** What a failed knowledge call to the Host says about it. */
-	heard(spaceId: string, error: unknown): void;
 };
 
 /** A project's knowledge, as each Device keeps it in step with the Space. */
@@ -99,7 +91,7 @@ export type KnowledgeReconciler = {
 /** The sync of the projects' knowledge with the Space, bound to its ports. */
 export type KnowledgeSync = {
 	documents: KnowledgeDocuments;
-	status: SpaceHostStatus;
+	status: SpaceStatus;
 	reconciler: KnowledgeReconciler;
 	/**
 	 * Starts the timers: every folder a moment after this, each minute the
@@ -120,7 +112,6 @@ export function wireSync(deps: SyncDeps): KnowledgeSync {
 		...(deps.documents ? { documents: deps.documents } : {}),
 	});
 	const spaces = drizzleProjectSpaces(deps.db);
-	const older = deps.older ?? createOlderHosts();
 	const { archive, locks } = deps;
 	/** The projects whose content waits for the Host. */
 	const pending = new Set<string>();
@@ -132,8 +123,6 @@ export function wireSync(deps: SyncDeps): KnowledgeSync {
 		spaces,
 		hosts: deps.hosts ?? {},
 		listener: deps.listener ?? {},
-		older,
-		now,
 		locks,
 		pending,
 		deviceId: deps.deviceId,
@@ -167,8 +156,6 @@ export function wireSync(deps: SyncDeps): KnowledgeSync {
 		status: {
 			spaceOf: spaces.spaceOf,
 			isShared: spaces.isShared,
-			isOlder: (spaceId) => older.isOlder(spaceId, now()),
-			heard: (spaceId, error) => older.heard(spaceId, error, now()),
 		},
 		reconciler: {
 			reconcile,

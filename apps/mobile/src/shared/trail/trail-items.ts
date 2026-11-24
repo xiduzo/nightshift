@@ -49,7 +49,7 @@ export function trailItemOf(
 	const waiting = state === "waiting";
 	const took = waitedText((step.endedAt ?? now) - step.startedAt);
 	const cost = costLabel(step);
-	const tokens = tokensLabel(step.metrics?.tokens);
+	const tokens = tokensLabel(step.metrics.tokens);
 	// A step of a test run that stood in for its node took no time and cost nothing.
 	const meta = waiting
 		? `Waiting ${took}`

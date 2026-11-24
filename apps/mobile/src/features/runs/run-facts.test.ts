@@ -30,6 +30,14 @@ function factRun(fields: Partial<FactRun> = {}): FactRun {
 		costMissing: 0,
 		costCalls: 3,
 		costEstimated: false,
+		metrics: {
+			wallMs: null,
+			agentMs: 0,
+			gateWaitMs: 0,
+			tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+			costBasis: "billed",
+			prUrl: null,
+		},
 		...fields,
 	} as FactRun;
 }

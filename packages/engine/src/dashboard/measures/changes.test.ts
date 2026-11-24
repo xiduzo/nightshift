@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { parseInstant } from "@nightshift/time";
 import type { FlowRevisionItem } from "../../flows";
 import type { RunSummary } from "../../read";
+import { NO_METRICS } from "../adapters/out/in-memory-neighbours";
 import {
 	BEFORE_RUNS,
 	changesOf,
@@ -55,6 +56,9 @@ function aRun(fields: Partial<RunSummary> = {}): RunSummary {
 		gates: [],
 		sleeps: [],
 		neededYou: [],
+		metrics: NO_METRICS,
+		lastActivityAt: NOW - HOUR,
+		endReason: "finished",
 		...fields,
 	};
 }

@@ -36,8 +36,7 @@ const UNTIL_STREAM: readonly (readonly string[])[] = [
 /**
  * Reads a synced document holds (`heldByDocuments`): the stream marks them
  * stale (`document-changed`), and so does a save on this screen. Ten
- * minutes is the backstop: a Host of an older version sends no item for a
- * document.
+ * minutes is the backstop.
  */
 const UNTIL_DOCUMENT = heldByDocuments();
 

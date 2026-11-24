@@ -29,7 +29,6 @@ describe("listKnowledgeFiles", () => {
 			],
 			proposed: 2,
 			shared: true,
-			olderHost: false,
 			learnsFromRuns: true,
 			reader: { kind: "nightshift" },
 		});
@@ -43,12 +42,10 @@ describe("listKnowledgeFiles", () => {
 		expect(listing.files.map((file) => file.path)).toEqual(["a.md"]);
 	});
 
-	test("a project with no Space is not shared, and has no older Host", async () => {
+	test("a project with no Space is not shared", async () => {
 		const ports = inMemoryFilesPorts();
 		ports.status.setSpace("p1", null);
-		ports.status.older = true;
 		const listing = await listKnowledgeFiles(ports)({ projectId: "p1" });
 		expect(listing.shared).toBe(false);
-		expect(listing.olderHost).toBe(false);
 	});
 });

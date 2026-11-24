@@ -1,8 +1,8 @@
-import type { KnowledgeDocuments, SpaceHostStatus } from "../../sync";
+import type { KnowledgeDocuments, SpaceStatus } from "../../sync";
 import { type ListedReads, listedLearnings } from "../domain/proposed";
 
 export type CountWaitingNotesPorts = {
-	status: Pick<SpaceHostStatus, "spaceOf" | "heard">;
+	status: Pick<SpaceStatus, "spaceOf">;
 	documents: Pick<KnowledgeDocuments, "open">;
 	archive: ListedReads["archive"];
 };

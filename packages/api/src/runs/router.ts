@@ -46,9 +46,7 @@ export const runs = {
 	/**
 	 * Newest first: by start, or with `order: "activity"` by when each run
 	 * last did something. With `limit`, one page: the next page starts
-	 * after the last run of this one (`cursor`). Without it, every run, as
-	 * older screens ask. Older Hosts send every run whatever the input, and
-	 * a Host from before `order` sends them by start.
+	 * after the last run of this one (`cursor`). Without it, every run.
 	 */
 	list: protectedProcedure
 		.route({
@@ -340,8 +338,7 @@ export const runs = {
 	/**
 	 * You copied or shared the command that takes the run over by hand.
 	 * The run's Walker logs it once: Needed you counts it. A screen calls
-	 * it without waiting and ignores a refusal: an older Host does not
-	 * know it.
+	 * it without waiting and ignores a refusal.
 	 */
 	takeOver: runProcedure(z.object({ runId: z.string() }))
 		.route({

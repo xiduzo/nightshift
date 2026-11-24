@@ -1,5 +1,5 @@
 import type { CloseNotes } from "../../search";
-import type { KnowledgeDocuments, SpaceHostStatus } from "../../sync";
+import type { KnowledgeDocuments, SpaceStatus } from "../../sync";
 import {
 	keptNotes,
 	type ListedReads,
@@ -9,7 +9,7 @@ import { byNewest, type WaitingLearning, withNearTo } from "../domain/waiting";
 import type { LearningsNotifications } from "./ports";
 
 export type ListWaitingLearningsPorts = {
-	status: Pick<SpaceHostStatus, "spaceOf" | "heard">;
+	status: Pick<SpaceStatus, "spaceOf">;
 	documents: Pick<KnowledgeDocuments, "open">;
 	archive: ListedReads["archive"];
 	notifications: LearningsNotifications;

@@ -29,7 +29,6 @@ type ContentRef = { kind: "content"; spaceId: string; sha256: string };
 export type ListedReads = {
 	status: {
 		spaceOf(projectId: string): Promise<string | null>;
-		heard(spaceId: string, error: unknown): void;
 	};
 	documents: {
 		open(projectId: string): Promise<{
@@ -71,8 +70,7 @@ export async function listedLearnings(
 		const content = await (onlyHere
 			? archive.here.read(ref)
 			: archive.read(ref)
-		).catch((error: unknown) => {
-			status.heard(spaceId, error);
+		).catch(() => {
 			onlyHere = true;
 			return null;
 		});

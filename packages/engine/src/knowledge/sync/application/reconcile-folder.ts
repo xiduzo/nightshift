@@ -15,7 +15,6 @@ import {
 	type SettleTools,
 	settle,
 } from "../domain/merge";
-import type { OlderHosts } from "../domain/older-hosts";
 import type {
 	ContentArchive,
 	KnowledgeDocuments,
@@ -32,9 +31,6 @@ export type ReconcileFolderPorts = {
 	spaces: Pick<ProjectSpaces, "spaceOf">;
 	hosts: SpaceHosts;
 	listener: ReconcileListener;
-	/** Which Hosts run an older version of Night Shift: shared with the reader. */
-	older: OlderHosts;
-	now: () => number;
 	/** The turns and the holds of each folder in this process. */
 	locks: KnowledgeFolderLocks;
 	/** The projects whose content waits for the Host. */
@@ -71,19 +67,15 @@ async function reconcileOnce(
 	ports: ReconcileFolderPorts,
 	projectId: string,
 ): Promise<void> {
-	const { copy, archive, older, now, deviceId } = ports;
+	const { copy, archive, deviceId } = ports;
 	const space = await ports.spaces.spaceOf(projectId);
 	if (space === null) return;
 	const spaceId: string = space;
 	const document = await ports.documents.open(projectId);
-	// A Host of an older version takes no knowledge: no wait, no call.
-	const isOlder = older.isOlder(spaceId, now());
 	// The Host's changes first, a short while: the step must not wait long.
-	if (!isOlder) {
-		await ports.hosts
-			.inStep?.(spaceId, [document.name], { timeoutMs: IN_STEP_BEFORE_MS })
-			.catch(() => {});
-	}
+	await ports.hosts
+		.inStep?.(spaceId, [document.name], { timeoutMs: IN_STEP_BEFORE_MS })
+		.catch(() => {});
 	await copy.ensure(projectId);
 
 	const state = parseReconcileState(await copy.readState(projectId));
@@ -94,7 +86,7 @@ async function reconcileOnce(
 	);
 	const unpushed = new Set(state?.unpushed ?? []);
 	/** The Host failed once: the rest waits for the next reconcile. */
-	let offline = isOlder;
+	let offline = false;
 	const ref = (sha256: string) => ({
 		kind: "content" as const,
 		spaceId,
@@ -107,10 +99,8 @@ async function reconcileOnce(
 			try {
 				await archive.put({ ref: ref(sha256), content });
 				unpushed.delete(sha256);
-				older.answered(spaceId);
 				return;
-			} catch (error) {
-				older.heard(spaceId, error, now());
+			} catch {
 				offline = true;
 			}
 		}
@@ -131,8 +121,7 @@ async function reconcileOnce(
 		if (offline) return archive.here.read(ref(sha256));
 		try {
 			return await archive.read(ref(sha256));
-		} catch (error) {
-			older.heard(spaceId, error, now());
+		} catch {
 			offline = true;
 			return null;
 		}
@@ -224,10 +213,7 @@ async function reconcileOnce(
 		held: state?.files ?? {},
 		listed: document.entries(),
 	});
-	if (
-		(plan.sets.length > 0 || plan.deletes.length > 0) &&
-		!older.isOlder(spaceId, now())
-	) {
+	if (plan.sets.length > 0 || plan.deletes.length > 0) {
 		// This Device's changes reach the Host before the step ends: the
 		// next step on another Device reads them.
 		await ports.hosts

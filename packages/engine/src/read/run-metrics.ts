@@ -56,20 +56,19 @@ export type RunMetrics = {
 	/**
 	 * How often agents searched (`search_knowledge`) and read
 	 * (`read_knowledge`) the project's knowledge. Absent when they did
-	 * neither. Older Hosts send none.
+	 * neither.
 	 */
 	knowledge?: KnowledgeCounts;
 	/**
 	 * The feedback on the run (`Scored`), oldest first: each Gate answered,
 	 * whether a person found it `useful`, what became of its pull request,
-	 * and the flow's own scores. Only a run's metrics have them. Older Hosts
-	 * send none.
+	 * and the flow's own scores. Only a run's metrics have them.
 	 */
 	scores?: RunScore[];
 	/**
 	 * Where the work landed (Q31): the run's landings per node, rung and
 	 * tier, with what they cost (`ladder.ts`). The steps of called flows
-	 * count here too. Only a run's metrics have them. Older Hosts send none.
+	 * count here too. Only a run's metrics have them.
 	 */
 	ladder?: RunRung[];
 };

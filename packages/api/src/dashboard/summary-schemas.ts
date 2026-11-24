@@ -42,7 +42,7 @@ const dashboardRunSchema = z.object({
 	costMissing: z.number(),
 	tokens: z.object({ input: z.number(), output: z.number() }).nullable(),
 	group: z.string(),
-	/** A test run: the nodes its start pinned and skipped. Older Hosts send none. */
+	/** A test run: the nodes its start pinned and skipped. Absent: not a test run. */
 	test: z
 		.object({ pinned: z.array(z.string()), skipped: z.array(z.string()) })
 		.optional(),
@@ -58,8 +58,8 @@ const nightTotalsSchema = z.object({
 	costUsd: z.number(),
 	tokens: z.number(),
 	gates: z.number(),
-	/** The runs that needed you. Older Hosts send none. */
-	neededYou: z.number().optional(),
+	/** The runs that needed you. */
+	neededYou: z.number(),
 });
 
 const periodTotalsSchema = nightTotalsSchema.omit({ night: true }).extend({
@@ -162,40 +162,38 @@ const nightsRangeSchema = z.object({
 			}),
 		),
 	}),
-	/** How often the runs needed you, and why. Older Hosts send none. */
-	needed: z
-		.object({
-			runs: z.number(),
-			needed: z.number(),
-			reasons: z.array(neededReasonCountSchema),
-			perNight: z.array(nightCountsSchema),
-			groups: topRows(
-				z.object({
-					label: z.string(),
-					runs: z.number(),
-					needed: z.number(),
-					reasons: z.array(neededReasonCountSchema),
-				}),
-			),
-			latest: z.array(
-				z.object({
-					runId: z.string(),
-					runTitle: z.string(),
-					group: z.string(),
-					createdAt: z.number(),
-					reasons: z.array(neededYouReasonSchema),
-				}),
-			),
-		})
-		.optional(),
-	/** The newest report of each flow, the newest end first. Older Hosts send none. */
+	/** How often the runs needed you, and why. */
+	needed: z.object({
+		runs: z.number(),
+		needed: z.number(),
+		reasons: z.array(neededReasonCountSchema),
+		perNight: z.array(nightCountsSchema),
+		groups: topRows(
+			z.object({
+				label: z.string(),
+				runs: z.number(),
+				needed: z.number(),
+				reasons: z.array(neededReasonCountSchema),
+			}),
+		),
+		latest: z.array(
+			z.object({
+				runId: z.string(),
+				runTitle: z.string(),
+				group: z.string(),
+				createdAt: z.number(),
+				reasons: z.array(neededYouReasonSchema),
+			}),
+		),
+	}),
+	/** The newest report of each flow, the newest end first. */
 	reports: topRows(
 		latestReportSchema.extend({
 			key: z.string(),
 			group: z.string(),
 			title: z.string(),
 		}),
-	).optional(),
+	),
 	totals: periodTotalsSchema,
 	before: periodTotalsSchema,
 	flows: topRows(flowHealthRowSchema).nullable(),
@@ -272,7 +270,7 @@ export const dashboardSummarySchema = exact<DashboardSummary>()(
 				runs: z.number(),
 				cost: knownCostSchema,
 				tokens: z.number(),
-				// The test runs among `runs`. Older Hosts send none.
+				// The test runs among `runs`. Absent: none.
 				tests: z.number().optional(),
 				latest: z.array(runSummarySchema.extend({ group: z.string() })),
 			})
@@ -286,7 +284,6 @@ export const dashboardSummarySchema = exact<DashboardSummary>()(
 			}),
 		),
 		flowHealth: topRows(flowHealthRowSchema).nullable(),
-		/** Older Hosts send none. */
-		watch: spaceWatchSchema.optional(),
+		watch: spaceWatchSchema,
 	}),
 );

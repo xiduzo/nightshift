@@ -1,4 +1,4 @@
-import { isTestRun, lastActivityAt, walkerName } from "@nightshift/client";
+import { isTestRun, walkerName } from "@nightshift/client";
 import { Button } from "@nightshift/ui/components/button";
 import {
 	Empty,
@@ -159,7 +159,7 @@ function runColumns(
 			},
 		}),
 		// Sorted by, never sortable: the run that last did something stays on top.
-		column.accessor(lastActivityAt, {
+		column.accessor("lastActivityAt", {
 			id: "activity",
 			header: () => <span className="sr-only">Details</span>,
 			cell: ({ row }) => (
@@ -244,7 +244,7 @@ function RunTitle({
 function RunFacts({ run }: { run: RunSummary }) {
 	const { trigger } = run;
 	const note = costNote(run);
-	const tokens = run.metrics?.tokens;
+	const tokens = run.metrics.tokens;
 	const used = tokens ? tokens.input + tokens.output : 0;
 	const costLabel = [
 		note ?? "What the run cost.",
@@ -350,7 +350,7 @@ function Fact({
 
 /** When the run last did something: how long ago, or the time of day with `clock`. */
 function LastActive({ run, clock }: { run: RunSummary; clock: boolean }) {
-	const at = lastActivityAt(run);
+	const at = run.lastActivityAt;
 	return (
 		<LocalTime at={at}>{clock ? formatTime(at) : formatRelative(at)}</LocalTime>
 	);
@@ -359,7 +359,7 @@ function LastActive({ run, clock }: { run: RunSummary; clock: boolean }) {
 /** How long an ended run took, after its start. Nothing while it is open. */
 function Took({ run }: { run: RunSummary }) {
 	const length =
-		run.metrics?.wallMs ??
+		run.metrics.wallMs ??
 		(run.endedAt === null ? null : run.endedAt - run.createdAt);
 	if (length === null) return null;
 	return <span title="How long the run took"> · {formatDuration(length)}</span>;

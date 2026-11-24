@@ -3,7 +3,7 @@ import { ORPCError } from "@orpc/client";
 import { type ApiClient, type ApiInputs, isHostUnreachable } from "../../api";
 import { mayAnswer, type OpenGate } from "../inbox";
 
-/** An answer to one Gate: its run, its step and the choice. `via: "lock-screen"` for a notification button. */
+/** An answer to one Gate: its run, its step and the choice. `via: "lock_screen"` for a notification button. */
 export type GateAnswer = ApiInputs["gates"]["resolve"];
 
 /** What you picked and wrote for a Gate with choices, before you send it. */

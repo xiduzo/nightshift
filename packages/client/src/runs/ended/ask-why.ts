@@ -32,11 +32,9 @@ export function askWhy({
 	flowName: string | null;
 	/**
 	 * The run's project in the Space you work in, or undefined when it is
-	 * not there. `folder` false: it has no folder. An older Host sends none.
+	 * not there. `folder` false: it has no folder.
 	 */
-	project:
-		| { id: string; repoPath: string | null; folder?: boolean }
-		| undefined;
+	project: { id: string; repoPath: string | null; folder: boolean } | undefined;
 	/** You own this computer. Undefined while that loads. */
 	owner: boolean | undefined;
 }): AskWhy {
@@ -48,7 +46,7 @@ export function askWhy({
 			reason: "Only the owner of this computer can ask an agent here.",
 		};
 	// Not `hasFolder` of projects: that vertical reads runs (a cycle).
-	if (project.repoPath === null && project.folder !== false)
+	if (project.repoPath === null && project.folder)
 		return {
 			kind: "disabled",
 			reason:

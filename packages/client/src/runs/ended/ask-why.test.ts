@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { askWhy, askWhyAnswer } from "./ask-why";
 
-const project = { id: "p1", repoPath: "/work/app" };
+const project = { id: "p1", repoPath: "/work/app", folder: true };
 const base = {
 	status: "failed" as const,
 	flowName: "build",
@@ -44,7 +44,7 @@ describe("askWhy", () => {
 	test("a project without a copy on this computer says so", () => {
 		const result = askWhy({
 			...base,
-			project: { id: "p1", repoPath: null },
+			project: { id: "p1", repoPath: null, folder: true },
 		});
 		expect(result).toEqual({
 			kind: "disabled",

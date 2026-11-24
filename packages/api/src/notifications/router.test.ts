@@ -183,13 +183,13 @@ describe("notifications", () => {
 			{ context: ada },
 		);
 		expect(saved.pushUrgencies).toEqual(["now", "today"]);
-		// An older phone app saves without the field.
-		const older = await call(
+		// A save of another field keeps it.
+		const other = await call(
 			settings.save,
 			{ holdMinutes: 5 },
 			{ context: ada },
 		);
-		expect(older.pushUrgencies).toEqual(["now", "today"]);
+		expect(other.pushUrgencies).toEqual(["now", "today"]);
 		expect(
 			await errorOf(
 				call(

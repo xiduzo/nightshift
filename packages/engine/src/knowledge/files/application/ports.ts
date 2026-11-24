@@ -105,7 +105,7 @@ export type KnowledgeEntries = {
 };
 
 /**
- * A Project's Space and its Host, as far as this Device knows them.
+ * A Project's Space, as far as this Device knows it.
  * @filledBy engine/knowledge
  */
 export type SpaceStatus = {
@@ -113,10 +113,6 @@ export type SpaceStatus = {
 	spaceOf(projectId: string): Promise<string | null>;
 	/** Whether a Space has Members besides one Person. */
 	isShared(spaceId: string): Promise<boolean>;
-	/** Whether the Space's Host runs an older version of Night Shift. */
-	isOlder(spaceId: string): boolean;
-	/** What a failed knowledge call to the Host says about it. */
-	heard(spaceId: string, error: unknown): void;
 };
 
 /**

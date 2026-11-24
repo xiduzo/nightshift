@@ -56,22 +56,14 @@ export type NeededYou = {
 	at: number;
 	/**
 	 * The flow draws this Gate or Ask for a person: an approval, not a
-	 * fallback. False on every other step-in. Older Hosts send none.
+	 * fallback. False on every other step-in.
 	 */
-	planned?: boolean;
-	/** A Gate or an Ask: its node. Older Hosts send none. */
+	planned: boolean;
+	/** A Gate or an Ask: its node. */
 	nodeId?: string;
-	/** A Gate or an Ask: the start of its question. Older Hosts send none. */
+	/** A Gate or an Ask: the start of its question. */
 	question?: string;
 };
-
-/**
- * Whether a step-in was planned. An older Host does not say: its Gates
- * and Asks count as planned, so an old run raises no alarm.
- */
-export function isPlanned(act: NeededYou): boolean {
-	return act.planned ?? (act.reason === "gate" || act.reason === "ask");
-}
 
 /** The sleeps only Night Shift ends early: it looks again when the Device or the lease is back. */
 const DAEMON_WAKES: ReadonlySet<string> = new Set(["device-offline", "lease"]);

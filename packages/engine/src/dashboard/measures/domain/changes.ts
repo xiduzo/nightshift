@@ -11,7 +11,7 @@ import type {
 } from "./changes-types";
 import { lastDays } from "./clock";
 import type { NightRange } from "./measure-types";
-import { isPlanned, type RevisionIn, type RunIn } from "./runs";
+import type { RevisionIn, RunIn } from "./runs";
 import { hasEnded } from "./stats";
 
 /**
@@ -47,7 +47,7 @@ function workMs(run: RunIn): number | null {
 	if (run.endedAt === null) return null;
 	const idle = [
 		...run.gates.map((gate) => ({ from: gate.openedAt, to: gate.closedAt })),
-		...(run.sleeps ?? []),
+		...run.sleeps,
 	].reduce(
 		(sum, span) =>
 			sum + Math.max((span.to ?? run.endedAt ?? span.from) - span.from, 0),
@@ -57,7 +57,7 @@ function workMs(run: RunIn): number | null {
 }
 
 function unplannedOf(run: RunIn): number {
-	return (run.neededYou ?? []).filter((act) => !isPlanned(act)).length;
+	return run.neededYou.filter((act) => !act.planned).length;
 }
 
 function gateWaitMs(run: RunIn): number {
@@ -84,7 +84,7 @@ export function measureRuns(runs: readonly RunIn[]): ChangeMeasure {
 	for (const run of runs) {
 		unplanned += unplannedOf(run);
 		wait += gateWaitMs(run);
-		const scores = run.metrics?.scores ?? [];
+		const scores = run.metrics.scores ?? [];
 		if (scores.some((score) => score.score === "pr_merged")) merged++;
 		else if (scores.some((score) => score.score === "pr_closed")) closed++;
 		const answer = scores.filter((score) => score.score === "useful").at(-1);

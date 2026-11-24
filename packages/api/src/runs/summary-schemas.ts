@@ -94,11 +94,8 @@ export const costFields = {
 	costCalls: z.number(),
 };
 
-/** Who chose a Gate's option: a person or its deadline. Null: nobody, or an older Host that does not say. */
-const answeredBySchema = z
-	.enum(["person", "deadline"])
-	.nullable()
-	.default(null);
+/** Who chose a Gate's option: a person or its deadline. Null: nobody. */
+const answeredBySchema = z.enum(["person", "deadline"]).nullable();
 
 /**
  * Why a run needed you: a person answered a Gate or an Ask, resumed,
@@ -121,7 +118,7 @@ export const rungBySchema = z.enum([
 /**
  * The start of a run's report: the End step that wrote it, at most 600
  * characters of its Markdown, and whether it goes on. The full text is in
- * that step's outputs (`report`). Absent: no report, or an older Host.
+ * that step's outputs (`report`). Absent: no report.
  */
 export const runReportGlanceSchema = z.object({
 	stepId: z.string(),
@@ -129,7 +126,7 @@ export const runReportGlanceSchema = z.object({
 	more: z.boolean(),
 });
 
-/** A time a step slept; `to` is null while it sleeps. Older Hosts send no sleeps. */
+/** A time a step slept; `to` is null while it sleeps. */
 export const sleepSchema = z.object({
 	from: z.number(),
 	to: z.number().nullable(),
@@ -137,8 +134,7 @@ export const sleepSchema = z.object({
 
 /**
  * How long a run or a step took, its agents' time and tokens, its Gates'
- * wait, how sure its cost is, and the pull request it opened. Older Hosts
- * send none.
+ * wait, how sure its cost is, and the pull request it opened.
  */
 export const metricsSchema = z.object({
 	wallMs: z.number().nullable(),
@@ -153,13 +149,12 @@ export const metricsSchema = z.object({
 	/** `billed`: every cost was reported. `estimated`: part is priced from tokens. `unknown`: part is not known. */
 	costBasis: z.enum(["billed", "estimated", "unknown"]),
 	prUrl: z.string().nullable(),
-	/** How often agents searched and read the project's knowledge. Older Hosts send none. */
+	/** How often agents searched and read the project's knowledge. Absent: neither. */
 	knowledge: z.object({ searches: z.number(), reads: z.number() }).optional(),
 	/**
 	 * The feedback on a run: each Gate answered, whether a person found it
-	 * `useful`, what became of its pull request, and the flow's own scores.
-	 * Older Hosts send none. A score's
-	 * name is an open list: a newer peer's name passes. Older Hosts send no `by`.
+	 * `useful`, what became of its pull request, and the flow's own scores. Only on a
+	 * run. A score's name is an open list: a newer peer's name passes.
 	 */
 	scores: z
 		.array(
@@ -177,8 +172,8 @@ export const metricsSchema = z.object({
 	 * Where the work landed: the run's landings per node, rung and tier,
 	 * with what they cost, every try included. `via`: the Subflow nodes it
 	 * ran in. A Decision's entry counts how often a decider gave a
-	 * probability (`picked`) and was not sure enough (`unsure`). Older Hosts
-	 * send none.
+	 * probability (`picked`) and was not sure enough (`unsure`).
+	 * Only on a run.
 	 */
 	ladder: z
 		.array(
@@ -218,7 +213,7 @@ export const runSummarySchema = exact<RunSummary>()(
 		runFolder: z.boolean().optional(),
 		status: runStatusSchema,
 		reason: z.string().nullable(),
-		endReason: z.enum(RUN_END_REASONS).nullable().optional(),
+		endReason: z.enum(RUN_END_REASONS).nullable(),
 		result: runResultSchema.nullable(),
 		wakeAt: z.number().nullable(),
 		signal: z.string().nullable(),
@@ -226,8 +221,7 @@ export const runSummarySchema = exact<RunSummary>()(
 		stopAt: z.number().nullable(),
 		stopAfterStep: z.boolean(),
 		createdAt: z.number(),
-		/** Absent from a Host of a version before it. */
-		lastActivityAt: z.number().optional(),
+		lastActivityAt: z.number(),
 		endedAt: z.number().nullable(),
 		...costFields,
 		warnings: z.array(
@@ -255,23 +249,21 @@ export const runSummarySchema = exact<RunSummary>()(
 				answeredBy: answeredBySchema,
 			}),
 		),
-		/** Each time a person stepped in, oldest first. Older Hosts send none. */
-		neededYou: z
-			.array(
-				z.object({
-					reason: neededYouReasonSchema,
-					at: z.number(),
-					/** The flow draws this Gate or Ask for a person. Older Hosts send none. */
-					planned: z.boolean().optional(),
-					nodeId: z.string().optional(),
-					question: z.string().optional(),
-				}),
-			)
-			.optional(),
+		/** Each time a person stepped in, oldest first. */
+		neededYou: z.array(
+			z.object({
+				reason: neededYouReasonSchema,
+				at: z.number(),
+				/** The flow draws this Gate or Ask for a person. */
+				planned: z.boolean(),
+				nodeId: z.string().optional(),
+				question: z.string().optional(),
+			}),
+		),
 		report: runReportGlanceSchema.optional(),
-		sleeps: z.array(sleepSchema).optional(),
-		metrics: metricsSchema.optional(),
-		/** A test run: the nodes its start pinned and skipped. Older Hosts send none. */
+		sleeps: z.array(sleepSchema),
+		metrics: metricsSchema,
+		/** A test run: the nodes its start pinned and skipped. Absent: not a test run. */
 		test: z
 			.object({ pinned: z.array(z.string()), skipped: z.array(z.string()) })
 			.optional(),

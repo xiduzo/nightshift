@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { iso, parseInstant } from "@nightshift/time";
 import type { RunSummary } from "../../read";
+import { NO_METRICS } from "../adapters/out/in-memory-neighbours";
 import { summarizeFlow } from "./domain/flow-health";
 import { type DashboardScope, summarizeDashboard } from "./domain/summary";
 
@@ -49,6 +50,10 @@ function aRun(fields: Partial<RunSummary> = {}): RunSummary {
 		subflows: [],
 		gates: [],
 		sleeps: [],
+		neededYou: [],
+		metrics: NO_METRICS,
+		lastActivityAt: NOW - HOUR,
+		endReason: "finished",
 		...fields,
 	};
 }
@@ -546,7 +551,7 @@ describe("the totals of a range of days", () => {
 				status: "failed",
 				costUsd: 1,
 				createdAt: TODAY - 3 * DAY,
-				neededYou: [{ reason: "resumed", at: TODAY - 2 * DAY }],
+				neededYou: [{ reason: "resumed", at: TODAY - 2 * DAY, planned: false }],
 			}),
 			// Stopped: a run, not one that ended for the finished share.
 			aRun({ status: "stopped", createdAt: TODAY - 6 * DAY }),
@@ -598,9 +603,9 @@ describe("the totals of a range of days", () => {
 					flowName: "triage",
 					createdAt: TODAY + HOUR,
 					neededYou: [
-						{ reason: "gate", at: TODAY + 2 * HOUR },
-						{ reason: "gate", at: TODAY + 3 * HOUR },
-						{ reason: "took-over", at: TODAY + 4 * HOUR },
+						{ reason: "gate", at: TODAY + 2 * HOUR, planned: true },
+						{ reason: "gate", at: TODAY + 3 * HOUR, planned: true },
+						{ reason: "took-over", at: TODAY + 4 * HOUR, planned: false },
 					],
 				}),
 				// Started yesterday, resumed today: it counts on the day it started.
@@ -608,11 +613,10 @@ describe("the totals of a range of days", () => {
 					id: "resumed",
 					flowName: "triage",
 					createdAt: TODAY - DAY + HOUR,
-					neededYou: [{ reason: "resumed", at: TODAY + HOUR }],
+					neededYou: [{ reason: "resumed", at: TODAY + HOUR, planned: false }],
 				}),
 				aRun({ id: "alone", flowName: "digest", createdAt: TODAY + HOUR }),
-				// From an older Host: it says nothing, so it needed nobody.
-				aRun({ id: "old", flowName: "digest", createdAt: TODAY - DAY }),
+				aRun({ id: "quiet", flowName: "digest", createdAt: TODAY - DAY }),
 			],
 			project(["triage", "digest"]),
 		);
@@ -1287,7 +1291,7 @@ describe("test runs", () => {
 			result: "done",
 			report: { stepId: "try-end", excerpt: "A try", more: false },
 			gates: [gate],
-			neededYou: [{ reason: "gate", at: TODAY + 2 * HOUR }],
+			neededYou: [{ reason: "gate", at: TODAY + 2 * HOUR, planned: true }],
 			metrics: metrics("useful"),
 			subflows: [
 				{

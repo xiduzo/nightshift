@@ -96,7 +96,7 @@ export function CostSection({
 	steps: StepSummary[];
 }) {
 	const nodes = useMemo(() => metricsByNode(steps), [steps]);
-	const tokens = run.metrics?.tokens;
+	const tokens = run.metrics.tokens;
 	const used = tokensLabel(tokens);
 	const waited = nodes.some((node) => node.gateWaitMs > 0);
 	return (
@@ -115,14 +115,14 @@ export function CostSection({
 					) : null}
 					<CostText cost={run} className="font-medium tabular-nums" />
 				</Fact>
-				{run.metrics && run.metrics.agentMs > 0 ? (
+				{run.metrics.agentMs > 0 ? (
 					<Fact label="Agents worked">
 						<span className="tabular-nums">
 							{formatDuration(run.metrics.agentMs)}
 						</span>
 					</Fact>
 				) : null}
-				{run.metrics?.prUrl ? (
+				{run.metrics.prUrl ? (
 					<Fact label="Pull request">
 						<a
 							href={run.metrics.prUrl}

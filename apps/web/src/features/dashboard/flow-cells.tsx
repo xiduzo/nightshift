@@ -73,8 +73,8 @@ export function CostCell({
 	unknownCost,
 	freeRuns,
 }: {
-	/** Null: too few runs to say. Undefined: an older Host. */
-	steadiness: CostSteadiness | null | undefined;
+	/** Null: too few runs to say. */
+	steadiness: CostSteadiness | null;
 	cost: Spread | null;
 	tokenUse: Spread | null;
 	unfinished: FlowHealthRow["unfinished"];
@@ -157,14 +157,14 @@ export function CostCell({
 /**
  * How long a finished run works against a usual run of the flow, as a
  * strip with the usual time on its right. Its colour says how steady the time
- * is. A dash when no run finished, or from an older Host.
+ * is. A dash when no run finished.
  */
 export function TimeCell({
 	steadiness,
 	length,
 }: {
-	steadiness: CostSteadiness | null | undefined;
-	length: Spread | null | undefined;
+	steadiness: CostSteadiness | null;
+	length: Spread | null;
 }) {
 	if (!length) return <NoLine />;
 	return (

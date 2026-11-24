@@ -97,8 +97,6 @@ export const knowledgeSchema = z.object({
 		/** Change when a source syncs on its own: this computer's owner only. */
 		schedules: z.boolean(),
 	}),
-	/** The Host that keeps the Space runs an older version of Night Shift: it cannot take this knowledge yet. */
-	olderHost: z.boolean(),
 	/** Night Shift proposes learnings from the runs of the project that ended (ADR 37). */
 	learnsFromRuns: z.boolean(),
 	/** The page reader of the Web pages source and of the quick look at a link (ADR 39). */
@@ -121,7 +119,7 @@ const waitingLearningSchema = exact<WaitingLearning>()(
 		notes: z.array(z.string()),
 		/** Epoch ms: when the step last added to it. */
 		proposedAt: z.number(),
-		/** The notes close to each note, one list per note, in their order. Absent: none, or a Host of an older version. */
+		/** The notes close to each note, one list per note, in their order. Absent: none. */
 		nearTo: z
 			.array(
 				z.array(
@@ -148,11 +146,8 @@ const projectLearningSchema = waitingLearningSchema.extend({
 
 /** A proposed learning in the list of what waits, with what the person may do with it. */
 export const listedLearningSchema = projectLearningSchema.extend({
-	/**
-	 * Whether the person's role lets them keep or delete it: the server refuses
-	 * it otherwise. Unset from a Host of an older version, which does not say.
-	 */
-	mayDecide: z.boolean().optional(),
+	/** Whether the person's role lets them keep or delete it: the server refuses it otherwise. */
+	mayDecide: z.boolean(),
 });
 
 /** A file a knowledge search found. */

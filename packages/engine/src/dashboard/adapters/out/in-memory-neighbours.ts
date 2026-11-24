@@ -112,6 +112,16 @@ export function inMemoryDashboardPorts() {
 	};
 }
 
+/** The metrics of a run that did nothing yet. */
+export const NO_METRICS: RunSummary["metrics"] = {
+	wallMs: null,
+	agentMs: 0,
+	gateWaitMs: 0,
+	tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+	costBasis: "billed",
+	prUrl: null,
+};
+
 let made = 0;
 
 /** A finished run of `night` in project p1 on this computer, with `fields` over it. */
@@ -148,6 +158,10 @@ export function runSummaryOf(fields: Partial<RunSummary> = {}): RunSummary {
 		subflows: [],
 		gates: [],
 		sleeps: [],
+		neededYou: [],
+		metrics: NO_METRICS,
+		lastActivityAt: fields.createdAt ?? 0,
+		endReason: "finished",
 		...fields,
 	};
 }

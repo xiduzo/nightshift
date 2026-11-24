@@ -37,10 +37,7 @@ export type FlowOverview = {
 	lastRuns: FlowHealthRow["lastRuns"];
 	ended: number;
 	finished: number;
-	/**
-	 * The newest report of its own runs, of any day. Null when none wrote
-	 * one, and with an older Host.
-	 */
+	/** The newest report of its own runs, of any day. Null when none wrote one. */
 	report: NonNullable<FlowHealthRow["report"]> | null;
 	problem: FlowProblem | null;
 };

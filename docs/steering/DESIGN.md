@@ -83,7 +83,6 @@ A project's page shows where each of its flows still needs you (`docs/research/d
 - Under it, one card with one row per flow (see Flow health). The flows that needed you most without a plan come first.
 - The page shows no spend of its own. The Spend page is in the sidebar. Cost stays only as evidence of a flow: how steady the cost of a run is, and what a run cost before and after a change.
 - A test run counts only in the spend. Every other number leaves it out (`isTestRun`, one rule for every number). So does the sidebar's runs donut. The run page and every run list show a **Test run** badge.
-- An older Host sends no level and no planned split: a dash. It sends no steadiness: a grey strip.
 - Setup does not go on this page. Its other pages sit under the project in the sidebar.
 
 ### Home
@@ -101,7 +100,6 @@ Home is a note over every project that you read top to bottom. It guards the flo
 - **What came out** lists the newest report of each flow from the last 7 days, the new ones first. The reports from before your last look fold behind one line. A row opens the run page at its report. Night Shift never pushes a report.
 - Home has no list of Gates and no list of runs at work. The inbox holds the Gates. A run that works longer than usual is a Needs a look row.
 - A test run does not count on Home.
-- An older Host sends no watch: one line asks to update Night Shift, and What came out still shows.
 - A run page opens at its report when the run ended with one and the link names no step.
 
 ### Spend
@@ -117,7 +115,6 @@ Spend is the page for the money of a Space, for the person who pays (`docs/resea
 - **Ways to save** lists changes that the runs show, the biggest first: runs that did not finish, runs that found nothing to do, and runs that cost over twice a usual run. A run counts under one of them only. The list is as wide as it needs: the flow list gives it room. Each change is an Item, not a Card. It says what the change saves, how many runs show it, and opens the newest of those runs and the flow.
 - The page never shows a saving that the runs do not show. It does not guess what another model or a removed step saves.
 - A test run counts in the spend. It is not in a usual run or in a way to save.
-- An older Host cannot send the page: one alert asks to update Night Shift.
 
 ### Knowledge
 

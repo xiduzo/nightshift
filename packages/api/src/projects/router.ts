@@ -34,6 +34,7 @@ const NO_RUNS: ProjectRuns = {
 	statuses: {},
 	last: null,
 	nextWakeAt: null,
+	nights: [],
 };
 
 /**

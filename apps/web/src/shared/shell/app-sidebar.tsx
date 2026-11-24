@@ -245,8 +245,8 @@ function ProjectItem({ project, range }: { project: Project; range: number }) {
 	const Icon = inProject ? FolderOpenIcon : FolderIcon;
 
 	// Counted by Night Shift with the project list: no read per project.
-	const running = (project.runs?.statuses.running ?? 0) > 0;
-	const inRange = project.runs?.nights?.find((r) => r.nights === range);
+	const running = (project.runs.statuses.running ?? 0) > 0;
+	const inRange = project.runs.nights.find((r) => r.nights === range);
 	const runs = inRange
 		? `Last ${range} days: ${describeRunStatuses(inRange)}`
 		: null;

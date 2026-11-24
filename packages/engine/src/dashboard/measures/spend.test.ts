@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { parseInstant } from "@nightshift/time";
 import type { AnswerCost } from "../../assistant";
 import type { RunSummary } from "../../read";
+import { NO_METRICS } from "../adapters/out/in-memory-neighbours";
 import type { RunRung } from "./domain/runs";
 import { steadinessOf, summarizeSpend } from "./domain/spend";
 import { spreadOf } from "./domain/stats";
@@ -50,6 +51,10 @@ function aRun(fields: Partial<RunSummary> = {}): RunSummary {
 		subflows: [],
 		gates: [],
 		sleeps: [],
+		neededYou: [],
+		metrics: NO_METRICS,
+		lastActivityAt: NOW - HOUR,
+		endReason: "finished",
 		...fields,
 	};
 }

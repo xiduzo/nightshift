@@ -2,6 +2,7 @@ import {
 	askWhyAnswer,
 	askWhyMutation,
 	explainRun,
+	HOST_OUTDATED,
 	isMissingOnHost,
 	type RunStatus,
 } from "@nightshift/client";
@@ -45,8 +46,7 @@ type LastAsk = {
  * one answer, about what went wrong and what you can do, shows in its
  * place. No thread: "Ask again" asks anew. The answer stays in the
  * mutation cache, so it shows again when the run opens again. Nothing for
- * a run that finished, and nothing on a Host of an older version, which
- * does not have it.
+ * a run that finished.
  */
 export const AskWhySection = memo(function AskWhySection({
 	runId,
@@ -87,7 +87,6 @@ function AskWhy({ runId, failed }: { runId: string; failed: boolean }) {
 		}),
 	});
 	const last = asks.at(-1);
-	if (last?.error && isMissingOnHost(last.error)) return null;
 	const asked = () => ask.mutate();
 	const title = failed ? "Why it failed" : "Why it stopped";
 	// Only an owner of the Host gets its lists: anyone else asks with the default.
@@ -146,7 +145,11 @@ function AskWhy({ runId, failed }: { runId: string; failed: boolean }) {
 					icon={{ sf: "exclamationmark.triangle.fill", lucide: TriangleAlert }}
 					iconColor={colors.destructive}
 					title="No answer came"
-					subtitle={last.error?.message || undefined}
+					subtitle={
+						isMissingOnHost(last.error)
+							? HOST_OUTDATED
+							: last.error?.message || undefined
+					}
 				/>
 			)}
 			{choose}

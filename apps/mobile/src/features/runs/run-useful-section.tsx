@@ -41,7 +41,7 @@ export function RunUsefulSection({
 	const [, setSaved] = useState(0);
 	const busy = useRef(false);
 	const mark = useMutation(queries.useful());
-	const known = knownUseful(run.metrics?.scores, rememberedUseful(run.id));
+	const known = knownUseful(run.metrics.scores, rememberedUseful(run.id));
 	const view = usefulView(status, known, run);
 
 	const choose = (useful: boolean) => {

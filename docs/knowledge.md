@@ -64,10 +64,9 @@ cannot copy waits. Night Shift tries again each minute and at the next
 reconcile. A file whose content it cannot fetch keeps its old version
 until the next reconcile. The step continues.
 
-A Host of an older version does not know the knowledge procedures. Its
-first answer tells the computer so, as it tells the run exchange. Then the
-computer works on its own copy and asks again after an hour. The Knowledge
-page says that the Host needs an update.
+A Host of an older version does not know the knowledge procedures. The
+computer works on its own copy, as when it cannot reach its Host. A file that
+it must fetch says that the Host needs an update.
 
 The first start after the upgrade reconciles each folder a computer has,
 and so publishes its files. When two computers have one path, the later
@@ -775,9 +774,7 @@ close. It does not say which of the two it is.
 `packages/engine/src/knowledge/search/domain/close-notes.ts` owns this. The list of what waits
 gains `nearTo`: one list per note, in the order of `notes`, with the three
 closest at most. Each has the file `id`, the text in `note`, whether it is `kept`,
-and the `similarity`. The field is additive. An older phone ignores it, and an
-older Host does not send it. The phone does not show it: comparing notes is work
-for a computer.
+and the `similarity`. The phone does not show it: comparing notes is work for a computer.
 
 **A page never waits for a model.** The read asks the search index for vectors
 that it already has. It does not ask whether the model is ready. A note with no

@@ -97,7 +97,7 @@ export function RunActions({
 				),
 		}),
 	);
-	// Needed you counts a take-over. Nothing waits for it: an older Host does not know it.
+	// Needed you counts a take-over. Nothing waits for it.
 	const tookOver = useMutation(runMutations.takeOver());
 	const stopPending = stopRun.isPending
 		? (stopRun.variables?.when ?? "now")

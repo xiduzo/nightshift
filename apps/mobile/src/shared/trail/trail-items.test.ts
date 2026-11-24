@@ -26,6 +26,15 @@ function step(fields: Partial<StepSummary>): StepSummary {
 		costCalls: 1,
 		device: null,
 		gate: null,
+		sleeps: [],
+		metrics: {
+			wallMs: null,
+			agentMs: 0,
+			gateWaitMs: 0,
+			tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+			costBasis: "billed",
+			prUrl: null,
+		},
 		...fields,
 	} as StepSummary;
 }

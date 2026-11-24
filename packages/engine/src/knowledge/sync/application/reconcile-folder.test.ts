@@ -1,5 +1,4 @@
 import { describe, expect, test } from "bun:test";
-import { OlderHostError } from "../../../contract";
 import { inMemorySyncPorts } from "../adapters/out/in-memory-neighbours";
 import type { KnowledgeEntry } from "../domain/entry";
 import { reconcileFolder } from "./reconcile-folder";
@@ -144,24 +143,14 @@ describe("reconcileFolder", () => {
 		expect(ports.copy.text("p1", "gone.md")).toBeUndefined();
 	});
 
-	test("an older Host gets no wait and no call: the content waits here", async () => {
-		const ports = inMemorySyncPorts();
-		ports.older.heard("s1", new OlderHostError(), ports.now());
-		ports.copy.put("p1", "a.md", "# A\n", 5);
-		await reconcileFolder(ports)({ projectId: "p1" });
-		expect(ports.hosts.waits).toEqual([]);
-		expect(ports.archive.calls).toEqual([]);
-		expect(ports.pending.has("p1")).toBe(true);
-		const state = JSON.parse(ports.copy.state("p1") ?? "{}");
-		expect(state.unpushed).toEqual([ports.copy.hash("# A\n")]);
-	});
-
 	test("a Host that is down: the content waits, and the next reconcile copies it", async () => {
 		const ports = inMemorySyncPorts();
 		ports.archive.down = true;
 		ports.copy.put("p1", "a.md", "# A\n", 5);
 		await reconcileFolder(ports)({ projectId: "p1" });
 		expect(ports.pending.has("p1")).toBe(true);
+		const state = JSON.parse(ports.copy.state("p1") ?? "{}");
+		expect(state.unpushed).toEqual([ports.copy.hash("# A\n")]);
 		ports.archive.down = false;
 		await reconcileFolder(ports)({ projectId: "p1" });
 		expect(ports.pending.has("p1")).toBe(false);

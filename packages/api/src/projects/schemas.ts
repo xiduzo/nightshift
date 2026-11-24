@@ -28,8 +28,7 @@ export const projectSchema = exact<Project>()(
 		remote: z.string().nullable(),
 		/**
 		 * False: the project has no folder (ADR 22). Each of its runs gets an
-		 * empty folder of its own. A Host from before ADR 22 sends none: read
-		 * that as true.
+		 * empty folder of its own.
 		 */
 		folder: z.boolean(),
 		createdAt: z.number(),
@@ -48,30 +47,25 @@ const projectRunsSchema = exact<ProjectRuns>()(
 	z.object({
 		total: z.number(),
 		statuses: z.partialRecord(runStatusSchema, z.number()),
-		/** The test runs among `statuses`. Older Hosts send none. */
+		/** The test runs among `statuses`. Absent: none. */
 		tests: z.partialRecord(runStatusSchema, z.number()).optional(),
 		last: z
 			.object({ id: z.string(), title: z.string(), createdAt: z.number() })
 			.nullable(),
 		nextWakeAt: z.number().nullable(),
-		nights: z
-			.array(
-				z.object({
-					nights: z.literal([7, 30, 90]),
-					total: z.number(),
-					statuses: z.partialRecord(runStatusSchema, z.number()),
-				}),
-			)
-			.optional(),
+		nights: z.array(
+			z.object({
+				nights: z.literal([7, 30, 90]),
+				total: z.number(),
+				statuses: z.partialRecord(runStatusSchema, z.number()),
+			}),
+		),
 	}),
 );
 
-/**
- * A project in the list, with how its runs stand. Older Hosts send no
- * `runs`: a screen then counts the runs it reads.
- */
-export const listedProjectSchema = exact<Project & { runs?: ProjectRuns }>()(
-	projectSchema.extend({ runs: projectRunsSchema.optional() }),
+/** A project in the list, with how its runs stand. */
+export const listedProjectSchema = exact<Project & { runs: ProjectRuns }>()(
+	projectSchema.extend({ runs: projectRunsSchema }),
 );
 
 /** The branches of a clone, newest commit first. */

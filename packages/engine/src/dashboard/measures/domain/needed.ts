@@ -13,10 +13,10 @@ import type { NeededGroup, NeededRange } from "./summary-types";
 
 /** Why a run needed you: each reason once, in the order they first happened. Empty: it needed nobody. */
 export function neededReasons(run: {
-	neededYou?: readonly { reason: NeededYouReason }[];
+	neededYou: readonly { reason: NeededYouReason }[];
 }): NeededYouReason[] {
 	const reasons: NeededYouReason[] = [];
-	for (const { reason } of run.neededYou ?? []) {
+	for (const { reason } of run.neededYou) {
 		if (!reasons.includes(reason)) reasons.push(reason);
 	}
 	return reasons;

@@ -21,6 +21,7 @@ function gate(fields: Partial<OpenGate>): OpenGate {
 		question: "Review the plan?",
 		choices: [{ name: "approve" }, { name: "reject", color: "red" }],
 		lockScreen: false,
+		urgency: "today",
 		openedAt: 0,
 		walker: { thisDevice: true, name: null },
 		answerPending: false,

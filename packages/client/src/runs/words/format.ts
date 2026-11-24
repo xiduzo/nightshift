@@ -113,7 +113,6 @@ const RESULT_LABELS: Record<RunResult, string> = {
 export function runEndLine(
 	run: Pick<RunSummary, "result" | "reason">,
 ): string | null {
-	// An older Host sends no result at all.
 	if (!run.result) return null;
 	const label = RESULT_LABELS[run.result];
 	return run.reason ? `${label}: ${run.reason}` : label;

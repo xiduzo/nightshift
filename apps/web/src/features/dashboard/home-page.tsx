@@ -103,7 +103,7 @@ export function HomePage() {
 	];
 
 	const reports = summary.data
-		? (daysOf(summary.data, REPORT_DAYS)?.reports?.rows ?? [])
+		? (daysOf(summary.data, REPORT_DAYS)?.reports.rows ?? [])
 		: undefined;
 	const newReports = (reports ?? []).filter(
 		(report) => before === null || report.endedAt > before.at,
@@ -149,13 +149,6 @@ export function HomePage() {
 				</header>
 
 				<SetupCard />
-
-				{summary.data && !watch ? (
-					<p className="text-sm text-muted-foreground">
-						Update Night Shift on the computer that runs your flows. Then Home
-						shows the flows that need a look.
-					</p>
-				) : null}
 
 				{watch && watch.flows.length === 0 && back.length === 0 ? (
 					<Item variant="muted">

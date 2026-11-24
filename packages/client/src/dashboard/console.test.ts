@@ -55,10 +55,8 @@ describe("CONSOLE_METRICS", () => {
 		});
 	});
 
-	test("has no share that needed you without runs, or from an older Host", () => {
+	test("has no share that needed you without runs", () => {
 		expect(valuesOf(range(7, {}, {}).totals).needed).toBeNull();
-		const older = range(7, { runs: 5, neededYou: undefined }, {});
-		expect(valuesOf(older.totals).needed).toBeNull();
 	});
 
 	test("has no share that finished without ended runs", () => {

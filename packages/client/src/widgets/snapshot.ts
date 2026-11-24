@@ -1,4 +1,4 @@
-import { gateOrder, mayAnswer, type OpenGate, urgencyOf } from "../gates";
+import { gateOrder, mayAnswer, type OpenGate } from "../gates";
 import { type GlanceTone, glanceTone } from "./tone";
 
 /** How many things a glance shows: the first in queue order. */
@@ -76,7 +76,7 @@ export function glanceSnapshot({
 	time: (epochMs: number) => string;
 }): GlanceSnapshot {
 	const open = gates.filter(mayAnswer);
-	const nowGates = gateOrder(open.filter((gate) => urgencyOf(gate) === "now"));
+	const nowGates = gateOrder(open.filter((gate) => gate.urgency === "now"));
 	const items: GlanceItem[] = [
 		...nowGates.map(
 			(gate): GlanceItem => ({
@@ -108,7 +108,6 @@ export function glanceSnapshot({
 /**
  * The flows that need a look now, from the watch of a dashboard summary:
  * those with a severe signal, the severe first as the watch sorts them.
- * An older Host sends no watch: then none.
  */
 export function glanceLooks(
 	watch:

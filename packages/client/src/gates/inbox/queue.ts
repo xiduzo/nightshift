@@ -16,18 +16,7 @@ export const URGENCY_LABEL: Record<GateUrgency, string> = {
 	later: "When you have time",
 };
 
-/**
- * A Gate's urgency. A Host older than the brief sends none: its Gates read
- * as today, as an old run does.
- */
-export function urgencyOf(gate: { urgency?: GateUrgency }): GateUrgency {
-	return gate.urgency ?? "today";
-}
-
-type Queued = { urgency?: GateUrgency } & Pick<
-	OpenGate,
-	"deadline" | "openedAt"
->;
+type Queued = Pick<OpenGate, "urgency" | "deadline" | "openedAt">;
 
 /** The deadline of a Gate, or the end of time without one: for the order. */
 function deadlineOf(gate: Queued): number {
@@ -35,7 +24,7 @@ function deadlineOf(gate: Queued): number {
 }
 
 function rankOf(gate: Queued): number {
-	return GATE_URGENCIES.indexOf(urgencyOf(gate));
+	return GATE_URGENCIES.indexOf(gate.urgency);
 }
 
 /**

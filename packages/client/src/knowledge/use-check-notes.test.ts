@@ -23,6 +23,7 @@ const learnings: WaitingLearning[] = [
 		stepId: null,
 		notes: ["Night Shift learned this."],
 		proposedAt: 1,
+		mayDecide: false,
 	},
 ];
 

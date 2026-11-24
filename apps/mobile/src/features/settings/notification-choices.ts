@@ -17,9 +17,6 @@ export function phoneTimeZone(): string {
 	return localZone();
 }
 
-/** A Host older than "Push for" sends none: it pushes the Gates for now only. */
-export const DEFAULT_PUSH_URGENCIES: readonly GateUrgency[] = ["now"];
-
 /**
  * Whether `urgency` is the only level that is on. Its switch stays on, as
  * on the web: turning off every Gate push is the Gates switch.

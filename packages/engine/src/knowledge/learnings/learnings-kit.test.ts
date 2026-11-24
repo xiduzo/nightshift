@@ -122,7 +122,7 @@ function learningsOver(
 			read: async ({ sha256 }: { sha256?: string }) =>
 				sha256 ? new Uint8Array(await readFile(join(knowledge, sha256))) : null,
 		} as never,
-		status: { spaceOf: async () => "space", heard: () => {} },
+		status: { spaceOf: async () => "space" },
 		holds: { startStep: async () => ({ done: async () => {} }) },
 		notifications: { learningsChanged: async () => {} },
 	});

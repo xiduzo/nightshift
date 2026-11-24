@@ -39,8 +39,6 @@ export type KnowledgeOverview = {
 	reviews: string[];
 	/** The Space is not a personal one: each of its Members reads the knowledge. */
 	shared: boolean;
-	/** The Host that keeps the Space runs an older version of Night Shift: it cannot take this knowledge yet. */
-	olderHost: boolean;
 	/** Night Shift proposes learnings from the runs of the project that ended (ADR 37). */
 	learnsFromRuns: boolean;
 	/** The page reader of the project (ADR 39). */
@@ -64,7 +62,7 @@ export const listKnowledgeSources =
 		can,
 	}: ListKnowledgeSources): Promise<KnowledgeOverview> => {
 		const [
-			{ files, proposed, shared, olderHost, learnsFromRuns, reader },
+			{ files, proposed, shared, learnsFromRuns, reader },
 			{ syncs, reviews },
 			readerReady,
 		] = await Promise.all([
@@ -82,7 +80,6 @@ export const listKnowledgeSources =
 			proposed,
 			reviews,
 			shared,
-			olderHost,
 			learnsFromRuns,
 			reader,
 			readerReady,

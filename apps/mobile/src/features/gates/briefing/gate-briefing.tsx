@@ -183,7 +183,7 @@ export function GateBriefing({
 		? stepsHint(
 				run.data.steps.filter((step) => step.scope === null).length,
 				null,
-				usageLabel(run.data.metrics?.tokens, costLabel(run.data)),
+				usageLabel(run.data.metrics.tokens, costLabel(run.data)),
 			)
 		: undefined;
 

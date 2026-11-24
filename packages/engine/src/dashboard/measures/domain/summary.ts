@@ -83,7 +83,7 @@ function idleSpans(run: RunIn, now: number): Span[] {
 		from: gate.openedAt,
 		to: gate.closedAt ?? (run.status === "waiting" ? now : gate.openedAt),
 	}));
-	const sleeps = (run.sleeps ?? []).map((sleep) => ({
+	const sleeps = run.sleeps.map((sleep) => ({
 		from: sleep.from,
 		to: sleep.to ?? (run.status === "sleeping" ? now : sleep.from),
 	}));

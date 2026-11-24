@@ -252,9 +252,9 @@ function gateMoves(runs: readonly RunDetailIn[]): Weighted[] {
 	let wait = 0;
 	let agent = 0;
 	for (const run of runs) {
-		wall += run.metrics?.wallMs ?? 0;
-		wait += run.metrics?.gateWaitMs ?? 0;
-		agent += run.metrics?.agentMs ?? 0;
+		wall += run.metrics.wallMs ?? 0;
+		wait += run.metrics.gateWaitMs;
+		agent += run.metrics.agentMs;
 	}
 	if (wall > 0 && wait / wall >= WAIT_SHARE) {
 		const longest = [...gates].sort((a, b) => b.waited - a.waited)[0];
@@ -400,7 +400,7 @@ function deciderMoves(runs: readonly RunDetailIn[]): Weighted[] {
 		{ picked: number; unsure: number; tier: string | null; runId: string }
 	>();
 	for (const run of runs) {
-		for (const row of run.metrics?.ladder ?? []) {
+		for (const row of run.metrics.ladder ?? []) {
 			if (row.ladder !== "choice" || row.by !== "model") continue;
 			const tally = models.get(row.nodeId) ?? {
 				picked: 0,
@@ -446,7 +446,7 @@ function runMoves(runs: readonly RunDetailIn[]): Weighted[] {
 				lateRun = run.id;
 			}
 		}
-		const answer = (run.metrics?.scores ?? [])
+		const answer = (run.metrics.scores ?? [])
 			.filter((score) => score.score === "useful")
 			.at(-1);
 		if (answer) {

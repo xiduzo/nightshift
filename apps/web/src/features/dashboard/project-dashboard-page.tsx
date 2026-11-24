@@ -86,7 +86,7 @@ export function ProjectDashboardPage({
 
 /**
  * How often the flows needed you without a plan over the range, against
- * the days before. An older Host sends no watch: nothing.
+ * the days before.
  */
 function NeededYou({
 	days,
@@ -97,9 +97,7 @@ function NeededYou({
 	range: NightRange;
 }) {
 	if (!days) return <Skeleton className="h-7 w-80" />;
-	const watches = (days.flows?.rows ?? []).flatMap((row) =>
-		row.watch ? [row.watch.attention] : [],
-	);
+	const watches = (days.flows?.rows ?? []).map((row) => row.watch.attention);
 	if (watches.length === 0) return null;
 	const now = watches.reduce((sum, a) => sum + a.unplanned, 0);
 	const before = watches.reduce((sum, a) => sum + a.before.unplanned, 0);

@@ -53,7 +53,7 @@ export function runTime(
 	const busy: Span[] = [];
 	for (const step of steps) {
 		const stepEnd = step.endedAt ?? end;
-		const slept = (step.sleeps ?? []).map(
+		const slept = step.sleeps.map(
 			({ from, to }): Span => [from, to ?? stepEnd],
 		);
 		sleeps.push(...slept);

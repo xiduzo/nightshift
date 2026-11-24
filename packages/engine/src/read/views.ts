@@ -116,12 +116,12 @@ export type StepSummary = {
 	} | null;
 	/**
 	 * When the step slept (a Wait node, a usage limit, the network), oldest
-	 * first. `to` is null while it sleeps. Older Hosts send none.
+	 * first. `to` is null while it sleeps.
 	 */
-	sleeps?: { from: number; to: number | null }[];
-	/** How long the step took, its agents' time and tokens, its Gate's wait. Older Hosts send none. */
-	metrics?: RunMetrics;
-	/** The knowledge files its agents used: read, or at the top of a search. Older Hosts send none. */
+	sleeps: { from: number; to: number | null }[];
+	/** How long the step took, its agents' time and tokens, its Gate's wait. */
+	metrics: RunMetrics;
+	/** The knowledge files its agents used: read, or at the top of a search. Absent: none. */
 	sources?: StepSource[];
 	/**
 	 * The step stood in for its node in a test run (ADR 27): it gave a
@@ -216,7 +216,7 @@ export type RunSummary = {
 	/**
 	 * The run's project has no folder (ADR 22): the run works in a run
 	 * folder of its own, with no branch and no base. Absent: it works in its
-	 * own copy of the project, and so does a run from an older Host.
+	 * own copy of the project.
 	 */
 	runFolder?: boolean;
 	status: RunStatus;
@@ -225,11 +225,8 @@ export type RunSummary = {
 	 * or the message of the End node that ended it.
 	 */
 	reason: string | null;
-	/**
-	 * Why the run ended, as a code. Null while it has not ended. Absent
-	 * on a summary a caller built by hand.
-	 */
-	endReason?: RunEndReason | null;
+	/** Why the run ended, as a code. Null while it has not ended. */
+	endReason: RunEndReason | null;
 	/**
 	 * How the End node that ended the run says it came out: `done`,
 	 * `nothing-to-do` or `failed`. Null when no End node ended it.
@@ -248,10 +245,9 @@ export type RunSummary = {
 	createdAt: number;
 	/**
 	 * When the run last did something: its latest event that is not
-	 * feedback (a rating, the fate of its pull request). Absent from a Host
-	 * of a version before it, and on a summary a caller built by hand.
+	 * feedback (a rating, the fate of its pull request).
 	 */
-	lastActivityAt?: number;
+	lastActivityAt: number;
 	/** When the run ended. Null while it is running, waiting or sleeping, or when it never ended. */
 	endedAt: number | null;
 	/** Sum over all steps. */
@@ -279,25 +275,24 @@ export type RunSummary = {
 	/**
 	 * Each time a person stepped in, oldest first: answered a Gate or an
 	 * Ask, resumed, stopped, or took the run over. Empty: the run needed
-	 * nobody. Older Hosts send none.
+	 * nobody.
 	 */
-	neededYou?: NeededYou[];
+	neededYou: NeededYou[];
 	/**
 	 * The start of the run's report (ADR 26), when the End node that ended
-	 * it wrote one. Absent: no report, or an older Host.
+	 * it wrote one. Absent: no report.
 	 */
 	report?: RunReportGlance;
 	/**
 	 * Every time a step of the run slept, also in called flows, oldest
-	 * first. `to` is null while it sleeps. Older Hosts send none.
+	 * first. `to` is null while it sleeps.
 	 */
-	sleeps?: { from: number; to: number | null }[];
+	sleeps: { from: number; to: number | null }[];
 	/**
 	 * How long the run took, its agents' time and tokens, how long its
 	 * Gates waited, how sure its cost is, and the pull request it opened.
-	 * Older Hosts send none.
 	 */
-	metrics?: RunMetrics;
+	metrics: RunMetrics;
 	/**
 	 * A test run (ADR 27): the nodes its start pinned and skipped, by id.
 	 * It keeps nothing that lasts. Absent: every node ran for real.
@@ -320,15 +315,14 @@ export type ProjectRuns = {
 	statuses: Partial<Record<RunStatus, number>>;
 	/**
 	 * Of `statuses`, the test runs (`isTestRun`) by status: a count of runs
-	 * leaves them out. Absent: none, or an older Host.
+	 * leaves them out. Absent: none.
 	 */
 	tests?: Partial<Record<RunStatus, number>>;
 	/**
 	 * The counts over the last 7, 30 and 90 days, on the reader's clock, as
-	 * the dashboard counts them: without the test runs. Older Hosts send
-	 * none. A Host of an older version counts the test runs in them.
+	 * the dashboard counts them: without the test runs.
 	 */
-	nights?: {
+	nights: {
 		nights: NightRange;
 		total: number;
 		statuses: Partial<Record<RunStatus, number>>;

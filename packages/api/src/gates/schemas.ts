@@ -152,12 +152,10 @@ export const gateAnswerSchema = z.object({
 	 */
 	files: answerFilesSchema.optional(),
 	/**
-	 * Where the answer comes from. `lock-screen` is the older name of
-	 * `lock_screen`: a button on a notification, without an unlock. Only a
+	 * Where the answer comes from. `lock_screen`: a button on a
+	 * notification, without an unlock. Only a
 	 * Gate its author marked for the lock screen takes that one. Omit it
 	 * and Night Shift records the answer without a place.
 	 */
-	via: z
-		.enum(["web", "phone", "lock_screen", "lock-screen", "_OTHER"])
-		.optional(),
+	via: z.enum(["web", "phone", "lock_screen", "_OTHER"]).optional(),
 });

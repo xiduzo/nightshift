@@ -129,9 +129,4 @@ describe("runTime", () => {
 		expect(time.slept).toBe(5 * MIN);
 		expect(time.active).toBe(10 * MIN);
 	});
-
-	test("reads a step from an older Host, which sends no sleeps, as one that never slept", () => {
-		const { sleeps: _, ...older } = step("a", 0, 10 * MIN);
-		expect(runTime([older], 0, 20 * MIN).active).toBe(10 * MIN);
-	});
 });

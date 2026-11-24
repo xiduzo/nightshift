@@ -53,9 +53,7 @@ export function FlowRows({
 		() =>
 			rows
 				? [...rows].sort(
-						(a, b) =>
-							(b.watch?.attention.unplanned ?? 0) -
-							(a.watch?.attention.unplanned ?? 0),
+						(a, b) => b.watch.attention.unplanned - a.watch.attention.unplanned,
 					)
 				: undefined,
 		[rows],
@@ -124,7 +122,7 @@ export function FlowRows({
 									>
 										{row.name}
 									</Link>
-									{(row.watch?.signals ?? []).map((signal) => (
+									{row.watch.signals.map((signal) => (
 										<Tooltip key={signal.kind}>
 											<TooltipTrigger render={<span className="shrink-0" />}>
 												<SignalIcon signal={signal} />
@@ -147,11 +145,11 @@ export function FlowRows({
 							<NeededCell watch={row.watch} />
 							<span className="flex flex-col gap-1">
 								<TimeCell
-									steadiness={row.steady?.time}
-									length={row.watch?.length}
+									steadiness={row.steady.time}
+									length={row.watch.length}
 								/>
 								<CostCell
-									steadiness={row.steady?.cost}
+									steadiness={row.steady.cost}
 									cost={row.cost}
 									tokenUse={row.tokenUse}
 									unfinished={row.unfinished}
@@ -202,15 +200,8 @@ export function FlowRows({
 	);
 }
 
-/** The level of the flow, and since when. Nothing from an older Host. */
-function LevelLine({
-	watch,
-	now,
-}: {
-	watch: FlowWatch | undefined;
-	now: number;
-}) {
-	if (!watch) return null;
+/** The level of the flow, and since when. */
+function LevelLine({ watch, now }: { watch: FlowWatch; now: number }) {
 	if (!watch.level) {
 		return (
 			<span className="text-xs text-muted-foreground">
@@ -249,11 +240,9 @@ export function Against({ now, before }: { now: number; before: number }) {
 
 /**
  * How often the flow needed you without a plan per week, and under the
- * bars the number against the days before. The planned times show on hover. An older Host sends
- * nothing: a dash.
+ * bars the number against the days before. The planned times show on hover.
  */
-function NeededCell({ watch }: { watch: FlowWatch | undefined }) {
-	if (!watch) return <span className="text-muted-foreground">—</span>;
+function NeededCell({ watch }: { watch: FlowWatch }) {
 	const { attention } = watch;
 	return (
 		<Tooltip>
