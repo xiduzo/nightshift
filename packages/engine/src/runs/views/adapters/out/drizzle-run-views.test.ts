@@ -23,6 +23,13 @@ import { drizzleRunViews } from "./drizzle-run-views";
  * `run-views.contract.ts`.
  */
 
+/**
+ * The run of this file. `bun test` keeps one module for every file of a
+ * process, so the spy also sees the runs that earlier files left at work:
+ * only the derivations of this run count.
+ */
+const RUN = "run-of-the-shared-derivation";
+
 let db: Database;
 let log: RunLog;
 let bus: RunBus;
@@ -35,7 +42,7 @@ beforeEach(async () => {
 	const spaceId = await localSpaceId(db);
 	await db.insert(project).values({ id: "p", spaceId, name: "p" });
 	await db.insert(run).values({
-		id: "r1",
+		id: RUN,
 		spaceId,
 		projectId: "p",
 		flow: "{}",
@@ -61,7 +68,7 @@ beforeEach(async () => {
 	});
 	await log.append({
 		type: "RunStarted",
-		runId: "r1",
+		runId: RUN,
 		payload: { projectId: "p", flowName: "f", title: "t", start: "a" },
 	});
 });
@@ -75,7 +82,7 @@ async function watcher() {
 	const controller = new AbortController();
 	controllers.push(controller);
 	const items: RunStreamItem[] = [];
-	const row = await getRunRow(db, "r1");
+	const row = await getRunRow(db, RUN);
 	void (async () => {
 		for await (const item of views.watch(row, controller.signal, 0)) {
 			items.push(item);
@@ -108,7 +115,7 @@ describe("the views over the run log", () => {
 				derive.mockClear();
 				await log.append({
 					type: "StepStarted",
-					runId: "r1",
+					runId: RUN,
 					stepId,
 					payload: {
 						nodeId: "a",
@@ -118,11 +125,12 @@ describe("the views over the run log", () => {
 						logPath: null,
 					},
 				});
-				bus.publish("r1", { kind: "step-changed", stepId });
+				bus.publish(RUN, { kind: "step-changed", stepId });
 				await until(() => watchers.every((items) => sentStep(items, stepId)));
 				// Each watcher's transcript reader reads the steps too.
 				await Bun.sleep(20);
-				expect(derive).toHaveBeenCalledTimes(1);
+				const own = derive.mock.calls.filter(([run]) => run.runId === RUN);
+				expect(own).toHaveLength(1);
 			}
 		} finally {
 			derive.mockRestore();
