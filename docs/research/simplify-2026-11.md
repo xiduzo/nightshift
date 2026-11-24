@@ -192,3 +192,16 @@ Each entry names its source. "Read" means found by reading and not reproduced.
   following the document, and a new Device gets none.
 - The orchestrator advised the rewrite before this design. Now it advises against it. The
   owner has not answered yet, and nothing is built.
+
+### P1d. Who may act moves into the use cases (90483d352 to e6a413346)
+
+- No use case ignores its actor: 51 to 0. The owner of this computer is a port,
+  `engine/src/access/computer`. The doors keep their checks, so a rule is asked twice.
+- Owner decision: five changes ask the role of the Person also when that Person owns the
+  computer: reset a kept value, forget node memory, dismiss a notice, use a project's folder
+  and save schedules. A viewer is refused.
+- A separate review compared 318 answers of the real daemon before and after (53 procedures,
+  6 identities). Five differ, the five above. CI passed.
+- Lines go up, as the plan said. The gain is that a rule has one place and a test.
+- Next: tests at the daemon for the wiring of the checks. Until then no door check goes.
+- The web still offers these five controls to a viewer, who then gets an error message.
