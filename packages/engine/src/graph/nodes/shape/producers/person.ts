@@ -1,5 +1,4 @@
 import { isAbsolute, relative, resolve as resolvePath } from "node:path";
-import { Command } from "@langchain/langgraph";
 import {
 	ASK_ANSWER,
 	type AskAttachment,
@@ -21,7 +20,7 @@ import {
 import type { GateChoice } from "../../../../log";
 import type { NodeAction, StepContext } from "../../../context";
 import { askAnswerProblem } from "../../../data";
-import { interruptNode, route } from "../../../route";
+import { askAgain, gateNode, route } from "../../../route";
 import type { BriefSpec, OpenStep } from "../../../step";
 
 import {
@@ -339,32 +338,13 @@ export function askEnding(
 	};
 }
 
-/** The node opens its Ask again, in a new visit. */
-function askAgain(node: ValueNode): Command {
-	return new Command({
-		update: { pending: { [node.id]: null } },
-		goto: node.id,
-	});
-}
-
 /**
  * The ask node of an Ask (`ask__<id>`): interrupts with the Gate the node
  * opened and, on the answer, ends the step with the form's data and
  * routes. A reopen asks again in a new visit, as a Gate does.
  */
 export function askAnswerNode(node: ValueNode, ctx: StepContext): NodeAction {
-	return interruptNode({
-		kind: "gate",
-		nodeId: node.id,
-		missing: `No question is open at node "${node.id}".`,
-		value: (pending) => ({
-			kind: "gate",
-			stepId: pending.stepId,
-			nodeId: node.id,
-			question: pending.question,
-			choices: pending.choices,
-			...(pending.deadline ? { deadline: pending.deadline } : {}),
-		}),
+	return gateNode(node, ctx, {
 		async answer(pending, answer, state, config) {
 			if (answer?.kind !== "gate" || pending.form === undefined) {
 				return askAgain(node);
@@ -382,6 +362,5 @@ export function askAnswerNode(node: ValueNode, ctx: StepContext): NodeAction {
 			if (done.kind === "parked") return done.command;
 			return route(ctx, state, node, done.end, config);
 		},
-		stale: { ctx, letGo: () => askAgain(node) },
 	});
 }

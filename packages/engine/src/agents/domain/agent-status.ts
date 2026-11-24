@@ -56,3 +56,13 @@ export function agentViewOf(input: {
 		job: input.job,
 	};
 }
+
+/** The setup of one agent in the list. */
+export function agentIn(
+	status: AgentSetupStatus,
+	harness: AgentSetupView["harness"],
+): AgentSetupView {
+	const agent = status.agents.find((row) => row.harness === harness);
+	if (!agent) throw new Error(`No setup for ${harness}.`);
+	return agent;
+}

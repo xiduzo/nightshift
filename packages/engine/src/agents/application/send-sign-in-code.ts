@@ -3,7 +3,7 @@ import { Refusal } from "@nightshift/refusal";
 import type { ComputerAccess } from "../../access";
 import type { Actor } from "../../contract";
 import type { SettingsStore } from "../../settings";
-import { type AgentSetupView, MAX_CODE } from "../domain/agent-status";
+import { type AgentSetupView, agentIn, MAX_CODE } from "../domain/agent-status";
 import type { AgentJobs } from "../domain/setup-jobs";
 import {
 	allowedSetup,
@@ -33,13 +33,7 @@ export const sendSignInCode =
 		request: { harness: HarnessName; code: string; here: boolean },
 	): AgentSetupView => {
 		ports.computerAccess.openComputer(actor);
-		allowedSetup(
-			request.here,
-			ports.here,
-			(h) => ports.catalog.of(h),
-			(h) => ports.catalog.label(h),
-			request.harness,
-		);
+		allowedSetup(request, ports.here, ports.catalog);
 		const state = ports.jobs.jobOf(request.harness).state;
 		const signIn = ports.jobs.runningOf(request.harness)?.signIn;
 		if (!signIn || (state !== "code-needed" && state !== "signing-in")) {
@@ -53,9 +47,8 @@ export const sendSignInCode =
 			throw new Refusal("invalid", pasteCodeProblem());
 		}
 		signIn.sendCode(line);
-		const agent = readAgentSetup(ports)(actor, { here: true }).agents.find(
-			(row) => row.harness === request.harness,
+		return agentIn(
+			readAgentSetup(ports)(actor, { here: true }),
+			request.harness,
 		);
-		if (!agent) throw new Error(`No setup for ${request.harness}.`);
-		return agent;
 	};

@@ -1,19 +1,14 @@
 import { Refusal } from "@nightshift/refusal";
 import { now } from "@nightshift/time";
 import type { Actor } from "../../contract";
-import { saveProfile } from "../../settings";
-import {
-	ollamaInstallOf,
-	saveNamedModelProfile,
-	withModelAgents,
-} from "../domain/decider-plan";
+import { ollamaInstallOf } from "../domain/decider-plan";
 import type { DeciderSetupStatus } from "../domain/decider-status";
-import { runLocalDecider } from "../domain/run-local-decider";
 import type { DeciderJob } from "../domain/setup-jobs";
 import { refuseDeciderBusy } from "../domain/setup-jobs";
 import { DECIDER_BLOCKED, refuseBlocked } from "../domain/setup-place";
 import type { SetupProcesses } from "./ports";
 import { readDeciderSetup } from "./read-decider-setup";
+import { runLocalDecider } from "./run-local-decider";
 import type { UseLocalDeciderPorts } from "./use-local-decider";
 
 export type InstallOllamaPorts = UseLocalDeciderPorts & {
@@ -114,38 +109,5 @@ async function finishInstall(
 		});
 		return;
 	}
-	await runLocalDecider(
-		{
-			model: ports.localModel.name,
-			startTimeoutMs: ports.here.startTimeoutMs ?? 60_000,
-			status: () => ports.ollama.status(ports.localModel.name),
-			ollamaOn: () => ports.settings.current().ollama === "on",
-			turnOllamaOn: async () => {
-				await ports.settings.save({ ollama: "on" });
-			},
-			refresh: () => ports.ollama.refresh(),
-			pull: (model) => ports.ollama.pull(model),
-			pause: () => ports.wait.pause(),
-			now: () => ports.wait.now(),
-			modelProfile: (base, settings) =>
-				saveNamedModelProfile(
-					base,
-					settings,
-					(name) => ports.profiles.byName(name),
-					(profile, id) =>
-						saveProfile(ports, profile, id === undefined ? {} : { id }),
-				),
-			saveLocal: async (profile) => {
-				await ports.settings.save({
-					decisionDecider: "ollama",
-					builtinAgents: withModelAgents(
-						ports.settings.current().builtinAgents,
-						profile.name,
-						"ollama",
-					),
-				});
-			},
-		},
-		run,
-	);
+	await runLocalDecider(ports)(run);
 }

@@ -11,7 +11,7 @@ import {
 	type ProfileStore,
 	type SettingsStore,
 } from "../../settings";
-import type { AgentSetupView } from "../domain/agent-status";
+import { type AgentSetupView, agentIn } from "../domain/agent-status";
 import { type AgentJobs, refuseAgentBusy } from "../domain/setup-jobs";
 import {
 	agentNotInstalledProblem,
@@ -54,13 +54,7 @@ export const signInAgent =
 		request: { harness: HarnessName; here: boolean },
 	): AgentSetupView => {
 		ports.computerAccess.openComputer(actor);
-		const setup = allowedSetup(
-			request.here,
-			ports.here,
-			(h) => ports.catalog.of(h),
-			(h) => ports.catalog.label(h),
-			request.harness,
-		);
+		const setup = allowedSetup(request, ports.here, ports.catalog);
 		const label = ports.catalog.label(request.harness);
 		refuseAgentBusy(ports.jobs.busy(request.harness), label);
 		const bin = String(ports.settings.current()[HARNESS_BIN[request.harness]]);
@@ -80,7 +74,10 @@ export const signInAgent =
 				});
 			},
 		);
-		return agentOf(ports, actor, request.harness);
+		return agentIn(
+			readAgentSetup(ports)(actor, { here: true }),
+			request.harness,
+		);
 	};
 
 async function runSignIn(
@@ -152,16 +149,4 @@ async function ready(
 		account: check.account,
 		at: now(),
 	});
-}
-
-function agentOf(
-	ports: SignInAgentPorts,
-	actor: Actor,
-	harness: HarnessName,
-): AgentSetupView {
-	const agent = readAgentSetup(ports)(actor, { here: true }).agents.find(
-		(row) => row.harness === harness,
-	);
-	if (!agent) throw new Error(`No setup for ${harness}.`);
-	return agent;
 }

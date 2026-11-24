@@ -4,7 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type Artifact, createArtifactStore } from "@nightshift/engine";
 
-import { artifactFileResponse, parseRange } from "./artifact-file";
+import { artifactFileResponse } from "./artifact-file";
+import { parseRange } from "./served-file";
 
 describe("parseRange", () => {
 	test("reads one bytes range, both ends inclusive", () => {

@@ -3,7 +3,7 @@ import { now } from "@nightshift/time";
 import type { ComputerAccess } from "../../access";
 import type { Actor } from "../../contract";
 import type { SettingsStore } from "../../settings";
-import type { AgentSetupView } from "../domain/agent-status";
+import { type AgentSetupView, agentIn } from "../domain/agent-status";
 import type { AgentJobs } from "../domain/setup-jobs";
 import { allowedSetup } from "../domain/setup-runs";
 import type { AgentCatalog, Programs, SetupHere } from "./ports";
@@ -29,17 +29,10 @@ export const cancelAgentSetup =
 		request: { harness: HarnessName; here: boolean },
 	): AgentSetupView => {
 		ports.computerAccess.openComputer(actor);
-		allowedSetup(
-			request.here,
-			ports.here,
-			(h) => ports.catalog.of(h),
-			(h) => ports.catalog.label(h),
+		allowedSetup(request, ports.here, ports.catalog);
+		ports.jobs.cancel(request.harness, now());
+		return agentIn(
+			readAgentSetup(ports)(actor, { here: true }),
 			request.harness,
 		);
-		ports.jobs.cancel(request.harness, now());
-		const agent = readAgentSetup(ports)(actor, { here: true }).agents.find(
-			(row) => row.harness === request.harness,
-		);
-		if (!agent) throw new Error(`No setup for ${request.harness}.`);
-		return agent;
 	};

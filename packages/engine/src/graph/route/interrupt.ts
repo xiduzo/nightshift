@@ -1,5 +1,5 @@
 import {
-	type Command,
+	Command,
 	interrupt,
 	isGraphInterrupt,
 	type LangGraphRunnableConfig,
@@ -7,13 +7,19 @@ import {
 
 import type { NodeAction, StepContext } from "../context";
 import { heldStep, holdEnded } from "../position";
-import type { Parked, Pending, ResumeValue, RunStateValues } from "../state";
+import type {
+	Parked,
+	Pending,
+	PendingGate,
+	ResumeValue,
+	RunStateValues,
+} from "../state";
 
 /**
  * The one interrupting graph node. Three nodes park a thread at an
  * interrupt: the wait node (a sleep, `graph/step/sleep.ts`), the park node (a
  * failed or stopped step, `graph/route/route.ts`) and the Gate's ask node
- * (`choosers/person.ts`). Each did the same three things with its own
+ * (`gateNode`). Each did the same three things with its own
  * `pending`: check it is this node's, interrupt with a copy of it, and jump
  * back on the answer. That skeleton lives here once; a node gives only what
  * differs: the copy the interrupt carries (`value`) and what its answer
@@ -78,4 +84,44 @@ export function interruptNode<K extends Pending["kind"]>(spec: {
 		}
 		return spec.answer(own, answer, state, config);
 	};
+}
+
+type GateSpec = Parameters<typeof interruptNode<"gate">>[0];
+
+/** The node opens its Gate again, in a new visit. */
+export function askAgain(node: { id: string }): Command {
+	return new Command({
+		update: { pending: { [node.id]: null } },
+		goto: node.id,
+	});
+}
+
+/**
+ * The ask node of a Gate (`ask__<id>`): it waits with the Gate the node
+ * opened. A stop can end the Gate's step before the Gate was checkpointed.
+ * Then the node asks again in a new visit, unless `letGo` says otherwise.
+ */
+export function gateNode(
+	node: { id: string },
+	ctx: Pick<StepContext, "log" | "run">,
+	spec: {
+		answer: GateSpec["answer"];
+		letGo?(pending: PendingGate): Command | Promise<Command>;
+	},
+): NodeAction {
+	return interruptNode({
+		kind: "gate",
+		nodeId: node.id,
+		missing: `No Gate is open at node "${node.id}".`,
+		value: (pending) => ({
+			kind: "gate",
+			stepId: pending.stepId,
+			nodeId: node.id,
+			question: pending.question,
+			choices: pending.choices,
+			...(pending.deadline ? { deadline: pending.deadline } : {}),
+		}),
+		answer: spec.answer,
+		stale: { ctx, letGo: spec.letGo ?? (() => askAgain(node)) },
+	});
 }

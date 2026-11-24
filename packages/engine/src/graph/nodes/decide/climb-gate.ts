@@ -1,4 +1,4 @@
-import { Command, type LangGraphRunnableConfig } from "@langchain/langgraph";
+import type { Command, LangGraphRunnableConfig } from "@langchain/langgraph";
 import type { CascadeNode, PersonTier } from "@nightshift/flows";
 import type { GateChoice } from "../../../log";
 import {
@@ -10,7 +10,7 @@ import {
 	tryAgain,
 } from "../../cascade";
 import type { NodeAction, StepContext } from "../../context";
-import { interruptNode, route } from "../../route";
+import { askAgain, gateNode, route } from "../../route";
 
 import type {
 	CascadeTry,
@@ -100,31 +100,11 @@ export async function answerRetryGate(
 	return climbCommand(node, end, tryAgain(node, climbAt(state, node), note));
 }
 
-/** The node opens its person tier's Gate again, in a new visit. */
-function askAgain(node: CascadeNode): Command {
-	return new Command({
-		update: { pending: { [node.id]: null } },
-		goto: node.id,
-	});
-}
-
 /** The ask node of a Call whose cascade ends with a person (`ask__<id>`). */
 export function climbAskNode(node: CascadeNode, ctx: StepContext): NodeAction {
-	return interruptNode({
-		kind: "gate",
-		nodeId: node.id,
-		missing: `No Gate is open at node "${node.id}".`,
-		value: (pending) => ({
-			kind: "gate",
-			stepId: pending.stepId,
-			nodeId: node.id,
-			question: pending.question,
-			choices: pending.choices,
-			...(pending.deadline ? { deadline: pending.deadline } : {}),
-		}),
+	return gateNode(node, ctx, {
 		answer: (pending, answer, state, config) =>
 			answerRetryGate(ctx, node, pending, answer, state, config),
-		stale: { ctx, letGo: () => askAgain(node) },
 	});
 }
 

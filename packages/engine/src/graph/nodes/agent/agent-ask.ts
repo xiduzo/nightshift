@@ -7,7 +7,13 @@ import {
 	type StepContext,
 } from "../../context";
 import { commitVisit } from "../../position";
-import { interruptNode, parkCommand, route, type StepEnd } from "../../route";
+import {
+	askAgain,
+	gateNode,
+	parkCommand,
+	route,
+	type StepEnd,
+} from "../../route";
 import type { PendingGate, PendingParked, RunStateUpdate } from "../../state";
 import { beginStep, resumePromptOf, scoreGate, sessionOf } from "../../step";
 
@@ -38,18 +44,7 @@ import { answerRetryGate } from "../decide";
  *   the run parks as stopped on the step, and a resume goes on as above.
  */
 export function agentAskNode(node: AgentNode, ctx: StepContext): NodeAction {
-	return interruptNode({
-		kind: "gate",
-		nodeId: node.id,
-		missing: `No Gate is open at node "${node.id}".`,
-		value: (pending) => ({
-			kind: "gate",
-			stepId: pending.stepId,
-			nodeId: node.id,
-			question: pending.question,
-			choices: pending.choices,
-			...(pending.deadline ? { deadline: pending.deadline } : {}),
-		}),
+	return gateNode(node, ctx, {
 		async answer(pending, answer, state, config) {
 			// The person tier of a cascade (ADR 6): try again, or stop.
 			if (pending.climb) {
@@ -88,16 +83,8 @@ export function agentAskNode(node: AgentNode, ctx: StepContext): NodeAction {
 			};
 			return new Command({ update: { pending: asked }, goto: node.id });
 		},
-		stale: {
-			ctx,
-			letGo: (pending) =>
-				pending.climb
-					? new Command({
-							update: { pending: { [node.id]: null } },
-							goto: node.id,
-						})
-					: parkOnStep(ctx, node, pending),
-		},
+		letGo: (pending) =>
+			pending.climb ? askAgain(node) : parkOnStep(ctx, node, pending),
 	});
 }
 

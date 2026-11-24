@@ -4,7 +4,7 @@ import { now } from "@nightshift/time";
 import type { ComputerAccess } from "../../access";
 import type { Actor } from "../../contract";
 import { HARNESS_BIN, type SettingsStore } from "../../settings";
-import type { AgentSetupView } from "../domain/agent-status";
+import { type AgentSetupView, agentIn } from "../domain/agent-status";
 import { type AgentJobs, refuseAgentBusy } from "../domain/setup-jobs";
 import {
 	allowedSetup,
@@ -43,13 +43,7 @@ export const installAgent =
 		request: { harness: HarnessName; here: boolean },
 	): AgentSetupView => {
 		ports.computerAccess.openComputer(actor);
-		const setup = allowedSetup(
-			request.here,
-			ports.here,
-			(h) => ports.catalog.of(h),
-			(h) => ports.catalog.label(h),
-			request.harness,
-		);
+		const setup = allowedSetup(request, ports.here, ports.catalog);
 		const label = ports.catalog.label(request.harness);
 		refuseAgentBusy(ports.jobs.busy(request.harness), label);
 		if (ports.programs.where("curl") === null) {
@@ -84,7 +78,10 @@ export const installAgent =
 				at: now(),
 			});
 		}
-		return agentOf(ports, actor, request.harness);
+		return agentIn(
+			readAgentSetup(ports)(actor, { here: true }),
+			request.harness,
+		);
 	};
 
 async function finishInstall(
@@ -125,16 +122,4 @@ async function finishInstall(
 					at: now(),
 				},
 	);
-}
-
-function agentOf(
-	ports: InstallAgentPorts,
-	actor: Actor,
-	harness: HarnessName,
-): AgentSetupView {
-	const agent = readAgentSetup(ports)(actor, { here: true }).agents.find(
-		(row) => row.harness === harness,
-	);
-	if (!agent) throw new Error(`No setup for ${harness}.`);
-	return agent;
 }

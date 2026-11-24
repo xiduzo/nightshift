@@ -76,18 +76,19 @@ export type RunningSignIn = {
 
 /** The setup of `harness`, when it can act now for this request. Refuses otherwise. */
 export function allowedSetup(
-	here: boolean,
+	{ here, harness }: { here: boolean; harness: HarnessName },
 	place: SetupPlace,
-	of: (harness: HarnessName) => SetupFacts | null,
-	label: (harness: HarnessName) => string,
-	harness: HarnessName,
+	catalog: {
+		of(harness: HarnessName): SetupFacts | null;
+		label(harness: HarnessName): string;
+	},
 ): SetupFacts {
 	refuseBlocked(here, place, AGENT_BLOCKED);
-	const setup = of(harness);
+	const setup = catalog.of(harness);
 	if (!setup) {
 		throw new Refusal(
 			"invalid",
-			`Night Shift cannot install ${label(harness)} for you. Install it yourself, then add it.`,
+			`Night Shift cannot install ${catalog.label(harness)} for you. Install it yourself, then add it.`,
 		);
 	}
 	return setup;

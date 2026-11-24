@@ -20,8 +20,9 @@ import { messageOf, type NodeAction, type StepContext } from "../../../context";
 import type { DoneStep } from "../../../position";
 
 import {
+	askAgain,
 	askNodeId,
-	interruptNode,
+	gateNode,
 	route,
 	routeDone,
 	type StepEnd,
@@ -168,41 +169,15 @@ export function gateChooser(
 	};
 }
 
-/** The ask node of a Gate (`interruptNode`): interrupts with the Gate the node opened and ends the step on the answer. */
+/** The ask node of a Gate (`gateNode`): interrupts with the Gate the node opened and ends the step on the answer. */
 export function gateAskNode(node: DecisionNode, ctx: StepContext): NodeAction {
-	return interruptNode({
-		kind: "gate",
-		nodeId: node.id,
-		missing: `No Gate is open at node "${node.id}".`,
-		value: (pending) => ({
-			kind: "gate",
-			stepId: pending.stepId,
-			nodeId: node.id,
-			question: pending.question,
-			choices: pending.choices,
-			...(pending.deadline ? { deadline: pending.deadline } : {}),
-		}),
+	return gateNode(node, ctx, {
 		async answer(pending, answer, state, config) {
-			if (answer?.kind !== "gate") {
-				// A reopen, or anything else: the node asks again in a new visit.
-				return new Command({
-					update: { pending: { [node.id]: null } },
-					goto: node.id,
-				});
-			}
+			// A reopen, or anything else: the node asks again in a new visit.
+			if (answer?.kind !== "gate") return askAgain(node);
 			const done = await resolve(ctx, node, state, config, pending, answer);
 			if (done.kind === "parked") return done.command;
 			return route(ctx, state, node, done.end, config);
-		},
-		// A stop ended the Gate's step before the Gate was checkpointed: the
-		// node asks again in a new visit, as a reopen does.
-		stale: {
-			ctx,
-			letGo: () =>
-				new Command({
-					update: { pending: { [node.id]: null } },
-					goto: node.id,
-				}),
 		},
 	});
 }
