@@ -14,6 +14,9 @@ export const PACKAGE_AGENTS: Record<string, Place> = {
 	// and PATH helpers for agent bins (O1, decision 98).
 	"harness-drivers": M,
 	knowledge: "knowledge",
+	// The one HTTP listener on 127.0.0.1 behind the tool bridge and the
+	// page reader of a step: a path and a token per route, and it heals.
+	loopback: M,
 	// The contract between the engine and a harness or a decider.
 	port: M,
 	// What a session or a model call cost, from a price list.

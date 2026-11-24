@@ -139,6 +139,30 @@ describe("shared tool bridge", () => {
 		expect(response.status).toBe(200);
 	});
 
+	test("a dead listener opens again on its own while a session is open", async () => {
+		const a = await provision();
+		toolBridgeState().server?.stop(true);
+		expect(await call(a, "echo").catch(() => "down")).toBe("down");
+
+		let status: number | undefined;
+		for (let tries = 0; status === undefined && tries < 100; tries += 1) {
+			await Bun.sleep(100);
+			status = await call(a, "echo").then(
+				(response) => response.status,
+				() => undefined,
+			);
+		}
+		expect(status).toBe(200);
+	}, 15_000);
+
+	test("a path of no session is not found", async () => {
+		const a = await provision();
+		const url = new URL("/elsewhere", a.url).href;
+		const response = await post({ ...a, url }, { jsonrpc: "2.0", id: 1 });
+		expect(response.status).toBe(404);
+		expect(await response.json()).toMatchObject({ error: { code: -32601 } });
+	});
+
 	test("a Docker sandbox keeps the default per-session bridge", async () => {
 		const shared = await provision();
 		const docker = await provision("echo", "docker");

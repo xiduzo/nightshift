@@ -7,6 +7,7 @@
 		"./knowledge": "./src/knowledge/index.ts",
 		"./pricing": "./src/pricing/index.ts",
 		"./tools": "./src/tools/index.ts",
+		"./loopback": "./src/loopback/index.ts",
 		"./types": "./src/port/index.ts",
 		"./testing": "./src/testing/index.ts"
 	},
