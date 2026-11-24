@@ -38,12 +38,6 @@ export type McpToolCall = {
 	isError: boolean;
 };
 
-/** An open client; `close` is safe to call twice. */
-export type McpSession = {
-	client: Client;
-	close(): Promise<void>;
-};
-
 async function transportFor(config: McpServerConfig) {
 	if ("command" in config) {
 		const { getDefaultEnvironment, StdioClientTransport } = await import(
@@ -116,21 +110,6 @@ export async function withMcpClient<T>(
 		if (onAbort) options.signal?.removeEventListener("abort", onAbort);
 		await client.close().catch(() => {});
 	}
-}
-
-/** `tools/list` of one server: each tool's name, description and input schema. */
-export async function listMcpTools(
-	config: McpServerConfig,
-	options: { timeoutMs?: number; signal?: AbortSignal } = {},
-): Promise<McpToolInfo[]> {
-	return withMcpClient(
-		config,
-		async (client) => {
-			const { tools } = await client.listTools();
-			return tools.map(toolInfo);
-		},
-		options,
-	);
 }
 
 export function toolInfo(tool: {

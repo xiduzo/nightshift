@@ -121,8 +121,6 @@ export type PullRequestScoresDeps = {
 	usage?: UsageNotes;
 };
 
-export type PullRequestScores = ReturnType<typeof createPullRequestScores>;
-
 /**
  * Writes one pull request score and notes the hours from when the run
  * opened it (or from when the run started) to `outcomeAt`.

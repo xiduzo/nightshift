@@ -283,9 +283,6 @@ export function createWorktreeSnapshots(
 	return { snapshotTree, treeChanges };
 }
 
-/** The operations on snapshots of worktrees (`createWorktreeSnapshots`). */
-export type WorktreeSnapshots = ReturnType<typeof createWorktreeSnapshots>;
-
 const STATUS: Record<string, WorktreeFileChange["status"]> = {
 	A: "added",
 	C: "added",

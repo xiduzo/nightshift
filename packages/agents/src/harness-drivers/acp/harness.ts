@@ -22,7 +22,6 @@ import {
 	type AgentHarness,
 	type AgentSessionInput,
 	type Effort,
-	type HarnessName,
 	type PermissionMode,
 	shellQuoteAlways,
 } from "../../port";
@@ -129,9 +128,6 @@ export const ACP_AGENTS: Record<AcpAgentName, AcpAgent> = {
 		readOnly: piReadOnly,
 	},
 };
-
-export const isAcpAgent = (name: HarnessName): name is AcpAgentName =>
-	Object.hasOwn(ACP_AGENTS, name);
 
 /**
  * The adapter's ACP policy for a permission mode. Night Shift's own tools

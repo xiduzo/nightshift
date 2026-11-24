@@ -184,6 +184,3 @@ export function drizzleMembershipRecord(db: Database): MembershipRecord {
 		},
 	};
 }
-
-/** @deprecated Prefer drizzleMembershipRecord. Kept for old call sites during the move. */
-export const membershipRecord = drizzleMembershipRecord;

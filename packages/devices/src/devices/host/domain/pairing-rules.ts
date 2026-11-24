@@ -1,9 +1,6 @@
 import { Refusal } from "@nightshift/refusal";
 import { SELF_PAIR, twinOnlineWords } from "./words";
 
-/** This Host's own Device id, as pairing compares it. */
-export type HostSelf = { id: string; name: string };
-
 /**
  * A computer cannot pair with itself: the joining Device id is this
  * Host's own.

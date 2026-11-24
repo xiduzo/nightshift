@@ -56,8 +56,6 @@ const ERROR_LINE = /level=(ERROR|FATAL)|\bpanic:|^Error:|\bfatal error\b/i;
 /** The prefix of each line the child writes to the log. */
 const PREFIX = "[ollama]";
 
-export type OllamaStarter = ReturnType<typeof createOllamaStarter>;
-
 export function createOllamaStarter(options: OllamaStarterOptions) {
 	const {
 		binary,

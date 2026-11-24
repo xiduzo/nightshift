@@ -17,8 +17,6 @@ export type OllamaPull = {
 	running: boolean;
 };
 
-export type OllamaPulls = ReturnType<typeof createOllamaPulls>;
-
 export function createOllamaPulls(options: {
 	/** A client for the Ollama to download into. */
 	client: () => Promise<Ollama>;

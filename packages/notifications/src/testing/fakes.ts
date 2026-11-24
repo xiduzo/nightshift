@@ -3,56 +3,13 @@ import type {
 	ScheduleMissed,
 	SevereTurn,
 } from "@nightshift/engine";
-import type {
-	NotificationChannel,
-	NotificationMessage,
-	PushTarget,
-	SendResult,
-	VapidKeys,
-	WebPushSender,
-} from "../channels";
+import type { VapidKeys, WebPushSender } from "../channels";
 // What a push service gets: only the fake reads it, past the barrel.
 import type { WebPushPayload, WebPushRequest } from "../channels/web-push";
 import type { RunEventSource } from "../notifications/notifier";
 // The shapes the notifier reads of a run and a Gate: only the fakes set them, past the barrel.
 import type { RunRef } from "../notifications/notifier/domain/facts";
 import type { OpenGateRef } from "../notifications/notifier/domain/gate-tracker";
-
-/** What a fake channel got, in order. */
-export type ChannelCall =
-	| { call: "send"; targetId: string; message: NotificationMessage }
-	| { call: "withdraw"; targetId: string; key: string };
-
-export type FakeChannel = NotificationChannel<PushTarget> & {
-	calls: ChannelCall[];
-	/** The messages sent, in order. */
-	sent(): NotificationMessage[];
-	/** The keys withdrawn, in order. */
-	withdrawn(): string[];
-	/** From now on, a send to this target answers that its service lost it. */
-	lose(targetId: string): void;
-};
-
-/** A push channel that records each call and reaches nothing. */
-export function fakeChannel(): FakeChannel {
-	const calls: ChannelCall[] = [];
-	const lost = new Set<string>();
-	return {
-		calls,
-		async send(target, message): Promise<SendResult> {
-			if (lost.has(target.id)) return "gone";
-			calls.push({ call: "send", targetId: target.id, message });
-			return "sent";
-		},
-		async withdraw(target, key) {
-			calls.push({ call: "withdraw", targetId: target.id, key });
-		},
-		sent: () => calls.flatMap((c) => (c.call === "send" ? [c.message] : [])),
-		withdrawn: () =>
-			calls.flatMap((c) => (c.call === "withdraw" ? [c.key] : [])),
-		lose: (targetId) => lost.add(targetId),
-	};
-}
 
 export type FakeRunEvents = {
 	source: RunEventSource;

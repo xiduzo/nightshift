@@ -2,10 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { BUILTIN_AGENTS } from "@nightshift/flows";
 import {
 	BUILTIN_TOOLS,
-	BUILTIN_TOP_TIER,
 	TOOL_TIERS,
 	toolAnnotations,
-	withinTier,
 } from "../../catalog/domain/builtin-tools";
 import { AUTHORING_TOOLS } from "../../domain/authoring";
 import { RUN_TOOLS } from "../../domain/terminal-runs";
@@ -28,9 +26,7 @@ describe("the tiers of the tools", () => {
 	test("a built-in agent lists only tools that exist, at most at the propose tier", () => {
 		for (const { id } of BUILTIN_AGENTS) {
 			for (const name of BUILTIN_TOOLS[id]) {
-				const tier = TOOL_TIERS[name];
-				expect(tier).toBeDefined();
-				if (tier) expect(withinTier(tier, BUILTIN_TOP_TIER)).toBe(true);
+				expect(["read", "propose"]).toContain(TOOL_TIERS[name] as string);
 			}
 		}
 	});

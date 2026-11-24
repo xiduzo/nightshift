@@ -17,7 +17,6 @@ import { NIGHT_SHIFT } from "../contract";
 import {
 	type DeviceDocument,
 	deviceDocumentName,
-	deviceFacts,
 	refreshDeviceFacts,
 	setDeviceFacts,
 } from "../documents/device-document";
@@ -284,7 +283,7 @@ describe("facts", () => {
 			checkedAt: 10,
 		});
 		await setDeviceFacts(document, { programs: ["gh", "git"], checkedAt: 20 });
-		expect(deviceFacts(document)).toMatchObject({
+		expect(document.facts.toJSON()).toMatchObject({
 			platform: "darwin",
 			programs: ["gh", "git"],
 			checkedAt: 10,
@@ -293,7 +292,7 @@ describe("facts", () => {
 		const { connections } = stores(document);
 		await connections.setSecret("TRACKER_TOKEN", "value");
 		const again = await sandbox.openDocument();
-		expect(deviceFacts(again)).toMatchObject({
+		expect(again.facts.toJSON()).toMatchObject({
 			secrets: [{ name: "TRACKER_TOKEN", setAt: expect.any(Number) }],
 			clones: [{ projectId: "p1", path: "/code/app" }],
 		});
@@ -319,7 +318,7 @@ describe("facts", () => {
 			harnesses: () => ({ "claude-code": "/bin/claude", codex: null }),
 			programs: async () => ["gh", "git"],
 		});
-		expect(deviceFacts(document)).toMatchObject({
+		expect(document.facts.toJSON()).toMatchObject({
 			name: "LE2316",
 			platform: process.platform,
 			harnesses: { "claude-code": "/bin/claude", codex: null },

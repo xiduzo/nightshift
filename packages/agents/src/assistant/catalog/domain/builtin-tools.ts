@@ -78,16 +78,6 @@ export const BUILTIN_TOOLS: Record<BuiltinAgentId, readonly string[]> = {
 	"brief-writer": [],
 };
 
-/** The highest tier a built-in agent may hold. */
-export const BUILTIN_TOP_TIER: ToolTier = "propose";
-
-const ORDER: readonly ToolTier[] = ["read", "propose", "act"];
-
-/** Whether `tier` is at most `top`. */
-export function withinTier(tier: ToolTier, top: ToolTier): boolean {
-	return ORDER.indexOf(tier) <= ORDER.indexOf(top);
-}
-
 /** The tools of `tools` that the agent `id` lists, in the order of `tools`. */
 export function toolsOf<T extends { name: string }>(
 	id: BuiltinAgentId,

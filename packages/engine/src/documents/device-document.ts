@@ -226,11 +226,6 @@ export async function refreshDeviceFacts(options: {
 	});
 }
 
-/** The facts as the Owner last wrote them. A fact not written yet is missing. */
-export function deviceFacts(document: DeviceDocument): Partial<DeviceFacts> {
-	return document.facts.toJSON() as Partial<DeviceFacts>;
-}
-
 function safeJson(text: string): unknown {
 	try {
 		return JSON.parse(text);

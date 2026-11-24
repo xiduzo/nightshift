@@ -93,26 +93,3 @@ export function personFieldTypes(): ReadonlyMap<string, EngineEventType[]> {
 	}
 	return found;
 }
-
-/**
- * The payload with each Person it names replaced by `persons`' id for
- * them. A Person `persons` does not name, and every other field, stays.
- * A type this Night Shift does not know (an event of a newer one) has
- * no field to rewrite.
- */
-export function rewritePersonFields<T extends EngineEventType>(
-	type: T,
-	payload: EnginePayloads[T],
-	persons: Readonly<Record<string, string>>,
-): EnginePayloads[T] {
-	const fields: readonly string[] =
-		(PERSON_FIELDS as Partial<Record<string, readonly string[]>>)[type] ?? [];
-	let rewritten: Record<string, unknown> | null = null;
-	for (const field of fields) {
-		const value = (payload as Record<string, unknown>)[field];
-		if (typeof value !== "string" || !Object.hasOwn(persons, value)) continue;
-		rewritten ??= { ...payload };
-		rewritten[field] = persons[value];
-	}
-	return (rewritten ?? payload) as EnginePayloads[T];
-}

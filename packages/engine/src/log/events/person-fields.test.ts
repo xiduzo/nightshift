@@ -1,14 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import type { EngineEventType, EnginePayloads } from "./events";
-import {
-	PERSON_FIELDS,
-	personFieldTypes,
-	rewritePersonFields,
-} from "./person-fields";
+import { PERSON_FIELDS, personFieldTypes } from "./person-fields";
 
-/** The Person on the Replica the rows come from, and the same Person where they go. */
+/** The Person of every sample. */
 const LOCAL = "ada";
-const HOSTED = "ada-on-host";
 
 const usage = { inputTokens: 1, outputTokens: 2 };
 const item = { id: "i1", title: "Item", url: null, value: 1 };
@@ -199,52 +194,16 @@ const samples: { [T in EngineEventType]: EnginePayloads[T] } = {
 	},
 };
 
-const count = (text: string, value: string) =>
-	text.split(JSON.stringify(value)).length - 1;
-
 describe("person fields", () => {
 	for (const type of Object.keys(samples) as EngineEventType[]) {
-		test(`${type}: every Person it names takes the id of the place it moves to`, () => {
-			const payload = samples[type];
-			const rewritten = JSON.stringify(
-				rewritePersonFields(type, payload, { [LOCAL]: HOSTED }),
-			);
-			expect(count(rewritten, LOCAL)).toBe(0);
-			expect(count(rewritten, HOSTED)).toBe(PERSON_FIELDS[type].length);
-			expect(count(JSON.stringify(payload), LOCAL)).toBe(
-				PERSON_FIELDS[type].length,
-			);
+		test(`${type}: the fields that hold a Person are the listed ones`, () => {
+			const named = Object.entries(samples[type])
+				.filter(([, value]) => value === LOCAL)
+				.map(([field]) => field);
+			const listed: string[] = [...PERSON_FIELDS[type]];
+			expect(named.sort()).toEqual(listed.sort());
 		});
 	}
-
-	test("a Person the map does not name, and the payload itself, stay as they were", () => {
-		const payload = samples.MemberJoined;
-		const same = rewritePersonFields("MemberJoined", payload, {
-			grace: "grace-on-host",
-		});
-		expect(same).toBe(payload);
-		const rewritten = rewritePersonFields("MemberJoined", payload, {
-			[LOCAL]: HOSTED,
-		});
-		expect(rewritten).not.toBe(payload);
-		expect(payload.personId).toBe(LOCAL);
-	});
-
-	test("a field of words is no Person, even when a Person has that id", () => {
-		const rewritten = rewritePersonFields("RunResumed", samples.RunResumed, {
-			person: HOSTED,
-		});
-		expect(rewritten.by).toBe("person");
-	});
-
-	test("an event of a newer Night Shift has no field to rewrite", () => {
-		const payload = { by: LOCAL } as never;
-		expect(
-			rewritePersonFields("Unknown" as EngineEventType, payload, {
-				[LOCAL]: HOSTED,
-			}),
-		).toBe(payload);
-	});
 
 	test("each field names the event types that have it", () => {
 		const fields = personFieldTypes();

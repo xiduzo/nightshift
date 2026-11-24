@@ -25,15 +25,3 @@ export function fsDatabaseCopy(db: Database): DatabaseCopy {
 		},
 	};
 }
-
-/**
- * @deprecated Prefer fsDatabaseCopy(db).copy(...). Kept for old call sites.
- */
-export async function backupDatabase(
-	db: Database,
-	dataDir: string,
-	at: number,
-	before: "personal-merge" | "leaving-host" = "personal-merge",
-): Promise<string> {
-	return fsDatabaseCopy(db).copy(dataDir, at, before);
-}

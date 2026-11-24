@@ -200,9 +200,6 @@ type PayloadOf<K extends RunCommandKind> = Extract<
 	{ kind: K }
 >["payload"];
 
-/** An answer to a Gate, on its way to the Walker. Named, so the declared types stay small. */
-export type GateResolvePayload = PayloadOf<"gate.resolve">;
-
 /** Whether `kind` names a Command (the wire's words) and not an action (the person's). */
 function isCommandKind(kind: string): kind is RunCommandKind {
 	return kind in ACTION_OF;

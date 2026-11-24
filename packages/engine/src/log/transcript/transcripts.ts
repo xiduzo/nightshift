@@ -176,5 +176,3 @@ export function openTranscriptWriter(path: string) {
 		},
 	};
 }
-
-export type TranscriptWriter = ReturnType<typeof openTranscriptWriter>;

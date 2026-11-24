@@ -143,5 +143,3 @@ function variablesNode(flow: Flow, ctx: StepContext) {
 		});
 	};
 }
-
-export type FlowGraph = ReturnType<typeof compileFlow>;

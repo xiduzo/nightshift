@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
+import type { Client } from "@modelcontextprotocol/client";
 import type { McpServerConfig } from "../port/types";
 import { fixturePath } from "../testing";
-import { callMcpTool, listMcpTools, toolInfo, withMcpClient } from "./mcp";
+import { callMcpTool, toolInfo, withMcpClient } from "./mcp";
 import { testMcpServer } from "./mcp-test";
 
 /** The shared MCP client against the fake stdio server in `testing/fixtures/fake-mcp.ts`. */
@@ -13,6 +14,10 @@ export const fakeMcpConfig = (
 	args: [fixturePath("fake-mcp.ts")],
 	env,
 });
+
+/** The tools of the server, as Night Shift keeps them. */
+const listed = async (client: Client) =>
+	(await client.listTools()).tools.map(toolInfo);
 
 describe("toolInfo", () => {
 	test("keeps the shape of the tool's answer when the server gives one", () => {
@@ -28,7 +33,7 @@ describe("toolInfo", () => {
 
 describe("the MCP client", () => {
 	test("lists the tools with their input schemas", async () => {
-		const tools = await listMcpTools(fakeMcpConfig());
+		const tools = await withMcpClient(fakeMcpConfig(), listed);
 		const create = tools.find((t) => t.name === "create_issue");
 		expect(create?.description).toBe("Creates an issue and returns it.");
 		expect(create?.inputSchema).toMatchObject({
@@ -105,8 +110,9 @@ describe("the MCP client", () => {
 
 	test("a server that cannot start is an error, not a hang", async () => {
 		await expect(
-			listMcpTools(
+			withMcpClient(
 				{ command: "/nonexistent/mcp-server", args: [], env: {} },
+				listed,
 				{ timeoutMs: 2_000 },
 			),
 		).rejects.toThrow();
