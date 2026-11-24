@@ -205,3 +205,12 @@ Each entry names its source. "Read" means found by reading and not reproduced.
 - Lines go up, as the plan said. The gain is that a rule has one place and a test.
 - Next: tests at the daemon for the wiring of the checks. Until then no door check goes.
 - The web still offers these five controls to a viewer, who then gets an error message.
+
+### W. Tests for the wiring of the checks, and controls by role (7009aca47, 9cb0a0a9c)
+
+- One table test over the real daemon asks 18 services as a stranger and as the owner. 26 of
+  26 mutants on the wiring are red.
+- The web disables the five controls for a viewer, with the rule that the flow route uses.
+  11 of 12 mutants are red. The last is a dialog that a viewer cannot open.
+- Not seen in a browser. New flow, Import, Delete flow, Save in the editor, project Rename,
+  Move and Remove, and Copy from GitHub are still enabled for a viewer.
