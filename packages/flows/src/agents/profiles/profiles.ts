@@ -1,13 +1,11 @@
 import { z } from "zod";
 import {
-	type Flow,
 	type FlowNode,
 	hasCascade,
 	lastModelTier,
 	nodeProfiles,
 	profileOf,
 	tierUsers,
-	withTierNode,
 } from "../../flow";
 import {
 	type AgentHarnessName,
@@ -302,54 +300,6 @@ export function resolveNodeProfile(
 		};
 	}
 	return { node: resolved };
-}
-
-/**
- * Resolves the profiles of every node of a flow that names one. `missing`
- * collects the profile names it could not find, with their nodes, and
- * `problems` the profiles that do not fit their node; those nodes stay as
- * they are.
- */
-export function resolveFlowProfiles(
-	flow: Flow,
-	profileFor: (profile: NodeProfile) => ProfileSettings | null,
-	missing: Map<string, string[]> = new Map(),
-	problems: string[] = [],
-): Flow {
-	let changed = false;
-	const resolveOne = (node: FlowNode, id: string): FlowNode => {
-		const named = profileOf(node);
-		if (named === undefined) return node;
-		const name = profileLabel(named);
-		const profile = profileFor(named);
-		if (!profile) {
-			const ids = missing.get(name) ?? [];
-			if (!ids.includes(id)) ids.push(id);
-			missing.set(name, ids);
-			return node;
-		}
-		const resolved = resolveNodeProfile(node, profile);
-		if ("problem" in resolved) {
-			problems.push(resolved.problem);
-			return node;
-		}
-		changed = true;
-		return resolved.node;
-	};
-	const nodes = flow.nodes.map((node) => {
-		if (!hasCascade(node)) return resolveOne(node, node.id);
-		let climbing: FlowNode = node;
-		for (const tier of tierUsers(node)) {
-			const resolved = resolveOne(tier.node, node.id);
-			if (resolved !== tier.node) {
-				climbing = withTierNode(climbing, tier.index, resolved);
-			}
-		}
-		const problem = cascadeProblem(climbing);
-		if (problem !== null) problems.push(problem);
-		return climbing;
-	});
-	return changed ? { ...flow, nodes } : flow;
 }
 
 /** The node's run settings, or null when a harness, model or permission mode is missing. */

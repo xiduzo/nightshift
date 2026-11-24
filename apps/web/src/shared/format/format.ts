@@ -38,13 +38,6 @@ function noCostYet(step: {
 	return step.endedAt === null && step.costCalls === 0;
 }
 
-/** A step's cost: "—" while it runs and has not reported any spend yet. */
-export function formatStepCost(
-	step: KnownCost & { endedAt: number | null; costCalls: number },
-): string {
-	return noCostYet(step) ? "—" : formatKnownCost(step);
-}
-
 /**
  * A step's tokens and cost together: "12.3K tokens · $0.0412". "—" while
  * it runs and has reported neither yet.

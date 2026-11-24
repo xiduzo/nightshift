@@ -1,4 +1,3 @@
-import { tokensLabel, type UsageTokens } from "@nightshift/client";
 import {
 	Tooltip,
 	TooltipContent,
@@ -38,29 +37,5 @@ export function CostText({
 			</TooltipTrigger>
 			<TooltipContent>{note}</TooltipContent>
 		</Tooltip>
-	);
-}
-
-/** A cost with the tokens that made it, when any were used. */
-export function CostWithTokens({
-	cost,
-	tokens,
-	className,
-}: {
-	cost: KnownCost;
-	tokens?: UsageTokens | number | null;
-	className?: string;
-}) {
-	const used = tokensLabel(tokens);
-	return (
-		<span className={cn("inline-flex items-baseline gap-1", className)}>
-			{used ? (
-				<>
-					<span>{used}</span>
-					<span aria-hidden="true">·</span>
-				</>
-			) : null}
-			<CostText cost={cost} />
-		</span>
 	);
 }

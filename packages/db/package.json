@@ -11,7 +11,6 @@
 		"build": "tsc -b",
 		"check-types": "tsc -b",
 		"test": "bun test",
-		"db:local": "turso dev --db-file local.db",
 		"db:push": "NIGHTSHIFT_DEV=true drizzle-kit push",
 		"db:generate": "drizzle-kit generate",
 		"db:migrate:deploy": "drizzle-kit migrate",

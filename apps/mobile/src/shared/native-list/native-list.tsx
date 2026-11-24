@@ -28,7 +28,6 @@ import {
 	font,
 	foregroundStyle,
 	keyboardType,
-	labelsHidden,
 	lineLimit,
 	listStyle,
 	multilineTextAlignment,
@@ -519,6 +518,3 @@ export function NativeTextFieldRow({
 		</LabeledContent>
 	);
 }
-
-/** Keeps a label off screen for pickers that sit in a row of their own. */
-export const HIDE_LABELS = labelsHidden;

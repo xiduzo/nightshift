@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test";
 import {
 	costNote,
 	formatKnownCost,
-	formatStepCost,
+	formatStepUsage,
 	sumKnownCost,
 } from "./format";
 
@@ -34,11 +34,11 @@ describe("a cost that may be partly unknown", () => {
 
 	test("a running step shows its spend so far, or a dash before it has any", () => {
 		const running = { costUsd: 0, endedAt: null, costCalls: 0 };
-		expect(formatStepCost(running)).toBe("—");
-		expect(formatStepCost({ ...running, costUsd: 0.12, costCalls: 1 })).toBe(
+		expect(formatStepUsage(running)).toBe("—");
+		expect(formatStepUsage({ ...running, costUsd: 0.12, costCalls: 1 })).toBe(
 			"$0.12",
 		);
 		// An ended step that never asked a model cost nothing.
-		expect(formatStepCost({ ...running, endedAt: 1 })).toBe("$0.00");
+		expect(formatStepUsage({ ...running, endedAt: 1 })).toBe("$0.00");
 	});
 });

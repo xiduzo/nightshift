@@ -70,7 +70,6 @@
 		"db:studio": "turbo run db:studio -F @nightshift/db --",
 		"db:generate": "turbo run db:generate -F @nightshift/db --",
 		"db:migrate": "turbo run db:migrate -F @nightshift/db --",
-		"db:local": "turbo run db:local -F @nightshift/db --",
 		"env:generate": "varlock codegen --path ./apps/web/ && varlock codegen --path ./apps/server/ && varlock codegen --path ./apps/mobile/ && varlock codegen --path ./packages/db/",
 		"postinstall": "varlock codegen --path ./apps/web/ && varlock codegen --path ./apps/server/ && varlock codegen --path ./apps/mobile/ && varlock codegen --path ./packages/db/",
 		"auth:generate": "cd apps/server && bun run auth:generate",

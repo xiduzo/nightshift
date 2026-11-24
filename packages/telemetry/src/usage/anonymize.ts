@@ -18,12 +18,6 @@ export function secondsOf(ms: number): number {
 	return Math.max(0, Math.round(ms / 1000));
 }
 
-/** US dollars rounded to whole cents. */
-export function centsOf(usd: number): number {
-	if (!Number.isFinite(usd)) return 0;
-	return Math.round(usd * 100) / 100;
-}
-
 /**
  * Hours from a duration. The seconds are whole first, then the hours may
  * be a fraction.

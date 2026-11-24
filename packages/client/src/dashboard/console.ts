@@ -63,15 +63,6 @@ export const CONSOLE_METRICS: readonly {
 	},
 ];
 
-export type ConsoleValues = Record<ConsoleMetric, number | null>;
-
-/** The value of each metric over a period or a day. */
-export function consoleValues(totals: Totals): ConsoleValues {
-	return Object.fromEntries(
-		CONSOLE_METRICS.map((metric) => [metric.key, metric.of(totals)]),
-	) as ConsoleValues;
-}
-
 /** The part of the dashboard's numbers a range of days picks. */
 export function daysOf(
 	summary: DashboardSummary,

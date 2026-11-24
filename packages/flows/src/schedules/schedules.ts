@@ -100,7 +100,6 @@ export const scheduleWebhookSchema = z.object({
 	secret: webhookSecretSchema,
 	when: z.string().trim().min(1).optional(),
 });
-export type ScheduleWebhook = z.infer<typeof scheduleWebhookSchema>;
 
 /**
  * The signal a webhook sends to the project's runs: each run whose Wait
@@ -112,7 +111,6 @@ export const scheduleSignalSchema = z.object({
 	name: labelSchema,
 	key: z.string().trim().min(1).optional(),
 });
-export type ScheduleSignal = z.infer<typeof scheduleSignalSchema>;
 
 export const scheduleSchema = z.object({
 	id: scheduleIdSchema,
@@ -185,9 +183,6 @@ export const schedulesFileSchema = z.object({
 });
 
 export type Schedule = z.infer<typeof scheduleSchema>;
-/** What a schedule holds before defaults apply. */
-export type ScheduleInput = z.input<typeof scheduleSchema>;
-export type SchedulesFile = z.infer<typeof schedulesFileSchema>;
 
 /** One problem in the schedules file. A schedule with an error does not start. */
 export type ScheduleIssue = {

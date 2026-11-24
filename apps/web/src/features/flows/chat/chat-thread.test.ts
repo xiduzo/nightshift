@@ -7,7 +7,6 @@ import {
 	chatRequest,
 	EMPTY_THREAD,
 	endAnswer,
-	openProposal,
 	readThread,
 	restorePoint,
 	setProposalStatus,
@@ -75,9 +74,11 @@ describe("a chat answer", () => {
 				usage: { inputTokens: 1, outputTokens: 2, costUsd: 0.01 },
 			},
 		]);
-		expect(openProposal(thread)?.id).toBe("1:agent");
 		const applied = setProposalStatus(thread, "1:agent", "applied");
-		expect(openProposal(applied)).toBeUndefined();
+		expect(applied.messages.at(-1)).toMatchObject({
+			id: "1:agent",
+			proposal: { status: "applied" },
+		});
 	});
 
 	test("an error event, a broken stream and a stop end the answer", () => {
@@ -260,9 +261,8 @@ describe("Undo after Apply", () => {
 	test("opens the proposal again", () => {
 		const shown = applyChatEvent(asked, { type: "proposal", proposal }, "B");
 		const applied = setProposalStatus(shown, "1:agent", "applied");
-		expect(openProposal(applied)).toBeUndefined();
 		const undone = setProposalStatus(applied, "1:agent", "open");
-		expect(openProposal(undone)?.id).toBe("1:agent");
+		expect(undone).toEqual(shown);
 	});
 });
 

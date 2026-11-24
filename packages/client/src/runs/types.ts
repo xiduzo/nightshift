@@ -13,15 +13,12 @@ export type SessionSummary = StepSummary["sessions"][number];
 /** One item of a Call step's visit (`each`). */
 export type ItemSummary = StepSummary["items"][number];
 export type ItemState = ItemSummary["state"];
-export type StepScope = NonNullable<StepSummary["scope"]>;
 export type RunStatus = RunSummary["status"];
 /** How the End node that ended a run says it came out. */
 export type RunResult = NonNullable<RunSummary["result"]>;
 export type StepOutcome = NonNullable<StepSummary["outcome"]>;
 export type StartRunInput = ApiInputs["runs"]["start"];
 export type RunTrigger = RunSummary["trigger"];
-/** A Device a run of the project can run on now (`runs.placements`). */
-export type RunPlacement = ApiOutputs["runs"]["placements"][number];
 /** One of the person's Devices for a project, online or not (`runs.devices`). */
 export type RunDevice = ApiOutputs["runs"]["devices"][number];
 

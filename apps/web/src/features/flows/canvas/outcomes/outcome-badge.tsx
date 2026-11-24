@@ -345,30 +345,25 @@ export function OutcomeBadge({
 	);
 }
 
-const ITEM_STATES: Record<ItemState, Style> = {
+const ITEM_STATES: Record<
+	ItemState,
+	Pick<Style, "label" | "icon" | "badge">
+> = {
 	done: { ...KNOWN_STATES.pass, label: "Done" },
 	failed: { ...KNOWN_STATES.fail, label: "Failed" },
 	blocked: {
 		label: "Blocked",
 		icon: BanIcon,
 		badge: "border-status-stopped/40 bg-status-stopped/10 text-status-stopped",
-		text: "text-status-stopped",
-		color: "var(--status-stopped)",
 	},
 	halted: {
 		label: "Halted",
 		icon: OctagonPauseIcon,
 		badge:
 			"border-status-interrupted/40 bg-status-interrupted/10 text-status-interrupted",
-		text: "text-status-interrupted",
-		color: "var(--status-interrupted)",
 	},
 	running: { ...KNOWN_STATES.running, label: runStatusLabel("running") },
 };
-
-export function itemStateStyle(state: ItemState): Style {
-	return ITEM_STATES[state];
-}
 
 /** The state of one item of a Call step. */
 export function ItemStateBadge({

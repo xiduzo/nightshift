@@ -1,5 +1,13 @@
 import { describe, expect, test } from "bun:test";
-import { FLOW_VERSION, type Flow, flowSchema, nodeProfiles } from "../../flow";
+import {
+	FLOW_VERSION,
+	type Flow,
+	type FlowNode,
+	flowSchema,
+	nodeProfiles,
+	tierUsers,
+	withTierNode,
+} from "../../flow";
 import {
 	type AgentNode,
 	agentHarnessSchema,
@@ -14,12 +22,12 @@ import {
 	type ModelProfileSettings,
 	modelAddressProblem,
 	modelProfileSettingsSchema,
+	type ProfileSettings,
 	profileLabel,
 	profileSecrets,
 	profileSettingsSchema,
 	resolveAgentNode,
 	resolvedAgent,
-	resolveFlowProfiles,
 	resolveModelNode,
 	resolveNodeProfile,
 } from "./profiles";
@@ -125,36 +133,6 @@ describe("resolveAgentNode", () => {
 		});
 		expect("effort" in resolved).toBe(false);
 		expect("connections" in resolved).toBe(false);
-	});
-});
-
-describe("resolveFlowProfiles", () => {
-	test("collects the profiles it cannot find, with their nodes", () => {
-		const missing = new Map<string, string[]>();
-		const flow = flowOf(
-			node(),
-			node({ id: "review", profile: { device: "mac", profile: "reviewer" } }),
-		);
-		const resolved = resolveFlowProfiles(
-			flow,
-			(profile) => (profileLabel(profile) === "builder" ? builder : null),
-			missing,
-		);
-		expect([...missing]).toEqual([["reviewer", ["review"]]]);
-		expect(resolved.nodes[0]).toMatchObject({ harness: "opencode" });
-		expect(resolved.nodes[1]).toEqual(flow.nodes[1] as AgentNode);
-	});
-
-	test("a flow without profiles comes back as it was", () => {
-		const flow = flowOf(
-			node({
-				profile: undefined,
-				harness: "claude-code",
-				model: "sonnet",
-				permissionMode: "auto",
-			}),
-		);
-		expect(resolveFlowProfiles(flow, () => builder)).toBe(flow);
 	});
 });
 
@@ -277,33 +255,6 @@ describe("model profiles", () => {
 				model: "~typesafe/jev-latest",
 			},
 		});
-	});
-
-	test("resolveFlowProfiles resolves Decisions and Values by model, and reports a misfit", () => {
-		const problems: string[] = [];
-		const flow = flowOf(
-			node(),
-			decision(),
-			decision({ id: "gate", by: "person", profile: undefined }),
-			value({ id: "agentish", profile: { device: "mac", profile: "builder" } }),
-		);
-		const resolved = resolveFlowProfiles(
-			flow,
-			(profile) =>
-				profileLabel(profile) === "builder"
-					? builder
-					: profileLabel(profile) === "triage"
-						? triage
-						: null,
-			new Map(),
-			problems,
-		);
-		expect(resolved.nodes[0]).toMatchObject({ harness: "opencode" });
-		expect(resolved.nodes[1]).toMatchObject({ decider: "openrouter" });
-		expect(resolved.nodes[2]).toBe(flow.nodes[2] as DecisionNode);
-		expect(problems).toEqual([
-			'The Value node "agentish" names the profile "builder", which is for Agent nodes. Pick a model profile.',
-		]);
 	});
 
 	test("only a model reads a profile", () => {
@@ -465,6 +416,24 @@ describe("the address of a model profile", () => {
 describe("the profiles of a cascade (ADR 6)", () => {
 	const local: ModelProfileSettings = { decider: "ollama", model: "qwen3" };
 
+	/** The node with the profile of each tier filled in. */
+	function resolveTiers(
+		climbing: FlowNode,
+		profileFor: (name: string) => ProfileSettings,
+	): FlowNode {
+		let resolved = climbing;
+		for (const tier of tierUsers(climbing)) {
+			const [named] = nodeProfiles(tier.node);
+			const result = resolveNodeProfile(
+				tier.node,
+				profileFor(profileLabel(named)),
+			);
+			if ("problem" in result) throw new Error(result.problem);
+			resolved = withTierNode(resolved, tier.index, result.node);
+		}
+		return resolved;
+	}
+
 	test("each tier's profile is resolved onto its tier, and the node names them all", () => {
 		const climbing = node({
 			profile: undefined,
@@ -476,8 +445,8 @@ describe("the profiles of a cascade (ADR 6)", () => {
 		expect(nodeProfiles(climbing)).toEqual([
 			{ device: "mac", profile: "builder" },
 		]);
-		const resolved = resolveFlowProfiles(flowOf(climbing), () => builder);
-		expect((resolved.nodes[0] as AgentNode).cascade).toEqual([
+		const resolved = resolveTiers(climbing, () => builder);
+		expect((resolved as AgentNode).cascade).toEqual([
 			{
 				profile: { device: "mac", profile: "builder" },
 				tries: 2,
@@ -500,20 +469,15 @@ describe("the profiles of a cascade (ADR 6)", () => {
 				{ profile: { device: "mac", profile: "triage" } },
 			],
 		});
-		const problems: string[] = [];
-		const resolved = resolveFlowProfiles(
-			flowOf(climbing),
-			(profile) => (profileLabel(profile) === "local" ? local : triage),
-			new Map(),
-			problems,
+		const resolved = resolveTiers(climbing, (name) =>
+			name === "local" ? local : triage,
 		);
-		expect((resolved.nodes[0] as DecisionNode).cascade?.[0]).toMatchObject({
+		expect((resolved as DecisionNode).cascade?.[0]).toMatchObject({
 			decider: "ollama",
 			model: "qwen3",
 		});
-		expect(problems).toEqual([
+		expect(cascadeProblem(resolved)).toBe(
 			'The tier "1" of Decision node "pick" uses ollama, which gives no probability. Only the last model tier can use it, without a minimum confidence. Pick another profile, or move the tier to the end.',
-		]);
-		expect(cascadeProblem(resolved.nodes[0] as DecisionNode)).not.toBeNull();
+		);
 	});
 });

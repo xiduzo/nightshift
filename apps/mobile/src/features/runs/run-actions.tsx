@@ -7,41 +7,9 @@ import {
 	stepName,
 	useRunActed,
 } from "@nightshift/client";
-import {
-	AlertDialog,
-	AlertDialogAction,
-	AlertDialogCancel,
-	AlertDialogContent,
-	AlertDialogDescription,
-	AlertDialogFooter,
-	AlertDialogHeader,
-	AlertDialogTitle,
-	AlertDialogTrigger,
-} from "@nightshift/ui-native/components/ui/alert-dialog";
-import {
-	Button,
-	buttonTextVariants,
-	buttonVariants,
-} from "@nightshift/ui-native/components/ui/button";
-import { Icon } from "@nightshift/ui-native/components/ui/icon";
-import { Label } from "@nightshift/ui-native/components/ui/label";
-import {
-	RadioGroup,
-	RadioGroupItem,
-} from "@nightshift/ui-native/components/ui/radio-group";
-import {
-	Text,
-	TextClassContext,
-} from "@nightshift/ui-native/components/ui/text";
 import { useMutation } from "@tanstack/react-query";
-import {
-	CircleStop,
-	type LucideIcon,
-	Play,
-	RotateCcw,
-} from "lucide-react-native";
-import { type ReactNode, useEffect, useState } from "react";
-import { Alert, View } from "react-native";
+import { useEffect } from "react";
+import { Alert } from "react-native";
 
 import { useSignedIn } from "@/features/access";
 import { ErrorAlert } from "@/shared/feedback";
@@ -130,8 +98,6 @@ export type RunActionContext = {
 
 /** What one action asks before it acts, and what it does. */
 type Ask = {
-	button: string;
-	icon: LucideIcon;
 	title: string;
 	description: string;
 	confirm: string;
@@ -149,8 +115,6 @@ function askOf(
 		case "resume": {
 			const retry = label === "Retry";
 			return {
-				button: label ?? "Resume run",
-				icon: retry ? RotateCcw : Play,
 				title: retry ? "Retry this run?" : "Resume this run?",
 				description: retry
 					? "The run continues at the step that failed."
@@ -165,8 +129,6 @@ function askOf(
 		case "restart":
 			return restartStep
 				? {
-						button: "Restart step",
-						icon: RotateCcw,
 						title: `Restart ${stepName(restartStep, labels)}?`,
 						description:
 							"The step stops and starts again at once. An agent continues its conversation.",
@@ -179,8 +141,6 @@ function askOf(
 				: null;
 		case "stop":
 			return {
-				button: "Stop",
-				icon: CircleStop,
 				title: "Stop this run?",
 				description:
 					"The running step stops now, and no new step starts. You can resume the run later.",
@@ -259,52 +219,6 @@ export function confirmRunAction(
 	);
 }
 
-/**
- * One action of a run: Stop, Resume (or Retry), Restart step or Run
- * again. Each asks first. `primary`: the run's main action, filled (Stop
- * in the destructive color). Otherwise an outline button. Full width.
- */
-export function RunActionButton({
-	action,
-	primary = false,
-	...context
-}: RunActionContext & {
-	action: RunActionKind;
-	primary?: boolean;
-}) {
-	const { runId, act, rerunFrom = [], labels } = context;
-	const busy = act.acting?.action === action;
-	if (action === "rerun") {
-		return rerunFrom.length > 0 ? (
-			<RerunConfirm
-				starts={rerunFrom}
-				labels={labels}
-				busy={busy}
-				primary={primary}
-				onConfirm={(step) => {
-					act.only("rerun");
-					act.rerun.mutate({ runId, nodeId: step.nodeId, stepId: step.id });
-				}}
-			/>
-		) : null;
-	}
-	const ask = askOf(action, context);
-	if (!ask) return null;
-	return (
-		<Confirm
-			button={ask.button}
-			icon={ask.icon}
-			busy={busy}
-			primary={primary}
-			title={ask.title}
-			description={ask.description}
-			confirm={ask.confirm}
-			destructive={ask.destructive}
-			onConfirm={ask.run}
-		/>
-	);
-}
-
 /** The action that failed last. Undefined when none failed. */
 export function failedAction(act: RunAct): Action | undefined {
 	return ACTIONS.find((action) => act[action].error);
@@ -320,145 +234,5 @@ export function RunActionFailure({ act }: { act: RunAct }) {
 			message={act[failed].error?.message ?? ""}
 			fix="Check that this phone is online and that your role in this Space lets you do this."
 		/>
-	);
-}
-
-/**
- * Run again, after you choose where from: the start of the flow or the
- * last step. That step runs again, and the steps after it follow as the
- * flow says.
- */
-function RerunConfirm({
-	starts,
-	labels,
-	busy,
-	primary,
-	onConfirm,
-}: {
-	starts: RerunStart<StepSummary>[];
-	labels: ReadonlyMap<string, string>;
-	busy: boolean;
-	primary: boolean;
-	onConfirm: (step: StepSummary) => void;
-}) {
-	const [from, setFrom] = useState<RerunStart["from"]>("last");
-	const chosen = starts.find((start) => start.from === from) ?? starts[0];
-	return (
-		<Confirm
-			button="Run again"
-			icon={RotateCcw}
-			busy={busy}
-			primary={primary}
-			title={RERUN_TITLE}
-			description={RERUN_DESCRIPTION}
-			confirm="Run again"
-			onConfirm={() => {
-				if (chosen) onConfirm(chosen.step);
-			}}
-		>
-			{starts.length > 1 ? (
-				<RadioGroup
-					value={chosen?.from}
-					onValueChange={(value) => setFrom(value as RerunStart["from"])}
-					accessibilityLabel="Run again from"
-				>
-					{starts.map((start) => (
-						<View
-							key={start.from}
-							className="min-h-11 flex-row items-center gap-3"
-						>
-							<RadioGroupItem
-								value={start.from}
-								aria-labelledby={`rerun-${start.from}`}
-							/>
-							<Label
-								nativeID={`rerun-${start.from}`}
-								onPress={() => setFrom(start.from)}
-							>
-								{rerunChoice(start, labels)}
-							</Label>
-						</View>
-					))}
-				</RadioGroup>
-			) : (
-				<Text className="text-sm text-muted-foreground">
-					{starts[0] ? `From ${stepName(starts[0].step, labels)}` : null}
-				</Text>
-			)}
-		</Confirm>
-	);
-}
-
-/** A full-width button that asks in an Alert Dialog before it acts. */
-function Confirm({
-	button,
-	icon,
-	busy,
-	title,
-	description,
-	confirm,
-	destructive = false,
-	primary = false,
-	onConfirm,
-	children,
-}: {
-	button: string;
-	icon: LucideIcon;
-	busy: boolean;
-	title: string;
-	description: string;
-	confirm: string;
-	destructive?: boolean;
-	/** The main action: a filled button. Otherwise an outline button. */
-	primary?: boolean;
-	onConfirm: () => void;
-	/** A choice to make before it acts, under the description. */
-	children?: ReactNode;
-}) {
-	return (
-		<AlertDialog>
-			<AlertDialogTrigger asChild>
-				<Button
-					size="lg"
-					variant={
-						primary ? (destructive ? "destructive" : "default") : "outline"
-					}
-					disabled={busy}
-					className="h-auto min-h-11 py-2"
-				>
-					<Icon as={icon} />
-					<Text>{busy ? `${button}…` : button}</Text>
-				</Button>
-			</AlertDialogTrigger>
-			<AlertDialogContent className="w-[90%]">
-				<AlertDialogHeader>
-					<AlertDialogTitle>{title}</AlertDialogTitle>
-					<AlertDialogDescription>{description}</AlertDialogDescription>
-				</AlertDialogHeader>
-				{children}
-				<AlertDialogFooter>
-					<AlertDialogCancel>
-						<Text>Cancel</Text>
-					</AlertDialogCancel>
-					<AlertDialogAction
-						className={
-							destructive
-								? buttonVariants({ variant: "destructive" })
-								: undefined
-						}
-						onPress={onConfirm}
-					>
-						{/* The Action gives its className to the text too: the label takes the text classes of its variant only. */}
-						<TextClassContext.Provider
-							value={buttonTextVariants({
-								variant: destructive ? "destructive" : "default",
-							})}
-						>
-							<Text>{confirm}</Text>
-						</TextClassContext.Provider>
-					</AlertDialogAction>
-				</AlertDialogFooter>
-			</AlertDialogContent>
-		</AlertDialog>
 	);
 }

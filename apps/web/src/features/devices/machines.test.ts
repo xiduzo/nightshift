@@ -75,7 +75,6 @@ describe("spaceMachines", () => {
 		expect(machines.starter).toMatchObject({
 			name: "hetzner-1",
 			online: false,
-			lastSeenAt: 7,
 			projectIds: [],
 		});
 		expect(machines.byId("self")?.projectIds).toEqual(["acme"]);
@@ -113,15 +112,15 @@ describe("neededMachines", () => {
 		[host()],
 		[
 			device("self", { name: "LE2316", thisDevice: true }),
-			device("studio", { online: false, lastSeenAt: 3 }),
+			device("studio", { online: false }),
 		],
 	);
 
 	test("a schedule runs on the Host; a device the Space does not know says so", () => {
 		const needed = neededMachines(machines, true, { ids: ["nobody"] });
-		expect(needed.map((m) => [m.name, m.online, m.gone])).toEqual([
-			["hetzner-1", true, undefined],
-			["Unknown device", null, true],
+		expect(needed.map((m) => [m.name, m.online])).toEqual([
+			["hetzner-1", true],
+			["Unknown device", null],
 		]);
 	});
 

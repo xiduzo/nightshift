@@ -55,7 +55,6 @@ export type Option = z.infer<typeof option>;
 export const decisionOption = option.extend({
 	impact: z.string().optional(),
 });
-export type DecisionOption = z.infer<typeof decisionOption>;
 
 /**
  * Why `name` is not an option of the node, or null when it is one. The one

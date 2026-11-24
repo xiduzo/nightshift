@@ -222,17 +222,6 @@ export function setProposalStatus(
 	};
 }
 
-/** The agent's answer that holds an open proposal, the latest first. */
-export function openProposal(
-	thread: ChatThread,
-): { id: string; proposal: ChatProposal } | undefined {
-	for (const message of [...thread.messages].reverse()) {
-		if (message.role === "agent" && message.proposal?.status === "open")
-			return { id: message.id, proposal: message.proposal };
-	}
-	return undefined;
-}
-
 /**
  * What a restore to before the proposal in message `id` does: the draft
  * goes back to `baseJson`, the draft sent with the message, and the

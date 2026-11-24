@@ -14,13 +14,9 @@ export type Machine = {
 	name: string;
 	/** Null when this computer cannot tell. */
 	online: boolean | null;
-	/** Epoch ms. For a Host: when its link last changed. */
-	lastSeenAt: number | null;
 	thisDevice: boolean;
 	/** The projects it has a copy of. Null when this computer cannot tell. */
 	projectIds: string[] | null;
-	/** A flow names it, and it is no longer in this Space. */
-	gone?: true;
 };
 
 export type SpaceMachines = {
@@ -44,7 +40,6 @@ function machineOf(computer: SpaceComputer): Machine {
 			: computer.paired?.revokedAt != null
 				? false
 				: computer.online,
-		lastSeenAt: computer.lastSeenAt,
 		thisDevice: computer.thisDevice,
 		projectIds: computer.clones.map((clone) => clone.projectId),
 	};
@@ -69,7 +64,6 @@ export function spaceMachines(view: SpaceView): SpaceMachines {
 					: host.host.status === "connecting"
 						? null
 						: false,
-			lastSeenAt: host.host.since,
 			thisDevice: false,
 			projectIds: known?.projectIds ?? [],
 		};
@@ -80,7 +74,6 @@ export function spaceMachines(view: SpaceView): SpaceMachines {
 			id: null,
 			name: host.computer?.name ?? "this computer",
 			online: true,
-			lastSeenAt: null,
 			thisDevice: true,
 			projectIds: null,
 		};
@@ -107,17 +100,15 @@ const gone: Machine = {
 	id: null,
 	name: "Unknown device",
 	online: null,
-	lastSeenAt: null,
 	thisDevice: false,
 	projectIds: null,
-	gone: true,
 };
 
 /**
  * The computers a run needs, in order: the one that keeps the Space when
  * the run starts on its own (a schedule's run always runs there, ADR 15),
  * then the ones the flow names, each once, by id. A computer the Space
- * does not know shows as "Unknown device", and says what to do about it.
+ * does not know shows as "Unknown device".
  */
 export function neededMachines(
 	machines: SpaceMachines,

@@ -3,7 +3,6 @@ import { describe, expect, test } from "bun:test";
 import {
 	enterSubflow,
 	isSubflowCycle,
-	leaveSubflow,
 	leaveSubflowTo,
 	type SubflowStack,
 	subflowContent,
@@ -45,14 +44,6 @@ describe("leaving", () => {
 		{ nodeId: "b", flow: "two", viewport: view },
 		{ nodeId: "c", flow: "three" },
 	];
-
-	test("one level up drops the deepest level", () => {
-		expect(leaveSubflow(stack)).toEqual(stack.slice(0, 2));
-	});
-
-	test("up at the root stays at the root", () => {
-		expect(leaveSubflow([])).toEqual([]);
-	});
 
 	test("to a depth keeps that many levels, with their viewports", () => {
 		expect(leaveSubflowTo(stack, 1)).toEqual([

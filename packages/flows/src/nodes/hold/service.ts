@@ -35,7 +35,6 @@ export const serviceReadySchema = z.object({
 	everySeconds: z.number().int().positive().optional(),
 	timeoutMinutes: z.number().int().positive().optional(),
 });
-export type ServiceReady = z.infer<typeof serviceReadySchema>;
 
 /**
  * Starts `start` in the background in the worktree, in its own process

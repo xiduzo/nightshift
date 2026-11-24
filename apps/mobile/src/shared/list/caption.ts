@@ -22,11 +22,6 @@ export function partText(part: CaptionPart): string {
 	return typeof part === "string" ? part : part.text;
 }
 
-/** A caption as one line of text: "Running · website · build". */
-export function captionText(caption: Caption | undefined): string {
-	return captionParts(caption).map(partText).join(" · ");
-}
-
 /**
  * What a screen reader says for a row, when the screen gives no label of
  * its own: what the icon means, the title, each caption, and the value.

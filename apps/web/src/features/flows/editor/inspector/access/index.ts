@@ -7,8 +7,8 @@ export {
 	type DaemonCliTool,
 	useCommandToolField,
 	useCommandTools,
-} from "./cli-tools-field";
-export { connectionKind, type DaemonConnection } from "./connections-field";
+} from "./cli-tools";
+export { connectionKind, type DaemonConnection } from "./connections";
 export { KnowledgeFoldersField } from "./knowledge-folders-field";
 export { SecretsField } from "./secrets-field";
 export { SkillCombobox } from "./skill-combobox";

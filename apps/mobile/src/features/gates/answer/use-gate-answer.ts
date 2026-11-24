@@ -145,5 +145,3 @@ export function useGateAnswer(
 		sent,
 	};
 }
-
-export type GateAnswerState = ReturnType<typeof useGateAnswer>;

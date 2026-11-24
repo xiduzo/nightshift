@@ -1,20 +1,24 @@
 /// <reference types="bun" />
 import { describe, expect, test } from "bun:test";
 
-import { captionParts, captionText, rowLabel } from "./caption";
+import { captionParts, rowLabel } from "./caption";
 
-describe("captionText", () => {
-	test("joins the parts with a dot and leaves out the empty ones", () => {
-		expect(captionText("website")).toBe("website");
+describe("captionParts", () => {
+	test("keeps the parts in order and leaves out the empty ones", () => {
+		expect(captionParts("website")).toEqual(["website"]);
 		expect(
-			captionText([
+			captionParts([
 				{ text: "Running", tone: "running" },
 				"website",
 				"",
 				{ text: "build", mono: true },
 			]),
-		).toBe("Running · website · build");
-		expect(captionText(undefined)).toBe("");
+		).toEqual([
+			{ text: "Running", tone: "running" },
+			"website",
+			{ text: "build", mono: true },
+		]);
+		expect(captionParts(undefined)).toEqual([]);
 		expect(captionParts(["  "])).toEqual([]);
 	});
 });

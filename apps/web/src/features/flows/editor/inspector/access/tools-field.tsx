@@ -30,8 +30,8 @@ import { Fragment, useState } from "react";
 
 import { missingConnectionMessage } from "../../draft";
 import { Note } from "../form";
-import { type DaemonCliTool, missingCliToolMessage } from "./cli-tools-field";
-import { connectionKind, type DaemonConnection } from "./connections-field";
+import { type DaemonCliTool, missingCliToolMessage } from "./cli-tools";
+import { connectionKind, type DaemonConnection } from "./connections";
 
 /** One tool in the picker: a program (CLI tool) or an MCP server (connection). */
 type ToolKey = `cli:${string}` | `mcp:${string}`;

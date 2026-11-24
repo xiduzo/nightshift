@@ -116,5 +116,3 @@ export function createFollower({
 		},
 	};
 }
-
-export type Follower = ReturnType<typeof createFollower>;

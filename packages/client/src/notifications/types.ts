@@ -21,7 +21,3 @@ export type NotificationSettingsPatch =
 /** A browser, phone or desktop app that gets the person's notifications. */
 export type NotificationScreen =
 	ApiOutputs["notifications"]["targets"]["list"][number];
-
-/** What a screen sends to get notifications. */
-export type RegisterScreenInput =
-	ApiInputs["notifications"]["targets"]["register"];

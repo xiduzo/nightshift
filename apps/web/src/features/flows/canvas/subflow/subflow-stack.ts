@@ -43,11 +43,6 @@ export function leaveSubflowTo(
 	return stack.slice(0, Math.max(0, depth));
 }
 
-/** One level up, or the same stack at the root. */
-export function leaveSubflow(stack: SubflowStack): SubflowStack {
-	return leaveSubflowTo(stack, stack.length - 1);
-}
-
 /**
  * Whether the deepest level runs a flow that is already open above it:
  * the root flow or a level between. That flow contains itself, and looking
