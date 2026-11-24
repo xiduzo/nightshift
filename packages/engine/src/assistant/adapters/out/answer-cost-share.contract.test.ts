@@ -2,26 +2,11 @@ import { migratedDb } from "@nightshift/db/testing";
 import { answerCostShareContract } from "./answer-cost-share.contract";
 import { drizzleAnswerCostShare } from "./drizzle-answer-cost-share";
 import { drizzleAnswerCostStore } from "./drizzle-answer-cost-store";
-import { inMemoryAnswerCostShare } from "./in-memory-answer-cost-share";
-import {
-	answerCostRecords,
-	inMemoryAnswerCostStore,
-} from "./in-memory-answer-cost-store";
 
 /**
- * The contract of `AnswerCostShare`, on both adapters, each with the
- * store of the same Replica. The real adapter's side runs on libsql in
- * memory.
+ * The contract of `AnswerCostShare`, with the store of the same Replica, on
+ * libsql in memory. No use case reads the port, so it has no twin.
  */
-
-answerCostShareContract("in memory", async () => {
-	const records = answerCostRecords();
-	return {
-		answerCostShare: inMemoryAnswerCostShare(records),
-		own: inMemoryAnswerCostStore(records),
-		close: async () => {},
-	};
-});
 
 answerCostShareContract("over drizzle", async () => {
 	const db = await migratedDb();

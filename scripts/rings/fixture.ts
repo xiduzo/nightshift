@@ -59,6 +59,10 @@ export function check(
 export const manifest = (name: string, exports: Record<string, string>) =>
 	JSON.stringify({ name: `@nightshift/${name}`, exports });
 
+/** The test of a use case, as short as it may be: it asserts an answer. */
+export const asserting = (file: string, useCase: string) =>
+	`import { ${useCase} } from "./${file}";\nexpect(${useCase}({} as never)).toBeDefined();\n`;
+
 /** The slice in shape. */
 export const SLICE = "packages/engine/src/schedules";
 

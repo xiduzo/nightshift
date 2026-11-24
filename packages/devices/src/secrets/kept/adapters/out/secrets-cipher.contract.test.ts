@@ -1,13 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { inMemorySecretsCipher } from "./in-memory-secrets-cipher";
 import { secretsCipherContract } from "./secrets-cipher.contract";
 import { webcryptoSecretsCipher } from "./webcrypto-secrets-cipher";
 
-/** The contract of `SecretsCipher`, on both adapters. */
-
-secretsCipherContract("in memory", async () => ({
-	secretsCipher: inMemorySecretsCipher(),
-}));
+/** The contract of `SecretsCipher`. No use case reads the port, so it has no twin. */
 
 secretsCipherContract("over WebCrypto", async () => ({
 	secretsCipher: webcryptoSecretsCipher(

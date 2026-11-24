@@ -1,0 +1,17 @@
+# Files that broke a rule of ADR 41 on the day the rules started.
+# One line each: <rule> <file>. scripts/check-rings.ts says what the rules ask.
+#   forward     a use case that passes its request to one port call
+#   empty-test  a use-case test that asserts no outcome
+#   twin        an in-memory adapter that takes code of a real adapter
+# Remove a line in the change that fixes the file. Add no line.
+forward packages/auth/src/spaces/application/mirror-host-space.ts
+forward packages/auth/src/spaces/members/application/remove-memberships.ts
+forward packages/auth/src/spaces/members/application/set-membership-role.ts
+forward packages/devices/src/devices/registry/application/list-home-persons.ts
+forward packages/devices/src/devices/registry/application/list-known-devices.ts
+forward packages/devices/src/devices/registry/application/read-self-owner.ts
+empty-test packages/devices/src/devices/membership/application/create-home-membership.test.ts
+empty-test packages/devices/src/devices/membership/application/merge-steps.test.ts
+empty-test packages/devices/src/devices/membership/application/split-steps.test.ts
+twin packages/engine/src/agents/adapters/out/in-memory-setup-processes.ts
+twin packages/engine/src/runs/views/adapters/out/in-memory-run-views.ts

@@ -9,8 +9,7 @@ const VALUE = "not-a-real-value";
 
 /**
  * What every adapter of `SecretsCipher` does.
- * `secrets-cipher.contract.test.ts` runs it on the in-memory adapter and
- * on the real one.
+ * `secrets-cipher.contract.test.ts` runs it on the real one.
  */
 export function secretsCipherContract(
 	name: string,

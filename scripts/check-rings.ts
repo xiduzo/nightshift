@@ -81,17 +81,27 @@
  *      `<verb>-<object>.ts`. It exports one function, named for the file
  *      (`answer-gate.ts` exports `answerGate`), and types. Its test is
  *      `<verb>-<object>.test.ts`, beside it. A step that two use cases
- *      share is a function in `domain/`.
+ *      share is a function in `domain/`. A use case decides (ADR 41):
+ *      - It is no forward: a body of one port call, whose arguments are the
+ *        request, its fields, or an object or a list of those.
+ *      - It reads its `Actor`. No parameter has the name `_actor`.
+ *      - Its test has an `expect` of more than a `typeof`.
+ *      - It declares no port: no type with a function, that a member of
+ *        its ports names. A function written in the ports themselves (a
+ *        clock, another use case) passes.
  * (H7) Every type that `application/ports.ts` exports is a port. A port
  *      `ScheduleStore` has, in `adapters/out/` of its slice:
- *      - `in-memory-schedule-store.ts`: the in-memory adapter. It imports
- *        `ScheduleStore` from `../../application/ports`.
+ *      - `in-memory-schedule-store.ts`: the in-memory adapter, when a use
+ *        case that is no forward reads the port. It imports `ScheduleStore`
+ *        from `../../application/ports`, and no value of a real adapter.
+ *        One that only its contract test imports fails when no use case
+ *        reads the port.
  *      - `<tech>-schedule-store.ts`: the real adapter
  *        (`drizzle-schedule-store.ts`).
  *      - `schedule-store.contract.ts`: the contract suite. It exports one
- *        function, `scheduleStoreContract`, and imports the port.
- *      - `schedule-store.contract.test.ts`: it imports the suite, the
- *        in-memory adapter and a real adapter, and runs the suite on both.
+ *        function, `scheduleStoreContract`, imports the port, and expects.
+ *      - `schedule-store.contract.test.ts`: it imports the suite, a real
+ *        adapter and the in-memory adapter, and runs the suite on each.
  *      A port that another slice or another package implements says so in
  *      its comment: `@filledBy <package>` or `@filledBy <package>/<vertical>`
  *      (`@filledBy devices`, `@filledBy engine/runs`). When the composition
@@ -120,6 +130,11 @@
  * pure yet. It fails once the file is pure, and a file that is not listed
  * fails.
  *
+ * `scripts/use-case-debt.txt` names the files that broke a rule of ADR 41 on
+ * the day it started: `forward <file>`, `empty-test <file>` or `twin
+ * <file>`. No line is added, and a line fails once its file breaks no rule.
+ * The other rules of ADR 41 have no list.
+ *
  *   bun run check:rings          (or: bun scripts/check-rings.ts)
  *
  * Exits 1 and names each problem.
@@ -131,10 +146,17 @@ import { join } from "node:path";
 import { PACKAGE_KERNEL, SERVER_PACKAGES } from "../.dependency-cruiser.mjs";
 import { MECHANISM, VERTICALS } from "./capabilities";
 import { debtOf } from "./check-time";
-import { portProblems, useCaseProblems, wireProblems } from "./rings/files";
+import { decisionOffences } from "./rings/decides";
+import {
+	portProblems,
+	twinReadersOf,
+	useCaseProblems,
+	wireProblems,
+} from "./rings/files";
 import { importTypeViolations } from "./rings/import-types";
 import { importViolations, KERNEL_RULE } from "./rings/imports";
 import {
+	filesOf,
 	hasApplication,
 	shapeProblems,
 	slicesOf,
@@ -149,6 +171,8 @@ export type Options = {
 	 * `<package>/<vertical>`. The ring rules do not cover them.
 	 */
 	mechanisms?: Iterable<string>;
+	/** The text of `scripts/use-case-debt.txt`. */
+	useCaseDebt?: string;
 };
 
 /** The globals that only `adapters/out/` uses (H4). */
@@ -212,6 +236,9 @@ export function biomeProblems(text: string): string[] {
 /** A line of the debt list for a file of a kernel: `kernel <file>`. */
 const KERNEL_LINE = /^kernel\s+(\S+)$/;
 
+/** A line of `scripts/use-case-debt.txt`: one of its rules, and a file. */
+const USE_CASE_LINE = /^(forward|empty-test|twin) (\S+)$/;
+
 /**
  * The problems of the server packages under `root` (the repository root),
  * as messages.
@@ -253,16 +280,30 @@ export async function checkRings(
 		}
 	}
 
+	const useCaseLines = debtOf(options.useCaseDebt ?? "");
+	const used = new Set<string>();
+	const twinReaders = twinReadersOf(slices.flatMap(filesOf));
 	for (const slice of slices) {
 		const key = keyOf(slice);
 		if (mechanisms.has(key)) continue;
+		const parts = withSubs(slice);
+		const offences = parts.flatMap((part) =>
+			decisionOffences(root, part).filter(({ rule, file }) => {
+				const line = `${rule} ${file}`;
+				if (!USE_CASE_LINE.test(line) || !useCaseLines.includes(line))
+					return true;
+				used.add(line);
+				return false;
+			}),
+		);
 		const own = [
 			...shapeProblems(root, slice),
-			...withSubs(slice).flatMap((part) => [
+			...parts.flatMap((part) => [
 				...wireProblems(root, part),
 				...useCaseProblems(root, part),
-				...portProblems(root, part, VERTICALS),
+				...portProblems(root, part, VERTICALS, twinReaders),
 			]),
+			...offences.map((offence) => offence.message),
 			...violations.filter((v) => v.vertical === key).map((v) => v.message),
 		];
 		if (!listed.includes(key)) problems.push(...own);
@@ -282,6 +323,16 @@ export async function checkRings(
 		} else if (mechanisms.has(line)) {
 			problems.push(
 				`scripts/hexagon-debt.txt: ${line} is a mechanism (scripts/capabilities.ts). The ring rules do not cover it. Remove it.`,
+			);
+		}
+	}
+
+	for (const [index, line] of useCaseLines.entries()) {
+		if (useCaseLines.indexOf(line) !== index) {
+			problems.push(`scripts/use-case-debt.txt: ${line} is listed twice.`);
+		} else if (!used.has(line)) {
+			problems.push(
+				`scripts/use-case-debt.txt: ${line} ${USE_CASE_LINE.test(line) ? "breaks no rule" : "is not <forward, empty-test or twin> <file>"}. Remove it.`,
 			);
 		}
 	}
@@ -307,10 +358,14 @@ if (import.meta.main) {
 	const started = performance.now();
 	const root = join(import.meta.dir, "..");
 	const debt = readFileSync(join(import.meta.dir, "hexagon-debt.txt"), "utf8");
+	const useCaseDebt = readFileSync(
+		join(import.meta.dir, "use-case-debt.txt"),
+		"utf8",
+	);
 	const mechanisms = mechanismsOf();
 	const problems = [
 		...biomeProblems(readFileSync(join(root, "biome.json"), "utf8")),
-		...(await checkRings(root, { debt, mechanisms })),
+		...(await checkRings(root, { debt, mechanisms, useCaseDebt })),
 	];
 	if (problems.length) {
 		console.error("Ring check failed (scripts/check-rings.ts):\n");

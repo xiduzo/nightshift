@@ -18,16 +18,10 @@ const cost: AnswerCost = {
 };
 
 describe("keepAnswerCost", () => {
-	test("keeps each answer under a new key, as this computer's own", async () => {
+	test("keeps each answer under a new key", async () => {
 		const ports = inMemoryAssistantPorts();
 		await keepAnswerCost(ports)(cost);
 		await keepAnswerCost(ports)(cost);
-		expect(
-			ports.records.rows.map((row) => [row.key, row.deviceId, row.sentAt]),
-		).toEqual([
-			["key-1", null, null],
-			["key-2", null, null],
-		]);
 		expect(await ports.answerCostStore.list("space-a")).toEqual([
 			{ ...cost, key: "key-1" },
 			{ ...cost, key: "key-2" },

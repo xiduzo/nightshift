@@ -4,8 +4,8 @@ import { {{{portCamel}}}Contract } from "./{{{portKebab}}}.contract";
 
 /**
  * The contract of `{{{port}}}`, on both adapters. When the real adapter
- * reads the database, its side runs on libsql in memory:
- * `createDb({ DATABASE_URL: ":memory:" })` with `migrateDb`.
+ * reads the database, its side runs on libsql in memory: `migratedDb()` of
+ * `@nightshift/db/testing`.
  */
 
 {{{portCamel}}}Contract("in memory", async () => ({

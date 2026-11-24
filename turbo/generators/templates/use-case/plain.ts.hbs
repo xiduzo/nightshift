@@ -1,4 +1,3 @@
-{{{actorImport}}}
 /**
  * The ports {{{useCaseCamel}}} stands on. Add each one it needs, narrowed
  * with `Pick<>` (`store: Pick<{{{slicePascal}}}Store, "find">`).
@@ -15,6 +14,7 @@ export type {{{useCasePascal}}} = { id: string };
  */
 export const {{{useCaseCamel}}} =
 	(_ports: {{{useCasePascal}}}Ports) =>
-	async ({{{actorParameter}}}_request: {{{useCasePascal}}}): Promise<void> => {
-		// Load, ask the domain rule, save.
+	async (request: {{{useCasePascal}}}): Promise<{ id: string }> => {
+		// Replace this with what the use case decides: a refusal, the order of effects, or a domain rule.
+		return { id: request.id.trim() };
 	};

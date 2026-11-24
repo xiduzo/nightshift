@@ -11,7 +11,9 @@ import ts from "@typescript/typescript6";
 
 import { resolveFile } from "../verticals/resolve";
 import { parse } from "../verticals/source-file";
+import { readPorts } from "./decides";
 import type { Slice } from "./slices";
+import { camel, exportedFunctions, treeOf } from "./syntax";
 
 /** `ScheduleStore` is `schedule-store`, `HTTPClient` is `http-client`. */
 export const kebab = (name: string): string =>
@@ -19,10 +21,6 @@ export const kebab = (name: string): string =>
 		.replace(/([A-Z]+)([A-Z][a-z])/g, "$1-$2")
 		.replace(/([a-z0-9])([A-Z])/g, "$1-$2")
 		.toLowerCase();
-
-/** `answer-gate` is `answerGate`. */
-export const camel = (name: string): string =>
-	name.replace(/-([a-z0-9])/g, (_, letter: string) => letter.toUpperCase());
 
 /** `run-status` is `RunStatus`. */
 const pascal = (name: string): string =>
@@ -64,6 +62,21 @@ const list = (names: Iterable<string>) =>
 		.map((name) => `"${name}"`)
 		.join(", ");
 
+/** Each in-memory adapter of `files`, with the files that import it. */
+export function twinReadersOf(files: Iterable<string>): Map<string, string[]> {
+	const readers = new Map<string, string[]>();
+	for (const file of files) {
+		// A parse of every file costs a second: few name a twin.
+		if (!readFileSync(file, "utf8").includes("/in-memory-")) continue;
+		for (const { specifier } of parse(file).imports) {
+			if (!/^\..*\/in-memory-[^/]*$/.test(specifier)) continue;
+			const twin = resolveFile(resolve(dirname(file), specifier));
+			if (twin) readers.set(twin, [...(readers.get(twin) ?? []), file]);
+		}
+	}
+	return readers;
+}
+
 /** The `.ts` files directly in `dir`, in name order. */
 function tsFiles(dir: string): string[] {
 	if (!existsSync(dir)) return [];
@@ -71,54 +84,6 @@ function tsFiles(dir: string): string[] {
 		.filter((entry) => entry.isFile() && entry.name.endsWith(".ts"))
 		.map((entry) => entry.name)
 		.sort();
-}
-
-/** `value`, without the parentheses, `as` and `satisfies` around it. */
-function unwrapped(value: ts.Expression): ts.Expression {
-	let inner = value;
-	while (
-		ts.isParenthesizedExpression(inner) ||
-		ts.isAsExpression(inner) ||
-		ts.isSatisfiesExpression(inner)
-	)
-		inner = inner.expression;
-	return inner;
-}
-
-/**
- * The names a file exports that are written as a function: a function
- * declaration, or a constant whose value is an arrow function or a
- * function expression.
- */
-function exportedFunctions(path: string): Set<string> {
-	const source = ts.createSourceFile(
-		path,
-		readFileSync(path, "utf8"),
-		ts.ScriptTarget.Latest,
-		true,
-	);
-	const exported = (node: ts.HasModifiers) =>
-		(ts.getModifiers(node) ?? []).some(
-			(modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword,
-		);
-	const found = new Set<string>();
-	for (const statement of source.statements) {
-		if (ts.isFunctionDeclaration(statement) && exported(statement)) {
-			if (statement.name) found.add(statement.name.text);
-		} else if (ts.isVariableStatement(statement) && exported(statement)) {
-			for (const declaration of statement.declarationList.declarations) {
-				const value =
-					declaration.initializer && unwrapped(declaration.initializer);
-				if (
-					ts.isIdentifier(declaration.name) &&
-					value &&
-					(ts.isArrowFunction(value) || ts.isFunctionExpression(value))
-				)
-					found.add(declaration.name.text);
-			}
-		}
-	}
-	return found;
 }
 
 /** `from` imports `name` (or every name) of the file `target`. */
@@ -233,12 +198,7 @@ export type Port = {
 export function portsOf(slice: Slice): Port[] {
 	const path = join(slice.dir, "application", "ports.ts");
 	if (!existsSync(path)) return [];
-	const source = ts.createSourceFile(
-		path,
-		readFileSync(path, "utf8"),
-		ts.ScriptTarget.Latest,
-		true,
-	);
+	const source = treeOf(path);
 	const fillers = new Map<string, string>();
 	for (const statement of source.statements) {
 		if (
@@ -262,16 +222,19 @@ export function portsOf(slice: Slice): Port[] {
 
 /**
  * H7: what each port of one slice (not of its sub-verticals) lacks, as
- * messages. A port has its in-memory adapter, its real adapter, its
- * contract suite and the test that runs the suite on both. A port with
- * `@filledBy` has an in-memory adapter only.
+ * messages. A port has its real adapter, its contract suite and the test
+ * that runs the suite. It has its in-memory adapter when something reads
+ * it, and the suite runs on both then. A port with `@filledBy` has an
+ * in-memory adapter only. `twinReaders` gives the files that import a twin.
  */
 export function portProblems(
 	root: string,
 	slice: Slice,
 	map: Record<string, Record<string, string>>,
+	twinReaders: Map<string, string[]>,
 ): string[] {
 	const rel = (path: string) => relative(root, path).split(sep).join("/");
+	const read = readPorts(slice);
 	const ports = join(slice.dir, "application", "ports.ts");
 	const out = join(slice.dir, "adapters", "out");
 	const files = tsFiles(out);
@@ -313,11 +276,22 @@ export function portProblems(
 		}
 
 		const twin = join(out, `in-memory-${name}.ts`);
-		if (!existsSync(twin)) {
+		const test = join(out, `${name}.contract.test.ts`);
+		const twinned = existsSync(twin);
+		const wantsTwin = read.has(port);
+		if (!twinned && wantsTwin) {
 			problems.push(
-				`${where} has no in-memory adapter. Add adapters/out/in-memory-${name}.ts. If another slice or package implements the port, write @filledBy <who> in its comment.`,
+				`${where} is read by a use case and has no in-memory adapter. Add adapters/out/in-memory-${name}.ts. If another slice or package implements the port, write @filledBy <who> in its comment.`,
 			);
-		} else if (!importsFrom(twin, ports, port)) {
+		} else if (
+			twinned &&
+			!wantsTwin &&
+			(twinReaders.get(twin) ?? []).every((reader) => reader === test)
+		) {
+			problems.push(
+				`${rel(twin)}: no use case reads ${port}, and nothing but its contract test imports this in-memory adapter. Remove it: the suite runs on the real adapter alone.`,
+			);
+		} else if (twinned && !importsFrom(twin, ports, port)) {
 			problems.push(
 				`${rel(twin)}: does not import the port ${port} from application/ports.ts. An in-memory adapter is typed by its port.`,
 			);
@@ -353,24 +327,24 @@ export function portProblems(
 			}
 		}
 
-		const test = join(out, `${name}.contract.test.ts`);
+		const both = twinned || wantsTwin;
 		if (!existsSync(test)) {
 			problems.push(
-				`${where} has no test that runs its contract suite. Add adapters/out/${name}.contract.test.ts, which runs "${suiteName}" on the in-memory adapter and on the real one.`,
+				`${where} has no test that runs its contract suite. Add adapters/out/${name}.contract.test.ts, which runs "${suiteName}" on ${both ? "the in-memory adapter and on the real one" : "the real adapter"}.`,
 			);
 			continue;
 		}
 		const lacks: string[] = [];
 		if (!importsFrom(test, suite, suiteName))
 			lacks.push(`"${suiteName}" from ./${name}.contract`);
-		if (!importsFrom(test, twin)) lacks.push(`./in-memory-${name}`);
+		if (both && !importsFrom(test, twin)) lacks.push(`./in-memory-${name}`);
 		if (!reals.some((file) => importsFrom(test, join(out, file))))
 			lacks.push(
 				`the real adapter (./${reals[0]?.slice(0, -3) ?? `<tech>-${name}`})`,
 			);
 		if (lacks.length) {
 			problems.push(
-				`${rel(test)}: runs the contract suite on both adapters, but it does not import ${lacks.join(" and ")}.`,
+				`${rel(test)}: runs the contract suite${both ? " on both adapters" : ""}, but it does not import ${lacks.join(" and ")}.`,
 			);
 		}
 	}

@@ -14,6 +14,7 @@ import { measure } from "../check-budgets";
 import { isTest } from "../check-layers";
 import { checkWorkspace } from "../check-verticals";
 import {
+	asserting,
 	check as checkFiles,
 	type Files,
 	gates,
@@ -161,8 +162,10 @@ describe("application/ imports (H2)", () => {
 			...lines,
 			"export const listSchedules = () => [];",
 		],
-		[`${SLICE}/application/list-schedules.test.ts`]:
-			'import "./list-schedules";\n',
+		[`${SLICE}/application/list-schedules.test.ts`]: asserting(
+			"list-schedules",
+			"listSchedules",
+		),
 	});
 
 	test("an adapter fails, the in-memory one too", async () => {
@@ -236,14 +239,14 @@ describe("application/ imports (H2)", () => {
 				withTest([
 					'import type { Harness } from "@nightshift/agents/types";',
 					'import { utc } from "@nightshift/time/testing";',
-					'test("x", () => [utc, {} as Harness]);',
+					'test("x", () => expect([utc, {} as Harness]));',
 				]),
 			),
 		).toEqual([]);
 		const problems = await check(
 			withTest([
 				'import { shellQuote } from "@nightshift/agents/types";',
-				'test("x", () => shellQuote);',
+				'test("x", () => expect(shellQuote));',
 			]),
 		);
 		expect(problems).toHaveLength(1);
@@ -310,7 +313,7 @@ describe("application/ imports (H2)", () => {
 			[`${SLICE}/application/create-schedule.test.ts`]: [
 				'import { test } from "bun:test";',
 				'import { appendEvent } from "../../log";',
-				'test("x", () => appendEvent);',
+				'test("x", () => expect(appendEvent));',
 			],
 		});
 		expect(problems).toHaveLength(1);
@@ -541,7 +544,7 @@ describe("a use-case test (H8)", () => {
 				'import type { Database } from "@nightshift/db";',
 				'import { mkdtempSync } from "node:fs";',
 				'import { spawnSync } from "node:child_process";',
-				'test("x", () => [mkdtempSync, spawnSync, {} as Database]);',
+				'test("x", () => expect([mkdtempSync, spawnSync, {} as Database]));',
 			]),
 		);
 		expect(problems).toHaveLength(3);
@@ -556,7 +559,7 @@ describe("a use-case test (H8)", () => {
 			...withTest([
 				'import { sandbox } from "../../testing/sandbox";',
 				'import { drizzleScheduleStore } from "../adapters/out/drizzle-schedule-store";',
-				'test("x", () => [sandbox, drizzleScheduleStore]);',
+				'test("x", () => expect([sandbox, drizzleScheduleStore]));',
 			]),
 			"packages/engine/src/testing/sandbox.ts": "export const sandbox = 1;\n",
 		});

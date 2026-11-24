@@ -35,8 +35,9 @@ import {
 	useCaseSteps,
 } from "../turbo/generators/steps";
 import { checkRings } from "./check-rings";
-import { camel, kebab } from "./rings/files";
+import { kebab } from "./rings/files";
 import { DEFAULTS, manifest, repository, SLICE, write } from "./rings/fixture";
+import { camel } from "./rings/syntax";
 
 const TEMPLATES = join(
 	import.meta.dir,
@@ -64,7 +65,7 @@ const ACCESS = Object.fromEntries(
 			'import { openSpace } from "./application/open-space";\nexport type Access = { openSpace: typeof openSpace };\nexport function wireAccess(): Access {\n\treturn { openSpace };\n}',
 		"application/open-space.ts": "export function openSpace() {}",
 		"application/open-space.test.ts":
-			'import { openSpace } from "./open-space";\nopenSpace();',
+			'import { expect } from "bun:test";\nimport { openSpace } from "./open-space";\nexpect(openSpace()).toBeUndefined();',
 		"adapters/out/in-memory-access.ts":
 			"export function inMemoryAccess() {}\nexport function allowing() {}",
 	}).map(([file, text]) => [`packages/engine/src/access/${file}`, `${text}\n`]),
@@ -234,6 +235,9 @@ describe("what the generators make keeps the ring check", () => {
 			]) {
 				expect(readFileSync(join(root, file), "utf8")).toContain("import");
 			}
+			expect(
+				readFileSync(join(root, `${out}/spend-store.contract.test.ts`), "utf8"),
+			).toContain("`migratedDb()` of\n * `@nightshift/db/testing`");
 			expect(await checkRings(root, DEFAULTS)).toEqual([]);
 			const wire = readFileSync(
 				join(root, `packages/${pkg}/src/spend/wire.ts`),
@@ -277,12 +281,8 @@ function handSlice(root: string, pkg: string): string {
 }
 
 describe("a use case of a slice without an access port", () => {
-	for (const [pkg, actor] of [
-		["engine", true],
-		["devices", true],
-		["auth", false],
-	] as const) {
-		test(`in ${pkg}: it ${actor ? "takes the actor" : "takes the request alone"}, and asks no access`, async () => {
+	for (const pkg of ["engine", "devices", "auth"]) {
+		test(`in ${pkg}: it takes the request alone, reads it, and asks no access`, async () => {
 			const root = repositoryWithMap();
 			const dir = handSlice(root, pkg);
 			const at = { package: pkg, slice: "notes" };
@@ -309,8 +309,9 @@ describe("a use case of a slice without an access port", () => {
 				"utf8",
 			);
 			expect(useCase).not.toContain("openSpace");
-			expect(useCase.includes("_actor: Actor, _request: KeepNote")).toBe(actor);
-			expect(useCase.includes("async (_request: KeepNote)")).toBe(!actor);
+			expect(useCase).not.toMatch(/actor: Actor|_actor|_request/);
+			expect(useCase).toContain("async (request: KeepNote)");
+			expect(useCase).toContain("request.id");
 			const wire = readFileSync(join(root, `${dir}/wire.ts`), "utf8");
 			expect(wire).toContain("\t\tkeepNote: keepNote(ports),\n");
 			expect(wire).toContain("\t\tnoteStore: drizzleNoteStore(),\n");

@@ -42,8 +42,7 @@ const served = (
 
 /**
  * What every adapter of `AnswerCostShare` does.
- * `answer-cost-share.contract.test.ts` runs it on the in-memory adapter
- * and on the real one.
+ * `answer-cost-share.contract.test.ts` runs it on the real one.
  */
 export function answerCostShareContract(
 	name: string,

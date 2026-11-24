@@ -9,7 +9,7 @@ import { join, relative, sep } from "node:path";
 
 import { SERVER_PACKAGES } from "../../.dependency-cruiser.mjs";
 import { isTest } from "../check-layers";
-import { parse, skipped } from "../verticals/source-file";
+import { parse, skipped, walk } from "../verticals/source-file";
 import { verticalsOf } from "../verticals/vertical";
 
 /** The folders of a slice that are rings. */
@@ -83,6 +83,13 @@ export function slicesOf(root: string): Slice[] {
 /** A slice and its sub-verticals, at every depth. */
 export function withSubs(slice: Slice): Slice[] {
 	return [slice, ...slice.subs.flatMap(withSubs)];
+}
+
+/** Every source file of a vertical, its sub-verticals included. */
+export function filesOf(slice: Slice): string[] {
+	const files: string[] = [];
+	walk(slice.dir, files);
+	return files;
 }
 
 /** The slice, or one of its sub-verticals, has an `application/` folder. */

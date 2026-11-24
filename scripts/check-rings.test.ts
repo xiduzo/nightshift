@@ -9,14 +9,16 @@ import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 
 import { biomeProblems, checkRings, mechanismsOf } from "./check-rings";
-import { camel, kebab } from "./rings/files";
+import { kebab } from "./rings/files";
 import {
+	asserting,
 	check as checkFiles,
 	type Files,
 	gates,
 	repository,
 	SLICE,
 } from "./rings/fixture";
+import { camel } from "./rings/syntax";
 
 const roots: string[] = [];
 
@@ -181,7 +183,7 @@ const runs: Files = {
 		"export const openRun =",
 		"\t(ports: { runs: RunRecords }): OpenRun =>",
 		"\t(id) =>",
-		"\t\tports.runs.find(id);",
+		'\t\tports.runs.find(id || "none");',
 	],
 	[`${RUNS}/access/application/open-run.test.ts`]: [
 		'import { expect, test } from "bun:test";',
@@ -231,7 +233,7 @@ const runs: Files = {
 		"export const stopRun =",
 		"\t(ports: { open: RunAccess }) =>",
 		"\t(id: string) =>",
-		"\t\tports.open(id);",
+		'\t\tports.open(id || "none");',
 	],
 	[`${RUNS}/actions/application/stop-run.test.ts`]: [
 		'import { expect, test } from "bun:test";',
@@ -455,7 +457,7 @@ describe("one use case per file (H6)", () => {
 		...repository,
 		[`${SLICE}/application/list-schedules.ts`]: lines,
 		[`${SLICE}/application/list-schedules.test.ts`]: withTest
-			? 'import "./list-schedules";\n'
+			? asserting("list-schedules", "listSchedules")
 			: null,
 	});
 
@@ -466,7 +468,7 @@ describe("one use case per file (H6)", () => {
 					"export type Listed = string[];",
 					"export interface ListSchedulesPorts { all(): Listed }",
 					"export function listSchedules(ports: ListSchedulesPorts): Listed {",
-					"\treturn ports.all();",
+					"\treturn [...ports.all()];",
 					"}",
 				]),
 			),
@@ -540,8 +542,10 @@ describe("one use case per file (H6)", () => {
 			...repository,
 			[`${SLICE}/application/listSchedules.ts`]:
 				"export const listSchedules = () => [];\n",
-			[`${SLICE}/application/listSchedules.test.ts`]:
-				'import "./listSchedules";\n',
+			[`${SLICE}/application/listSchedules.test.ts`]: asserting(
+				"listSchedules",
+				"listSchedules",
+			),
 		});
 		expect(problems).toHaveLength(1);
 		expect(problems[0]).toContain("<verb>-<object>.ts");
@@ -568,18 +572,20 @@ describe("a port has an in-memory adapter and a contract suite (H7)", () => {
 			[`${OUT}/schedule-store.contract.ts`]: null,
 			[`${OUT}/schedule-store.contract.test.ts`]: null,
 			[`${SLICE}/wire.ts`]: "export const wireSchedules = () => ({});\n",
-			[`${SLICE}/application/create-schedule.test.ts`]:
-				'import "./create-schedule";\n',
+			[`${SLICE}/application/create-schedule.test.ts`]: asserting(
+				"create-schedule",
+				"createSchedule",
+			),
 		});
 		expect(problems).toEqual([
-			`${PORTS}: the port ScheduleStore has no in-memory adapter. Add adapters/out/in-memory-schedule-store.ts. If another slice or package implements the port, write @filledBy <who> in its comment.`,
+			`${PORTS}: the port ScheduleStore is read by a use case and has no in-memory adapter. Add adapters/out/in-memory-schedule-store.ts. If another slice or package implements the port, write @filledBy <who> in its comment.`,
 			`${PORTS}: the port ScheduleStore has no real adapter. Add adapters/out/<tech>-schedule-store.ts (drizzle-schedule-store.ts).`,
 			`${PORTS}: the port ScheduleStore has no contract suite. Add adapters/out/schedule-store.contract.ts, which exports the function "scheduleStoreContract".`,
 			`${PORTS}: the port ScheduleStore has no test that runs its contract suite. Add adapters/out/schedule-store.contract.test.ts, which runs "scheduleStoreContract" on the in-memory adapter and on the real one.`,
 		]);
 	});
 
-	test("a second port needs its own files", async () => {
+	test("a second port needs its own files, and a twin only when a use case reads it", async () => {
 		const problems = await check({
 			...repository,
 			[PORTS]: [
@@ -588,12 +594,10 @@ describe("a port has an in-memory adapter and a contract suite (H7)", () => {
 				"export interface FiredTimes { last(): number }",
 			],
 		});
-		expect(problems).toHaveLength(4);
-		expect(problems[0]).toContain(
-			"the port FiredTimes has no in-memory adapter. Add adapters/out/in-memory-fired-times.ts.",
-		);
-		expect(problems[1]).toContain("the port FiredTimes has no real adapter.");
-		expect(problems[2]).toContain("the port FiredTimes has no contract suite.");
+		expect(problems).toHaveLength(3);
+		expect(problems[0]).toContain("the port FiredTimes has no real adapter.");
+		expect(problems[1]).toContain("the port FiredTimes has no contract suite.");
+		expect(problems[2]).toContain('"firedTimesContract" on the real adapter.');
 	});
 
 	test("an in-memory adapter and a suite that do not name the port fail", async () => {
@@ -602,7 +606,7 @@ describe("a port has an in-memory adapter and a contract suite (H7)", () => {
 			[`${OUT}/in-memory-schedule-store.ts`]:
 				"export function inMemoryScheduleStore() {\n\treturn { save: async () => {} };\n}\n",
 			[`${OUT}/schedule-store.contract.ts`]:
-				"export function contract(make: () => unknown): void {\n\tmake();\n}\n",
+				"export function contract(make: () => unknown): void {\n\texpect(make()).toBeDefined();\n}\n",
 		});
 		expect(problems).toEqual([
 			`${OUT}/in-memory-schedule-store.ts: does not import the port ScheduleStore from application/ports.ts. An in-memory adapter is typed by its port.`,
@@ -912,18 +916,28 @@ describe("the H4 override of biome.json", () => {
 });
 
 describe("the command", () => {
-	test("it passes on this repository, and only with its debt list", async () => {
+	test("it passes on this repository, and only with its debt lists", async () => {
 		const root = join(import.meta.dir, "..");
 		const debt = readFileSync(
 			join(import.meta.dir, "hexagon-debt.txt"),
 			"utf8",
 		);
+		const useCaseDebt = readFileSync(
+			join(import.meta.dir, "use-case-debt.txt"),
+			"utf8",
+		);
 		const mechanisms = mechanismsOf();
-		expect(await checkRings(root, { mechanisms, debt })).toEqual([]);
+		expect(await checkRings(root, { mechanisms, debt, useCaseDebt })).toEqual(
+			[],
+		);
 		const listed = debt
 			.split("\n")
 			.some((line) => line.trim() !== "" && !line.trim().startsWith("#"));
-		const withoutDebt = await checkRings(root, { mechanisms, debt: "" });
+		const withoutDebt = await checkRings(root, {
+			mechanisms,
+			debt: "",
+			useCaseDebt,
+		});
 		// With a non-empty debt list, clearing it must surface the debtors.
 		// With none left, empty debt is the green state.
 		if (listed) expect(withoutDebt).not.toEqual([]);

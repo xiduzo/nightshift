@@ -201,8 +201,8 @@ function useCaseData(root: string, pkg: string, slice: string, name: string) {
 /**
  * The shapes of a generated use case. `access` asks the engine's `access`
  * who may act first. `port` does so through the port `<Slice>Access`, above
- * the engine. `plain` is for a slice that has neither: it takes the actor
- * (or, below the engine, the request alone) and asks nothing.
+ * the engine. `plain` is for a slice that has neither: it takes the request
+ * alone.
  */
 type UseCaseShape = "access" | "port" | "plain";
 
@@ -281,17 +281,9 @@ function sliceData(pkg: string, slice: string): Data {
 		actorFromApplication: actor?.application ?? "",
 		actorFromAdapters: actor?.adapters ?? "",
 		...accessData(pkg, depth, name),
-		// The parts of a plain use case and its test that name the Actor.
-		actorImport: actor
-			? `import type { Actor } from "${actor.application}";\n`
-			: "",
-		actorParameter: actor ? "_actor: Actor, " : "",
-		actorArgument: actor ? "ADA, " : "",
-		actorConstant: actor
-			? 'const ADA: Actor = { personId: "person-ada", door: "session" };\n'
-			: "",
+		// Who calls a plain use case.
 		whoAsks: actor
-			? "It checks no role: the slice does not ask access."
+			? "It takes no actor: the clock or another slice calls it. When the door of a person calls it, give it the `Actor` and ask who may act."
 			: `${pkg} is below the engine: the use case takes the request alone.`,
 	};
 }

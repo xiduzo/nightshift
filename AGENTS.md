@@ -35,11 +35,13 @@ Read `docs/steering/STRUCTURE.md` before you add a file, a folder or a package.
 - **One request, one use case.** In a server package (`engine`, `devices`,
   `notifications`, `agents`, `auth`, `telemetry`), a capability has three rings:
   `domain/`, `application/` and `adapters/`. A use case takes its ports, decides who may
-  act and throws a `Refusal`. Only a `wire.ts` builds a real adapter. Read section 9 of
+  act and throws a `Refusal`. A call that only passes its request to a port is the wire's.
+  A test asserts an outcome. Only a `wire.ts` builds a real adapter. Read section 9 of
   `STRUCTURE.md` before you add code there. Start a new slice, use case or adapter with
   `bun run gen` (`turbo gen`).
-- **A debt list only gets shorter.** Never add a line to a `scripts/*-debt.txt` file, and
-  never raise a number in one. Fix the new offender. A listed file may not grow: split it
+- **A debt list only gets shorter.** A new check may start with a list that is filled on its
+  first day, with the yes of the owner. After that, never add a line to a
+  `scripts/*-debt.txt` file, and never raise a number in one. Fix the new offender. A listed file may not grow: split it
   first.
 - **Run the checks.** `bun scripts/check-layers.ts`, `bun scripts/check-verticals.ts`,
   `bun scripts/check-capabilities.ts`, `bun scripts/check-budgets.ts` and
