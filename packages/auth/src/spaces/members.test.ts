@@ -303,3 +303,17 @@ describe("roles in a Space", () => {
 		await expect(after.setActiveSpace(platform)).rejects.toThrow();
 	});
 });
+
+describe("the membership of a Person", () => {
+	test("is the one of that Person in that Space, or null", async () => {
+		const ada = await sandbox.signUp("Ada");
+		const bob = await sandbox.signUp("Bob");
+		const spaceId = await platformOf(ada.headers);
+		expect(
+			await spaces.members.findMembership({ spaceId, personId: ada.userId }),
+		).toEqual({ id: expect.any(String), role: "owner" });
+		expect(
+			await spaces.members.findMembership({ spaceId, personId: bob.userId }),
+		).toBeNull();
+	});
+});

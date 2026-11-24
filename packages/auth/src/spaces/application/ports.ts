@@ -1,5 +1,4 @@
 import type { Role } from "../roles";
-import type { Space } from "./list-spaces";
 
 /**
  * The driven ports of spaces. A port of its own has a real adapter, an
@@ -12,7 +11,9 @@ export type SpaceStore = {
 	 * The Spaces the Person is a member of, the personal one first, then by
 	 * name. A membership of a Space that is gone does not count.
 	 */
-	spacesOf(personId: string): Promise<Space[]>;
+	spacesOf(
+		personId: string,
+	): Promise<{ id: string; name: string; personal: boolean; role: Role }[]>;
 	/**
 	 * The Person's role in the Space, from their membership alone: a
 	 * membership of a Space that is gone counts here (decision 87).

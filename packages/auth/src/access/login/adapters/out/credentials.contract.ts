@@ -39,6 +39,8 @@ export function credentialsContract(
 			expect(await under.credentials.hasPassword("ada")).toBe(true);
 			await under.credentials.savePassword("ada", "another-password");
 			expect(await under.credentials.hasPassword("ada")).toBe(true);
+			await under.addPerson({ id: "bob", email: "bob@example.com" });
+			expect(await under.credentials.hasPassword("bob")).toBe(false);
 		});
 
 		test("a new email takes the place of the old one", async () => {

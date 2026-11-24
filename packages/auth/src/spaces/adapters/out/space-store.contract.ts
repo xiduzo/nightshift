@@ -79,6 +79,7 @@ export function spaceStoreContract(
 			expect(await store.roleOf("ada", "c")).toBeNull();
 			expect(await store.roleOf("someone-else", "b")).toBeNull();
 			expect(await store.exists("c")).toBe(true);
+			expect(await store.exists("gone")).toBe(false);
 			expect((await store.ids()).sort()).toEqual(["a", "b", "c", "p"]);
 		});
 

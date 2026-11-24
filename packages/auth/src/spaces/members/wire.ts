@@ -6,13 +6,11 @@ import { drizzlePersonStore } from "./adapters/out/drizzle-person-store";
 import { addMembership } from "./application/add-membership";
 import { checkSignUp } from "./application/check-sign-up";
 import { claimHostAdmin } from "./application/claim-host-admin";
-import { findMembership } from "./application/find-membership";
-import { findPersonContact } from "./application/find-person-contact";
 import { hasHostAdmin } from "./application/has-host-admin";
 import { isHostAdmin } from "./application/is-host-admin";
 import { listMembers } from "./application/list-members";
 import { listPersonNames } from "./application/list-person-names";
-import { listRoster } from "./application/list-roster";
+import type { MemberStore, PersonStore } from "./application/ports";
 import { removeMemberships } from "./application/remove-memberships";
 import { setMembershipRole } from "./application/set-membership-role";
 import { viewInvitation } from "./application/view-invitation";
@@ -27,7 +25,7 @@ export type MembersDeps = {
 	db: Database;
 };
 
-/** The use cases of members, bound to their ports. */
+/** The use cases of members, bound to their ports, and the calls of a port that other slices make. */
 export type Members = {
 	/** Whether the Host has a Host admin yet. */
 	hasHostAdmin: ReturnType<typeof hasHostAdmin>;
@@ -42,9 +40,14 @@ export type Members = {
 	/** The Members of a Space, oldest first, and its pending invitations that have not expired. */
 	listMembers: ReturnType<typeof listMembers>;
 	/** The Members of a Space by Person: their name and role, in no set order. */
-	listRoster: ReturnType<typeof listRoster>;
-	/** The Person's membership of the Space, or null. */
-	findMembership: ReturnType<typeof findMembership>;
+	listRoster: (request: {
+		spaceId: string;
+	}) => ReturnType<MemberStore["roster"]>;
+	/** The Person's membership of the Space (its id and role), or null. */
+	findMembership: (request: {
+		spaceId: string;
+		personId: string;
+	}) => ReturnType<MemberStore["membershipOf"]>;
 	/** Makes the Person a Member of the Space in that role. */
 	addMembership: ReturnType<typeof addMembership>;
 	/** Gives a membership another role. */
@@ -54,7 +57,9 @@ export type Members = {
 	/** The names of these Persons, by id. A Person this Replica does not know is missing. */
 	listPersonNames: ReturnType<typeof listPersonNames>;
 	/** The name and email of a Person, or null for one this Replica does not know. */
-	findPersonContact: ReturnType<typeof findPersonContact>;
+	findPersonContact: (request: {
+		personId: string;
+	}) => ReturnType<PersonStore["contact"]>;
 };
 
 export function wireMembers(deps: MembersDeps): Members {
@@ -71,12 +76,13 @@ export function wireMembers(deps: MembersDeps): Members {
 		checkSignUp: checkSignUp(ports),
 		viewInvitation: viewInvitation(ports),
 		listMembers: listMembers(ports),
-		listRoster: listRoster(ports),
-		findMembership: findMembership(ports),
+		listRoster: ({ spaceId }) => ports.memberStore.roster(spaceId),
+		findMembership: ({ spaceId, personId }) =>
+			ports.memberStore.membershipOf(spaceId, personId),
 		addMembership: addMembership(ports),
 		setMembershipRole: setMembershipRole(ports),
 		removeMemberships: removeMemberships(ports),
 		listPersonNames: listPersonNames(ports),
-		findPersonContact: findPersonContact(ports),
+		findPersonContact: ({ personId }) => ports.personStore.contact(personId),
 	};
 }

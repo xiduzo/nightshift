@@ -53,6 +53,18 @@ describe("personal Space", () => {
 		expect(session?.session.activeOrganizationId).toBe(spaces[0]?.id);
 	});
 
+	test("the role of a Person is the one of their own membership of that Space", async () => {
+		const ada = await sandbox.signUp("Ada");
+		const bob = await sandbox.signUp("Bob");
+		const spaceId = await sharedSpace(ada.headers);
+		expect(await authSpaces.findRole({ personId: ada.userId, spaceId })).toBe(
+			"owner",
+		);
+		expect(
+			await authSpaces.findRole({ personId: bob.userId, spaceId }),
+		).toBeNull();
+	});
+
 	test("nobody can be invited to or added to it", async () => {
 		const ada = await sandbox.signUp("Ada");
 		const bob = await sandbox.signUp("Bob");

@@ -2,8 +2,6 @@ import type { Database } from "@nightshift/db";
 import type { Auth } from "../../auth";
 import { betterAuthCredentials } from "./adapters/out/better-auth-credentials";
 import { drizzleSessionStore } from "./adapters/out/drizzle-session-store";
-import { endSession } from "./application/end-session";
-import { hasLogin } from "./application/has-login";
 import { listLiveSessions } from "./application/list-live-sessions";
 import { setLogin } from "./application/set-login";
 
@@ -18,14 +16,21 @@ export type LoginDeps = {
 	db: Database;
 };
 
-/** The use cases of login, bound to their ports. */
+/** The use cases of login, bound to their ports, and the calls of a port that other slices make. */
 export type Login = {
 	/** Whether the Person can sign in with an email and a password. */
-	hasLogin: ReturnType<typeof hasLogin>;
+	hasLogin: (request: { personId: string }) => Promise<boolean>;
 	/** Sets the Person's email, name and password. */
 	setLogin: ReturnType<typeof setLogin>;
-	/** Ends one of the Person's sessions. */
-	endSession: ReturnType<typeof endSession>;
+	/**
+	 * Ends one of the Person's sessions: the screen that holds it is signed
+	 * out at its next call. Removing a phone ends the session it signed in
+	 * with. False when the Person has no session of that id.
+	 */
+	endSession: (request: {
+		personId: string;
+		sessionId: string;
+	}) => Promise<boolean>;
 	/** Which of these sessions still work. */
 	listLiveSessions: ReturnType<typeof listLiveSessions>;
 };
@@ -36,9 +41,10 @@ export function wireLogin(deps: LoginDeps): Login {
 		sessionStore: drizzleSessionStore(deps.db),
 	};
 	return {
-		hasLogin: hasLogin(ports),
+		hasLogin: ({ personId }) => ports.credentials.hasPassword(personId),
 		setLogin: setLogin(ports),
-		endSession: endSession(ports),
+		endSession: ({ personId, sessionId }) =>
+			ports.sessionStore.end(personId, sessionId),
 		listLiveSessions: listLiveSessions(ports),
 	};
 }

@@ -6,7 +6,6 @@ import { drizzlePersonalSpaceStore } from "./adapters/out/drizzle-personal-space
 import { adoptPersonalSpace } from "./application/adopt-personal-space";
 import { ensurePersonalSpace } from "./application/ensure-personal-space";
 import { findLocalPerson } from "./application/find-local-person";
-import { findPersonalSpace } from "./application/find-personal-space";
 import { findPersonalSpaceBySlug } from "./application/find-personal-space-by-slug";
 import { splitPersonalSpace } from "./application/split-personal-space";
 
@@ -22,10 +21,10 @@ export type PersonalDeps = {
 	claimHostAdmin: (request: { personId: string }) => Promise<void>;
 };
 
-/** The use cases of personal, bound to their ports. */
+/** The use cases of personal, bound to their ports, and the call of a port that other slices make. */
 export type Personal = {
 	/** The id of the Person's personal Space, or null. */
-	findPersonalSpace: ReturnType<typeof findPersonalSpace>;
+	findPersonalSpace: (request: { personId: string }) => Promise<string | null>;
 	/** The id of the Person's personal Space by its slug, or null. */
 	findPersonalSpaceBySlug: ReturnType<typeof findPersonalSpaceBySlug>;
 	/** The Person's personal Space: made with its owner membership when there is none. */
@@ -48,7 +47,8 @@ export function wirePersonal(deps: PersonalDeps): Personal {
 	};
 	const ensure = ensurePersonalSpace(ports);
 	return {
-		findPersonalSpace: findPersonalSpace(ports),
+		findPersonalSpace: ({ personId }) =>
+			ports.personalSpaceStore.personalSpaceId(personId),
 		findPersonalSpaceBySlug: findPersonalSpaceBySlug(ports),
 		ensurePersonalSpace: ensure,
 		findLocalPerson: findLocalPerson({ ...ports, ensurePersonalSpace: ensure }),
