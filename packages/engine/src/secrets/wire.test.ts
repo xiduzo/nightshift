@@ -1,6 +1,5 @@
 import { describe, expect, spyOn, test } from "bun:test";
-import { createDb } from "@nightshift/db";
-import { migrateDb } from "@nightshift/db/migrate";
+import { migratedDb } from "@nightshift/db/testing";
 import * as Y from "yjs";
 import { inMemoryAccess } from "../access/adapters/out/in-memory-access";
 import { inMemoryComputer } from "../access/computer/adapters/out/in-memory-computer";
@@ -25,8 +24,7 @@ const VALUE = "v4lue-that-must-not-leak";
 const RUN = { spaceId: "space-1", projectId: "app", runId: "run-1" };
 
 async function wired() {
-	const db = createDb({ DATABASE_URL: ":memory:" });
-	await migrateDb(db);
+	const db = await migratedDb();
 	const document = await openDeviceDocument({ db, deviceId: "device-1" });
 	const computer = inMemoryComputerSecrets();
 	const personal = inMemoryPersonalSecrets();

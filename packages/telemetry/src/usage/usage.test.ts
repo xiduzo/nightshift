@@ -2,8 +2,8 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createDb, type Database } from "@nightshift/db";
-import { migrateDb } from "@nightshift/db/migrate";
+import type { Database } from "@nightshift/db";
+import { migratedDb } from "@nightshift/db/testing";
 import { type LandedFact, RUNGS, type RunTrace } from "@nightshift/engine";
 import { NODE_TYPE_LABEL, starterList } from "@nightshift/flows";
 import {
@@ -33,8 +33,7 @@ const SECRET_RUN = "run-secret-id";
 
 async function openDb(): Promise<{ db: Database; close(): Promise<void> }> {
 	const dir = await mkdtemp(join(tmpdir(), "nightshift-usage-"));
-	const db = createDb({ DATABASE_URL: `file:${join(dir, "usage.db")}` });
-	await migrateDb(db);
+	const db = await migratedDb(`file:${join(dir, "usage.db")}`);
 	return { db, close: () => rm(dir, { recursive: true, force: true }) };
 }
 

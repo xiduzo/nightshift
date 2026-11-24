@@ -2,9 +2,8 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { hostname, tmpdir } from "node:os";
 import { join } from "node:path";
-import { createDb } from "@nightshift/db";
-import { migrateDb } from "@nightshift/db/migrate";
 import { daemonLease } from "@nightshift/db/schema";
+import { migratedDb } from "@nightshift/db/testing";
 import { asDate, now as timeNow } from "@nightshift/time";
 import {
 	checkHealth,
@@ -28,8 +27,7 @@ async function database() {
 	const root = mkdtempSync(join(tmpdir(), "nightshift-health-"));
 	roots.push(root);
 	const path = join(root, "nightshift.db");
-	const db = createDb({ DATABASE_URL: `file:${path}` });
-	await migrateDb(db);
+	const db = await migratedDb(`file:${path}`);
 	return { db, path, url: `file:${path}` };
 }
 

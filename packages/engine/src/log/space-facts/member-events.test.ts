@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { createDb } from "@nightshift/db";
-import { migrateDb } from "@nightshift/db/migrate";
 import { event, user } from "@nightshift/db/schema";
+import { migratedDb } from "@nightshift/db/testing";
 import { and, eq, isNull } from "drizzle-orm";
 import { ownDevice } from "../../testing/alone-directory";
 import { localSpaceId } from "../../testing/test-support";
@@ -13,8 +12,7 @@ import { logMemberChange } from "./member-events";
 
 describe("the audit of Members", () => {
 	test("joined, new role and removed go in the Space's log, with who did it", async () => {
-		const db = createDb({ DATABASE_URL: ":memory:" });
-		await migrateDb(db);
+		const db = await migratedDb();
 		const walkerId = (await ownDevice(db)).id;
 		const spaceId = await localSpaceId(db);
 		const log = createRunLog(db, { walkerId, dataDir: "/nowhere" });

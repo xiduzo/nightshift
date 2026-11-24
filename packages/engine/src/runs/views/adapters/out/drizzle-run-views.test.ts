@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
-import { createDb } from "@nightshift/db";
-import { migrateDb } from "@nightshift/db/migrate";
+import type { Database } from "@nightshift/db";
 import { project, run } from "@nightshift/db/schema";
+import { migratedDb } from "@nightshift/db/testing";
 import {
 	createRunBus,
 	createRunLog,
@@ -23,15 +23,14 @@ import { drizzleRunViews } from "./drizzle-run-views";
  * `run-views.contract.ts`.
  */
 
-let db: ReturnType<typeof createDb>;
+let db: Database;
 let log: RunLog;
 let bus: RunBus;
 let views: RunViews;
 const controllers: AbortController[] = [];
 
 beforeEach(async () => {
-	db = createDb({ DATABASE_URL: ":memory:" });
-	await migrateDb(db);
+	db = await migratedDb();
 	const deviceId = (await ownDevice(db)).id;
 	const spaceId = await localSpaceId(db);
 	await db.insert(project).values({ id: "p", spaceId, name: "p" });
