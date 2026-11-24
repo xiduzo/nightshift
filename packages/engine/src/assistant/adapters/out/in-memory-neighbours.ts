@@ -1,5 +1,4 @@
 import { inMemoryAccess } from "../../../access/adapters/out/in-memory-access";
-import { inMemoryAnswerCostShare } from "./in-memory-answer-cost-share";
 import {
 	answerCostRecords,
 	inMemoryAnswerCostStore,
@@ -7,8 +6,8 @@ import {
 
 /**
  * `inMemoryAssistantPorts`, which gives a use-case test every port of the
- * slice at once: both twins on the records of one Replica. Test code:
- * production code never imports this file.
+ * use cases at once, on the records of one Replica. Test code: production
+ * code never imports this file.
  */
 
 /** Every port of assistant in memory at once: where each use-case test starts. */
@@ -19,7 +18,6 @@ export function inMemoryAssistantPorts() {
 		access: inMemoryAccess(),
 		records,
 		answerCostStore: inMemoryAnswerCostStore(records),
-		answerCostShare: inMemoryAnswerCostShare(records),
 		newKey: () => `key-${++keys}`,
 	};
 }

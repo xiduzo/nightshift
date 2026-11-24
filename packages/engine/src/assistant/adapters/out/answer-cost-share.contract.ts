@@ -101,11 +101,24 @@ export function answerCostShareContract(
 				"space-b": 2,
 			});
 			expect(await share.unsent(["space-a", "space-b"], 10)).toEqual([]);
+			const [kept] = await share.after({
+				spaces: ["space-b"],
+				cursors: {},
+				selfId: "this-one",
+				limit: 10,
+			});
+			expect(kept).toMatchObject({
+				...served("h3", 2, { spaceId: "space-b", deviceId: "other" }),
+				seq: expect.any(Number),
+			});
 		});
 
 		test("an own answer that comes back takes the Host's number and stays this computer's", async () => {
 			await own("k1");
-			await share.ingest([served("k1", 5, { deviceId: "laptop" })], 9_000);
+			await share.ingest(
+				[served("k1", 5, { personId: "ada-there", costUsd: 0.5 })],
+				9_000,
+			);
 			expect(await share.cursors(["space-a"])).toEqual({ "space-a": 5 });
 			const [back] = await share.after({
 				spaces: ["space-a"],
@@ -113,7 +126,12 @@ export function answerCostShareContract(
 				selfId: "this-one",
 				limit: 10,
 			});
-			expect(back).toMatchObject({ key: "k1", deviceId: "this-one" });
+			expect(back).toMatchObject({
+				key: "k1",
+				deviceId: "this-one",
+				personId: "ada",
+				costUsd: 0.1,
+			});
 		});
 
 		test("a Host keeps what a Device gives once, as that Device's and its Person's", async () => {
@@ -128,6 +146,7 @@ export function answerCostShareContract(
 					personId: "bob",
 				}),
 			).toEqual(["a1"]);
+			expect(await share.unsent(["space-a"], 10)).toEqual([]);
 			const rows = await share.after({
 				spaces: ["space-a"],
 				cursors: {},
@@ -163,12 +182,20 @@ export function answerCostShareContract(
 			]);
 			const seqOf = (key: string) =>
 				all.find((r) => r.key === key)?.seq ?? Number.NaN;
-			const after = (cursors: Record<string, number>, limit = 10) =>
+			const after = (
+				cursors: Record<string, number>,
+				limit = 10,
+				spaces = ["space-a"],
+			) =>
 				share
-					.after({ spaces: ["space-a"], cursors, selfId: "h", limit })
+					.after({ spaces, cursors, selfId: "h", limit })
 					.then((rows) => rows.map((r) => r.key));
 			expect(await after({ "space-a": seqOf("a1") })).toEqual(["a2"]);
 			expect(await after({}, 2)).toEqual(["mine", "a1"]);
+			// A Space without a cursor is read from its start.
+			expect(
+				await after({ "space-a": seqOf("a2") }, 10, ["space-a", "space-b"]),
+			).toEqual(["b1"]);
 		});
 	});
 }

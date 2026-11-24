@@ -1,5 +1,5 @@
 import type { Actor } from "../../../contract";
-import type { RunRow } from "../../../log";
+import type { RunRow, WaitReason } from "../../../log";
 import type {
 	AnsweredGate,
 	OpenGate,
@@ -13,7 +13,19 @@ import type {
 	StepTranscript,
 } from "../../../read";
 import type { RunStatus } from "../../../run-status";
-import type { RunHere } from "./read-run-here";
+
+/** A run's status and whether it is on this computer. */
+type RunPlace = {
+	id: string;
+	status: RunStatus;
+	wakeAt: number | null;
+	/** What a sleeping run waits for: a time, the network, an offline Device. Null while it does not sleep. */
+	waitReason: WaitReason | null;
+	/** This computer walks it. */
+	walkedHere: boolean;
+	/** Its steps run on this computer (its Device, as its row says). */
+	stepsHere: boolean;
+};
 
 /**
  * What people see of the runs of this Replica, derived from the event
@@ -48,7 +60,7 @@ export type RunViews = {
 	/** The run's status, or null for a run the log has nothing on. */
 	runStatus(runId: string): Promise<RunStatus | null>;
 	/** Where a run is and what it does, cheap. Null when this Replica has no such run. */
-	runHere(runId: string): Promise<RunHere | null>;
+	runHere(runId: string): Promise<RunPlace | null>;
 	/** The run as monitoring reads it, or null when the log has none of it. */
 	trace(runId: string): Promise<RunTrace | null>;
 	/** The open Gates of the Space's runs of projects a person has not removed, in the inbox order. */

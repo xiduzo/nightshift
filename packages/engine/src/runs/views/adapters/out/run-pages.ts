@@ -34,7 +34,7 @@ import {
 	toSummary,
 } from "../../../../read";
 import { isTestRun, type RunStatus } from "../../../../run-status";
-import type { RunHere } from "../../application/read-run-here";
+import type { RunViews } from "../../application/ports";
 
 /**
  * The pages of a run that people open, made from its row and its run
@@ -295,7 +295,7 @@ export function runHereOf(
 	facts: RunFacts,
 	self: string,
 	deviceId: string,
-): RunHere {
+): NonNullable<Awaited<ReturnType<RunViews["runHere"]>>> {
 	const here = (id: string) => id === self || id === deviceId;
 	return {
 		id: runId,

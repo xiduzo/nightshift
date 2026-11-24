@@ -18,6 +18,10 @@ export type RunViewsUnderTest = {
 		worktreePath?: string;
 		branch?: string;
 		baseRef?: string;
+		/** The Device that walks it, when that is another one. */
+		walkerId?: string;
+		/** The Device its steps run on, when that is another one. */
+		deviceId?: string;
 	}): Promise<void>;
 	/** Moves the start of a run. */
 	startedAt(runId: string, at: number): Promise<void>;
@@ -129,6 +133,15 @@ export function runViewsContract(
 				waitReason: null,
 				walkedHere: true,
 				stepsHere: true,
+			});
+			await under.addRun({
+				id: "r2",
+				walkerId: "device-far",
+				deviceId: "device-far",
+			});
+			expect(await views.runHere("r2")).toMatchObject({
+				walkedHere: false,
+				stepsHere: false,
 			});
 			expect(await views.runHere("missing")).toBeNull();
 			expect(await views.runStatus("r1")).toBe("running");

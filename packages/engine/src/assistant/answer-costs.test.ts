@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { createDb, type Database } from "@nightshift/db";
 import { migrateDb } from "@nightshift/db/migrate";
 import { answerCost } from "@nightshift/db/schema";
+import { instantOrNull } from "@nightshift/time";
 import { inMemoryAccess } from "../access/adapters/out/in-memory-access";
 import { NIGHT_SHIFT } from "../contract";
 import type { AnswerCost } from "./domain/answer-costs";
@@ -51,19 +52,16 @@ describe("shared answer costs", () => {
 		const here = device.cases;
 		const there = host.cases;
 		const spaces = ["space-a"];
-		const rows = await here.listUnsentAnswerCosts({ spaces, limit: 100 });
-		const taken = await there.takeSentAnswerCosts({
-			rows,
-			from: { deviceId, personId },
-		});
-		const served = await there.serveAnswerCosts({
+		const rows = await here.shared.unsent(spaces, 100);
+		const taken = await there.shared.take(rows, { deviceId, personId });
+		const served = await there.shared.after({
 			spaces,
-			cursors: await here.readAnswerCostCursors({ spaces }),
+			cursors: await here.shared.cursors(spaces),
 			selfId: "the-host",
 			limit: 100,
 		});
-		await here.ingestServedAnswerCosts({ rows: served, now: 9_000 });
-		await here.markAnswerCostsSent({ keys: taken, now: 9_000 });
+		await here.shared.ingest(served, 9_000);
+		await here.shared.sent(taken, 9_500);
 		return { rows, served };
 	}
 
@@ -83,12 +81,18 @@ describe("shared answer costs", () => {
 		expect(second).toEqual({ rows: [], served: [] });
 		expect(await listOf(host, "space-a")).toHaveLength(1);
 		const own = await device.db.select().from(answerCost);
-		expect(own.map((row) => [row.spaceId, row.deviceId, row.personId])).toEqual(
-			[
-				["space-a", null, "ada-here"],
-				["space-b", null, "ada"],
-			],
-		);
+		expect(
+			own.map((row) => [
+				row.spaceId,
+				row.deviceId,
+				row.personId,
+				instantOrNull(row.sentAt),
+			]),
+		).toEqual([
+			// Sent at the first time the Host had it.
+			["space-a", null, "ada-here", 9_000],
+			["space-b", null, "ada", null],
+		]);
 	});
 
 	test("a second Device reads what the first one and the Host spent, each once", async () => {

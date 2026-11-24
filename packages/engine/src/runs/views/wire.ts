@@ -7,8 +7,6 @@ import { listProjectRuns } from "./application/list-project-runs";
 import { listRuns } from "./application/list-runs";
 import type { PrivatePaths, RunViews } from "./application/ports";
 import { readRun } from "./application/read-run";
-import { readRunHere } from "./application/read-run-here";
-import { readRunTrace } from "./application/read-run-trace";
 import { readStep } from "./application/read-step";
 import { readStepTranscript } from "./application/read-step-transcript";
 import { watchRun } from "./application/watch-run";
@@ -27,7 +25,10 @@ export type ViewsDeps = DrizzleRunViewsDeps & {
 	access: Pick<Access, "openRun" | "openSpace">;
 };
 
-/** The reads of the runs, bound to their ports. */
+/** A run's status and whether it is on this computer. */
+export type RunHere = NonNullable<Awaited<ReturnType<RunViews["runHere"]>>>;
+
+/** The reads of the runs, bound to their ports, and two calls of the views that Night Shift itself makes. */
 export type Views = {
 	/** The views themselves, for the readers in this process that act for Night Shift. */
 	reads: RunViews;
@@ -37,8 +38,18 @@ export type Views = {
 	readStep: ReturnType<typeof readStep>;
 	readStepTranscript: ReturnType<typeof readStepTranscript>;
 	watchRun: ReturnType<typeof watchRun>;
-	readRunHere: ReturnType<typeof readRunHere>;
-	readRunTrace: ReturnType<typeof readRunTrace>;
+	/**
+	 * Where a run is and what it does, cheap, in any Space of this Replica,
+	 * for Night Shift itself (keep this computer awake). Null for a run this
+	 * Replica does not have.
+	 */
+	readRunHere: (request: { runId: string }) => ReturnType<RunViews["runHere"]>;
+	/**
+	 * A run as an export to monitoring reads it, in any Space of this
+	 * Replica, for Night Shift itself. Null for a run this Replica has no
+	 * events of.
+	 */
+	readRunTrace: (request: { runId: string }) => ReturnType<RunViews["trace"]>;
 };
 
 export function wireViews(deps: ViewsDeps): Views {
@@ -54,7 +65,7 @@ export function wireViews(deps: ViewsDeps): Views {
 		readStep: readStep({ views, openRun }),
 		readStepTranscript: readStepTranscript({ views, openRun }),
 		watchRun: watchRun({ views, openRun }),
-		readRunHere: readRunHere({ views }),
-		readRunTrace: readRunTrace({ views }),
+		readRunHere: ({ runId }) => views.runHere(runId),
+		readRunTrace: ({ runId }) => views.trace(runId),
 	};
 }

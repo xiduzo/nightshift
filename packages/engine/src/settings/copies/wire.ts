@@ -4,7 +4,6 @@ import type { SyncedDocuments } from "../../documents";
 import { drizzleDeviceDocuments } from "./adapters/out/drizzle-device-documents";
 import { keepDeviceCopies } from "./application/keep-device-copies";
 import { listDeviceCopies } from "./application/list-device-copies";
-import { listStoredDevices } from "./application/list-stored-devices";
 import { readDeviceCopy } from "./application/read-device-copy";
 import { readKeptDeviceCopy } from "./application/read-kept-device-copy";
 import { readLastKnownProfiles } from "./application/read-last-known-profiles";
@@ -39,8 +38,13 @@ export type Copies = {
 	readLastKnownProfiles: ReturnType<typeof readLastKnownProfiles>;
 	/** What the document a Host keeps for one of its Devices says. Null when it keeps none. */
 	readKeptDeviceCopy: ReturnType<typeof readKeptDeviceCopy>;
-	/** Every Device whose document this Replica keeps, once each. */
-	listStoredDevices: ReturnType<typeof listStoredDevices>;
+	/**
+	 * Every Device whose document this Replica keeps, as that document says:
+	 * its own, those a Host keeps for the Devices whose home it is, and the
+	 * copies of its owner's other Devices. One entry per Device: a kept
+	 * document wins over a copy.
+	 */
+	listStoredDevices: () => Promise<DeviceCopy[]>;
 };
 
 /**
@@ -71,6 +75,6 @@ export function wireCopies(deps: {
 		},
 		readLastKnownProfiles: readLastKnownProfiles({ documents }),
 		readKeptDeviceCopy: readKeptDeviceCopy({ documents }),
-		listStoredDevices: listStoredDevices({ documents }),
+		listStoredDevices: () => documents.readAll(),
 	};
 }

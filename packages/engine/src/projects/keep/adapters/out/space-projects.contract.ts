@@ -84,7 +84,10 @@ export function spaceProjectsContract(
 					projectIds: ["app"],
 				}),
 			).toBeNull();
-			await space.take("hosted", { define: [] });
+			await space.take("hosted", {
+				define: [{ id: "app", ...entry, createdAt: 0, removedAt: null }],
+				clones: [studio("app")],
+			});
 			expect(await under.read("hosted")).toEqual({ projects: {}, clones: [] });
 		});
 

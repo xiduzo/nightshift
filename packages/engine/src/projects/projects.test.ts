@@ -132,6 +132,17 @@ describe("projects by remote", () => {
 	});
 });
 
+describe("the folder of a project", () => {
+	test("is the one of its Clone here, in its own Space only", async () => {
+		const path = await repo("app");
+		const projects = projectsOf();
+		const { id } = await projects.add({ repoPath: path }, sandbox.spaceId);
+		expect(await projects.clonePath(id, sandbox.spaceId)).toBe(path);
+		const other = await otherSpace(sandbox.db);
+		expect(await projects.clonePath(id, other)).toBeNull();
+	});
+});
+
 describe("a project without a folder", () => {
 	test("has no remote and no Clone, in the Space document and its row", async () => {
 		const projects = projectsOf();
@@ -284,6 +295,7 @@ describe("what the peers ask of the Projects", () => {
 		expect(await deviceIds(tools.id)).toEqual([sandbox.deviceId, "studio"]);
 
 		const document = await documents.open(sandbox.spaceId);
+		expect(document.devices.has("studio")).toBe(true);
 		const changes: number[] = [];
 		const count = () => changes.push(1);
 		document.doc.on("update", count);
@@ -298,5 +310,10 @@ describe("what the peers ask of the Projects", () => {
 		expect(changes).toEqual([]);
 		// Another Device's Clones stay as they are.
 		expect(await deviceIds(app.id)).toEqual([sandbox.deviceId]);
+
+		// A Device that is gone: its Clones and its name go.
+		await projects.forgetDevice("studio");
+		expect(await deviceIds(tools.id)).toEqual([sandbox.deviceId]);
+		expect(document.devices.has("studio")).toBe(false);
 	});
 });
