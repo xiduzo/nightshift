@@ -60,18 +60,18 @@ We only move forward. We do not keep an old thing because it exists.
 - **A new test replaces the old test.** When a use-case test covers what an older test
   proves, remove the older test in the same change. First make sure that the new test
   fails for the same fault.
-- **Old data moves once.** A format change ships one migration to the new shape. Code
-  after that migration reads only the new shape.
-- **An old reader needs a name and an end.** Keep compatibility only for a reader that
-  runs today and that we cannot update in the same change: a released phone build, a
-  Host, a file that a person owns. The comment names that reader and the condition that
-  removes the code. Without both, remove it.
+- **Old data goes too.** A change that is not backwards compatible removes the data that
+  the new code cannot read, in the same change. Code reads only the current shape. Nothing
+  downstream meets an old shape. The removal names what it removes and logs it.
+- **No old readers.** We do not support an older Host, Device, desktop build, phone build
+  or flow file. An update is the answer. A peer that is too old gets one clear message.
 - **Git is the archive.** No commented-out code, no unused export, no "just in case".
 - **Do not build on legacy.** When your change meets old code of this kind, remove it
   first. If it is too large for the change, tell the owner. Do not copy it.
 
 Database migrations, `docs/adr/` and `docs/research/` are records, not legacy. A removal
-never deletes the data of a person.
+never touches data in the current shape. Before it deletes data of a real install, the
+change counts that data and makes a backup.
 
 # UI: shadcn/ui only
 

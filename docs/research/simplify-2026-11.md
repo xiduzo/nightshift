@@ -84,3 +84,25 @@ Each entry names its source. "Read" means found by reading and not reproduced.
 - 40 files, +192/-1035 lines. No dependency became unused.
 - Kept: `schedulesFileSchema` in `flows`. Only tests and the JSON-schema snapshot use it,
   and it is a format.
+
+### Decisions of the owner, 2026-11-24
+
+- No older versions stay: no old Host, Device, desktop, phone build, flow file, run bundle
+  or `.nightshift/` folder. Data that the new code cannot read is removed, so that nothing
+  downstream breaks.
+- CI becomes a requirement on main. A type check runs before a push, and a check resolves
+  every relative import.
+
+### A0 and F4a, landed on `arch/forward`
+
+- A0: each red cause traces to one commit: f161cb1be (first red CI), 22507ddcb (imports),
+  7e200b30d (defaults of a facade dropped), 3d306043b, ba5310a6a (assistant tools, four test
+  files deleted), 5ff33c00b and b5d8b7852. The product faults are fixed. Those of them with
+  a test that was red before are in the commit messages.
+- How it got through: the pre-commit hook runs no types and no tests, main has no
+  protection, and 13 pushes followed a red CI. The nightly build does not wait for CI.
+- F4a: 61 same titles, not 62. 420 lines added and 2,998 removed in 45 test files. 141 cases
+  fewer. Of 51 valid mutants, the survivors caught all but three at first: one equivalent,
+  one gap that is now tested, and one same title over a different function (case restored).
+- The whole engine suite is not measurably faster: 642 s against 631 s, within noise. The
+  time is in real git and graph walks. So candidate 4 is worth its lines, not its seconds.
