@@ -1,14 +1,11 @@
 import { inMemoryAccess } from "../../../../access/adapters/out/in-memory-access";
 import type { TranscriptEntry } from "../../../../log";
+import { inMemorySearch } from "../../../search/adapters/out/in-memory-search";
+import { inMemorySync } from "../../../sync/adapters/out/in-memory-sync";
 import type {
 	AskLearner,
-	CloseNotes,
-	ContentArchive,
-	FolderHolds,
-	LearningEntries,
 	LearningsNotifications,
 	RunsToLearnFrom,
-	SpaceStatus,
 } from "../../application/ports";
 import type { EndedRun, RecentRun } from "../../domain/look-back";
 import { inMemoryLearningFolder } from "./in-memory-learning-folder";
@@ -19,112 +16,6 @@ import { inMemoryLearningFolder } from "./in-memory-learning-folder";
  * `inMemoryLearningsPorts`, which gives a use-case test every port of
  * the slice at once. Test code: production code never imports this file.
  */
-
-type Entry = { sha256: string; changedAt: number };
-
-/** The knowledge documents of the projects, in memory. */
-export type InMemoryLearningEntries = LearningEntries & {
-	/** What each project's document lists, by path. */
-	listed: Map<string, Map<string, Entry>>;
-	/** Whether each project learns from its runs. Default: on. */
-	learnsFromRuns: Map<string, boolean>;
-	/** Lists a file in a project's document. */
-	list(projectId: string, path: string, entry: Entry): void;
-};
-
-export function inMemoryLearningEntries(): InMemoryLearningEntries {
-	const listed = new Map<string, Map<string, Entry>>();
-	const learnsFromRuns = new Map<string, boolean>();
-	const of = (projectId: string) => {
-		const entries = listed.get(projectId) ?? new Map<string, Entry>();
-		listed.set(projectId, entries);
-		return entries;
-	};
-	return {
-		listed,
-		learnsFromRuns,
-		list: (projectId, path, entry) => of(projectId).set(path, entry),
-		async open(projectId) {
-			return {
-				entries: () => new Map(of(projectId)),
-				learnsFromRunsOn: () => learnsFromRuns.get(projectId) ?? true,
-				async setLearnsFromRuns(on) {
-					learnsFromRuns.set(projectId, on);
-				},
-			};
-		},
-	};
-}
-
-/** The content by hash: what is here, and what only the Host has. */
-export type InMemoryContentArchive = ContentArchive & {
-	/** Content on this computer, by hash. */
-	local: Map<string, Uint8Array>;
-	/** Content only the Space's Host has, by hash. */
-	host: Map<string, Uint8Array>;
-	/** From now on the Host fails with this. */
-	hostFails(error: unknown): void;
-	/** Each hash asked of the Host, in order. */
-	askedHost: string[];
-};
-
-export function inMemoryContentArchive(): InMemoryContentArchive {
-	const local = new Map<string, Uint8Array>();
-	const host = new Map<string, Uint8Array>();
-	let failure: { error: unknown } | null = null;
-	const twin: InMemoryContentArchive = {
-		local,
-		host,
-		askedHost: [],
-		hostFails: (error) => {
-			failure = { error };
-		},
-		here: { read: async ({ sha256 }) => local.get(sha256) ?? null },
-		async read({ sha256 }) {
-			const here = local.get(sha256);
-			if (here) return here;
-			twin.askedHost.push(sha256);
-			if (failure) throw failure.error;
-			return host.get(sha256) ?? null;
-		},
-	};
-	return twin;
-}
-
-/** The Spaces of the projects, and what the Host failures said. */
-export type InMemorySpaceStatus = SpaceStatus & {
-	spaces: Map<string, string>;
-	heardFrom: { spaceId: string; error: unknown }[];
-};
-
-export function inMemorySpaceStatus(): InMemorySpaceStatus {
-	const spaces = new Map<string, string>();
-	const twin: InMemorySpaceStatus = {
-		spaces,
-		heardFrom: [],
-		spaceOf: async (projectId) => spaces.get(projectId) ?? null,
-		heard: (spaceId, error) => twin.heardFrom.push({ spaceId, error }),
-	};
-	return twin;
-}
-
-/** The holds of the folders: each start and each end, in order. */
-export type InMemoryFolderHolds = FolderHolds & { log: string[] };
-
-export function inMemoryFolderHolds(): InMemoryFolderHolds {
-	const log: string[] = [];
-	return {
-		log,
-		async startStep(projectId) {
-			log.push(`hold ${projectId}`);
-			return {
-				done: async () => {
-					log.push(`done ${projectId}`);
-				},
-			};
-		},
-	};
-}
 
 /** Who heard that what waits changed: the Space and the project, in order. */
 export type InMemoryLearningsNotifications = LearningsNotifications & {
@@ -143,30 +34,6 @@ export function inMemoryLearningsNotifications(): InMemoryLearningsNotifications
 		async learningsChanged(spaceId, projectId) {
 			twin.told.push([spaceId, projectId]);
 			if (failure) throw failure.error;
-		},
-	};
-	return twin;
-}
-
-/** The close notes: what a test sets, and the notes each call compared. */
-export type InMemoryCloseNotes = CloseNotes & {
-	/** What `among` answers next. Null: nothing could be compared yet. */
-	answer: Awaited<ReturnType<CloseNotes["among"]>>;
-	/** The notes each call compared. */
-	compared: Awaited<ReturnType<Parameters<CloseNotes["among"]>[1]["notes"]>>[];
-	/** The `onPrepared` of the last call: a test calls it as the vectors get ready. */
-	prepared: (() => void) | null;
-};
-
-export function inMemoryCloseNotes(): InMemoryCloseNotes {
-	const twin: InMemoryCloseNotes = {
-		answer: null,
-		compared: [],
-		prepared: null,
-		async among(_projectId, read) {
-			twin.compared.push(await read.notes());
-			twin.prepared = read.onPrepared;
-			return twin.answer;
 		},
 	};
 	return twin;
@@ -239,18 +106,21 @@ export function inMemoryLearner(answer: string[] = []): InMemoryLearner {
 	return twin;
 }
 
-/** Every port of knowledge/learnings in memory at once: where each use-case test starts. */
-
+/** Every port of knowledge/learnings in memory at once, over the real sync and search: where each use-case test starts. */
 export function inMemoryLearningsPorts() {
+	const sync = inMemorySync();
+	const search = inMemorySearch(sync);
 	return {
 		access: inMemoryAccess(),
 		folder: inMemoryLearningFolder(),
-		documents: inMemoryLearningEntries(),
-		archive: inMemoryContentArchive(),
-		status: inMemorySpaceStatus(),
-		holds: inMemoryFolderHolds(),
+		sync,
+		search,
+		documents: sync.documents,
+		archive: sync.archive,
+		status: sync.status,
+		holds: sync.reconciler,
 		notifications: inMemoryLearningsNotifications(),
-		closeNotes: inMemoryCloseNotes(),
+		closeNotes: search.closeNotes,
 		runs: inMemoryRunsToLearnFrom(),
 		learner: inMemoryLearner(),
 		now: () => 1_700_000_000_000,

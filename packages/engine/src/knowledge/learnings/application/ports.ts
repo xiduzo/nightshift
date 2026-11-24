@@ -1,7 +1,5 @@
 import type { Actor } from "../../../contract";
 import type { TranscriptEntry } from "../../../log";
-import type { CloseNotes as SearchCloseNotes } from "../../search";
-import type { KnowledgeStepHold, SpaceHostStatus } from "../../sync";
 import type { EndedRun } from "../domain/look-back";
 
 /**
@@ -36,58 +34,6 @@ export type LearningFolder = {
 };
 
 /**
- * The knowledge document of a project, as the learnings read it: what the
- * Space lists, and the switch of the learnings from runs.
- * @filledBy engine/knowledge
- */
-export type LearningEntries = {
-	open(projectId: string): Promise<{
-		/** The files the Space lists, by path. */
-		entries(): ReadonlyMap<string, { sha256: string; changedAt: number }>;
-		/** Whether Night Shift proposes learnings from the project's runs (ADR 37). */
-		learnsFromRunsOn(): boolean;
-		/** Turns the learnings from runs on or off, for every Device of the Space. */
-		setLearnsFromRuns(on: boolean): Promise<void>;
-	}>;
-};
-
-/**
- * The knowledge content by hash: here, and at the Space's Host.
- * @filledBy engine/archive
- */
-export type ContentArchive = {
-	/** Only what this computer has. */
-	here: {
-		read(ref: {
-			kind: "content";
-			spaceId: string;
-			sha256: string;
-		}): Promise<Uint8Array | null>;
-	};
-	/** Here, else at the Space's Host. */
-	read(ref: {
-		kind: "content";
-		spaceId: string;
-		sha256: string;
-	}): Promise<Uint8Array | null>;
-};
-
-/**
- * The Space of a project, and what a failed call to its Host says.
- * @filledBy engine/knowledge
- */
-export type SpaceStatus = Pick<SpaceHostStatus, "spaceOf" | "heard">;
-
-/**
- * Holds a project's folder as a step does: what the learnings change
- * there goes to the Space when the hold ends.
- * @filledBy engine/knowledge
- */
-export type FolderHolds = {
-	startStep(projectId: string): Promise<KnowledgeStepHold>;
-};
-
-/**
  * Who tells the open screens of a Space's Members: `notifications` of the
  * daemon, a layer above.
  * @filledBy notifications
@@ -96,12 +42,6 @@ export type LearningsNotifications = {
 	/** What waits in a project changed. Quiet: a screen reads it again, and no push goes out. */
 	learningsChanged(spaceId: string, projectId: string): Promise<void>;
 };
-
-/**
- * Which notes are close to others, from vectors made in the background.
- * @filledBy engine/knowledge
- */
-export type CloseNotes = Pick<SearchCloseNotes, "among">;
 
 /**
  * What the look back reads of the runs on this computer: the engine

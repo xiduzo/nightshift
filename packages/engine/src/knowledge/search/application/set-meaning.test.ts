@@ -4,7 +4,7 @@ import {
 	inMemoryAccess,
 } from "../../../access/adapters/out/in-memory-access";
 import { NIGHT_SHIFT } from "../../../contract";
-import { inMemoryMeaningSetting } from "../adapters/out/in-memory-neighbours";
+import { inMemoryKnowledgeDocuments } from "../../sync/adapters/out/in-memory-knowledge-documents";
 import type { KnowledgeMeaningStatus } from "../domain/meaning";
 import { setMeaning } from "./set-meaning";
 
@@ -21,7 +21,7 @@ const turnedOff: KnowledgeMeaningStatus = {
 
 describe("setMeaning", () => {
 	test("writes the setting and returns how far search by meaning is", async () => {
-		const documents = inMemoryMeaningSetting();
+		const documents = inMemoryKnowledgeDocuments();
 		const status = await setMeaning({
 			access: inMemoryAccess(),
 			documents,
@@ -32,14 +32,15 @@ describe("setMeaning", () => {
 			projectId: "p1",
 			on: false,
 		});
-		expect(documents.written).toEqual([{ projectId: "p1", on: false }]);
+		expect((await documents.open("p1")).meaningOn()).toBe(false);
+		expect((await documents.open("p2")).meaningOn()).toBe(true);
 		expect(status).toEqual(turnedOff);
 	});
 
 	test("owners, admins and members may, and nobody else", async () => {
 		const ports = {
 			access: inMemoryAccess(),
-			documents: inMemoryMeaningSetting(),
+			documents: inMemoryKnowledgeDocuments(),
 			meaning: async () => turnedOff,
 		};
 		expect(
@@ -50,9 +51,9 @@ describe("setMeaning", () => {
 						actor,
 						spaceId: "space-1",
 						projectId: "p1",
-						on: true,
+						on: false,
 					}),
-				() => ports.documents.written,
+				() => ports.documents.changes,
 			),
 		).toEqual(allowing("owner", "admin", "member"));
 	});

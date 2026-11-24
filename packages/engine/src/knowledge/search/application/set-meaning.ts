@@ -1,14 +1,14 @@
 import type { Permissions } from "@nightshift/auth";
 import type { Access } from "../../../access";
 import type { Actor } from "../../../contract";
+import type { KnowledgeDocuments } from "../../sync";
 import type { KnowledgeMeaningStatus } from "../domain/meaning";
-import type { MeaningSetting } from "./ports";
 
 const CHANGES_KNOWLEDGE: Permissions = { run: ["start"] };
 
 export type SetMeaningPorts = {
 	access: Pick<Access, "openSpace">;
-	documents: MeaningSetting;
+	documents: Pick<KnowledgeDocuments, "open">;
 	meaning(projectId: string): Promise<KnowledgeMeaningStatus>;
 };
 

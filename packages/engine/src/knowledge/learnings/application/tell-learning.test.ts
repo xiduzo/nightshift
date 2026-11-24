@@ -32,7 +32,7 @@ describe("tellLearning", () => {
 		expect(ports.folder.read("p1", TOLD)).toContain(
 			"- Ask Bo.\n  Told by Ada on 2023-11-14.\n",
 		);
-		expect(ports.holds.log).toEqual(["hold p1", "done p1"]);
+		expect(ports.sync.holds).toEqual(["hold p1", "done p1"]);
 	});
 
 	test("refuses an empty note before it holds the folder", async () => {
@@ -48,7 +48,7 @@ describe("tellLearning", () => {
 		);
 		expect(refusal?.kind).toBe("invalid");
 		expect(refusal?.message).toBe("Write the note first.");
-		expect(ports.holds.log).toEqual([]);
+		expect(ports.sync.holds).toEqual([]);
 	});
 
 	test("a told note replaces the note it changes, and keeps nothing when that note is gone", async () => {
@@ -96,7 +96,7 @@ describe("tellLearning", () => {
 						note: "Ask Bo.",
 						by: ADA,
 					}),
-				() => ports.holds.log,
+				() => ports.sync.holds,
 			),
 		).toEqual(allowing("owner", "admin", "member"));
 	});

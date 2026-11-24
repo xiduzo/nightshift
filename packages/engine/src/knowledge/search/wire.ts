@@ -1,12 +1,13 @@
 import { now } from "@nightshift/time";
 import type { FolderSnapshot } from "../../folder-snapshot";
 import { createSearchStore } from "../../search-index";
+import type { KnowledgeFolders } from "../files";
 import { fsFileTexts } from "./adapters/out/fs-file-texts";
 import { langchainSectionSplitter } from "./adapters/out/langchain-section-splitter";
 import { langchainVectorIndexing } from "./adapters/out/langchain-vector-indexing";
 import { evaluateSearch } from "./application/evaluate-search";
 import { findCloseNotes } from "./application/find-close-notes";
-import type { FolderLooks, MeaningModel } from "./application/ports";
+import type { MeaningModel } from "./application/ports";
 import { prepareVectors } from "./application/prepare-vectors";
 import {
 	type IndexForMap,
@@ -56,7 +57,7 @@ export type SearchDeps = {
 	/** Where this computer keeps its data: the index is in its `knowledge/`. */
 	dataDir: string;
 	/** The look at a project's folder (`files`). */
-	folders: FolderLooks;
+	folders: Pick<KnowledgeFolders, "scan">;
 	/**
 	 * The embedding model for search by meaning, or a function that gives the
 	 * one to use now (the model or Ollama's address can change while Night

@@ -1,17 +1,17 @@
 import type { FolderSnapshot } from "../../../folder-snapshot";
 import type { IndexedFileWrite } from "../../../search-index";
-import { cutText, describeFile, isText } from "../../files";
+import {
+	cutText,
+	describeFile,
+	isText,
+	type KnowledgeFolders,
+} from "../../files";
 import { indexedSections, type SectionPage } from "../domain/sections";
 import type { VectorStates } from "../domain/vector-states";
-import type {
-	FileTexts,
-	FolderLooks,
-	SearchIndex,
-	SectionSplitter,
-} from "./ports";
+import type { FileTexts, SearchIndex, SectionSplitter } from "./ports";
 
 export type RefreshSearchIndexPorts = {
-	folders: FolderLooks;
+	folders: Pick<KnowledgeFolders, "scan">;
 	texts: FileTexts;
 	splitter: SectionSplitter;
 	index: Pick<SearchIndex, "open" | "files" | "removeFiles" | "writeFiles">;

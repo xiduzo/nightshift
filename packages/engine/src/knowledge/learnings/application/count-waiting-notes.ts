@@ -1,10 +1,10 @@
-import { listedLearnings } from "../domain/proposed";
-import type { ContentArchive, LearningEntries, SpaceStatus } from "./ports";
+import type { KnowledgeDocuments, SpaceHostStatus } from "../../sync";
+import { type ListedReads, listedLearnings } from "../domain/proposed";
 
 export type CountWaitingNotesPorts = {
-	status: SpaceStatus;
-	documents: LearningEntries;
-	archive: ContentArchive;
+	status: Pick<SpaceHostStatus, "spaceOf" | "heard">;
+	documents: Pick<KnowledgeDocuments, "open">;
+	archive: ListedReads["archive"];
 };
 
 /** The project whose notes to count. */

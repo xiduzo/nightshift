@@ -8,6 +8,7 @@
 
 export type { KnowledgeTimes } from "./adapters/in/knowledge-timers";
 export type { KnowledgeStepHold } from "./application/hold-folder";
+export type { KnowledgeDocuments } from "./application/ports";
 export {
 	createKnowledgeFolderLocks,
 	type KnowledgeFolderLocks,

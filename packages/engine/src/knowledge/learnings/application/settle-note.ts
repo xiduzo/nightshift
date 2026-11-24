@@ -2,6 +2,7 @@ import type { Permissions } from "@nightshift/auth";
 import { proposedLearningOf } from "@nightshift/flows";
 import type { Access } from "../../../access";
 import type { Actor } from "../../../contract";
+import type { KnowledgeDocuments, KnowledgeReconciler } from "../../sync";
 import { acceptNote, proposedFile } from "../domain/proposed";
 import {
 	learningGone,
@@ -9,15 +10,15 @@ import {
 	noteIn,
 	type WaitingNote,
 } from "../domain/waiting";
-import type { FolderHolds, LearningEntries, LearningFolder } from "./ports";
+import type { LearningFolder } from "./ports";
 
 const CHANGES_KNOWLEDGE: Permissions = { run: ["start"] };
 
 export type SettleNotePorts = {
 	access: Pick<Access, "openSpace">;
 	folder: Pick<LearningFolder, "has" | "text" | "append" | "write" | "remove">;
-	documents: Pick<LearningEntries, "open">;
-	holds: FolderHolds;
+	documents: Pick<KnowledgeDocuments, "open">;
+	holds: Pick<KnowledgeReconciler, "startStep">;
 	now: () => number;
 };
 

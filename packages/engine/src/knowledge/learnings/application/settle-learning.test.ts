@@ -33,7 +33,7 @@ describe("settleLearning", () => {
 			TEXT,
 		);
 		expect(ports.folder.read("p1", PROPOSED)).toBeUndefined();
-		expect(ports.holds.log).toEqual(["hold p1", "done p1"]);
+		expect(ports.sync.holds).toEqual(["hold p1", "done p1"]);
 	});
 
 	test("delete keeps nothing", async () => {
@@ -64,12 +64,12 @@ describe("settleLearning", () => {
 		expect((refusal as Refusal).message).toBe(
 			"This learning no longer waits. Someone kept or deleted it.",
 		);
-		expect(ports.holds.log).toEqual([]);
+		expect(ports.sync.holds).toEqual([]);
 	});
 
 	test("waits to be fetched when the Space lists a file this folder does not have", async () => {
 		const ports = inMemoryLearningsPorts();
-		ports.documents.list("p1", PROPOSED, { sha256: "a", changedAt: 1 });
+		await ports.sync.publish("p1", PROPOSED, TEXT, 1, "nowhere");
 		const refusal = await refusalOf(
 			settleLearning(ports)({
 				actor: NIGHT_SHIFT,
@@ -80,7 +80,7 @@ describe("settleLearning", () => {
 			}),
 		);
 		expect((refusal as Refusal).kind).toBe("unavailable");
-		expect(ports.holds.log).toEqual(["hold p1", "done p1"]);
+		expect(ports.sync.holds).toEqual(["hold p1", "done p1"]);
 		const gone = await refusalOf(
 			settleLearning(ports)({
 				actor: NIGHT_SHIFT,
@@ -107,7 +107,7 @@ describe("settleLearning", () => {
 						id: "run-1.s1.md",
 						decision: "keep",
 					}),
-				() => ports.holds.log,
+				() => ports.sync.holds,
 			),
 		).toEqual(allowing("owner", "admin", "member"));
 	});

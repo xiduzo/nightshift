@@ -1,10 +1,5 @@
-import type { FolderSnapshot } from "../../../../folder-snapshot";
-import type {
-	FolderLooks,
-	MeaningModel,
-	MeaningSetting,
-	SearchIndex,
-} from "../../application/ports";
+import { inMemoryKnowledgeFolders } from "../../../files/adapters/out/in-memory-knowledge-folders";
+import type { MeaningModel, SearchIndex } from "../../application/ports";
 import type { KnowledgeMeaning } from "../../domain/meaning";
 import { inMemoryFileTexts } from "./in-memory-file-texts";
 import { inMemorySectionSplitter } from "./in-memory-section-splitter";
@@ -16,75 +11,6 @@ import { inMemoryVectorIndexing } from "./in-memory-vector-indexing";
  * `inMemorySearchPorts`, which gives a use-case test every port of
  * the slice at once. Test code: production code never imports this file.
  */
-
-/** A file of a twin folder. */
-type TwinFolderFile = {
-	path: string;
-	size: number;
-	changedAt: number;
-	sha256: string;
-};
-
-/** The knowledge folders of a test: a test puts the files a look finds. */
-export function inMemoryFolderLooks() {
-	const folders = new Map<string, Map<string, TwinFolderFile>>();
-	const twin = {
-		/** The projects looked at, in order. */
-		scanned: [] as string[],
-		/** The folder of a project, as a look gives it. */
-		dirOf: (projectId: string) => `/knowledge/${projectId}`,
-		/** Puts a file in the project's folder, or changes it. */
-		put(projectId: string, file: TwinFolderFile) {
-			const files = folders.get(projectId) ?? new Map();
-			files.set(file.path, file);
-			folders.set(projectId, files);
-		},
-		/** Removes a file of the project's folder. */
-		remove(projectId: string, path: string) {
-			folders.get(projectId)?.delete(path);
-		},
-		async scan(projectId: string): Promise<FolderSnapshot> {
-			twin.scanned.push(projectId);
-			const files = [...(folders.get(projectId)?.values() ?? [])].map(
-				({ path, size, changedAt }) => ({ path, size, changedAt }),
-			);
-			const hashes = new Map(
-				[...(folders.get(projectId)?.values() ?? [])].map((f) => [
-					f.path,
-					f.sha256,
-				]),
-			);
-			return {
-				dir: twin.dirOf(projectId),
-				files,
-				readable: files,
-				newestReadable: Math.max(0, ...files.map((f) => f.changedAt)),
-				file: (path) => files.find((f) => f.path === path),
-				changedSince(base, among = files) {
-					const changed = new Map<string, (typeof files)[number]>();
-					const seen = new Set<string>();
-					for (const file of among) {
-						seen.add(file.path);
-						const known = base.get(file.path);
-						if (
-							!known ||
-							known.size !== file.size ||
-							known.mtimeMs !== file.changedAt
-						) {
-							changed.set(file.path, file);
-						}
-					}
-					const gone = [...base].flatMap(([path, known]) =>
-						seen.has(path) ? [] : [known],
-					);
-					return { changed, gone };
-				},
-				sha256: async (path) => hashes.get(path) ?? null,
-			};
-		},
-	};
-	return twin satisfies FolderLooks;
-}
 
 /** The embedding model of a test: none until the test sets one. */
 export function inMemoryMeaningModel(meaning: KnowledgeMeaning | null = null) {
@@ -354,30 +280,11 @@ export function fakeMeaning(
 	};
 }
 
-export type InMemoryMeaningSetting = MeaningSetting & {
-	written: { projectId: string; on: boolean }[];
-};
-
-/** The project's search-by-meaning setting, in memory. */
-export function inMemoryMeaningSetting(): InMemoryMeaningSetting {
-	const written: { projectId: string; on: boolean }[] = [];
-	return {
-		written,
-		async open(projectId) {
-			return {
-				async setMeaning(on) {
-					written.push({ projectId, on });
-				},
-			};
-		},
-	};
-}
-
 /** Every port of knowledge/search in memory at once: where each use-case test starts. */
 export function inMemorySearchPorts() {
 	return {
 		index: inMemorySearchIndex(),
-		folders: inMemoryFolderLooks(),
+		folders: inMemoryKnowledgeFolders(),
 		meaning: inMemoryMeaningModel(),
 		fileTexts: inMemoryFileTexts(),
 		sectionSplitter: inMemorySectionSplitter(),

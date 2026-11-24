@@ -1,8 +1,8 @@
-import type { FolderHolds } from "./ports";
+import type { KnowledgeReconciler } from "../../sync";
 import type { ProposeLearnings } from "./propose-learnings";
 
 export type ProposeFromRunPorts = {
-	holds: FolderHolds;
+	holds: Pick<KnowledgeReconciler, "startStep">;
 	/** `proposeLearnings`, bound by the wire. */
 	propose(request: ProposeLearnings): Promise<void>;
 };

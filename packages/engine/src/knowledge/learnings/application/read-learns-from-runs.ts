@@ -1,7 +1,7 @@
-import type { LearningEntries } from "./ports";
+import type { KnowledgeDocuments } from "../../sync";
 
 export type ReadLearnsFromRunsPorts = {
-	documents: Pick<LearningEntries, "open">;
+	documents: Pick<KnowledgeDocuments, "open">;
 };
 
 /** The project to ask about. */

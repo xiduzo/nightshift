@@ -7,22 +7,16 @@ import { countWaitingNotes } from "./count-waiting-notes";
 describe("countWaitingNotes", () => {
 	test("counts the notes the page shows, and a file whose content is not here counts as one", async () => {
 		const ports = inMemoryLearningsPorts();
-		ports.status.spaces.set("p1", "s1");
-		ports.documents.list("p1", "learnings/proposed/run-1.s1.md", {
-			sha256: "a",
-			changedAt: 1,
-		});
-		ports.archive.local.set(
-			"a",
-			new TextEncoder().encode("- One.\n-\n- Two.\n"),
+		const { publish } = ports.sync;
+		await publish(
+			"p1",
+			"learnings/proposed/run-1.s1.md",
+			"- One.\n-\n- Two.\n",
 		);
-		ports.documents.list("p1", "learnings/proposed/run-2.s1.md", {
-			sha256: "b",
-			changedAt: 2,
-		});
-		ports.archive.host.set("b", new TextEncoder().encode("- Three.\n"));
+		const host = ["- Three.\n- Four.\n", 2, "host"] as const;
+		await publish("p1", "learnings/proposed/run-2.s1.md", ...host);
 		expect(await countWaitingNotes(ports)({ projectId: "p1" })).toBe(3);
 		// The count asks no Host.
-		expect(ports.archive.askedHost).toEqual([]);
+		expect(ports.archive.calls).toEqual([]);
 	});
 });

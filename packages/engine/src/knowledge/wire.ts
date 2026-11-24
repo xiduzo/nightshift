@@ -382,7 +382,7 @@ export function wireKnowledge(deps: KnowledgeDeps): Knowledge {
 		documents,
 		archive,
 		status,
-		startStep: (projectId) => reconciler.startStep(projectId),
+		holds: reconciler,
 		notifications: deps.notifications,
 		closeNotes: search.closeNotes,
 	});

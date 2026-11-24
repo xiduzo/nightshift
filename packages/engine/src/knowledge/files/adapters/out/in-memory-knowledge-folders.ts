@@ -75,6 +75,10 @@ export function inMemoryKnowledgeFolders() {
 		put(projectId: string, path: string, text: string, changedAt = 1) {
 			filesOf(projectId).set(path, { text, changedAt });
 		},
+		/** Takes a file out of the project's folder. */
+		take(projectId: string, path: string) {
+			folders.get(projectId)?.delete(path);
+		},
 		folder: (projectId: string) => `/knowledge/${projectId}`,
 		async ensure(projectId: string) {
 			filesOf(projectId);

@@ -1,4 +1,3 @@
-import type { FolderSnapshot } from "../../../folder-snapshot";
 import type {
 	IndexedFile,
 	IndexedFileWrite,
@@ -50,15 +49,6 @@ export type VectorIndexing = {
 		model: Pick<KnowledgeMeaning, "model" | "embeddings">,
 		sections: readonly SectionToEmbed[],
 	): Promise<void>;
-};
-
-/**
- * The look at a project's knowledge folder on this computer (`files`).
- * @filledBy engine/knowledge
- */
-export type FolderLooks = {
-	/** The project's folder as it is now. */
-	scan(projectId: string): Promise<FolderSnapshot>;
 };
 
 /**
@@ -161,12 +151,4 @@ export type SearchIndex = {
 	vectorModel(): string | null;
 	/** Drops every vector: a model embedded while this one took over. */
 	resetVectors(model: string): void;
-};
-
-/**
- * The knowledge document of a project: where search by meaning is on or off.
- * @filledBy engine/knowledge
- */
-export type MeaningSetting = {
-	open(projectId: string): Promise<{ setMeaning(on: boolean): Promise<void> }>;
 };

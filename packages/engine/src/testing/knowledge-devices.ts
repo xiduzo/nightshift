@@ -88,7 +88,7 @@ export async function knowledgeDevice(
 		documents,
 		archive,
 		status,
-		startStep: (projectId) => reconciler.startStep(projectId),
+		holds: sync.reconciler,
 		notifications: {
 			learningsChanged: async (spaceId, projectId) => {
 				told.push([spaceId, projectId]);

@@ -3,6 +3,12 @@ import { now as timeNow } from "@nightshift/time";
 import type { Access } from "../../access";
 import type { Actor } from "../../contract";
 import type { TranscriptEntry } from "../../log";
+import type { CloseNotes } from "../search";
+import type {
+	KnowledgeDocuments,
+	KnowledgeReconciler,
+	SpaceHostStatus,
+} from "../sync";
 import { followEndedRuns } from "./adapters/in/follow-ended-runs";
 import { fsLearningFolder } from "./adapters/out/fs-learning-folder";
 import { countWaitingNotes } from "./application/count-waiting-notes";
@@ -14,13 +20,8 @@ import { listWaitingLearnings } from "./application/list-waiting-learnings";
 import { lookBackAtRun } from "./application/look-back-at-run";
 import type {
 	AskLearner,
-	CloseNotes,
-	ContentArchive,
-	FolderHolds,
-	LearningEntries,
 	LearningsNotifications,
 	RunsToLearnFrom,
-	SpaceStatus,
 } from "./application/ports";
 import { proposeFromRun } from "./application/propose-from-run";
 import { proposeLearnings } from "./application/propose-learnings";
@@ -34,6 +35,7 @@ import {
 	LOOK_TIMEOUT_MS,
 	type RunLookBack,
 } from "./domain/look-back";
+import type { ListedReads } from "./domain/proposed";
 import type {
 	LearningStep,
 	NotePerson,
@@ -52,12 +54,13 @@ export type LearningsDeps = {
 	access: Pick<Access, "openSpace">;
 	/** The knowledge folders on this computer (`files`). */
 	folders: { folder(projectId: string): string };
-	documents: LearningEntries;
+	/** The knowledge documents of the projects (`sync`). */
+	documents: Pick<KnowledgeDocuments, "open">;
 	/** The content by hash: here, and at the Space's Host. */
-	archive: ContentArchive;
-	status: SpaceStatus;
+	archive: ListedReads["archive"];
+	status: Pick<SpaceHostStatus, "spaceOf" | "heard">;
 	/** Holds the folder as a step does: `settle` changes it, and the reconcile at `done` publishes that. */
-	startStep: FolderHolds["startStep"];
+	holds: Pick<KnowledgeReconciler, "startStep">;
 	notifications: LearningsNotifications;
 	/** Which notes are close to others. Absent: the list has no `nearTo`. */
 	closeNotes?: CloseNotes;
@@ -160,8 +163,7 @@ export type Learnings = {
 
 export function wireLearnings(deps: LearningsDeps): Learnings {
 	const folder = fsLearningFolder(deps.folders);
-	const { documents, archive, status, notifications } = deps;
-	const holds = { startStep: deps.startStep };
+	const { documents, archive, status, holds, notifications } = deps;
 	const now = deps.now ?? timeNow;
 
 	const propose = proposeLearnings({ folder });

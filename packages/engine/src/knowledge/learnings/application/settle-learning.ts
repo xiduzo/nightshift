@@ -2,17 +2,18 @@ import type { Permissions } from "@nightshift/auth";
 import { ACCEPTED_LEARNINGS_DIR, proposedLearningOf } from "@nightshift/flows";
 import type { Access } from "../../../access";
 import type { Actor } from "../../../contract";
+import type { KnowledgeDocuments, KnowledgeReconciler } from "../../sync";
 import { proposedFile } from "../domain/proposed";
 import { learningGone } from "../domain/waiting";
-import type { FolderHolds, LearningEntries, LearningFolder } from "./ports";
+import type { LearningFolder } from "./ports";
 
 const CHANGES_KNOWLEDGE: Permissions = { run: ["start"] };
 
 export type SettleLearningPorts = {
 	access: Pick<Access, "openSpace">;
 	folder: Pick<LearningFolder, "bytes" | "append" | "remove">;
-	documents: Pick<LearningEntries, "open">;
-	holds: FolderHolds;
+	documents: Pick<KnowledgeDocuments, "open">;
+	holds: Pick<KnowledgeReconciler, "startStep">;
 };
 
 /** One step's proposed learnings, by the name of its file, and what a person decided. */

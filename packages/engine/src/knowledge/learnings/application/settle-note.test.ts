@@ -44,7 +44,7 @@ describe("settleNote", () => {
 		expect(kept).toContain("- One.\n  Kept by Ada on 2023-11-14.\n");
 		expect(ports.folder.read("p1", PROPOSED)).toContain("- Two.");
 		expect(ports.folder.read("p1", PROPOSED)).not.toContain("- One.");
-		expect(ports.holds.log).toEqual(["hold p1", "done p1"]);
+		expect(ports.sync.holds).toEqual(["hold p1", "done p1"]);
 	});
 
 	test("a delete of the last note keeps nothing, and the proposed file goes", async () => {
@@ -106,7 +106,7 @@ describe("settleNote", () => {
 
 	test("waits to be fetched when the Space lists a file this folder does not have", async () => {
 		const ports = inMemoryLearningsPorts();
-		ports.documents.list("p1", PROPOSED, { sha256: "a", changedAt: 1 });
+		await ports.sync.publish("p1", PROPOSED, "- One.\n", 1, "nowhere");
 		const refusal = await refusalOf(
 			settleNote(ports)({
 				actor: NIGHT_SHIFT,
@@ -134,7 +134,7 @@ describe("settleNote", () => {
 						decision: "delete",
 						by: ADA,
 					}),
-				() => ports.holds.log,
+				() => ports.sync.holds,
 			),
 		).toEqual(allowing("owner", "admin", "member"));
 	});

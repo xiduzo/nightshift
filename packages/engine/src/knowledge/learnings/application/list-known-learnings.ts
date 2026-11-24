@@ -1,10 +1,14 @@
-import { keptNotes, listedLearnings } from "../domain/proposed";
-import type { ContentArchive, LearningEntries, SpaceStatus } from "./ports";
+import type { KnowledgeDocuments, SpaceHostStatus } from "../../sync";
+import {
+	keptNotes,
+	type ListedReads,
+	listedLearnings,
+} from "../domain/proposed";
 
 export type ListKnownLearningsPorts = {
-	status: SpaceStatus;
-	documents: LearningEntries;
-	archive: ContentArchive;
+	status: Pick<SpaceHostStatus, "spaceOf" | "heard">;
+	documents: Pick<KnowledgeDocuments, "open">;
+	archive: ListedReads["archive"];
 };
 
 /** The project whose notes to list. */

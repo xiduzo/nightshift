@@ -1,13 +1,13 @@
 import type { Permissions } from "@nightshift/auth";
 import type { Access } from "../../../access";
 import type { Actor } from "../../../contract";
-import type { LearningEntries } from "./ports";
+import type { KnowledgeDocuments } from "../../sync";
 
 const CHANGES_KNOWLEDGE: Permissions = { run: ["start"] };
 
 export type SetLearnsFromRunsPorts = {
 	access: Pick<Access, "openSpace">;
-	documents: Pick<LearningEntries, "open">;
+	documents: Pick<KnowledgeDocuments, "open">;
 };
 
 /** The project, and whether Night Shift learns from its runs. */

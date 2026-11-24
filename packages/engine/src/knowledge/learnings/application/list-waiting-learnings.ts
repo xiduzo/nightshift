@@ -1,17 +1,17 @@
-import { keptNotes, listedLearnings } from "../domain/proposed";
+import type { CloseNotes } from "../../search";
+import type { KnowledgeDocuments, SpaceHostStatus } from "../../sync";
+import {
+	keptNotes,
+	type ListedReads,
+	listedLearnings,
+} from "../domain/proposed";
 import { byNewest, type WaitingLearning, withNearTo } from "../domain/waiting";
-import type {
-	CloseNotes,
-	ContentArchive,
-	LearningEntries,
-	LearningsNotifications,
-	SpaceStatus,
-} from "./ports";
+import type { LearningsNotifications } from "./ports";
 
 export type ListWaitingLearningsPorts = {
-	status: SpaceStatus;
-	documents: LearningEntries;
-	archive: ContentArchive;
+	status: Pick<SpaceHostStatus, "spaceOf" | "heard">;
+	documents: Pick<KnowledgeDocuments, "open">;
+	archive: ListedReads["archive"];
 	notifications: LearningsNotifications;
 	/** Which notes are close to others. Absent: the list has no `nearTo`. */
 	closeNotes?: CloseNotes;
