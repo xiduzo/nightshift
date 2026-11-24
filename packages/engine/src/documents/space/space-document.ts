@@ -1,12 +1,11 @@
 import { wireSpaces } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
-import { clone, project, spaceMerge, spaceSplit } from "@nightshift/db/schema";
+import { clone, project } from "@nightshift/db/schema";
 import { asDate, instant, instantOrNull, now } from "@nightshift/time";
-import { and, eq, inArray, ne, or } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import type * as Y from "yjs";
 import { z } from "zod";
 import type { DeviceDirectory } from "../../contract";
-import { writeExplicitEntries } from "../explicit-entries";
 import {
 	createSyncedDocuments,
 	documentId,
@@ -23,7 +22,7 @@ import type { PersistedDocument } from "../ydoc";
  *
  * - `projects`: id → `{ name, remote, folder, createdAt, removedAt, updatedAt }`.
  *   `folder` false: a project without a folder, which has no Clone (ADR
- *   22). An entry from before it has a folder.
+ *   22). An entry without a field is not read, and stays in the document.
  * - `clones`: `<project id>/<device id>` → `{ projectId, deviceId, addedAt }`.
  *   That a Device has a Clone, never where: the path stays in the
  *   Device's own data (its `clone` row and its Device document).
@@ -61,8 +60,8 @@ export type SpaceDocument = PersistedDocument & {
 export const spaceProjectSchema = z.object({
 	name: z.string().min(1),
 	remote: z.string().nullable(),
-	/** Absent in an entry from before ADR 22: the project has a folder. */
-	folder: z.boolean().default(true),
+	/** False: the project has no folder (ADR 22). */
+	folder: z.boolean(),
 	createdAt: z.number(),
 	removedAt: z.number().nullable(),
 	updatedAt: z.number(),
@@ -296,7 +295,6 @@ export function createSpaceDocuments(options: {
 			if (!document.hostedElsewhere) {
 				await importRows(db, directory, document);
 				await mirror(db, document);
-				await writeExplicitProjects(db, directory, document);
 			} else {
 				// What the Link brought before this start.
 				await projectSpace(db, document);
@@ -399,63 +397,6 @@ async function importRows(
 			}
 		}
 	});
-}
-
-/**
- * CONVERSION, with an end (`writeExplicitEntries`): each Project of a
- * Space this Replica keeps says that it has a folder. A Space whose merge
- * or split is not done is left for a later start: its keeper may change.
- * Who keeps it is asked last, right before the change. A failure never
- * stops the start.
- */
-async function writeExplicitProjects(
-	db: Database,
-	directory: Pick<DeviceDirectory, "hostedElsewhere">,
-	document: SpaceDocument,
-): Promise<void> {
-	try {
-		if (await moveUnfinished(db, document.spaceId)) {
-			console.log("Explicit projects: 1 Space waits for its move.");
-			return;
-		}
-		if (await directory.hostedElsewhere(document.spaceId)) return;
-		const { written, entries } = await writeExplicitEntries(
-			document,
-			document.projects,
-			{ folder: true },
-		);
-		if (written > 0) {
-			console.log(`Explicit projects: ${written} of ${entries} written.`);
-		}
-	} catch (error) {
-		console.error("The projects of a Space were not made explicit:", error);
-	}
-}
-
-/** Whether a merge or a split that this Space is part of is not done. */
-async function moveUnfinished(db: Database, spaceId: string): Promise<boolean> {
-	const [merge] = await db
-		.select({ id: spaceMerge.fromSpace })
-		.from(spaceMerge)
-		.where(
-			and(
-				ne(spaceMerge.state, "pushed"),
-				or(eq(spaceMerge.fromSpace, spaceId), eq(spaceMerge.toSpace, spaceId)),
-			),
-		)
-		.limit(1);
-	if (merge) return true;
-	const [split] = await db
-		.select({ id: spaceSplit.toSpace })
-		.from(spaceSplit)
-		.where(
-			and(
-				ne(spaceSplit.state, "done"),
-				or(eq(spaceSplit.fromSpace, spaceId), eq(spaceSplit.toSpace, spaceId)),
-			),
-		)
-		.limit(1);
-	return split !== undefined;
 }
 
 /** A `project` row as a document entry. */

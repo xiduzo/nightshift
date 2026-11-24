@@ -206,9 +206,13 @@ describe("Hocuspocus on Bun", () => {
 		});
 
 		// The client edits: the Owner's stores see it.
-		client.doc
-			.getMap("cliTools")
-			.set("jq", { description: "JSON", updatedAt: 1 });
+		client.doc.getMap("cliTools").set("jq", {
+			description: "JSON",
+			program: null,
+			login: null,
+			git: null,
+			updatedAt: 1,
+		});
 		await waitFor(() => tools.get("jq") !== null);
 
 		// The Owner edits: the client sees it.
@@ -238,9 +242,13 @@ describe("Hocuspocus on Bun", () => {
 	test("a client's edit lasts across a restart of the Owner", async () => {
 		const client = connect();
 		await waitFor(() => client.provider.isSynced);
-		client.doc
-			.getMap("cliTools")
-			.set("aws", { description: null, updatedAt: 1 });
+		client.doc.getMap("cliTools").set("aws", {
+			description: null,
+			program: null,
+			login: null,
+			git: null,
+			updatedAt: 1,
+		});
 		await waitFor(() => document.cliTools.has("aws"));
 		await document.flush();
 
@@ -323,6 +331,7 @@ describe("a read-only connection", () => {
 	const entry = (name: string) => ({
 		name,
 		remote: null,
+		folder: true,
 		createdAt: 1,
 		removedAt: null,
 		updatedAt: 1,

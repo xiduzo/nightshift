@@ -28,6 +28,7 @@ import {
 	type SpaceDocuments,
 	spaceDocumentName,
 	spaceProjects,
+	withoutFolder,
 } from "./space-document";
 
 /**
@@ -155,6 +156,7 @@ describe("projection", () => {
 			document.projects.set("p9", {
 				name: "from a client",
 				remote: "github.com/acme/nine",
+				folder: true,
 				createdAt: 1,
 				removedAt: null,
 				updatedAt: 1,
@@ -166,6 +168,7 @@ describe("projection", () => {
 			document.projects.set("p9", {
 				name: "renamed",
 				remote: "github.com/acme/nine",
+				folder: true,
 				createdAt: 1,
 				removedAt: 5,
 				updatedAt: 2,
@@ -187,6 +190,7 @@ describe("projection", () => {
 		const entry = {
 			name: "from the Host",
 			remote: "github.com/acme/nine",
+			folder: true,
 			createdAt: 1,
 			removedAt: null,
 			updatedAt: 1,
@@ -214,17 +218,17 @@ describe("projection", () => {
 		await waitFor(async () => projected.length === 2);
 	});
 
-	test("whether a project has a folder reaches its row: an entry from before says nothing and has one", async () => {
+	test("whether a project has a folder reaches its row", async () => {
 		const document = await documents.open(sandbox.spaceId);
 		const entry = {
-			name: "older",
+			name: "app",
 			remote: null,
 			createdAt: 1,
 			removedAt: null,
 			updatedAt: 1,
 		};
 		asClient(document.doc, () => {
-			document.projects.set("p1", entry);
+			document.projects.set("p1", { ...entry, folder: true });
 			document.projects.set("p2", { ...entry, name: "feeds", folder: false });
 		});
 		const folders = () =>
@@ -237,7 +241,6 @@ describe("projection", () => {
 			{ id: "p1", folder: true },
 			{ id: "p2", folder: false },
 		]);
-		expect(spaceProjects(document).get("p1")?.folder).toBe(true);
 
 		// A row from before the document comes in with its folder.
 		const team = await otherSpace(sandbox.db, "Team");
@@ -246,6 +249,43 @@ describe("projection", () => {
 			.values({ id: "p3", spaceId: team, name: "leads", folder: false });
 		const imported = await documents.open(team);
 		expect(imported.projects.get("p3")).toMatchObject({ folder: false });
+	});
+
+	test("an entry without `folder` is not read, has no row and stays in the document", async () => {
+		const document = await documents.open(sandbox.spaceId);
+		const entry = { remote: null, createdAt: 1, removedAt: null, updatedAt: 1 };
+		const partial = { ...entry, name: "partial", later: true };
+		await document.change(() => {
+			document.projects.set("p1", partial);
+			document.projects.set("p2", { ...entry, name: "app", folder: true });
+			document.clones.set("p1/studio", {
+				projectId: "p1",
+				deviceId: "studio",
+				addedAt: 1,
+			});
+		});
+		expect((await projectRows()).map((row) => row.id)).toEqual(["p2"]);
+		expect([...spaceProjects(document).keys()]).toEqual(["p2"]);
+		expect(withoutFolder(document, "p1")).toBe(false);
+		await documents.flush();
+
+		const reopened = await createSpaceDocuments({
+			db: sandbox.db,
+			directory: aloneDirectory(sandbox.db),
+		}).open(sandbox.spaceId);
+		expect(reopened.projects.get("p1")).toEqual(partial);
+	});
+
+	test("a project that has its row keeps it when its entry loses `folder`", async () => {
+		const document = await documents.open(sandbox.spaceId);
+		const entry = { remote: null, createdAt: 1, removedAt: null, updatedAt: 1 };
+		await document.change(() => {
+			document.projects.set("p1", { ...entry, name: "app", folder: true });
+		});
+		await document.change(() => {
+			document.projects.set("p1", { ...entry, name: "renamed" });
+		});
+		expect((await projectRows()).map((row) => row.name)).toEqual(["app"]);
 	});
 
 	test("an entry for a project of another Space does not take its row", async () => {
@@ -258,6 +298,7 @@ describe("projection", () => {
 			document.projects.set("p1", {
 				name: "mine now",
 				remote: null,
+				folder: true,
 				createdAt: 1,
 				removedAt: null,
 				updatedAt: 1,

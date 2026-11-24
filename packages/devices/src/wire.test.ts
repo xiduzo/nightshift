@@ -791,6 +791,7 @@ describe("the documents a Device syncs with a Host", () => {
 				space.projects.set(id, {
 					name: id,
 					remote: null,
+					folder: true,
 					createdAt: 1,
 					removedAt: null,
 					updatedAt: 1,

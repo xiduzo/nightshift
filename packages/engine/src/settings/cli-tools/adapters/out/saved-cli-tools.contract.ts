@@ -52,17 +52,14 @@ export function savedCliToolsContract(
 			expect([...under.saved.read().keys()]).toEqual(["aws"]);
 		});
 
-		test("an older entry with no program, login or git reads as none of them", async () => {
-			await under.put("gh", { description: null, updatedAt: 5 });
-			expect(under.saved.read().get("gh")).toEqual({
-				name: "gh",
-				description: null,
-				program: null,
-				login: null,
-				git: null,
-				updatedAt: 5,
+		for (const field of ["program", "login", "git"] as const) {
+			test(`an entry without its ${field} is left out, and the others stay`, async () => {
+				const { [field]: _, ...partial } = gh;
+				await under.put("partial", partial);
+				await under.put("gh", gh);
+				expect([...under.saved.read().keys()]).toEqual(["gh"]);
 			});
-		});
+		}
 
 		test("a login this version cannot read reads as none", async () => {
 			await under.put("gh", { ...gh, login: { env: { "not a name": "x" } } });
