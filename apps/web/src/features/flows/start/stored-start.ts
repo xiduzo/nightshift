@@ -36,11 +36,6 @@ function inputsKey(projectId: string, flowName: string) {
 	return `nightshift:inputs:${projectId}:${flowName}`;
 }
 
-/** Before inputs: run parameters, by the same names. */
-function legacyKey(projectId: string, flowName: string) {
-	return `nightshift:params:${projectId}:${flowName}`;
-}
-
 /** The values of the last start of this flow, for the names it still declares. */
 export function readStoredInputs(
 	projectId: string,
@@ -49,9 +44,7 @@ export function readStoredInputs(
 ): InputValues {
 	const values: InputValues = {};
 	try {
-		const raw =
-			window.localStorage.getItem(inputsKey(projectId, flowName)) ??
-			window.localStorage.getItem(legacyKey(projectId, flowName));
+		const raw = window.localStorage.getItem(inputsKey(projectId, flowName));
 		const parsed: unknown = raw ? JSON.parse(raw) : null;
 		if (parsed && typeof parsed === "object") {
 			for (const { name } of inputs) {
