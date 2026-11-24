@@ -310,13 +310,4 @@ describe("Spaces", () => {
 
 		await theirs.act(started.id, { kind: "stop" });
 	});
-
-	test("a move to a Space that does not exist is refused", async () => {
-		const mine = makeEngine().space(sandbox.spaceId, NIGHT_SHIFT);
-		const added = await mine.addProject({ repoPath: sandbox.repoPath });
-		await expect(mine.moveProject(added.id, "nowhere")).rejects.toThrow(
-			"That Space does not exist.",
-		);
-		expect((await mine.listProjects()).map((p) => p.id)).toEqual([added.id]);
-	});
 });

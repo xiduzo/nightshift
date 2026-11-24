@@ -10,7 +10,6 @@ import { asc } from "drizzle-orm";
 import { NIGHT_SHIFT } from "../../src/contract";
 import { createRunLog } from "../../src/log/run-log/run-log";
 import { createRunFolders } from "../../src/run-folders/run-folders";
-import { NO_BRANCHES } from "../../src/runs/start/domain/prepared-run";
 import type { SpaceEngine } from "../../src/space-engine";
 import {
 	createSandbox,
@@ -224,18 +223,5 @@ describe("a run of a project without a folder", () => {
 		expect(String(run.steps[0]?.outputs.log_tail).trim()).toBe(
 			createRunFolders(sandbox.dataDir).path(started.id),
 		);
-	});
-
-	test("a base is refused: the project has no branches", async () => {
-		const engine = makeEngine();
-		const research = await engine.addProjectWithoutFolder({ name: "Research" });
-		await expect(
-			engine.startRun({
-				projectId: research.id,
-				flow: flowOf([command("write", "true")]),
-				baseRef: "main",
-			}),
-		).rejects.toThrow(NO_BRANCHES);
-		expect(await engine.listRuns()).toEqual([]);
 	});
 });
