@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 import { keptGround } from "../../test-support";
 import { drizzlePersonalSecretStore } from "./drizzle-personal-secret-store";
 
@@ -40,5 +40,22 @@ describe("PersonalSecretStore over drizzle", () => {
 		});
 		await store.remove("person-ada", "A_TOKEN");
 		expect(await store.list("person-ada")).toEqual([]);
+	});
+
+	test("a removal drops one name of one Person only, and a read takes no row of another Person", async () => {
+		const warned = spyOn(console, "warn").mockImplementation(() => {});
+		const { personalSecretStore: store } = await make(() => 1);
+		await store.set("person-1", "A_TOKEN", "value-a", null);
+		await store.set("person-1", "B_TOKEN", "value-b", null);
+		await store.set("person-2", "A_TOKEN", "value-other", null);
+		await store.remove("person-1", "A_TOKEN");
+		expect(await store.values("person-1", ["A_TOKEN", "B_TOKEN"])).toEqual({
+			B_TOKEN: "value-b",
+		});
+		expect(await store.values("person-2", ["A_TOKEN"])).toEqual({
+			A_TOKEN: "value-other",
+		});
+		expect(warned).not.toHaveBeenCalled();
+		warned.mockRestore();
 	});
 });
