@@ -1,8 +1,8 @@
 import type { NewTarget, PushTarget } from "../domain/push-targets";
 
 /**
- * The driven ports of targets. A port of its own has a real adapter,
- * an in-memory adapter and a contract suite in `adapters/out/`. Another
+ * The driven ports of targets. A port of its own has a real adapter
+ * and its test in `adapters/out/`. Another
  * package fills a port with `@filledBy`: the composition of the package
  * passes it to `wireTargets`.
  */

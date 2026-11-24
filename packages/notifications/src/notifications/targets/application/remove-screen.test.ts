@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import type { PersonActor } from "@nightshift/engine";
-import { inMemoryTargetsPorts } from "../adapters/out/in-memory-neighbours";
 import type { NewTarget } from "../domain/push-targets";
+import { targetsPorts } from "../test-support";
 import { removeScreen } from "./remove-screen";
 
-/** The use case removeScreen, on in-memory adapters. */
+/** The use case removeScreen, over a database in memory. */
 
 const ADA: PersonActor = { personId: "ada", door: "session" };
 const BOB: PersonActor = { personId: "bob", door: "session" };
@@ -24,19 +24,19 @@ const target = (id: string, fields: Partial<NewTarget> = {}): NewTarget => ({
 
 describe("removeScreen", () => {
 	test("a Person removes only their own screens", async () => {
-		const ports = inMemoryTargetsPorts();
+		const ports = await targetsPorts();
 		await ports.targetStore.upsert(target("phone"));
 		const remove = removeScreen(ports);
 
 		expect(await remove(BOB, { id: "phone" })).toBeNull();
-		expect(ports.targetStore.all()).toHaveLength(1);
+		expect(await ports.allTargets()).toHaveLength(1);
 		expect(ports.sessions.ended).toEqual([]);
 		expect((await remove(ADA, { id: "phone" }))?.id).toBe("phone");
-		expect(ports.targetStore.all()).toEqual([]);
+		expect(await ports.allTargets()).toEqual([]);
 	});
 
 	test("a phone is signed out; a browser or a phone without a session is not", async () => {
-		const ports = inMemoryTargetsPorts();
+		const ports = await targetsPorts();
 		await ports.targetStore.upsert(target("phone"));
 		await ports.targetStore.upsert(target("bare", { sessionId: null }));
 		await ports.targetStore.upsert(

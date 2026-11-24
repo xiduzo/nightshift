@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { utc } from "@nightshift/time/testing";
-import { inMemoryNotifier } from "../adapters/out/in-memory-notifier";
+import { notifier } from "../test-support";
 
 /**
- * The use case endQuietHours, on in-memory adapters: what quiet hours
+ * The use case endQuietHours, over a database in memory: what quiet hours
  * held goes out when they end. The twins of the tests of the same names in
  * `notifier.test.ts`.
  */
@@ -14,8 +14,8 @@ const NIGHT = utc(2026, 9, 21, 23, 0);
 const MORNING = utc(2026, 9, 22, 7, 0);
 
 /** ada's quiet hours are 22:00 to 07:00, and it is 23:00. */
-function setup() {
-	const n = inMemoryNotifier();
+async function setup() {
+	const n = await notifier();
 	n.ports.time = NIGHT;
 	n.ports.settings.save("ada", {
 		quietHours: { start: "22:00", end: "07:00" },
@@ -23,14 +23,14 @@ function setup() {
 	return n;
 }
 
-async function morning(n: ReturnType<typeof setup>, at = MORNING) {
+async function morning(n: Awaited<ReturnType<typeof setup>>, at = MORNING) {
 	n.ports.time = at;
 	await n.endQuiet({ at });
 }
 
 describe("quiet hours", () => {
 	test("hold pushes, not the in-app stream; when they end, the one Gate that waits goes out", async () => {
-		const n = setup();
+		const n = await setup();
 		const ada = n.ports.targets.add("ada", "web");
 
 		await n.openGate("run-1", "step-1");
@@ -44,7 +44,7 @@ describe("quiet hours", () => {
 		expect(n.ports.pushes.web.sentTo()).toEqual([`${ada.id}:run-1:step-1`]);
 		// The run that ended meanwhile goes without a push.
 		expect(
-			n.ports.deliveries.entry("ada", `run-2:end:${n.seq()}`),
+			await n.ports.deliveries.entry("ada", `run-2:end:${n.seq()}`),
 		).toMatchObject({ status: "dropped", heldFor: [] });
 
 		// It went out once: the next check sends nothing more.
@@ -53,7 +53,7 @@ describe("quiet hours", () => {
 	});
 
 	test("when they end, one push says how many Gates still wait", async () => {
-		const n = setup();
+		const n = await setup();
 		n.ports.targets.add("ada", "web");
 
 		await n.openGate("run-1", "step-1");
@@ -73,7 +73,7 @@ describe("quiet hours", () => {
 	});
 
 	test("when they end, each screen hears only of the Gates it held", async () => {
-		const n = setup();
+		const n = await setup();
 		// Another Host sends for OTHER_SPACE: only this computer's desktop held its Gate.
 		n.ports.members[OTHER_SPACE] = ["ada"];
 		n.ports.sendsFor.senders.delete(OTHER_SPACE);
@@ -102,7 +102,7 @@ describe("quiet hours", () => {
 	});
 
 	test("a Gate the summary named counts as sent there: its close withdraws it, and the last close withdraws the summary", async () => {
-		const n = setup();
+		const n = await setup();
 		const phone = n.ports.targets.add("ada", "expo");
 		const own = n.ports.targets.add("ada", "desktop");
 
@@ -142,7 +142,7 @@ describe("quiet hours", () => {
 
 describe("this computer's desktop", () => {
 	test("the quiet-hours summary of a Space another Host sends for reaches no push", async () => {
-		const n = setup();
+		const n = await setup();
 		n.ports.sendsFor.senders.delete(SPACE);
 		n.ports.targets.add("ada", "web");
 
@@ -156,7 +156,7 @@ describe("this computer's desktop", () => {
 
 describe("a step that waits for a device", () => {
 	test("a wait held over quiet hours goes out with its words when they end", async () => {
-		const n = setup();
+		const n = await setup();
 		n.ports.events.setRun("run-1", {
 			title: "Nightly triage",
 			personId: "ada",
@@ -189,7 +189,7 @@ describe("a step that waits for a device", () => {
 
 describe("a missed schedule", () => {
 	test("held over quiet hours, it goes out when they end", async () => {
-		const n = setup();
+		const n = await setup();
 		const ada = n.ports.targets.add("ada", "web");
 		const at = utc(2026, 9, 21, 22, 30);
 		await n.tellMissed({
@@ -213,7 +213,7 @@ describe("a missed schedule", () => {
 
 describe("a flow that turns severe under Needs a look", () => {
 	test("held over quiet hours, it goes out when they end", async () => {
-		const n = setup();
+		const n = await setup();
 		const ada = n.ports.targets.add("ada", "expo");
 		n.ports.events.setRun("run-2", {
 			title: "triage",

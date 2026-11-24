@@ -1,8 +1,8 @@
 import type { NotificationSettings } from "../domain/notification-settings";
 
 /**
- * The driven ports of settings. A port of its own has a real adapter,
- * an in-memory adapter and a contract suite in `adapters/out/`.
+ * The driven ports of settings. A port of its own has a real adapter
+ * and its test in `adapters/out/`.
  */
 
 /** The settings each Person saved. */

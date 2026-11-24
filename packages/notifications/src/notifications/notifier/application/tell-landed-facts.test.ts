@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import type { LandedFact } from "@nightshift/engine";
 import { utc } from "@nightshift/time/testing";
-import { inMemoryNotifier } from "../adapters/out/in-memory-notifier";
+import { notifier } from "../test-support";
 
 /**
- * The use case tellLandedFacts, on in-memory adapters: the open screens
+ * The use case tellLandedFacts, over a database in memory: the open screens
  * hear when a run changes, a Gate that closes is withdrawn everywhere.
  * The twins of the tests of the same names in `notifier.test.ts`.
  */
@@ -13,17 +13,17 @@ const SPACE = "space-1";
 /** 12:00 UTC on a weekday. */
 const NOON = utc(2026, 9, 21, 12, 0);
 
-function setup() {
-	const n = inMemoryNotifier();
+async function setup() {
+	const n = await notifier();
 	n.ports.time = NOON;
 	return n;
 }
 
-type What = Parameters<ReturnType<typeof setup>["landed"]>[1];
+type What = Parameters<Awaited<ReturnType<typeof setup>>["landed"]>[1];
 
 describe("the open screens hear when a run changes", () => {
 	test("a run that starts, sleeps, wakes, moves, stops or ends tells each open screen of its Space, quietly", async () => {
-		const n = setup();
+		const n = await setup();
 		n.ports.targets.add("ada", "web");
 
 		// It starts, a step starts, sleeps, wakes, moves, a stop waits, the step ends.
@@ -55,7 +55,7 @@ describe("the open screens hear when a run changes", () => {
 	});
 
 	test("once per run in a landing; a run told of otherwise in it hears nothing more", async () => {
-		const n = setup();
+		const n = await setup();
 		n.ports.events.setOpen(SPACE, [{ runId: "run-2", stepId: "gate" }]);
 
 		await n.tellLanded([
@@ -84,7 +84,7 @@ describe("the open screens hear when a run changes", () => {
 	});
 
 	test("what changes no list of runs tells nothing", async () => {
-		const n = setup();
+		const n = await setup();
 
 		await n.tellLanded([
 			n.landed("run-1", { kind: "other", changes: "spend" }),
@@ -96,7 +96,7 @@ describe("the open screens hear when a run changes", () => {
 	});
 
 	test("the facts of two Spaces in one landing tell each Space in its turn", async () => {
-		const n = setup();
+		const n = await setup();
 		const facts: LandedFact[] = [
 			n.landed("run-1", { kind: "other" }),
 			n.landed("run-9", { kind: "other" }, "space-2"),
@@ -115,7 +115,7 @@ describe("the open screens hear when a run changes", () => {
 
 describe("answer once, clear everywhere", () => {
 	test("a Gate that closes is withdrawn from every screen that got it", async () => {
-		const n = setup();
+		const n = await setup();
 		const { targets, pushes, inApp } = n.ports;
 		const browser = targets.add("ada", "web");
 		const phone = targets.add("ada", "expo");
@@ -132,14 +132,16 @@ describe("answer once, clear everywhere", () => {
 			call: "withdraw",
 			key: "run-1:step-1",
 		});
-		expect(n.ports.deliveries.entry("ada", "run-1:step-1")).toMatchObject({
-			status: "withdrawn",
-			withdrawnAt: NOON,
-		});
+		expect(await n.ports.deliveries.entry("ada", "run-1:step-1")).toMatchObject(
+			{
+				status: "withdrawn",
+				withdrawnAt: NOON,
+			},
+		);
 	});
 
 	test("a run that stops closes its Gate", async () => {
-		const n = setup();
+		const n = await setup();
 		const web = n.ports.targets.add("ada", "web");
 		await n.openGate("run-1", "step-1");
 
@@ -150,7 +152,7 @@ describe("answer once, clear everywhere", () => {
 	});
 
 	test("an event of another run leaves an open Gate alone", async () => {
-		const n = setup();
+		const n = await setup();
 		n.ports.targets.add("ada", "web");
 		await n.openGate("run-1", "step-1");
 
@@ -164,8 +166,8 @@ describe("a step that waits for a device", () => {
 	/** 06:00 UTC the next morning: the run's stop time. */
 	const STOP = utc(2026, 9, 22, 6, 0);
 
-	function waiting() {
-		const n = setup();
+	async function waiting() {
+		const n = await setup();
 		n.ports.events.setRun("run-1", {
 			title: "Nightly triage",
 			personId: "ada",
@@ -177,7 +179,7 @@ describe("a step that waits for a device", () => {
 
 	/** The step sleeps because its Device is offline: the first sleep, or a look again a minute later. */
 	const sleepFor = (
-		n: ReturnType<typeof setup>,
+		n: Awaited<ReturnType<typeof setup>>,
 		stepId = "step-1",
 		deviceName: string | null = "studio-mac",
 	) =>
@@ -191,7 +193,7 @@ describe("a step that waits for a device", () => {
 		]);
 
 	test("tells only the person the run runs for, with the flow, the device and the stop time", async () => {
-		const n = waiting();
+		const n = await waiting();
 		const ada = n.ports.targets.add("ada", "expo");
 		n.ports.targets.add("bob", "expo");
 		n.ports.inApp.setActive("ada", true);
@@ -221,7 +223,7 @@ describe("a step that waits for a device", () => {
 	});
 
 	test("the step that looks again every minute keeps its one notification", async () => {
-		const n = waiting();
+		const n = await waiting();
 		n.ports.targets.add("ada", "web");
 
 		await sleepFor(n);
@@ -239,7 +241,7 @@ describe("a step that waits for a device", () => {
 	});
 
 	test("is withdrawn at once when the step or the run ends", async () => {
-		const n = waiting();
+		const n = await waiting();
 		const web = n.ports.targets.add("ada", "web");
 		await sleepFor(n, "step-1");
 		await sleepFor(n, "step-2");
@@ -259,7 +261,7 @@ describe("a step that waits for a device", () => {
 	});
 
 	test("says no stop time when the run has none, and names a device of an older Night Shift as a device", async () => {
-		const n = waiting();
+		const n = await waiting();
 		n.ports.events.setRun("run-1", {
 			title: "Nightly triage",
 			personId: "ada",
@@ -277,7 +279,7 @@ describe("a step that waits for a device", () => {
 	});
 
 	test("goes to nobody when the person turned it off, left the Space, or the run names nobody", async () => {
-		const n = waiting();
+		const n = await waiting();
 		n.ports.targets.add("ada", "web");
 		n.ports.targets.add("cy", "web");
 		n.ports.settings.save("ada", { events: { deviceWait: false } });
@@ -317,11 +319,13 @@ describe("a flow that turns severe under Needs a look", () => {
 	});
 	const keyOf = (runId: string) => `look:project-1:triage:${runId}`;
 	/** What the phones got about Needs a look. */
-	const looks = (n: ReturnType<typeof setup>, kind: "web" | "expo" = "expo") =>
-		n.ports.pushes[kind].sentTo().filter((sent) => sent.includes(":look:"));
+	const looks = (
+		n: Awaited<ReturnType<typeof setup>>,
+		kind: "web" | "expo" = "expo",
+	) => n.ports.pushes[kind].sentTo().filter((sent) => sent.includes(":look:"));
 
-	function severe() {
-		const n = setup();
+	async function severe() {
+		const n = await setup();
 		n.ports.events.setRun("run-2", {
 			title: "triage",
 			personId: "ada",
@@ -332,14 +336,14 @@ describe("a flow that turns severe under Needs a look", () => {
 	}
 
 	test("a run that does not turn its flow severe pushes no alert", async () => {
-		const n = severe();
+		const n = await severe();
 		n.ports.targets.add("ada", "expo");
 		await n.endRun("run-1", "failed");
 		expect(looks(n)).toEqual([]);
 	});
 
 	test("the run that turns it severe pushes Now to every Member: the flow and why", async () => {
-		const n = severe();
+		const n = await severe();
 		const ada = n.ports.targets.add("ada", "expo");
 		const bob = n.ports.targets.add("bob", "web");
 		n.ports.events.setSevere("run-2", turn("run-2"));
@@ -362,7 +366,7 @@ describe("a flow that turns severe under Needs a look", () => {
 	});
 
 	test("a push only: an open page gets no item", async () => {
-		const n = severe();
+		const n = await severe();
 		n.ports.targets.add("ada", "expo");
 		n.ports.inApp.setActive("ada", true);
 		n.ports.events.setSevere("run-2", turn("run-2"));
@@ -371,13 +375,13 @@ describe("a flow that turns severe under Needs a look", () => {
 			n.ports.inApp.messages("ada").filter((m) => m.key === keyOf("run-2")),
 		).toEqual([]);
 		expect(looks(n)).toEqual([]);
-		expect(n.ports.deliveries.entry("ada", keyOf("run-2"))?.status).toBe(
-			"held",
-		);
+		expect(
+			(await n.ports.deliveries.entry("ada", keyOf("run-2")))?.status,
+		).toBe("held");
 	});
 
 	test("while it stays severe, nothing new; after it recovered, a new turn pushes again", async () => {
-		const n = severe();
+		const n = await severe();
 		const ada = n.ports.targets.add("ada", "expo");
 		n.ports.events.setSevere("run-2", turn("run-2"));
 		await n.endRun("run-2", "failed");
@@ -398,12 +402,12 @@ describe("a flow that turns severe under Needs a look", () => {
 	});
 
 	test("a restart does not push the same turn again", async () => {
-		const n = severe();
+		const n = await severe();
 		const ada = n.ports.targets.add("ada", "expo");
 		n.ports.events.setSevere("run-2", turn("run-2"));
 		await n.endRun("run-2", "failed");
 
-		const next = inMemoryNotifier({
+		const next = await notifier({
 			events: n.ports.events,
 			deliveries: n.ports.deliveries,
 			targets: n.ports.targets,
@@ -415,7 +419,7 @@ describe("a flow that turns severe under Needs a look", () => {
 	});
 
 	test("it follows the Now urgency of the push settings", async () => {
-		const n = severe();
+		const n = await severe();
 		n.ports.settings.save("ada", { pushUrgencies: ["today"] });
 		n.ports.targets.add("ada", "expo");
 		const bob = n.ports.targets.add("bob", "expo");

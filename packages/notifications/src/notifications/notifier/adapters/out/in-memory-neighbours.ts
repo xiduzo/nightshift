@@ -1,4 +1,4 @@
-import { INBOX_KEEP_MS, type SevereTurn } from "@nightshift/engine";
+import type { SevereTurn } from "@nightshift/engine";
 import type {
 	InAppTarget,
 	NotificationMessage,
@@ -22,16 +22,12 @@ import type {
 	SpaceList,
 } from "../../application/ports";
 import type { RunRef } from "../../domain/facts";
-import { createGateTracker, type OpenGateRef } from "../../domain/gate-tracker";
-import { createBundles, createPruneClock } from "../../domain/notifier-state";
-import { createWaitTracker } from "../../domain/wait-tracker";
-import { inMemoryDeliveryLog } from "./in-memory-delivery-log";
+import type { OpenGateRef } from "../../domain/gate-tracker";
 
 /**
  * The in-memory adapters of the ports that others fill (the engine's runs,
  * auth's Members and roles, the daemon's one sender per Space, the
- * settings and targets of a Person, the channels), and
- * `inMemoryNotifierPorts`, which gives a use-case test every port at once.
+ * settings and targets of a Person, the channels)).
  * Test code: production code never imports this file.
  */
 
@@ -261,55 +257,3 @@ export function inMemoryPushes() {
 		desktop: inMemoryPushChannel(),
 	} satisfies Pushes;
 }
-
-/**
- * Every port of the notifier in memory at once, and the state its use
- * cases share: where each use-case test starts. Two Spaces: `space-1`
- * with ada and bob, `space-2` with cy. This daemon sends for both. ada may
- * answer the Gates of `space-1`, cy those of `space-2`.
- */
-export function inMemoryNotifierPorts() {
-	const members: Record<string, string[]> = {
-		"space-1": ["ada", "bob"],
-		"space-2": ["cy"],
-	};
-	const events = inMemoryRunEvents();
-	const sendsFor = inMemorySendsFor();
-	sendsFor.senders.add("space-1").add("space-2");
-	const mayAnswer = inMemoryMayAnswer();
-	mayAnswer.answerers.add("space-1:ada").add("space-2:cy");
-	const ports = {
-		/** The time of the test, in ms. A test sets it. */
-		time: 0,
-		now: (): number => ports.time,
-		members,
-		events,
-		audience: inMemoryAudience(members),
-		spaces: inMemorySpaceList(members),
-		mayAnswer,
-		sendsFor,
-		settings: inMemoryPersonSettings(),
-		targets: inMemoryPushTargets(),
-		inApp: inMemoryInApp(),
-		pushes: inMemoryPushes(),
-		deliveries: inMemoryDeliveryLog(),
-		// Reads the events of `ports`, so an override of them counts.
-		gates: createGateTracker(
-			(spaceId: string): Promise<OpenGateRef[]> =>
-				ports.events.openGates(spaceId),
-		),
-		waits: createWaitTracker(),
-		bundles: createBundles(),
-		pruning: createPruneClock(),
-		inboxKeepMs: INBOX_KEEP_MS,
-		/** What went wrong, in order. */
-		errors: [] as string[],
-		onError: (message: string): void => {
-			ports.errors.push(message);
-		},
-	};
-	return ports;
-}
-
-/** The twins of one notifier, and the state its use cases share. */
-export type NotifierTwins = ReturnType<typeof inMemoryNotifierPorts>;

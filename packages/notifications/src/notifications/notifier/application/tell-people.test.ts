@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { utc } from "@nightshift/time/testing";
-import { inMemoryNotifier } from "../adapters/out/in-memory-notifier";
+import { notifier } from "../test-support";
 
 /**
- * The use case tellPeople, on in-memory adapters, through the landed facts
+ * The use case tellPeople, over a database in memory, through the landed facts
  * that call it: who hears of an event, one sender per Space, this
  * computer's desktop, push by urgency, quiet hours at the time of the event.
  * The twins of the tests of the same names in `notifier.test.ts`.
@@ -14,14 +14,14 @@ const OTHER_SPACE = "space-2";
 /** 12:00 UTC on a weekday. */
 const NOON = utc(2026, 9, 21, 12, 0);
 
-function setup() {
-	const n = inMemoryNotifier();
+async function setup() {
+	const n = await notifier();
 	n.ports.time = NOON;
 	return n;
 }
 
 /** What the Person's open screens got, as [kind, alert]. */
-const screen = (n: ReturnType<typeof setup>, personId: string) =>
+const screen = (n: Awaited<ReturnType<typeof setup>>, personId: string) =>
 	n.ports.inApp
 		.of(personId)
 		.map((c) =>
@@ -30,7 +30,7 @@ const screen = (n: ReturnType<typeof setup>, personId: string) =>
 
 describe("who hears of an event", () => {
 	test("a new Gate reaches every Member of its Space, on every screen, and nobody else", async () => {
-		const n = setup();
+		const n = await setup();
 		const { targets, pushes, inApp } = n.ports;
 		const ada = targets.add("ada", "web");
 		const bob = targets.add("bob", "expo");
@@ -54,7 +54,7 @@ describe("who hears of an event", () => {
 	});
 
 	test("the in-app stream gets every event, and alerts only for what the person wants", async () => {
-		const n = setup();
+		const n = await setup();
 		n.ports.settings.save("bob", { events: { runFailed: false } });
 
 		await n.openGate("run-1", "step-1");
@@ -82,7 +82,7 @@ describe("who hears of an event", () => {
 	});
 
 	test("a person who turned an event off gets no push of it", async () => {
-		const n = setup();
+		const n = await setup();
 		const ada = n.ports.targets.add("ada", "web");
 		n.ports.settings.save("ada", { events: { runFinished: false } });
 
@@ -95,7 +95,7 @@ describe("who hears of an event", () => {
 	});
 
 	test("a screen kind the person turned off gets nothing", async () => {
-		const n = setup();
+		const n = await setup();
 		n.ports.targets.add("ada", "web");
 		const phone = n.ports.targets.add("ada", "expo");
 		n.ports.settings.save("ada", { screens: { web: false } });
@@ -109,7 +109,7 @@ describe("who hears of an event", () => {
 
 describe("one sender per Space", () => {
 	test("a daemon that does not send for the Space pushes nothing, and its pages only update", async () => {
-		const n = setup();
+		const n = await setup();
 		n.ports.sendsFor.senders.delete(SPACE);
 		n.ports.targets.add("ada", "web");
 
@@ -122,13 +122,13 @@ describe("one sender per Space", () => {
 			false,
 		]);
 		// Nothing was claimed: the sender of the Space claims its pushes.
-		expect(n.ports.deliveries.rows()).toEqual([]);
+		expect(await n.ports.deliveries.rows()).toEqual([]);
 	});
 });
 
 describe("this computer's desktop", () => {
 	test("shows the Gates of a Space another Host sends for, and pushes nothing else", async () => {
-		const n = setup();
+		const n = await setup();
 		const { targets, pushes, inApp } = n.ports;
 		n.ports.sendsFor.senders.delete(SPACE);
 		const own = targets.add("ada", "desktop");
@@ -158,7 +158,7 @@ describe("this computer's desktop", () => {
 	});
 
 	test("says when an open page showed the notice, so the desktop does not show it twice", async () => {
-		const n = setup();
+		const n = await setup();
 		n.ports.targets.add("ada", "desktop");
 		n.ports.inApp.setActive("ada", true);
 
@@ -171,7 +171,7 @@ describe("this computer's desktop", () => {
 	});
 
 	test("respects the person's events, screens and quiet hours there too", async () => {
-		const n = setup();
+		const n = await setup();
 		const { targets, pushes, settings } = n.ports;
 		n.ports.sendsFor.senders.delete(SPACE);
 		settings.save("ada", {
@@ -202,7 +202,7 @@ describe("this computer's desktop", () => {
 
 describe("push by urgency", () => {
 	test("by default only a Gate for now pushes; the inbox and its count get every Gate", async () => {
-		const n = setup();
+		const n = await setup();
 		const { targets, pushes, inApp } = n.ports;
 		const ada = targets.add("ada", "web");
 		const phone = targets.add("ada", "expo");
@@ -230,7 +230,7 @@ describe("push by urgency", () => {
 	});
 
 	test("a Person who pushes for today gets those Gates too, and later stays in the inbox", async () => {
-		const n = setup();
+		const n = await setup();
 		const ada = n.ports.targets.add("ada", "web");
 		const bob = n.ports.targets.add("bob", "web");
 		n.ports.settings.save("ada", { pushUrgencies: ["now", "today"] });
@@ -243,7 +243,7 @@ describe("push by urgency", () => {
 	});
 
 	test("no urgency chosen: no Gate pushes, other events still do", async () => {
-		const n = setup();
+		const n = await setup();
 		const ada = n.ports.targets.add("ada", "web");
 		n.ports.settings.save("ada", { pushUrgencies: [] });
 
@@ -256,7 +256,7 @@ describe("push by urgency", () => {
 	});
 
 	test("quiet hours still hold a Gate of an urgency that pushes", async () => {
-		const n = setup();
+		const n = await setup();
 		const ada = n.ports.targets.add("ada", "web");
 		n.ports.settings.save("ada", {
 			quietHours: { start: "22:00", end: "07:00" },
@@ -276,7 +276,7 @@ describe("push by urgency", () => {
 
 describe("quiet hours", () => {
 	test("are in the person's own time zone", async () => {
-		const n = setup();
+		const n = await setup();
 		n.ports.settings.save("ada", {
 			quietHours: { start: "22:00", end: "07:00" },
 			timeZone: "Asia/Tokyo",
@@ -291,7 +291,7 @@ describe("quiet hours", () => {
 	});
 
 	test("hold pushes, not the in-app stream: the open page updates without an alert", async () => {
-		const n = setup();
+		const n = await setup();
 		n.ports.settings.save("ada", {
 			quietHours: { start: "22:00", end: "07:00" },
 		});
@@ -307,8 +307,7 @@ describe("quiet hours", () => {
 			["run-finished", false],
 		]);
 		expect(
-			n.ports.deliveries
-				.rows()
+			(await n.ports.deliveries.rows())
 				.filter((row) => row.personId === "ada")
 				.map((row) => row.status),
 		).toEqual(["quiet", "quiet"]);
@@ -317,7 +316,7 @@ describe("quiet hours", () => {
 
 describe("the active screen first", () => {
 	test("while a page is open, a push to the phone waits; the desktop does not", async () => {
-		const n = setup();
+		const n = await setup();
 		const { targets, pushes, inApp } = n.ports;
 		const phone = targets.add("ada", "expo");
 		const mac = targets.add("ada", "desktop");
@@ -329,16 +328,18 @@ describe("the active screen first", () => {
 		expect(pushes.expo.calls).toEqual([]);
 		// The desktop app is a screen of its own: it does not wait.
 		expect(pushes.desktop.sentTo()).toEqual([`${mac.id}:run-1:step-1`]);
-		expect(n.ports.deliveries.entry("ada", "run-1:step-1")).toMatchObject({
-			status: "held",
-			dueAt: NOON + 3 * 60_000,
-			sentTo: [mac.id],
-			heldFor: [phone.id],
-		});
+		expect(await n.ports.deliveries.entry("ada", "run-1:step-1")).toMatchObject(
+			{
+				status: "held",
+				dueAt: NOON + 3 * 60_000,
+				sentTo: [mac.id],
+				heldFor: [phone.id],
+			},
+		);
 	});
 
 	test("a delay of zero sends at once", async () => {
-		const n = setup();
+		const n = await setup();
 		n.ports.settings.save("ada", { holdMinutes: 0 });
 		n.ports.targets.add("ada", "expo");
 		n.ports.inApp.setActive("ada", true);
@@ -349,7 +350,7 @@ describe("the active screen first", () => {
 	});
 
 	test("no open page: every screen at once", async () => {
-		const n = setup();
+		const n = await setup();
 		n.ports.targets.add("ada", "web");
 		n.ports.targets.add("ada", "expo");
 
@@ -360,7 +361,7 @@ describe("the active screen first", () => {
 	});
 
 	test("the phone app in front holds the push; its stream gets the Gate at once to show it", async () => {
-		const n = setup();
+		const n = await setup();
 		n.ports.targets.add("ada", "expo");
 		n.ports.inApp.setActive("ada", true);
 
@@ -371,7 +372,7 @@ describe("the active screen first", () => {
 	});
 
 	test("a phone app that went to the background is no open screen: a new Gate is pushed at once", async () => {
-		const n = setup();
+		const n = await setup();
 		const phone = n.ports.targets.add("ada", "expo");
 		n.ports.inApp.setActive("ada", false);
 
@@ -383,7 +384,7 @@ describe("the active screen first", () => {
 
 describe("once per key", () => {
 	test("the same Gate landing twice is pushed once", async () => {
-		const n = setup();
+		const n = await setup();
 		const ada = n.ports.targets.add("ada", "web");
 
 		await n.openGate("run-1", "step-1");
@@ -400,9 +401,9 @@ describe("once per key", () => {
 	});
 
 	test("two notifiers on the same log push a Gate once", async () => {
-		const first = setup();
+		const first = await setup();
 		const ada = first.ports.targets.add("ada", "web");
-		const second = inMemoryNotifier({
+		const second = await notifier({
 			deliveries: first.ports.deliveries,
 			targets: first.ports.targets,
 			pushes: first.ports.pushes,
@@ -416,27 +417,29 @@ describe("once per key", () => {
 	});
 
 	test("the claim goes in the log before the push goes out", async () => {
-		const n = setup();
+		const n = await setup();
 		const ada = n.ports.targets.add("ada", "web");
 		const seen: unknown[] = [];
 		const send = n.ports.pushes.web.send;
 		n.ports.pushes.web.send = async (target, message) => {
-			seen.push(n.ports.deliveries.entry("ada", message.key)?.status);
+			seen.push((await n.ports.deliveries.entry("ada", message.key))?.status);
 			return send(target, message);
 		};
 
 		await n.openGate("run-1", "step-1");
 
 		expect(seen).toEqual(["sending"]);
-		expect(n.ports.deliveries.entry("ada", "run-1:step-1")).toMatchObject({
-			status: "sent",
-			sentTo: [ada.id],
-			heldFor: [],
-		});
+		expect(await n.ports.deliveries.entry("ada", "run-1:step-1")).toMatchObject(
+			{
+				status: "sent",
+				sentTo: [ada.id],
+				heldFor: [],
+			},
+		);
 	});
 
 	test("a Gate that opens again after it was answered is pushed again", async () => {
-		const n = setup();
+		const n = await setup();
 		n.ports.targets.add("ada", "web");
 
 		await n.openGate("run-1", "step-1");
@@ -449,7 +452,7 @@ describe("once per key", () => {
 
 describe("a Space of another sender", () => {
 	test("a Member of two Spaces hears of each, as each Space's sender decides", async () => {
-		const n = setup();
+		const n = await setup();
 		n.ports.members[OTHER_SPACE] = ["ada"];
 		n.ports.sendsFor.senders.delete(OTHER_SPACE);
 		const web = n.ports.targets.add("ada", "web");
@@ -467,7 +470,7 @@ describe("a Space of another sender", () => {
 
 describe("a lost screen", () => {
 	test("a target its push service no longer knows is forgotten", async () => {
-		const n = setup();
+		const n = await setup();
 		const ada = n.ports.targets.add("ada", "web");
 		n.ports.pushes.web.lose(ada.id);
 
@@ -475,14 +478,16 @@ describe("a lost screen", () => {
 
 		expect(await n.ports.targets.of("ada")).toEqual([]);
 		expect(n.ports.targets.forgotten).toEqual([ada.id]);
-		expect(n.ports.deliveries.entry("ada", "run-1:step-1")).toMatchObject({
-			status: "dropped",
-			sentTo: [],
-		});
+		expect(await n.ports.deliveries.entry("ada", "run-1:step-1")).toMatchObject(
+			{
+				status: "dropped",
+				sentTo: [],
+			},
+		);
 	});
 
 	test("a send that throws is told, and the next screen still gets it", async () => {
-		const n = setup();
+		const n = await setup();
 		const web = n.ports.targets.add("ada", "web");
 		const phone = n.ports.targets.add("ada", "expo");
 		n.ports.pushes.web.fail(web.id);
@@ -498,7 +503,7 @@ describe("lock-screen Gates", () => {
 	const marked = { lockScreen: true, choices: ["ship", "hold"] };
 
 	test("a push about a marked Gate carries its options to a person who may answer", async () => {
-		const n = setup();
+		const n = await setup();
 		n.ports.targets.add("ada", "expo");
 		n.ports.targets.add("bob", "expo");
 
@@ -517,7 +522,7 @@ describe("lock-screen Gates", () => {
 	});
 
 	test("an unmarked Gate carries no options", async () => {
-		const n = setup();
+		const n = await setup();
 		n.ports.targets.add("ada", "expo");
 
 		await n.openGate("run-1", "step-1", SPACE, { choices: ["ship", "hold"] });
@@ -531,7 +536,7 @@ describe("lock-screen Gates", () => {
 	});
 
 	test("a run that ended carries no Gate", async () => {
-		const n = setup();
+		const n = await setup();
 		n.ports.targets.add("ada", "expo");
 
 		await n.endRun("run-1", "finished");

@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { utc } from "@nightshift/time/testing";
-import { inMemoryNotifier } from "../adapters/out/in-memory-notifier";
+import { notifier } from "../test-support";
 
 /**
- * The use case sendHeldPushes, on in-memory adapters: the active screen
+ * The use case sendHeldPushes, over a database in memory: the active screen
  * first. The in-app port says whether the Person has a screen open (the
  * channel decides that a closed page counts for a minute, and a phone app
  * in the background not at all). The twins of the tests of the same names
@@ -15,15 +15,15 @@ const SPACE = "space-1";
 const NOON = utc(2026, 9, 21, 12, 0);
 const MINUTE = 60_000;
 
-function setup() {
-	const n = inMemoryNotifier();
+async function setup() {
+	const n = await notifier();
 	n.ports.time = NOON;
 	return n;
 }
 
 describe("the active screen first", () => {
 	test("while a page is open, a push to the phone waits, and goes when the Gate still waits", async () => {
-		const n = setup();
+		const n = await setup();
 		const phone = n.ports.targets.add("ada", "expo");
 		n.ports.inApp.setActive("ada", true);
 		await n.openGate("run-1", "step-1");
@@ -35,16 +35,18 @@ describe("the active screen first", () => {
 		n.ports.time += MINUTE;
 		await n.sendHeld({ at: n.ports.time });
 		expect(n.ports.pushes.expo.sentTo()).toEqual([`${phone.id}:run-1:step-1`]);
-		expect(n.ports.deliveries.entry("ada", "run-1:step-1")).toMatchObject({
-			status: "sent",
-			sentTo: [phone.id],
-			heldFor: [],
-			sentAt: NOON + 3 * MINUTE,
-		});
+		expect(await n.ports.deliveries.entry("ada", "run-1:step-1")).toMatchObject(
+			{
+				status: "sent",
+				sentTo: [phone.id],
+				heldFor: [],
+				sentAt: NOON + 3 * MINUTE,
+			},
+		);
 	});
 
 	test("a Gate answered meanwhile never reaches the phone", async () => {
-		const n = setup();
+		const n = await setup();
 		n.ports.targets.add("ada", "expo");
 		n.ports.inApp.setActive("ada", true);
 
@@ -58,7 +60,7 @@ describe("the active screen first", () => {
 	});
 
 	test("a run's end that showed on an open page is not pushed after it", async () => {
-		const n = setup();
+		const n = await setup();
 		n.ports.targets.add("ada", "expo");
 		n.ports.inApp.setActive("ada", true);
 
@@ -67,14 +69,14 @@ describe("the active screen first", () => {
 		await n.sendHeld({ at: n.ports.time });
 
 		expect(n.ports.pushes.expo.calls).toEqual([]);
-		expect(n.ports.deliveries.rows()[0]).toMatchObject({
+		expect((await n.ports.deliveries.rows())[0]).toMatchObject({
 			personId: "ada",
 			status: "dropped",
 		});
 	});
 
 	test("a run's end is pushed when the person closed every screen meanwhile", async () => {
-		const n = setup();
+		const n = await setup();
 		n.ports.targets.add("ada", "expo");
 		n.ports.inApp.setActive("ada", true);
 
@@ -89,7 +91,7 @@ describe("the active screen first", () => {
 	});
 
 	test("a page that closed counts as open for a minute: it may reload", async () => {
-		const n = setup();
+		const n = await setup();
 		n.ports.targets.add("ada", "expo");
 		// The page closed 10 s ago: the channel still counts it as open.
 		n.ports.inApp.setActive("ada", true);
@@ -101,7 +103,7 @@ describe("the active screen first", () => {
 	});
 
 	test("a held push goes once the person has no screen open, not after the full delay", async () => {
-		const n = setup();
+		const n = await setup();
 		const phone = n.ports.targets.add("ada", "expo");
 		n.ports.inApp.setActive("ada", true);
 		await n.openGate("run-1", "step-1");
@@ -116,7 +118,7 @@ describe("the active screen first", () => {
 	});
 
 	test("a held push waits out the minute of a page that closed, then goes", async () => {
-		const n = setup();
+		const n = await setup();
 		const phone = n.ports.targets.add("ada", "expo");
 		n.ports.inApp.setActive("ada", true);
 		await n.openGate("run-1", "step-1");
@@ -133,7 +135,7 @@ describe("the active screen first", () => {
 	});
 
 	test("a held push that comes due in quiet hours waits for their end", async () => {
-		const n = setup();
+		const n = await setup();
 		n.ports.targets.add("ada", "expo");
 		n.ports.inApp.setActive("ada", true);
 		await n.openGate("run-1", "step-1");
@@ -145,15 +147,15 @@ describe("the active screen first", () => {
 		await n.sendHeld({ at: n.ports.time });
 
 		expect(n.ports.pushes.expo.calls).toEqual([]);
-		expect(n.ports.deliveries.entry("ada", "run-1:step-1")?.status).toBe(
-			"quiet",
-		);
+		expect(
+			(await n.ports.deliveries.entry("ada", "run-1:step-1"))?.status,
+		).toBe("quiet");
 	});
 });
 
 describe("lock-screen Gates", () => {
 	test("a held push still carries the options when it goes", async () => {
-		const n = setup();
+		const n = await setup();
 		n.ports.targets.add("ada", "expo");
 		n.ports.inApp.setActive("ada", true);
 
@@ -172,7 +174,7 @@ describe("lock-screen Gates", () => {
 
 describe("a missed schedule", () => {
 	test("a push only: an open page gets no item, and the push waits until it closes", async () => {
-		const n = setup();
+		const n = await setup();
 		const ada = n.ports.targets.add("ada", "web");
 		const at = utc(2026, 9, 21, 10, 30);
 		n.ports.inApp.setActive("ada", true);
@@ -201,7 +203,7 @@ describe("a missed schedule", () => {
 
 describe("a flow that turns severe under Needs a look", () => {
 	test("a push only: an open page gets no item, and the push waits until it closes", async () => {
-		const n = setup();
+		const n = await setup();
 		const ada = n.ports.targets.add("ada", "expo");
 		n.ports.inApp.setActive("ada", true);
 		n.ports.events.setSevere("run-2", {

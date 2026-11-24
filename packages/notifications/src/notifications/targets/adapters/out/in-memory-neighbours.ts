@@ -1,11 +1,9 @@
 import type { Sessions } from "../../application/ports";
-import { inMemoryTargetStore } from "./in-memory-target-store";
 
 /**
  * The in-memory adapter of the port that another package fills
- * (`Sessions`, `@filledBy auth`), and `inMemoryTargetsPorts`, which gives
- * a use-case test every port of the slice at once. Test code: production
- * code never imports this file.
+ * (`Sessions`, `@filledBy auth`). Test code: production code never imports
+ * this file.
  */
 
 /** The sessions of a test: each live until its end (ms). */
@@ -29,18 +27,4 @@ export function inMemorySessions() {
 		},
 	};
 	return sessions satisfies Sessions;
-}
-
-/** Every port of targets in memory at once: where each use-case test starts. */
-export function inMemoryTargetsPorts() {
-	let ids = 0;
-	const ports = {
-		targetStore: inMemoryTargetStore(),
-		sessions: inMemorySessions(),
-		/** The time of the test, in ms. A test sets it. */
-		time: 1_000,
-		clock: () => ports.time,
-		newId: () => `target-${++ids}`,
-	};
-	return ports;
 }

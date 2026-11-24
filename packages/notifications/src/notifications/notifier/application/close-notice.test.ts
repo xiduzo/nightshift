@@ -1,22 +1,22 @@
 import { describe, expect, test } from "bun:test";
 import { utc } from "@nightshift/time/testing";
-import { inMemoryNotifier } from "../adapters/out/in-memory-notifier";
+import { notifier } from "../test-support";
 
-/** The use case closeNotice, on in-memory adapters: answer once, clear everywhere. */
+/** The use case closeNotice, over a database in memory: answer once, clear everywhere. */
 
 const SPACE = "space-1";
 /** 12:00 UTC on a weekday. */
 const NOON = utc(2026, 9, 21, 12, 0);
 
-function setup() {
-	const n = inMemoryNotifier();
+async function setup() {
+	const n = await notifier();
 	n.ports.time = NOON;
 	return n;
 }
 
 describe("closeNotice", () => {
 	test("the open pages of the Space first, then each push that went out, then the entry is withdrawn", async () => {
-		const n = setup();
+		const n = await setup();
 		const order: string[] = [];
 		const web = n.ports.targets.add("ada", "web");
 		await n.openGate("run-1", "step-1");
@@ -35,15 +35,17 @@ describe("closeNotice", () => {
 		await n.close({ spaceId: SPACE, key: "run-1:step-1" });
 
 		expect(order).toEqual(["in-app ada", "in-app bob", `push ${web.id}`]);
-		expect(n.ports.deliveries.entry("ada", "run-1:step-1")).toMatchObject({
-			status: "withdrawn",
-			heldFor: [],
-			withdrawnAt: NOON + 60_000,
-		});
+		expect(await n.ports.deliveries.entry("ada", "run-1:step-1")).toMatchObject(
+			{
+				status: "withdrawn",
+				heldFor: [],
+				withdrawnAt: NOON + 60_000,
+			},
+		);
 	});
 
 	test("a push that still waits, and went nowhere yet, is dropped", async () => {
-		const n = setup();
+		const n = await setup();
 		n.ports.targets.add("ada", "expo");
 		n.ports.inApp.setActive("ada", true);
 		await n.openGate("run-1", "step-1");
@@ -51,14 +53,16 @@ describe("closeNotice", () => {
 		await n.close({ spaceId: SPACE, key: "run-1:step-1" });
 
 		expect(n.ports.pushes.expo.calls).toEqual([]);
-		expect(n.ports.deliveries.entry("ada", "run-1:step-1")).toMatchObject({
-			status: "dropped",
-			heldFor: [],
-		});
+		expect(await n.ports.deliveries.entry("ada", "run-1:step-1")).toMatchObject(
+			{
+				status: "dropped",
+				heldFor: [],
+			},
+		);
 	});
 
 	test("a key nobody got withdraws only on the open pages", async () => {
-		const n = setup();
+		const n = await setup();
 
 		await n.close({ spaceId: SPACE, key: "run-9:step-9" });
 

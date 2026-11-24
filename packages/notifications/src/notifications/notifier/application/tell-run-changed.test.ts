@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { utc } from "@nightshift/time/testing";
-import { inMemoryNotifier } from "../adapters/out/in-memory-notifier";
+import { notifier } from "../test-support";
 
 /**
- * The use case tellRunChanged, on in-memory adapters: an answer that waits
+ * The use case tellRunChanged, over a database in memory: an answer that waits
  * for the Device that walks the run. The twins of the tests of the same
  * names in `notifier.test.ts`.
  */
@@ -12,15 +12,15 @@ const SPACE = "space-1";
 /** 12:00 UTC on a weekday. */
 const NOON = utc(2026, 9, 21, 12, 0);
 
-function setup() {
-	const n = inMemoryNotifier();
+async function setup() {
+	const n = await notifier();
 	n.ports.time = NOON;
 	return n;
 }
 
 /** The answer is kept for the run's Device, or that Device refused it: the engine reads it so. */
 async function setPending(
-	n: ReturnType<typeof setup>,
+	n: Awaited<ReturnType<typeof setup>>,
 	runId: string,
 	stepId: string,
 	pending: boolean,
@@ -38,7 +38,7 @@ async function setPending(
 
 describe("an answer that waits for the Device that walks the run", () => {
 	test("closes the Gate everywhere at once", async () => {
-		const n = setup();
+		const n = await setup();
 		const browser = n.ports.targets.add("ada", "web");
 		const phone = n.ports.targets.add("ada", "expo");
 		await n.openGate("run-1", "step-1");
@@ -60,7 +60,7 @@ describe("an answer that waits for the Device that walks the run", () => {
 	});
 
 	test("refused, the Gate waits again without a new push, and its real close still tells the screens", async () => {
-		const n = setup();
+		const n = await setup();
 		const web = n.ports.targets.add("ada", "web");
 		await n.openGate("run-1", "step-1");
 		await setPending(n, "run-1", "step-1", true);
@@ -78,7 +78,7 @@ describe("an answer that waits for the Device that walks the run", () => {
 	});
 
 	test("applied, the Gate goes without a second withdraw", async () => {
-		const n = setup();
+		const n = await setup();
 		const web = n.ports.targets.add("ada", "web");
 		await n.openGate("run-1", "step-1");
 		await setPending(n, "run-1", "step-1", true);
@@ -95,7 +95,7 @@ describe("an answer that waits for the Device that walks the run", () => {
 	});
 
 	test("a run without a known Gate reads nothing again and closes nothing", async () => {
-		const n = setup();
+		const n = await setup();
 		n.ports.targets.add("ada", "web");
 
 		await n.runChanged({ spaceId: SPACE, runId: "run-1" });

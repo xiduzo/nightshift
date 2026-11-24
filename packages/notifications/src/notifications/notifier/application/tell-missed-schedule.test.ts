@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { utc } from "@nightshift/time/testing";
-import { inMemoryNotifier } from "../adapters/out/in-memory-notifier";
+import { notifier } from "../test-support";
 
 /**
- * The use case tellMissedSchedule, on in-memory adapters. The twins of the
+ * The use case tellMissedSchedule, over a database in memory. The twins of the
  * tests of the same names in `notifier.test.ts`.
  */
 
@@ -11,8 +11,8 @@ const SPACE = "space-1";
 /** 12:00 UTC on a weekday. */
 const NOON = utc(2026, 9, 21, 12, 0);
 
-function setup() {
-	const n = inMemoryNotifier();
+async function setup() {
+	const n = await notifier();
 	n.ports.time = NOON;
 	return n;
 }
@@ -27,7 +27,7 @@ const missed = {
 
 describe("a missed schedule", () => {
 	test("every Member hears that it did not start, with the flow and its time", async () => {
-		const n = setup();
+		const n = await setup();
 		const ada = n.ports.targets.add("ada", "web");
 		const bob = n.ports.targets.add("bob", "expo");
 
@@ -49,7 +49,7 @@ describe("a missed schedule", () => {
 	});
 
 	test("a push only: an open page gets no item", async () => {
-		const n = setup();
+		const n = await setup();
 		n.ports.targets.add("ada", "web");
 		n.ports.inApp.setActive("ada", true);
 
@@ -58,7 +58,7 @@ describe("a missed schedule", () => {
 		expect(n.ports.inApp.of("ada")).toEqual([]);
 		expect(n.ports.pushes.web.calls).toEqual([]);
 		expect(
-			n.ports.deliveries.entry(
+			await n.ports.deliveries.entry(
 				"ada",
 				`missed:project-1:rebalance:${missed.at}`,
 			),
@@ -71,7 +71,7 @@ describe("a missed schedule", () => {
 	});
 
 	test("a time a day or more ago says its day", async () => {
-		const n = setup();
+		const n = await setup();
 		n.ports.targets.add("ada", "web");
 
 		await n.tellMissed({ ...missed, at: utc(2026, 9, 19, 22, 30) });
@@ -82,7 +82,7 @@ describe("a missed schedule", () => {
 	});
 
 	test("a person who turned off failed runs does not hear of it", async () => {
-		const n = setup();
+		const n = await setup();
 		const current = await n.ports.settings.get("ada");
 		n.ports.settings.save("ada", {
 			events: { ...current.events, runFailed: false },
@@ -95,7 +95,7 @@ describe("a missed schedule", () => {
 	});
 
 	test("the time is on the clock of each person", async () => {
-		const n = setup();
+		const n = await setup();
 		n.ports.settings.save("ada", { timeZone: "Asia/Tokyo" });
 		n.ports.targets.add("ada", "web");
 

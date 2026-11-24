@@ -1,34 +1,31 @@
-import { describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { notificationSettings } from "@nightshift/db/schema";
 import { migratedDb } from "@nightshift/db/testing";
 import { eq } from "drizzle-orm";
+import {
+	defaultSettings,
+	type NotificationSettings,
+} from "../../domain/notification-settings";
 import { drizzleSettingsStore } from "./drizzle-settings-store";
-import { inMemorySettingsStore } from "./in-memory-settings-store";
-import { settingsStoreContract } from "./settings-store.contract";
 
-/**
- * The contract of `SettingsStore`, on both adapters. The real adapter's
- * side runs on libsql in memory. Then the rows only the real adapter can
- * hold: from an older version, or not readable.
- */
+const SAVED: NotificationSettings = {
+	events: {
+		gateOpened: true,
+		runFinished: false,
+		runFailed: true,
+		deviceWait: false,
+	},
+	quietHours: { start: "22:30", end: "06:45" },
+	timeZone: "Europe/Amsterdam",
+	screens: { web: true, expo: false, desktop: true },
+	holdMinutes: 10,
+	pushUrgencies: ["now", "later"],
+};
 
 async function memoryDb() {
 	const db = await migratedDb();
 	return db;
 }
-
-settingsStoreContract("in memory", async () => ({
-	settingsStore: inMemorySettingsStore(),
-	close: async () => {},
-}));
-
-settingsStoreContract("over drizzle", async () => ({
-	settingsStore: drizzleSettingsStore({
-		db: await memoryDb(),
-		timeZone: "UTC",
-	}),
-	close: async () => {},
-}));
 
 describe("SettingsStore over drizzle: the rows it reads", () => {
 	test("a row from before the urgencies, or one it cannot read, pushes only for now", async () => {
@@ -71,5 +68,40 @@ describe("SettingsStore over drizzle: the rows it reads", () => {
 			expo: false,
 			desktop: true,
 		});
+	});
+});
+
+const make = async () => ({
+	settingsStore: drizzleSettingsStore({
+		db: await memoryDb(),
+		timeZone: "UTC",
+	}),
+});
+
+describe("SettingsStore over drizzle", () => {
+	let under: Awaited<ReturnType<typeof make>>;
+	beforeEach(async () => {
+		under = await make();
+	});
+
+	test("a Person who saved nothing has no settings", async () => {
+		expect(await under.settingsStore.get("ada")).toBeNull();
+	});
+
+	test("gives back what was put, for that Person only", async () => {
+		await under.settingsStore.put("ada", SAVED);
+		expect(await under.settingsStore.get("ada")).toEqual(SAVED);
+		expect(await under.settingsStore.get("bob")).toBeNull();
+	});
+
+	test("a put replaces what the Person had, also no quiet hours and no urgencies", async () => {
+		await under.settingsStore.put("ada", SAVED);
+		const next = {
+			...defaultSettings("UTC"),
+			quietHours: null,
+			pushUrgencies: [],
+		};
+		await under.settingsStore.put("ada", next);
+		expect(await under.settingsStore.get("ada")).toEqual(next);
 	});
 });

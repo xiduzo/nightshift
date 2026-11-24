@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { inMemoryTargetsPorts } from "../adapters/out/in-memory-neighbours";
 import type { NewTarget } from "../domain/push-targets";
+import { targetsPorts } from "../test-support";
 import { listTargets } from "./list-targets";
 
-/** The use case listTargets, on in-memory adapters. */
+/** The use case listTargets, over a database in memory. */
 
 const phone = (id: string, sessionId: string | null): NewTarget => ({
 	id,
@@ -19,7 +19,7 @@ const phone = (id: string, sessionId: string | null): NewTarget => ({
 
 describe("listTargets", () => {
 	test("a phone gets nothing more once its session ended: signed out, expired or revoked", async () => {
-		const ports = inMemoryTargetsPorts();
+		const ports = await targetsPorts();
 		ports.time = 5_000;
 		ports.sessions.add("live", "ada", 10_000);
 		ports.sessions.add("expired", "ada", 4_000);
@@ -36,14 +36,14 @@ describe("listTargets", () => {
 		const listed = await listTargets(ports)({ personId: "ada" });
 		expect(listed.map((t) => t.id)).toEqual(["kept", "browser"]);
 		// Forgotten, not only left out.
-		expect(ports.targetStore.all().map((t) => t.id)).toEqual([
+		expect((await ports.allTargets()).map((t) => t.id)).toEqual([
 			"kept",
 			"browser",
 		]);
 	});
 
 	test("without phones, or with every phone live, it forgets nothing", async () => {
-		const ports = inMemoryTargetsPorts();
+		const ports = await targetsPorts();
 		ports.sessions.add("live", "ada", 10_000);
 		await ports.targetStore.upsert(phone("kept", "live"));
 		await ports.targetStore.upsert(phone("bare", null));

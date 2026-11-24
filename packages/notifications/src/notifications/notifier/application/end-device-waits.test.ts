@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { utc } from "@nightshift/time/testing";
-import { inMemoryNotifier } from "../adapters/out/in-memory-notifier";
+import { notifier } from "../test-support";
 
 /**
- * The use case endDeviceWaits, on in-memory adapters. The twin of the test
+ * The use case endDeviceWaits, over a database in memory. The twin of the test
  * of the same name in `notifier.test.ts`.
  */
 
@@ -12,7 +12,7 @@ const NOON = utc(2026, 9, 21, 12, 0);
 
 describe("a step that waits for a device", () => {
 	test("is withdrawn once the step does not sleep again", async () => {
-		const n = inMemoryNotifier();
+		const n = await notifier();
 		n.ports.time = NOON;
 		n.ports.events.setRun("run-1", {
 			title: "Nightly triage",

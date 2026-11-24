@@ -1,14 +1,14 @@
 import { describe, expect, test } from "bun:test";
-import { inMemoryNotifier } from "../adapters/out/in-memory-notifier";
+import { notifier } from "../test-support";
 
-/** The use case pruneDeliveries, on in-memory adapters. */
+/** The use case pruneDeliveries, over a database in memory. */
 
 const DAY = 24 * 60 * 60_000;
 const START = 400 * DAY;
 
 describe("pruneDeliveries", () => {
 	test("removes what the inbox no longer keeps, at most once an hour", async () => {
-		const n = inMemoryNotifier();
+		const n = await notifier();
 		const run = (key: string) => ({
 			personId: "ada",
 			key,
@@ -25,7 +25,9 @@ describe("pruneDeliveries", () => {
 		);
 
 		await n.prune({ at: START + 90 * DAY + 1 });
-		expect(n.ports.deliveries.rows().map((row) => row.key)).toEqual(["newer"]);
+		expect((await n.ports.deliveries.rows()).map((row) => row.key)).toEqual([
+			"newer",
+		]);
 
 		// Within the hour: no prune, though "newer" is old enough by then.
 		await n.ports.deliveries.claim(
@@ -34,12 +36,12 @@ describe("pruneDeliveries", () => {
 			START,
 		);
 		await n.prune({ at: START + 90 * DAY + 1 + 59 * 60_000 });
-		expect(n.ports.deliveries.rows().map((row) => row.key)).toEqual([
+		expect((await n.ports.deliveries.rows()).map((row) => row.key)).toEqual([
 			"newer",
 			"old-again",
 		]);
 
 		await n.prune({ at: START + 91 * DAY + 1 });
-		expect(n.ports.deliveries.rows()).toEqual([]);
+		expect(await n.ports.deliveries.rows()).toEqual([]);
 	});
 });

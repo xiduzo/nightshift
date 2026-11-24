@@ -1,17 +1,17 @@
 import { describe, expect, test } from "bun:test";
 import type { PersonActor } from "@nightshift/engine";
-import { inMemoryTargetsPorts } from "../adapters/out/in-memory-neighbours";
+import { targetsPorts } from "../test-support";
 import { listScreens } from "./list-screens";
 import { listTargets } from "./list-targets";
 
-/** The use case listScreens, on in-memory adapters. */
+/** The use case listScreens, over a database in memory. */
 
 const ADA: PersonActor = { personId: "ada", door: "session" };
 const BOB: PersonActor = { personId: "bob", door: "session" };
 
 describe("listScreens", () => {
 	test("the Person's screens as they see them, without the phones whose session ended", async () => {
-		const ports = inMemoryTargetsPorts();
+		const ports = await targetsPorts();
 		ports.sessions.add("live", "ada", 10_000);
 		const phone = {
 			personId: "ada",
@@ -46,7 +46,7 @@ describe("listScreens", () => {
 				},
 			],
 		);
-		expect(ports.targetStore.all().map((t) => t.id)).toEqual(["kept"]);
+		expect((await ports.allTargets()).map((t) => t.id)).toEqual(["kept"]);
 		expect(await listScreens({ listTargets: listTargets(ports) })(BOB)).toEqual(
 			[],
 		);

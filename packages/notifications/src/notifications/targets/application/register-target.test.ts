@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { inMemoryTargetsPorts } from "../adapters/out/in-memory-neighbours";
 import type { RegisterTarget } from "../domain/push-targets";
+import { targetsPorts } from "../test-support";
 import { registerTarget } from "./register-target";
 
-/** The use case registerTarget, on in-memory adapters. */
+/** The use case registerTarget, over a database in memory. */
 
 const phone = (endpoint = "ExponentPushToken[shared]"): RegisterTarget => ({
 	kind: "expo",
@@ -13,7 +13,7 @@ const phone = (endpoint = "ExponentPushToken[shared]"): RegisterTarget => ({
 
 describe("registerTarget", () => {
 	test("a screen registers once per endpoint; registering again renames it and marks it seen", async () => {
-		const ports = inMemoryTargetsPorts();
+		const ports = await targetsPorts();
 		const register = registerTarget(ports);
 		const safari = {
 			kind: "web" as const,
@@ -41,13 +41,13 @@ describe("registerTarget", () => {
 			createdAt: 1_000,
 			lastSeenAt: 2_000,
 		});
-		expect(ports.targetStore.all()).toMatchObject([
+		expect(await ports.allTargets()).toMatchObject([
 			{ keys: { p256dh: "key", auth: "secret" }, sessionId: null },
 		]);
 	});
 
 	test("reaches only the Person who signed in on it last", async () => {
-		const ports = inMemoryTargetsPorts();
+		const ports = await targetsPorts();
 		const register = registerTarget(ports);
 		await register({
 			personId: "ada",
@@ -61,13 +61,13 @@ describe("registerTarget", () => {
 			sessionId: "bob-phone",
 		});
 
-		expect(ports.targetStore.all().map((t) => [t.personId, t.id])).toEqual([
+		expect((await ports.allTargets()).map((t) => [t.personId, t.id])).toEqual([
 			["bob", bobs.id],
 		]);
 	});
 
 	test("refuses a screen it cannot read, and keeps nothing", async () => {
-		const ports = inMemoryTargetsPorts();
+		const ports = await targetsPorts();
 		await expect(
 			registerTarget(ports)({
 				personId: "ada",
@@ -75,14 +75,14 @@ describe("registerTarget", () => {
 				sessionId: null,
 			}),
 		).rejects.toThrow();
-		expect(ports.targetStore.all()).toEqual([]);
+		expect(await ports.allTargets()).toEqual([]);
 	});
 
 	test("says what went wrong when the store keeps nothing", async () => {
-		const ports = inMemoryTargetsPorts();
-		ports.targetStore.keepNothingNext();
+		const ports = await targetsPorts();
+		const targetStore = { ...ports.targetStore, upsert: async () => null };
 		await expect(
-			registerTarget(ports)({
+			registerTarget({ ...ports, targetStore })({
 				personId: "ada",
 				screen: phone(),
 				sessionId: null,
