@@ -1,10 +1,10 @@
-import type { RowBatch } from "@nightshift/engine";
 import type { MembershipRecord } from "../../application/ports";
 import type {
 	MergeRow,
 	SplitRow,
 	Unfinished,
 } from "../../domain/membership-rows";
+import { inMemoryBatch } from "./in-memory-neighbours";
 
 /** `MembershipRecord` in memory for use-case and contract tests. */
 export function inMemoryMembershipRecord(): MembershipRecord & {
@@ -25,13 +25,17 @@ export function inMemoryMembershipRecord(): MembershipRecord & {
 		splitsRows,
 		async unfinished(): Promise<Unfinished | null> {
 			const split = splitsRows.find((row) => row.state !== "done");
-			if (split) return { step: "split", row: split };
+			if (split) return { step: "split", row: { ...split } };
 			const merge = mergesRows.find((row) => row.state !== "pushed");
-			return merge ? { step: "merge", row: merge } : null;
+			return merge ? { step: "merge", row: { ...merge } } : null;
 		},
 		merges: {
 			async latest() {
-				return mergesRows.at(-1) ?? null;
+				const latest = mergesRows.reduce<MergeRow | null>(
+					(a, b) => (a === null || b.updatedAt >= a.updatedAt ? b : a),
+					null,
+				);
+				return latest && { ...latest };
 			},
 			async plan(input) {
 				const row: MergeRow = {
@@ -48,7 +52,7 @@ export function inMemoryMembershipRecord(): MembershipRecord & {
 					updatedAt: nextTime(),
 				};
 				mergesRows.push(row);
-				return row;
+				return { ...row };
 			},
 			async mapped(fromSpace, input) {
 				const row = mergesRows.find((m) => m.fromSpace === fromSpace);
@@ -60,18 +64,19 @@ export function inMemoryMembershipRecord(): MembershipRecord & {
 				row.updatedAt = nextTime();
 			},
 			moved(fromSpace) {
-				const row = mergesRows.find((m) => m.fromSpace === fromSpace);
-				if (row) {
+				return inMemoryBatch(() => {
+					const row = mergesRows.find((m) => m.fromSpace === fromSpace);
+					if (!row) return;
 					row.state = "moved";
 					row.updatedAt = nextTime();
-				}
-				return [] as unknown as RowBatch;
+				});
 			},
 			abandon() {
-				for (let i = mergesRows.length - 1; i >= 0; i--) {
-					if (mergesRows[i]?.state !== "pushed") mergesRows.splice(i, 1);
-				}
-				return [] as unknown as RowBatch;
+				return inMemoryBatch(() => {
+					for (let i = mergesRows.length - 1; i >= 0; i--) {
+						if (mergesRows[i]?.state !== "pushed") mergesRows.splice(i, 1);
+					}
+				});
 			},
 			async pushed(fromSpace) {
 				const row = mergesRows.find((m) => m.fromSpace === fromSpace);
@@ -98,17 +103,17 @@ export function inMemoryMembershipRecord(): MembershipRecord & {
 					unpinned: 0,
 				};
 				splitsRows.push(row);
-				return row;
+				return { ...row };
 			},
 			moved(toSpace, input) {
-				const row = splitsRows.find((s) => s.toSpace === toSpace);
-				if (row) {
+				return inMemoryBatch(() => {
+					const row = splitsRows.find((s) => s.toSpace === toSpace);
+					if (!row) return;
 					row.state = "moved";
 					row.projects = [...input.projects];
 					row.runs = input.runs;
 					row.unpinned = input.unpinned;
-				}
-				return [] as unknown as RowBatch;
+				});
 			},
 			async done(toSpace) {
 				const row = splitsRows.find((s) => s.toSpace === toSpace);
