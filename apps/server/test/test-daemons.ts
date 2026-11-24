@@ -48,10 +48,11 @@ export function savesOn(
 	};
 }
 
+/** A port that is free at the address a daemon listens on. `localhost` would ask for `::1` only. */
 export async function freePort(): Promise<number> {
 	const probe = Bun.serve({
 		port: 0,
-		hostname: "localhost",
+		hostname: "127.0.0.1",
 		fetch: () => new Response(),
 	});
 	const port = probe.port as number;

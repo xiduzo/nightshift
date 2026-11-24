@@ -3,7 +3,7 @@ import type { FlowRevision } from "../domain/flow-json";
 import type { FlowMergePlan } from "../domain/flow-merge";
 import type { FlowSave } from "../domain/flow-save";
 import type { OutputType, StepShapes } from "../domain/inferred";
-import type { FlowNotice } from "../domain/notices";
+import type { FlowNotice, NewNotice } from "../domain/notices";
 
 /**
  * The flows and the schedules of each Project, in its flow document
@@ -74,6 +74,8 @@ export type FlowStore = {
 	): Promise<void>;
 	/** What a person must know about the project's flows, oldest first. */
 	notices(projectId: string): Promise<FlowNotice[]>;
+	/** Adds the notice once per document: `marker` says that it was added, also after a person dismissed it. */
+	note(projectId: string, marker: string, notice: NewNotice): Promise<void>;
 	/** Removes a notice. One that is gone already is no error. */
 	dismissNotice(projectId: string, noticeId: string): Promise<void>;
 	/** What a merge of the flows of `source` into those of `destination` renames. Changes nothing. */
@@ -82,11 +84,20 @@ export type FlowStore = {
 		destination: string,
 		persons: Readonly<Record<string, string>>,
 	): Promise<FlowMergePlan>;
-	/** Merges the flows of `source`, their revisions and its schedules into `destination`. Runs again safely. */
+	/**
+	 * Merges the flows of `source`, their revisions and its schedules into
+	 * `destination`. Runs again safely. `apart`: `destination` is not all
+	 * here, so each flow takes a name and each schedule an id of its own with
+	 * this suffix, and each schedule is off.
+	 */
 	merge(
 		source: string,
 		destination: string,
-		merge: { persons?: Readonly<Record<string, string>>; at: number },
+		merge: {
+			persons?: Readonly<Record<string, string>>;
+			at: number;
+			apart?: string;
+		},
 	): Promise<FlowMergePlan>;
 };
 

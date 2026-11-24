@@ -3,6 +3,8 @@ import type { DeviceCopies } from "@nightshift/engine/settings";
 import type {
 	MergeRow,
 	MergeTarget,
+	PausedBySplit,
+	PausedSchedule,
 	SplitRow,
 	Unfinished,
 } from "../domain/membership-rows";
@@ -24,6 +26,8 @@ export type MembershipRecord = {
 	merges: {
 		/** The latest merge, done or not. */
 		latest(): Promise<MergeRow | null>;
+		/** The merges that are done, oldest first. */
+		done(): Promise<MergeRow[]>;
 		/** A new merge, planned: its copy of the database is made. */
 		plan(input: {
 			fromSpace: string;
@@ -47,6 +51,17 @@ export type MembershipRecord = {
 		 */
 		moved(fromSpace: string): RowBatch;
 		/**
+		 * The statements that make a done merge `moved` again, for Projects it
+		 * left here: they go in the batch that moves their rows.
+		 */
+		late(
+			fromSpace: string,
+			input: {
+				projectMap: Record<string, MergeTarget>;
+				personMap: Record<string, string>;
+			},
+		): RowBatch;
+		/**
 		 * The statements that end a merge that is not done, when this
 		 * computer leaves its home Host.
 		 */
@@ -59,8 +74,15 @@ export type MembershipRecord = {
 		of(fromSpace: string): Promise<SplitRow | null>;
 		/** A new split, planned: its copy of the database is made. */
 		plan(
-			input: Omit<SplitRow, "state" | "projects" | "runs" | "unpinned">,
+			input: Omit<
+				SplitRow,
+				"state" | "projects" | "runs" | "unpinned" | "paused" | "waiting"
+			>,
 		): Promise<SplitRow>;
+		/** A split that moved no row goes. One that moved its rows stays. */
+		forget(toSpace: string): Promise<void>;
+		/** What each split whose rows moved paused here, oldest first. */
+		paused(): Promise<PausedBySplit[]>;
 		/**
 		 * The statements that mark the split moved: they go in the batch that
 		 * moves the rows.
@@ -71,6 +93,8 @@ export type MembershipRecord = {
 				projects: readonly string[];
 				runs: number;
 				unpinned: number;
+				paused: readonly PausedSchedule[];
+				waiting: Readonly<Record<string, string>>;
 			},
 		): RowBatch;
 		/** The new Space's document has its Projects. */
@@ -85,7 +109,7 @@ export type DatabaseCopy = {
 	copy(
 		dataDir: string,
 		at: number,
-		before?: "personal-merge" | "leaving-host",
+		before?: "personal-merge" | "leaving-host" | "late-projects",
 	): Promise<string>;
 };
 

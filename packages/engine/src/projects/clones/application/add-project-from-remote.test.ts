@@ -37,6 +37,19 @@ async function seeded() {
 }
 
 describe("addProjectFromRemote", () => {
+	test("is refused in a Space whose Projects move", async () => {
+		const ports = await seeded();
+		ports.spaceHolds.held.add("s1");
+		await expect(
+			addProjectFromRemote(ports)({
+				spaceId: "s1",
+				name: "site",
+				remote: "github.com/acme/site",
+			}),
+		).rejects.toThrow("held");
+		expect(ports.projectLog.facts).toEqual([]);
+	});
+
 	test("a new project without a Clone here, the same one again, a removed one back", async () => {
 		const ports = await seeded();
 		const request = {

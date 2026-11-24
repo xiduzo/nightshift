@@ -18,9 +18,12 @@ import type {
 } from "./ports";
 
 export type MoveProjectsPorts = {
-	holds: MoveHolds;
+	holds: Pick<MoveHolds, "holdStarts" | "holdSchedules">;
 	walker: ThisWalker;
-	moveStore: Pick<MoveStore, "runIds" | "projectRows" | "batchOf" | "commit">;
+	moveStore: Pick<
+		MoveStore,
+		"runIds" | "projectRows" | "batchOf" | "emptied" | "commit"
+	>;
 	movedSchedules: Pick<ProjectFlows, "schedules" | "saveSchedules">;
 	spaceEntries: Pick<SpaceEntries, "move">;
 	/** The rows of the packages above the engine, in this order. */
@@ -33,7 +36,7 @@ export type MoveProjectsPorts = {
 async function editSchedules(
 	schedules: Pick<ProjectFlows, "schedules" | "saveSchedules">,
 	projectIds: readonly string[],
-	edit: (schedule: Schedule) => Schedule,
+	edit: (schedule: Schedule, projectId: string) => Schedule,
 ): Promise<number> {
 	let changed = 0;
 	for (const projectId of projectIds) {
@@ -47,7 +50,7 @@ async function editSchedules(
 				throw error;
 			});
 		if (!read) continue;
-		const edited = read.schedules.map(edit);
+		const edited = read.schedules.map((s) => edit(s, projectId));
 		const count = edited.filter((s, i) => s !== read.schedules[i]).length;
 		if (count === 0) continue;
 		await schedules.saveSchedules(projectId, edited);
@@ -135,6 +138,7 @@ export const moveProjects =
 				}
 			}
 			batches.push((await request.statements?.(moved)) ?? []);
+			if (plan.empties) batches.push(ports.moveStore.emptied(from));
 			await ports.moveStore.commit(batches);
 			ports.reread.reread(moved.runIds);
 

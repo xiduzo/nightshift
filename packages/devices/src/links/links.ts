@@ -8,6 +8,7 @@ import {
 	isHomeHost,
 } from "./host-links";
 import { type HttpsLinkOptions, httpsLink, type Link } from "./link";
+import { keepUnderOwnName, reportKeyNames } from "./own-key-names";
 import type { LinkedHost } from "./types";
 
 /**
@@ -79,10 +80,37 @@ export function createDeviceLinks(deps: {
 		running.delete(hostId);
 	}
 
+	/** The Host refused the key. What follows does not stop when one step of it fails. */
+	async function lostAccess(link: HostLink) {
+		try {
+			await deps.links.revoked(link.hostId);
+		} catch (error) {
+			// The link keeps its access here: the next start asks the Host again.
+			console.error(`The link to ${link.name} was not marked:`, error);
+			return;
+		}
+		const steps = await Promise.allSettled([
+			deps.revoked?.(link),
+			deps.keys.delete(link.hostId),
+		]);
+		for (const step of steps) {
+			if (step.status === "rejected") {
+				console.error(
+					`Not everything of ${link.name} went from this computer:`,
+					step.reason,
+				);
+			}
+		}
+	}
+
+	/** This install does not connect to that Host. */
+	const staysLocal = (link: HostLink) =>
+		deps.localOnly === true && !isLocalHost(link.addresses);
+
 	async function add(link: HostLink, key?: string) {
 		await stop(link.hostId);
 		if (link.revokedAt) return;
-		if (deps.localOnly && !isLocalHost(link.addresses)) {
+		if (staysLocal(link)) {
 			console.warn(`Not connecting to ${link.name}: ${DEV_STAYS_LOCAL}`);
 			return;
 		}
@@ -111,12 +139,11 @@ export function createDeviceLinks(deps: {
 			onAddresses: (addresses) => {
 				deps.links.setAddresses(link.hostId, addresses).catch(() => {});
 			},
+			onAccepted: () => {
+				void keepUnderOwnName(deps.keys, link.hostId, secret);
+			},
 			onRevoked: () => {
-				void deps.links
-					.revoked(link.hostId)
-					.then(() => deps.keys.delete(link.hostId))
-					.then(() => deps.revoked?.(link))
-					.catch(() => {});
+				void lostAccess(link);
 			},
 		});
 		running.set(link.hostId, started);
@@ -126,7 +153,14 @@ export function createDeviceLinks(deps: {
 
 	return {
 		async start() {
-			for (const link of await deps.links.list()) await add(link);
+			const all = await deps.links.list();
+			await reportKeyNames(
+				deps.keys,
+				all
+					.filter((link) => !link.revokedAt && !staysLocal(link))
+					.map((link) => link.hostId),
+			);
+			for (const link of all) await add(link);
 		},
 		add,
 		async hosts() {

@@ -5,6 +5,7 @@ import type {
 	ProjectDirectory,
 	ProjectLog,
 	Repos,
+	SpaceHolds,
 	ThisDevice,
 } from "../keep";
 import { addProject } from "./application/add-project";
@@ -29,6 +30,7 @@ export type CatalogDeps = Keep & {
 	thisDevice: ThisDevice;
 	repos: Repos;
 	directory: ProjectDirectory;
+	spaceHolds: SpaceHolds;
 	/** The relay to the Hosts, when this computer has one. */
 	relay?: HostRelay;
 	ids: NewIds;

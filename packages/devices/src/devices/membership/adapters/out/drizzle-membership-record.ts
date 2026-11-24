@@ -2,7 +2,7 @@ import type { Database } from "@nightshift/db";
 import { spaceMerge, spaceSplit } from "@nightshift/db/schema";
 import type { RowBatch } from "@nightshift/engine";
 import { asDate, instant } from "@nightshift/time";
-import { desc, eq, ne } from "drizzle-orm";
+import { and, asc, desc, eq, ne } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import type { MembershipRecord } from "../../application/ports";
 import type { MergeRow, SplitRow } from "../../domain/membership-rows";
@@ -22,6 +22,7 @@ function mergeOf(row: typeof spaceMerge.$inferSelect): MergeRow {
 		projectMap: parse(row.projectMap, {}),
 		personMap: parse(row.personMap, {}),
 		joined: parse(row.joined, []),
+		late: parse(row.late, null),
 		backup: row.backup,
 		createdAt: instant(row.createdAt),
 		updatedAt: instant(row.updatedAt),
@@ -40,6 +41,8 @@ function splitOf(row: typeof spaceSplit.$inferSelect): SplitRow {
 		projects: parse(row.projects, []),
 		runs: row.runs,
 		unpinned: row.unpinned,
+		paused: parse(row.paused, []),
+		waiting: parse(row.waiting, {}),
 		backup: row.backup,
 	};
 }
@@ -88,6 +91,15 @@ export function drizzleMembershipRecord(db: Database): MembershipRecord {
 				return latest ? mergeOf(latest) : null;
 			},
 
+			async done() {
+				const rows = await db
+					.select()
+					.from(spaceMerge)
+					.where(eq(spaceMerge.state, "pushed"))
+					.orderBy(asc(spaceMerge.createdAt));
+				return rows.map(mergeOf);
+			},
+
 			async plan(input) {
 				const [row] = await db
 					.insert(spaceMerge)
@@ -126,6 +138,19 @@ export function drizzleMembershipRecord(db: Database): MembershipRecord {
 				);
 			},
 
+			late(fromSpace, input) {
+				return asBatch(
+					db
+						.update(spaceMerge)
+						.set({
+							state: "moved",
+							late: JSON.stringify(input),
+							updatedAt: asDate(),
+						})
+						.where(eq(spaceMerge.fromSpace, fromSpace)),
+				);
+			},
+
 			abandon() {
 				return asBatch(
 					db.delete(spaceMerge).where(ne(spaceMerge.state, "pushed")),
@@ -160,6 +185,26 @@ export function drizzleMembershipRecord(db: Database): MembershipRecord {
 				return splitOf(row);
 			},
 
+			async paused() {
+				const rows = await db
+					.select()
+					.from(spaceSplit)
+					.where(ne(spaceSplit.state, "planned"))
+					.orderBy(asc(spaceSplit.createdAt));
+				return rows.map(splitOf);
+			},
+
+			async forget(toSpace) {
+				await db
+					.delete(spaceSplit)
+					.where(
+						and(
+							eq(spaceSplit.toSpace, toSpace),
+							eq(spaceSplit.state, "planned"),
+						),
+					);
+			},
+
 			moved(toSpace, input) {
 				return asBatch(
 					db
@@ -169,6 +214,8 @@ export function drizzleMembershipRecord(db: Database): MembershipRecord {
 							projects: JSON.stringify(input.projects),
 							runs: input.runs,
 							unpinned: input.unpinned,
+							paused: JSON.stringify(input.paused),
+							waiting: JSON.stringify(input.waiting),
 							updatedAt: asDate(),
 						})
 						.where(eq(spaceSplit.toSpace, toSpace)),

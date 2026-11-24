@@ -173,6 +173,38 @@ export function moveStoreContract(
 			expect(await store.holdsRows("to")).toBe(false);
 		});
 
+		test("a batch that is to empty a Space fails while a Project is left, and nothing of it lands", async () => {
+			const store = await twoSpaces();
+			const move = async (ids: string[]) =>
+				store.commit([
+					await store.batchOf({
+						from: "from",
+						to: "to",
+						projectMap: Object.fromEntries(ids.map((id) => [id, id])),
+					}),
+					store.emptied("from"),
+				]);
+			const all = ["app", "tools"];
+			await subject?.seed.project({
+				id: "tools",
+				spaceId: "from",
+				remote: null,
+			});
+			expect(
+				await move(all.slice(1)).then(
+					() => "landed",
+					() => "failed",
+				),
+			).toBe("failed");
+			for (const row of (await store.projectRows(all)).values()) {
+				expect(row.spaceId).toBe("from");
+			}
+			await move(all);
+			for (const row of (await store.projectRows(all)).values()) {
+				expect(row.spaceId).toBe("to");
+			}
+		});
+
 		test("forgetting the rows of a Space keeps its Projects and runs, and runs again safely", async () => {
 			const store = await twoSpaces();
 			await store.forgetRows("from");

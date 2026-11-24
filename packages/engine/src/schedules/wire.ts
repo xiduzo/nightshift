@@ -19,6 +19,7 @@ import { listSchedules } from "./application/list-schedules";
 import { pauseScheduleTonight } from "./application/pause-schedule-tonight";
 import type {
 	Clock,
+	PausedHere,
 	PullRequestScorer,
 	ScheduledProjects,
 	ScheduledRuns,
@@ -48,6 +49,8 @@ export type SchedulesDeps = {
 	log: DrizzleScheduleLogDeps;
 	/** The flows slice: the schedules and flows of each project, in its flow document. */
 	flows: FlowDocumentScheduleStoreDeps;
+	/** The schedules a leave paused on this computer only. Default: none. */
+	pausedHere?: PausedHere;
 	clock: Clock;
 	/** How often the scheduler looks for due schedules. Default 30 000 ms. */
 	tickMs?: number;
@@ -104,7 +107,7 @@ export function wireSchedules(deps: SchedulesDeps): Schedules {
 		switch: deps.switch,
 		notices: deps.notices,
 		...(deps.usage ? { usage: deps.usage } : {}),
-		store: flowDocumentScheduleStore(deps.flows),
+		store: flowDocumentScheduleStore(deps.flows, deps.pausedHere),
 		log: drizzleScheduleLog(deps.log),
 		watch: createScheduleWatch(deps.clock()),
 		refusals: createWebhookRefusals(),

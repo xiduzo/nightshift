@@ -4,6 +4,7 @@ import {
 	type NewIds,
 	type ProjectLog,
 	type ProjectStore,
+	type SpaceHolds,
 	type SpaceProjects,
 } from "../../keep";
 
@@ -11,6 +12,7 @@ export type DefineProjectWithoutFolderPorts = {
 	store: Pick<ProjectStore, "row">;
 	spaceProjects: Pick<SpaceProjects, "create">;
 	projectLog: Pick<ProjectLog, "append">;
+	spaceHolds: SpaceHolds;
 	ids: NewIds;
 };
 
@@ -29,14 +31,16 @@ export const defineProjectWithoutFolder =
 	): Promise<{ projectId: string }> => {
 		const { spaceId, name } = request;
 		const projectId = ports.ids.projectId();
-		await createProject(
-			{ create: ports.spaceProjects.create, row: ports.store.row },
-			{
-				spaceId,
-				projectId,
-				entry: { name, remote: null, folder: false },
-				onHost: HOSTED_ELSEWHERE,
-			},
+		await ports.spaceHolds.unlessHeld(spaceId, () =>
+			createProject(
+				{ create: ports.spaceProjects.create, row: ports.store.row },
+				{
+					spaceId,
+					projectId,
+					entry: { name, remote: null, folder: false },
+					onHost: HOSTED_ELSEWHERE,
+				},
+			),
 		);
 		await ports.projectLog.append({
 			type: "ProjectAdded",

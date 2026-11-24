@@ -1,5 +1,12 @@
 import { describe, expect, test } from "bun:test";
+import type { RowBatch } from "@nightshift/engine";
 import type { MembershipRecord } from "../../application/ports";
+
+/** One adapter, and what runs its batches. */
+export type MembershipRecordSubject = {
+	record: MembershipRecord;
+	run(batch: RowBatch): Promise<void>;
+};
 
 /**
  * What every adapter of `MembershipRecord` does.
@@ -7,11 +14,11 @@ import type { MembershipRecord } from "../../application/ports";
  */
 export function membershipRecordContract(
 	name: string,
-	make: () => Promise<MembershipRecord> | MembershipRecord,
+	make: () => Promise<MembershipRecordSubject>,
 ): void {
 	describe(`MembershipRecord contract: ${name}`, () => {
 		test("plan then unfinished returns the merge", async () => {
-			const record = await make();
+			const { record } = await make();
 			const row = await record.merges.plan({
 				fromSpace: "from",
 				hostId: "host",
@@ -25,7 +32,7 @@ export function membershipRecordContract(
 		});
 
 		test("mapped then moved then pushed ends the merge", async () => {
-			const record = await make();
+			const { record, run } = await make();
 			await record.merges.plan({
 				fromSpace: "from",
 				hostId: "host",
@@ -38,10 +45,88 @@ export function membershipRecordContract(
 				projectMap: { p1: { spaceId: "to", projectId: "p1" } },
 				personMap: { person: "host-person" },
 			});
-			record.merges.moved("from");
+			await run(record.merges.moved("from"));
 			await record.merges.pushed("from");
 			expect(await record.unfinished()).toBeNull();
 			expect((await record.merges.latest())?.state).toBe("pushed");
+		});
+
+		test("a split says what it paused once its rows moved, and only a planned one is forgotten", async () => {
+			const { record, run } = await make();
+			await record.splits.plan({
+				toSpace: "to",
+				fromSpace: "from",
+				hostId: "host",
+				hostName: "Studio",
+				personId: "ada",
+				hostPersonId: "ada-there",
+				backup: "/b",
+			});
+			await record.splits.forget("other");
+			expect(await record.splits.of("from")).toMatchObject({
+				paused: [],
+				waiting: {},
+			});
+			expect(await record.splits.paused()).toEqual([]);
+			const paused = [{ projectId: "p1", scheduleId: "night" }];
+			await run(
+				record.splits.moved("to", {
+					projects: ["p1"],
+					runs: 0,
+					unpinned: 1,
+					paused,
+					waiting: { old: "p1" },
+				}),
+			);
+			const moved = { hostId: "host", fromSpace: "from", paused };
+			expect(await record.splits.paused()).toMatchObject([moved]);
+			expect(await record.splits.of("from")).toMatchObject({
+				waiting: { old: "p1" },
+			});
+			await record.splits.forget("to");
+			await record.splits.done("to");
+			await record.splits.forget("to");
+			expect(await record.splits.paused()).toMatchObject([moved]);
+		});
+
+		test("a planned split can be forgotten", async () => {
+			const { record } = await make();
+			await record.splits.plan({
+				toSpace: "to",
+				fromSpace: "from",
+				hostId: "host",
+				hostName: "Studio",
+				personId: "ada",
+				hostPersonId: "ada-there",
+				backup: "/b",
+			});
+			await record.splits.forget("to");
+			expect(await record.unfinished()).toBeNull();
+			expect(await record.splits.of("from")).toBeNull();
+		});
+
+		test("a done merge goes on for the Projects it left", async () => {
+			const { record, run } = await make();
+			const from = {
+				hostId: "host",
+				personId: "ada",
+				joined: [],
+				backup: "/b",
+			};
+			await record.merges.plan({ fromSpace: "from", ...from });
+			expect(await record.merges.done()).toEqual([]);
+			await record.merges.pushed("from");
+			expect((await record.merges.done()).map((m) => m.late)).toEqual([null]);
+			const late = {
+				projectMap: { p9: { spaceId: "to", projectId: "there" } },
+				personMap: { ada: "ada-there" },
+			};
+			await run(record.merges.late("from", late));
+			expect(await record.unfinished()).toMatchObject({
+				step: "merge",
+				row: { state: "moved", late, backup: "/b", projectMap: {} },
+			});
+			expect(await record.merges.done()).toEqual([]);
 		});
 	});
 }

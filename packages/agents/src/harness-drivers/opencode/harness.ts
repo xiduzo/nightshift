@@ -41,7 +41,6 @@
  */
 
 import { parseInstant, now as timeNow } from "@nightshift/time";
-import type { SandboxHandle, SandboxProvider } from "@tanstack/ai-sandbox";
 import type {
 	AgentEvent,
 	AgentHarness,
@@ -49,11 +48,9 @@ import type {
 	AgentUsage,
 	McpServerConfig,
 } from "../../port";
-import { shellQuoteAlways } from "../../port";
 import type { HarnessProfile, SdkSignals } from "../../session";
 import {
 	type AdapterSetup,
-	freePort,
 	type HarnessSpec,
 	harnessSession,
 	readOnlyInput,
@@ -62,6 +59,7 @@ import { acpAgentHarness } from "../acp";
 import { harnessFacts } from "../facts";
 import { OPENCODE_ACP_AGENT, opencodeMajor, opencodeRules } from "./acp";
 import { adapterPermissionMode, opencodePermission } from "./permissions";
+import { mergeConfig, rewriteServe, withSpawnRewrite } from "./serve";
 
 export type OpencodeHarnessOptions = {
 	/** Path or name of the `opencode` executable. Defaults to `opencode`. */
@@ -104,26 +102,6 @@ export function opencodeMcpConfig(
 	return mcp;
 }
 
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-/** Merge plain objects; `over` wins, arrays and other values replace. */
-export function mergeConfig(
-	base: Record<string, unknown>,
-	over: Record<string, unknown>,
-): Record<string, unknown> {
-	const out: Record<string, unknown> = { ...base };
-	for (const [key, value] of Object.entries(over)) {
-		const current = out[key];
-		out[key] =
-			isPlainObject(current) && isPlainObject(value)
-				? mergeConfig(current, value)
-				: value;
-	}
-	return out;
-}
-
 /** The session's own OpenCode config, before the adapter's bridge. */
 export function opencodeSessionConfig(
 	input: Pick<
@@ -145,110 +123,6 @@ export function opencodeSessionConfig(
 		),
 		...(names.length > 0 ? { mcp: opencodeMcpConfig(servers) } : {}),
 	});
-}
-
-const SERVE_COMMAND = /^opencode serve(?=\s|$)/;
-
-/**
- * Rewrite the adapter's `opencode serve` command: run `executable`, merge
- * `config` under the adapter's `OPENCODE_CONFIG_CONTENT` (its bridge wins),
- * and add `env`. Other commands pass through.
- */
-export function rewriteServe(
-	command: string,
-	env: Record<string, string> | undefined,
-	options: {
-		executable: string;
-		config: Record<string, unknown>;
-		env?: Record<string, string>;
-	},
-): { command: string; env: Record<string, string> | undefined } {
-	if (!SERVE_COMMAND.test(command)) return { command, env };
-	let adapterConfig: Record<string, unknown> = {};
-	try {
-		const parsed: unknown = JSON.parse(env?.OPENCODE_CONFIG_CONTENT ?? "{}");
-		if (isPlainObject(parsed)) adapterConfig = parsed;
-	} catch {
-		// Not JSON: the session config alone.
-	}
-	return {
-		command: command.replace(
-			SERVE_COMMAND,
-			`${shellQuoteAlways(options.executable)} serve`,
-		),
-		env: {
-			...options.env,
-			...env,
-			OPENCODE_CONFIG_CONTENT: JSON.stringify(
-				mergeConfig(options.config, adapterConfig),
-			),
-		},
-	};
-}
-
-/**
- * A sandbox provider whose handles run `spawn` commands through `rewrite`,
- * and stop a spawned process only `killAfterAbortMs` after an abort.
- */
-export function withSpawnRewrite(
-	provider: SandboxProvider,
-	rewrite: (
-		command: string,
-		env: Record<string, string> | undefined,
-	) => { command: string; env: Record<string, string> | undefined },
-	killAfterAbortMs = 10_000,
-): SandboxProvider {
-	const wrap = (handle: SandboxHandle): SandboxHandle => {
-		const process: SandboxHandle["process"] = {
-			exec: (command, opts) => handle.process.exec(command, opts),
-			spawn: async (command, opts) => {
-				const next = rewrite(command, opts?.env);
-				// Not killed on abort right away: an abort reaches the server as
-				// a session abort, the turn ends, and the adapter's own teardown
-				// stops the server. A server killed at once can leave the
-				// adapter's event subscription retrying. A server that does not
-				// stop within `killAfterAbortMs` is killed.
-				const { signal, ...rest } = opts ?? {};
-				const spawned = await handle.process.spawn(next.command, {
-					...rest,
-					...(next.env ? { env: next.env } : {}),
-				});
-				if (signal) {
-					const kill = () => {
-						const timer = setTimeout(
-							() => void spawned.kill().catch(() => {}),
-							killAfterAbortMs,
-						);
-						timer.unref?.();
-						void spawned.wait().then(
-							() => clearTimeout(timer),
-							() => clearTimeout(timer),
-						);
-					};
-					if (signal.aborted) kill();
-					else signal.addEventListener("abort", kill, { once: true });
-				}
-				return spawned;
-			},
-		};
-		return new Proxy(handle, {
-			get(target, prop) {
-				if (prop === "process") return process;
-				const value = Reflect.get(target, prop, target);
-				return typeof value === "function" ? value.bind(target) : value;
-			},
-		});
-	};
-	return {
-		name: provider.name,
-		capabilities: () => provider.capabilities(),
-		create: async (input) => wrap(await provider.create(input)),
-		resume: async (input) => {
-			const handle = await provider.resume(input);
-			return handle ? wrap(handle) : null;
-		},
-		destroy: (input) => provider.destroy(input),
-	};
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -457,8 +331,9 @@ export const OPENCODE_SPEC: HarnessSpec = {
 };
 
 /**
- * The `opencode` adapter of one session: a server on a free loopback port,
- * whose spawn is rewritten to the configured executable and config.
+ * The `opencode` adapter of one session: a server on a loopback port it
+ * chooses itself, whose spawn is rewritten to the configured executable and
+ * config.
  */
 async function opencodeAdapter(
 	input: AgentSessionInput,
@@ -466,12 +341,12 @@ async function opencodeAdapter(
 ): Promise<AdapterSetup> {
 	// The adapter package loads on the first session, not when Night Shift starts.
 	const { opencodeText } = await import("@tanstack/ai-opencode");
-	const port = await freePort();
 	const executable = options.opencodeExecutable ?? "opencode";
 	const config = opencodeSessionConfig(input, options.config);
 	const adapter = opencodeText(input.model, {
-		// One port per session, on the loopback interface only.
-		port,
+		// One port per session, on the loopback interface only. The server
+		// chooses it (`withSpawnRewrite` reads it back).
+		port: 0,
 		hostname: "127.0.0.1",
 		permissionMode: adapterPermissionMode(input.permissionMode),
 	});

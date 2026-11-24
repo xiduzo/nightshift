@@ -5,7 +5,6 @@
  */
 export {
 	type AdapterSetup,
-	freePort,
 	type HarnessSpec,
 	harnessSession,
 	OTLP_HEADER_VARIABLES,

@@ -30,10 +30,15 @@ export type ProjectsMovePlan = {
 	 */
 	ownRunsOnly?: boolean;
 	/**
+	 * Every Project of `from` moves. Nothing moves when one is left, also one
+	 * that another process added after `plan`.
+	 */
+	empties?: boolean;
+	/**
 	 * Each schedule of a moved Project as it is to be after the move. It
 	 * returns the schedule itself to keep it as it is.
 	 */
-	schedule?(schedule: Schedule): Schedule;
+	schedule?(schedule: Schedule, projectId: string): Schedule;
 };
 
 /** A move of Projects out of one Space. */

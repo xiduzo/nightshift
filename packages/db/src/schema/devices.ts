@@ -223,6 +223,12 @@ export const spaceMerge = sqliteTable("space_merge", {
 	joined: text("joined").notNull().default("[]"),
 	/** The copy of the database made before the merge changed anything. */
 	backup: text("backup").notNull(),
+	/**
+	 * JSON: the Projects that a done merge left here and that moved later, by
+	 * themselves: their `project_map` and `person_map`. Null: every Project
+	 * moved with the merge.
+	 */
+	late: text("late"),
 	createdAt: createdAt(),
 	updatedAt: updatedAt(),
 });
@@ -259,6 +265,19 @@ export const spaceSplit = sqliteTable("space_split", {
 	runs: integer("runs").notNull().default(0),
 	/** How many schedules that named another Device are paused on this computer now. */
 	unpinned: integer("unpinned").notNull().default(0),
+	/**
+	 * JSON: the schedules that came along, each with its Project: paused on
+	 * this computer only, as the Host goes on with them. Their flow document
+	 * has them as the Host does. Null until `moved`, and for a split from
+	 * before this column, which wrote the pause into the document.
+	 */
+	paused: text("paused"),
+	/**
+	 * JSON: the Projects whose flows waited for the Host, by their id before
+	 * the merge: the id they came along with. Their flows merge here after the
+	 * rows moved. Null: none.
+	 */
+	waiting: text("waiting"),
 	/** The copy of the database made before the split changed anything. */
 	backup: text("backup").notNull(),
 	createdAt: createdAt(),

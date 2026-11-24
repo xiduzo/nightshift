@@ -5,6 +5,7 @@ import type { Device } from "./device";
 import type { FlowDocuments, SpaceDocuments } from "./documents";
 import type { Git } from "./git";
 import type { PeersFactory } from "./peers";
+import type { PausedHere } from "./schedules";
 import type { PullRequestReader } from "./scores";
 import type { RunSettings } from "./settings";
 import type { MoveRows, ProjectsMoved } from "./space-move";
@@ -102,6 +103,8 @@ export type EngineOptions = {
 	 * (`@nightshift/notifications`).
 	 */
 	moveRows?: readonly MoveRows[];
+	/** The schedules a leave of a Host paused on this computer only. Default: none. */
+	pausedHere?: PausedHere;
 	/**
 	 * What follows the Projects of a Space move outside the rows, after
 	 * its batch: the daemon moves each Project's knowledge

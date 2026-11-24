@@ -31,8 +31,10 @@ type Plan = {
 	projects: Readonly<Record<string, { spaceId: string; projectId: string }>>;
 	personMap?: Readonly<Record<string, string>>;
 	renumber?: boolean;
+	empties?: boolean;
 	ownRunsOnly?: boolean;
 };
+type MergeOptions = { persons?: unknown; apart?: string };
 type HostRow = NonNullable<
 	Awaited<ReturnType<HomeMembershipDeps["hostLinks"]["home"]>>
 >;
@@ -96,8 +98,9 @@ export function inMemoryHome() {
 		revokedAt: null,
 	} as HostRow;
 	const asked: PersonalMergeInput[] = [];
-	const merged: { from: string; to: string; persons: unknown }[] = [];
+	const merged: ({ from: string; to: string } & MergeOptions)[] = [];
 	const planned: unknown[] = [];
+	const marked = new Set<string>();
 	const plans: Plan[] = [];
 	const forgotten: string[] = [];
 	const opened: string[] = [];
@@ -121,11 +124,17 @@ export function inMemoryHome() {
 		/** The Hosts this computer has a link to. */
 		linked: new Set(["host"]),
 		listed: [{ id: "theirs", name: "Personal on Studio", personal: true }],
+		/** The Host that lists them. */
+		listedBy: "host",
 		/** The Spaces a Host keeps. */
 		keptBy: new Map([["theirs", "host"]]),
 		projects: [moving("p1")] as Moving[],
+		/** The notes on the Flows pages, by Project. */
+		notes: new Map<string, string[]>(),
 		runs: [] as Run[],
 		schedules: new Map<string, Schedule[]>(),
+		/** The Host's copy of the schedules, as the documents last synced (`sync`). */
+		hostSchedules: new Map<string, Schedule[]>(),
 		answer: (input: PersonalMergeInput): PersonalMerge => ({
 			spaceId: "theirs",
 			projectMap: Object.fromEntries(input.projects.map((p) => [p.id, p.id])),
@@ -159,6 +168,20 @@ export function inMemoryHome() {
 			personalSpaces.existing.clear();
 			personalSpaces.existing.add("theirs");
 			world.projects = [moving("p1", { spaceId: "theirs" })];
+		},
+		/**
+		 * The documents sync with the Host, as a link with access does: those of
+		 * the Projects in a Space that the Host keeps. What this computer wrote
+		 * goes to the Host, a pause too.
+		 */
+		sync(hostId = "host") {
+			const link = world.hosts.find((h) => h.hostId === hostId);
+			if (!link || link.revokedAt !== null) return;
+			for (const p of world.projects) {
+				if (world.keptBy.get(p.spaceId) !== hostId) continue;
+				const schedules = world.schedules.get(p.id);
+				if (schedules) world.hostSchedules.set(p.id, schedules);
+			}
 		},
 		/** The Host's access removed, as the link marks it. */
 		revoke(hostId = "host") {
@@ -240,7 +263,7 @@ export function inMemoryHome() {
 			let changed = 0;
 			for (const id of sources) {
 				const before = world.schedules.get(id) ?? [];
-				const after = before.map((s) => plan.schedule?.(s) ?? s);
+				const after = before.map((s) => plan.schedule?.(s, id) ?? s);
 				changed += after.filter((s, i) => s !== before[i]).length;
 				world.schedules.set(id, after);
 			}
@@ -257,6 +280,11 @@ export function inMemoryHome() {
 			};
 			const batch = await move.statements?.(done);
 			if (world.batchFails) throw world.batchFails;
+			// As the engine's batch: a Project that is left fails it.
+			const left = world.projects.some(
+				(p) => p.spaceId === move.from && !sources.includes(p.id),
+			);
+			if (plan.empties && left) throw new Error("A project is left.");
 			runInMemory((batch ?? []) as RowBatch);
 			for (const run of moves) {
 				const to = plan.projects[run.projectId];
@@ -286,8 +314,14 @@ export function inMemoryHome() {
 				planned.push(args);
 				return { flows: { hello: "hello-2" } };
 			},
-			async merge(from: string, to: string, options: { persons: unknown }) {
-				merged.push({ from, to, persons: options.persons });
+			async note(id: string, marker: string, notice: { message: string }) {
+				const notes = world.notes.get(id) ?? [];
+				if (marked.has(`${id} ${marker}`)) return;
+				marked.add(`${id} ${marker}`);
+				world.notes.set(id, [...notes, notice.message]);
+			},
+			async merge(from: string, to: string, options: MergeOptions) {
+				merged.push({ from, to, ...options });
 			},
 		},
 		exchange: {
@@ -297,7 +331,8 @@ export function inMemoryHome() {
 			},
 		},
 		hostSpaces: {
-			listed: async (hostId: string) => (hostId === "host" ? world.listed : []),
+			listed: async (hostId: string) =>
+				hostId === world.listedBy ? world.listed : [],
 			hostOf: async (spaceId: string) => world.keptBy.get(spaceId) ?? null,
 			async keeper(spaceId: string) {
 				const hostId = world.keptBy.get(spaceId);
@@ -332,6 +367,7 @@ export function inMemoryHome() {
 				null,
 			get: async (hostId: string) =>
 				world.hosts.find((h) => h.hostId === hostId) ?? null,
+			list: async () => world.hosts,
 			async revoked(hostId: string) {
 				log.push(`revoked ${hostId}`);
 				world.revoke(hostId);

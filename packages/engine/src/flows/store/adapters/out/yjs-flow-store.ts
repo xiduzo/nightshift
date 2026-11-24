@@ -8,7 +8,7 @@ import {
 	removeFlow,
 	saveFlow,
 } from "./yjs-flow-saves";
-import { dismissNotice, flowNotices } from "./yjs-notices";
+import { dismissNotice, flowNotices, noteOnce } from "./yjs-notices";
 import { readSchedules, saveSchedules } from "./yjs-schedules";
 
 /**
@@ -61,6 +61,10 @@ export function yjsFlowStore(deps: {
 
 		async notices(projectId) {
 			return flowNotices(await open(projectId));
+		},
+
+		async note(projectId, marker, notice) {
+			await noteOnce(await open(projectId), marker, notice);
 		},
 
 		async dismissNotice(projectId, noticeId) {

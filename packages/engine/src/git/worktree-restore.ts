@@ -15,6 +15,7 @@ export type RestoreParts = {
 	isAncestor(cwd: string, ancestor: string, commit: string): Promise<boolean>;
 	branchExists(cwd: string, name: string): Promise<boolean>;
 	setWorktreeAuthor(
+		repoPath: string,
 		worktreePath: string,
 		author: { name: string; email: string },
 	): Promise<void>;
@@ -166,7 +167,8 @@ export function createWorktreeRestore(git: Git, parts: RestoreParts) {
 				? ["worktree", "add", "-q", worktreePath, branch]
 				: ["worktree", "add", "-q", "-B", branch, worktreePath, start.commit],
 		);
-		if (input.author) await setWorktreeAuthor(worktreePath, input.author);
+		if (input.author)
+			await setWorktreeAuthor(repoPath, worktreePath, input.author);
 		for (const [ref, commit] of keptRefs) {
 			const own = ref.startsWith(heads) ? ref.slice(heads.length) : branch;
 			if (await isAncestor(repoPath, commit, `refs/heads/${own}`)) {

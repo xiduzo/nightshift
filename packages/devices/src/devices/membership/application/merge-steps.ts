@@ -4,6 +4,7 @@ import type {
 	PeerProjects,
 	RowBatch,
 } from "@nightshift/engine";
+import type { Schedule } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { now as timeNow } from "@nightshift/time";
 import type {
@@ -24,6 +25,7 @@ import {
 	NOT_DONE,
 	notDoneHeld,
 } from "../domain/words";
+import { lateProjects } from "./late-projects";
 import type {
 	DatabaseCopy,
 	EngineKernel,
@@ -51,7 +53,8 @@ import type {
  *    (`VACUUM INTO`), before any change.
  * 3. `mapped`: the Host takes the Projects (`sync.mergePersonal`) and
  *    says where each one goes. It answers the same when it is asked
- *    again.
+ *    again. It is asked again when the Projects of Personal are not those
+ *    it answered for: a person added one, or moved one away.
  * 4. `moved`: one Space move (`Engine.moveProjects`), with this
  *    computer's events numbered after its latest. No run becomes active
  *    in Personal from the last check for runs that are not done through
@@ -59,12 +62,16 @@ import type {
  *    on. The batch moves
  *    every row of the Projects and their runs, makes the Host's Space
  *    this computer's personal Space named "Personal"
- *    (`adoptPersonalSpaceBatch`), and sets this state.
+ *    (`adoptPersonalSpaceBatch`), and sets this state. It fails, and no
+ *    row of it lands, while a Project of Personal is not in it.
  * 5. What the old Space leaves goes once nothing names it: its Space
  *    document and its facts of no run (a Member that joined). The flow
  *    documents of a Project that joins another merge into it, once the
  *    Host's copy of that document is here.
  * 6. `pushed`: the Host has the moved runs: the exchange pushed them.
+ *
+ * A Project that a merge of an older version left in the old Space goes to
+ * the Host by itself (`moveLate`): the same steps, for those Projects.
  *
  * `preview` answers what a merge would do and changes nothing: the Host
  * answers a dry run. A merge that stopped goes on from its state: after
@@ -72,8 +79,11 @@ import type {
  * membership runs each step (`HomeMembership`).
  */
 
+/** How often a merge asks the Host again because its Projects changed on the way. */
+const MAX_ASKS = 3;
+
 /** Every check of a merge passed: whom it merges, and how. */
-type MergeReady = {
+export type MergeReady = {
 	held: null;
 	host: { id: string; name: string };
 	link: Link;
@@ -86,7 +96,7 @@ type MergeReady = {
 export type MergeDeps = {
 	engine: Pick<Engine, "space" | "moveProjects" | "flows" | "forgetSpace"> & {
 		exchange: Pick<RunHistoryExchange, "pushed">;
-		hostSpaces: Pick<HostSpaces, "listed">;
+		hostSpaces: Pick<HostSpaces, "listed" | "keeper">;
 		projects: Pick<PeerProjects, "ofSpace">;
 	};
 	links: Pick<DeviceLinks, "get">;
@@ -146,6 +156,10 @@ export function mergeSteps(deps: MergeDeps & { record: MembershipRecord }) {
 	 * from the Host's answer on.
 	 */
 	async function checks(started?: MergeRow): Promise<MergeReady | MergeHeld> {
+		// A split ends first: until then Personal is the Host's it leaves.
+		if ((await deps.record.unfinished())?.step === "split") {
+			return held("leaving");
+		}
 		const home = await deps.hostLinks.home();
 		let host: { id: string; name: string };
 		let from: string;
@@ -239,6 +253,56 @@ export function mergeSteps(deps: MergeDeps & { record: MembershipRecord }) {
 		);
 	}
 
+	/**
+	 * Whether the Host answered for other Projects than `from` has now: one
+	 * was added since, or went to another Space.
+	 */
+	async function changed(
+		from: string,
+		projectMap: Record<string, MergeTarget>,
+	): Promise<boolean> {
+		const here = await engine.projects.ofSpace(from);
+		return (
+			here.length !== Object.keys(projectMap).length ||
+			here.some((p) => !Object.hasOwn(projectMap, p.id))
+		);
+	}
+
+	/**
+	 * A schedule that a leave paused here only, as it goes to this Host: as it
+	 * is to the Host that has the same document and goes on with it. Off in
+	 * the document to any other one: nobody turned it on there.
+	 */
+	async function pausedElsewhere(
+		hostId: string,
+		targets: Record<string, MergeTarget>,
+		personMap: Record<string, string>,
+		to: string,
+	) {
+		const there = personMap[deps.ownerId] ?? deps.ownerId;
+		const splits = await deps.record.splits.paused();
+		return (schedule: Schedule, projectId: string): Schedule => {
+			const last = splits.findLast((split) =>
+				split.paused.some(
+					(p) => p.projectId === projectId && p.scheduleId === schedule.id,
+				),
+			);
+			if (!last || !schedule.enabled) return schedule;
+			const target = targets[projectId];
+			const same =
+				last.hostId === hostId &&
+				last.hostPersonId === there &&
+				last.fromSpace === to &&
+				target?.projectId === projectId &&
+				target.spaceId === to;
+			if (same) return schedule;
+			const { person: _person, ...rest } = schedule;
+			return { ...rest, enabled: false };
+		};
+	}
+
+	const late = lateProjects(deps, { checks, ask, targetsOf, changed, runsOf });
+
 	/** How many schedules of the project move to the Host. A removed project has none that fire. */
 	async function schedulesOf(projectId: string, removed: boolean) {
 		if (removed) return 0;
@@ -314,12 +378,13 @@ export function mergeSteps(deps: MergeDeps & { record: MembershipRecord }) {
 	async function resume(row: MergeRow): Promise<MergeResult> {
 		const from = row.fromSpace;
 		let state: MergeState = row.state;
-		let projectMap = row.projectMap;
-		let personMap = row.personMap;
+		let { projectMap, personMap } =
+			row.state === "moved" && row.late ? row.late : row;
 		let to = row.toSpace;
 		const runIds: string[] = [];
 
-		if (state === "planned") {
+		/** The Host takes the Projects of `from` as they are now. */
+		async function map() {
 			const { link, to: personal } = await ready(row);
 			const answer = await ask(link, from, row.joined, false);
 			if (answer.spaceId !== personal) {
@@ -333,20 +398,23 @@ export function mergeSteps(deps: MergeDeps & { record: MembershipRecord }) {
 			await rows.mapped(from, { toSpace: to, projectMap, personMap });
 			state = "mapped";
 		}
-		if (to === null) throw new Error("A mapped merge has no Space to go to.");
 
-		if (state === "mapped") {
+		/** One Space move of every Project of `from`, with the runs under the hold checked. */
+		async function move(to: string) {
 			const targets = projectMap;
 			const moved = await engine.moveProjects({
 				from,
 				plan: async () => {
-					// The last check of the runs, under the hold.
+					// The last checks, under the hold.
 					const { notDone } = await runsOf(from);
 					if (notDone > 0) throw notDoneHeld(notDone).refusal;
+					if (await changed(from, targets)) throw held("changed").refusal;
 					return {
 						projects: targets,
 						personMap,
 						renumber: true,
+						empties: true,
+						schedule: await pausedElsewhere(row.hostId, targets, personMap, to),
 					};
 				},
 				statements: async () =>
@@ -363,8 +431,21 @@ export function mergeSteps(deps: MergeDeps & { record: MembershipRecord }) {
 			state = "moved";
 		}
 
+		if (state === "planned") await map();
+		for (let asks = 1; state === "mapped"; asks++) {
+			if (await changed(from, projectMap)) await map();
+			if (to === null) throw new Error("A mapped merge has no Space to go to.");
+			try {
+				await move(to);
+			} catch (error) {
+				// The batch of a move that does not empty `from` fails: ask again.
+				if (asks >= MAX_ASKS || !(await changed(from, projectMap))) throw error;
+			}
+		}
+
 		if (state === "moved") {
 			await finishMoved(row.hostId, from, projectMap, personMap);
+			await late.say(row);
 			if (await pushed(row.hostId, projectMap)) {
 				await rows.pushed(from);
 				state = "pushed";
@@ -391,7 +472,8 @@ export function mergeSteps(deps: MergeDeps & { record: MembershipRecord }) {
 		projectMap: Record<string, MergeTarget>,
 		personMap: Record<string, string>,
 	) {
-		// A Project the Host did not take stays: the old Space keeps it.
+		// Every Project of the old Space moved: the batch fails otherwise. One
+		// that an older version left there keeps the rest of it (`moveLate`).
 		await cleanUp(from);
 
 		const pairs = Object.entries(projectMap).filter(
@@ -481,6 +563,14 @@ export function mergeSteps(deps: MergeDeps & { record: MembershipRecord }) {
 				hostName: (await deps.hostLinks.home())?.name ?? null,
 				blocked: checked.held === null ? null : checked.refusal.message,
 			};
+		},
+
+		/** Moves the Projects that done merges left here: a merge of an older version did. */
+		async moveLate(): Promise<void> {
+			for (const row of await rows.done()) {
+				const moved = await late.moveOf(row);
+				if (moved) await resume(moved);
+			}
 		},
 
 		/** Removes what a merge that is done left of the old Space: a merge of an older version did not. */

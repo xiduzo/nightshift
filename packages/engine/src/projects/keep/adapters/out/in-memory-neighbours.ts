@@ -6,6 +6,7 @@ import type {
 	ProjectDirectory,
 	ProjectLog,
 	Repos,
+	SpaceHolds,
 	ThisDevice,
 } from "../../application/ports";
 import {
@@ -103,6 +104,19 @@ export function inMemoryProjectDirectory() {
 	return twin satisfies ProjectDirectory;
 }
 
+/** The Spaces a move holds, as a test says. */
+export function inMemorySpaceHolds() {
+	const held = new Set<string>();
+	const twin = {
+		held,
+		async unlessHeld<T>(spaceId: string, work: () => Promise<T>): Promise<T> {
+			if (held.has(spaceId)) throw new Refusal("unavailable", "held");
+			return work();
+		},
+	};
+	return twin satisfies SpaceHolds;
+}
+
 /** New ids: `project-1`, `project-2`, and so on. */
 export function inMemoryIds() {
 	let next = 0;
@@ -121,6 +135,7 @@ export function inMemoryKeepPorts() {
 		thisDevice: { deviceId: async () => HERE } satisfies ThisDevice,
 		repos: inMemoryRepos(),
 		directory: inMemoryProjectDirectory(),
+		spaceHolds: inMemorySpaceHolds(),
 		ids: inMemoryIds(),
 	};
 }

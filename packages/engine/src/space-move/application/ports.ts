@@ -32,6 +32,11 @@ export type MoveStore = {
 	 * another remote.
 	 */
 	batchOf(move: RowMove): Promise<RowBatch>;
+	/**
+	 * The statement that fails its batch while a Project is in the Space: the
+	 * last of a move that empties it. It reads nothing before.
+	 */
+	emptied(spaceId: string): RowBatch;
 	/** Runs the statements of these batches, in their order, as one batch. None: nothing runs. */
 	commit(batches: readonly RowBatch[]): Promise<void>;
 	/** Whether the Space's own row is here. */
@@ -71,6 +76,8 @@ export type SpaceEntries = {
 export type MoveHolds = {
 	/** No run becomes active in the Space: resolves with the release, once the starts under way end. */
 	holdStarts(spaceId: string): Promise<() => void>;
+	/** Does `work`, which a hold of the Space waits for. Refused while the Space is held. */
+	unlessHeld<T>(spaceId: string, work: () => Promise<T>): Promise<T>;
 	/** No schedule of this computer fires: resolves with the release. */
 	holdSchedules(): Promise<() => void>;
 };

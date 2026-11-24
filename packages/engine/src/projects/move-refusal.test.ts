@@ -30,6 +30,7 @@ test("refuseMove reads the Space the project leaves and the Space it goes to in 
 			hosts: undefined,
 			options: {},
 			access: { openSpace: async () => {} },
+			startHolds: () => ({ start: (_spaceId, work) => work() }),
 			runner: () => ({ isActive: () => false }),
 		});
 		await projects.refuseMove("p1", sandbox.spaceId, to);

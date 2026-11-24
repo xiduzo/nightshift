@@ -17,10 +17,14 @@
  * events, and the assistant message: with the error `$FAKE_OPENCODE_ERROR`
  * (JSON) when that is set, and the cost `$FAKE_OPENCODE_COST` (default 0.002).
  *
+ * `--port=0` listens on a free port, as OpenCode does, and the ready line
+ * names it. With `$FAKE_OPENCODE_PORT_TAKEN` a port the caller chose is
+ * taken.
+ *
  * It sends `server.heartbeat` events, as OpenCode does. `--version` prints
  * the 1.x version it replays.
  *
- * Each prompt appends `{ argv, config, prompt, tools, sessionId }` as one
+ * Each prompt appends `{ argv, pid, config, prompt, tools, sessionId }` as one
  * JSON line to `$FAKE_OPENCODE_LOG` (`config`: the parsed
  * `OPENCODE_CONFIG_CONTENT`; `tools`: the bridge's `tools/list`).
  */
@@ -38,6 +42,10 @@ const flag = (name: string) =>
 	argv.find((arg) => arg.startsWith(`--${name}=`))?.split("=")[1];
 const hostname = flag("hostname") ?? "127.0.0.1";
 const port = Number(flag("port") ?? 4096);
+// Another program takes the port the caller chose, before this one listens.
+if (process.env.FAKE_OPENCODE_PORT_TAKEN && port !== 0) {
+	Bun.serve({ hostname, port, fetch: () => new Response() });
+}
 const config = JSON.parse(process.env.OPENCODE_CONFIG_CONTENT ?? "{}");
 const known = new Set(
 	(process.env.FAKE_OPENCODE_SESSIONS ?? "").split(",").filter(Boolean),
@@ -94,7 +102,7 @@ async function prompt(sessionID: string, text: string) {
 	if (log) {
 		appendFileSync(
 			log,
-			`${JSON.stringify({ argv, config, prompt: text, tools, sessionId: sessionID })}\n`,
+			`${JSON.stringify({ argv, pid: process.pid, config, prompt: text, tools, sessionId: sessionID })}\n`,
 		);
 	}
 
@@ -217,7 +225,7 @@ const json = (body: unknown, status = 200) =>
 		headers: { "Content-Type": "application/json" },
 	});
 
-Bun.serve({
+const server = Bun.serve({
 	hostname,
 	port,
 	idleTimeout: 0,
@@ -273,4 +281,4 @@ Bun.serve({
 // OpenCode sends a heartbeat every few seconds; the adapter's teardown
 // waits for the next event.
 setInterval(() => emit("server.heartbeat", {}), 300);
-console.log(`opencode server listening on http://${hostname}:${port}`);
+console.log(`opencode server listening on http://${hostname}:${server.port}`);

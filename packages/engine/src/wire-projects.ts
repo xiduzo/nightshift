@@ -10,6 +10,7 @@ import { createWorktrees, systemGit } from "./git";
 import type { Runner } from "./graph";
 import { type EventWrites, type RunLog, runIdsOfProject } from "./log";
 import { type HostRelay, wireCatalog, wireClones, wireKeep } from "./projects";
+import type { StartHolds } from "./runs";
 import { wireSpaces } from "./spaces";
 
 /**
@@ -31,6 +32,8 @@ export function wireEngineProjects(deps: {
 	/** The relay to the Hosts, when this computer has one. */
 	hosts: HostRelay | undefined;
 	options: Pick<EngineOptions, "git">;
+	/** The start holds, made after this block (`wire-walk.ts`). */
+	startHolds: () => Pick<StartHolds, "start">;
 	/** The runner, made after this block: whether a run runs a step here. */
 	runner: () => Pick<Runner, "isActive">;
 	/** Who may act in a Space (`access`). */
@@ -60,6 +63,11 @@ export function wireEngineProjects(deps: {
 			exists: existsSync,
 		},
 		directory,
+		// A Project comes into a Space as a run starts in it: a move holds both.
+		spaceHolds: {
+			unlessHeld: <T>(spaceId: string, work: () => Promise<T>) =>
+				deps.startHolds().start(spaceId, work),
+		},
 		ids: { projectId: () => randomUUID() },
 	};
 	const projects = wireClones({

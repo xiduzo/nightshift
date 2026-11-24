@@ -8,6 +8,20 @@ import { addProjectWithoutFolder } from "./add-project-without-folder";
 const ADA: Actor = { personId: "person-ada", door: "session" };
 
 describe("addProjectWithoutFolder", () => {
+	test("is refused in a Space whose Projects move", async () => {
+		const ports = inMemoryCatalogPorts();
+		ports.repos.add("/work/late", "git@github.com:acme/late.git");
+		ports.spaceHolds.held.add("s1");
+		await expect(
+			addProjectWithoutFolder(ports)(ADA, {
+				spaceId: "s1",
+				name: "Late",
+			}),
+		).rejects.toThrow("held");
+		expect(ports.spaceProjects.documentOf("s1").projects.size).toBe(0);
+		expect(ports.projectLog.facts).toEqual([]);
+	});
+
 	test("has no remote and no Clone, in the Space document and its row; a name may repeat", async () => {
 		const ports = inMemoryCatalogPorts();
 		const added = await addProjectWithoutFolder(ports)(ADA, {

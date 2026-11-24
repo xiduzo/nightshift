@@ -25,8 +25,16 @@ import { entryRecords, inMemorySpaceEntries } from "./in-memory-space-entries";
  */
 
 /** The holds of a move: each call and each release is a step. */
-export function inMemoryMoveHolds(steps: string[]): MoveHolds {
+export function inMemoryMoveHolds(
+	steps: string[],
+): MoveHolds & { held: Set<string> } {
+	const held = new Set<string>();
 	return {
+		held,
+		async unlessHeld(spaceId, work) {
+			if (held.has(spaceId)) throw new Refusal("unavailable", "held");
+			return work();
+		},
 		async holdStarts(spaceId) {
 			steps.push(`hold starts ${spaceId}`);
 			return () => steps.push(`release starts ${spaceId}`);

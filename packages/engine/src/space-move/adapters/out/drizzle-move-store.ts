@@ -1,7 +1,7 @@
 import { wireSpaces } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import { answerCost, event, project, run } from "@nightshift/db/schema";
-import { and, eq, inArray, isNull, notExists, or } from "drizzle-orm";
+import { and, eq, inArray, isNull, notExists, or, sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import type { RowBatch } from "../../../contract";
 import type { MoveStore } from "../../application/ports";
@@ -42,6 +42,16 @@ export function drizzleMoveStore(db: Database): MoveStore {
 		async batchOf(move) {
 			// The statements leave as the opaque batch the port names (G2).
 			return (await spaceMoveBatch(db, move)) as unknown as RowBatch;
+		},
+
+		emptied(spaceId) {
+			// `space_id` takes no null: a row that is left fails the batch.
+			return [
+				db
+					.update(project)
+					.set({ spaceId: sql`null` })
+					.where(eq(project.spaceId, spaceId)),
+			] as unknown as RowBatch;
 		},
 
 		async commit(batches) {

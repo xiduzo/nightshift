@@ -53,6 +53,7 @@ function projectsOf(
 		hosts: more.relay,
 		options: {},
 		access: { openSpace: async () => {} },
+		startHolds: () => ({ start: (_spaceId, work) => work() }),
 		runner: () => ({ isActive: () => false }),
 	});
 	/** The project's row, with its folder here. */

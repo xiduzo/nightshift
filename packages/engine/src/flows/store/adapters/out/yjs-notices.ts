@@ -1,5 +1,10 @@
+import { randomUUID } from "node:crypto";
 import type { FlowDocument } from "../../../../documents";
-import { type FlowNotice, readableNotices } from "../../domain/notices";
+import {
+	type FlowNotice,
+	type NewNotice,
+	readableNotices,
+} from "../../domain/notices";
 import { mapsOf } from "./yjs-flow-encoding";
 
 /**
@@ -15,6 +20,20 @@ export function flowNotices(document: FlowDocument): FlowNotice[] {
 /** Whether the document holds this marker: a step done once per document (the merge of another document). */
 export function marked(document: FlowDocument, marker: string): boolean {
 	return mapsOf(document).meta.has(marker);
+}
+
+/** Adds the notice once per document: the marker stays when a person dismisses it. */
+export async function noteOnce(
+	document: FlowDocument,
+	marker: string,
+	notice: NewNotice,
+): Promise<void> {
+	if (marked(document, marker)) return;
+	const maps = mapsOf(document);
+	await document.current.change(() => {
+		maps.notices.set(randomUUID(), { ...notice });
+		maps.meta.set(marker, notice.at);
+	});
 }
 
 /** Removes a notice. One that is gone already is no error. */

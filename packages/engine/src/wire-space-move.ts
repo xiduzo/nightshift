@@ -20,7 +20,7 @@ import { wireSpaceMove } from "./space-move";
 export function wireEngineSpaceMove(deps: {
 	db: Database;
 	documents: Pick<SpaceDocuments, "open" | "remove">;
-	startHolds: Pick<StartHolds, "hold">;
+	startHolds: Pick<StartHolds, "hold" | "start">;
 	/** Holds every schedule of this computer: resolves with the release. */
 	holdSchedules(): Promise<() => void>;
 	log: Pick<RunLog, "walkerId" | "forget" | "append">;
@@ -39,6 +39,7 @@ export function wireEngineSpaceMove(deps: {
 		documents: deps.documents,
 		holds: {
 			holdStarts: (spaceId) => deps.startHolds.hold(spaceId),
+			unlessHeld: (spaceId, work) => deps.startHolds.start(spaceId, work),
 			holdSchedules: () => deps.holdSchedules(),
 		},
 		walker: { walkerId: () => log.walkerId() },

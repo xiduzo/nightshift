@@ -9,7 +9,7 @@ import { Refusal } from "@nightshift/refusal";
 import { now as timeNow } from "@nightshift/time";
 import type { SplitResult, SplitState } from "../../../contract";
 import type { HostSpaces } from "../../../links";
-import type { SplitRow } from "../domain/membership-rows";
+import type { PausedSchedule, SplitRow } from "../domain/membership-rows";
 import { NOT_DONE, SPLIT_WORDS } from "../domain/words";
 import type {
 	DatabaseCopy,
@@ -27,6 +27,7 @@ import type {
 
 export type SplitDeps = {
 	engine: Pick<Engine, "space" | "moveProjects"> & {
+		flows: Pick<Engine["flows"], "merge" | "schedules">;
 		hostSpaces: Pick<HostSpaces, "hostOf" | "keeper" | "named">;
 		projects: Pick<PeerProjects, "ofSpace">;
 	};
@@ -101,6 +102,40 @@ export function splitSteps(deps: SplitDeps & { record: MembershipRecord }) {
 			.map((p) => p.id);
 	}
 
+	/**
+	 * The Projects of a merge whose rows moved, and whose flows still wait for
+	 * the Host, by their id before the merge: only the row of that merge says
+	 * which Project each became, and the batch of the split ends that merge.
+	 */
+	async function waitingFlows(): Promise<Record<string, string>> {
+		const merge = await merges.latest();
+		if (merge?.state !== "moved") return {};
+		return Object.fromEntries(
+			Object.entries((merge.late ?? merge).projectMap)
+				.filter(([source, target]) => source !== target.projectId)
+				.map(([source, target]) => [source, target.projectId]),
+		);
+	}
+
+	/** The schedules of the Projects. A Project that is gone has none. */
+	async function schedulesOf(projectIds: readonly string[]) {
+		const found: (PausedSchedule & { on: boolean })[] = [];
+		for (const projectId of projectIds) {
+			const read = await engine.flows
+				.schedules(projectId, { validate: false })
+				.catch((error: unknown) => {
+					if (error instanceof Refusal && error.kind === "not-found") {
+						return { schedules: [] };
+					}
+					throw error;
+				});
+			for (const { id, enabled } of read.schedules) {
+				found.push({ projectId, scheduleId: id, on: enabled });
+			}
+		}
+		return found;
+	}
+
 	/** Goes on from the split's state, to its end. */
 	async function resume(row: SplitRow): Promise<SplitResult> {
 		const { fromSpace: from, toSpace: to } = row;
@@ -108,24 +143,29 @@ export function splitSteps(deps: SplitDeps & { record: MembershipRecord }) {
 		let projects = row.projects;
 		let runs = row.runs;
 		let unpinned = row.unpinned;
+		let waiting = row.waiting;
 
 		if (state === "planned") {
+			// No document changes: the Host's schedules are the Host's.
+			let paused: PausedSchedule[] = [];
+			const flows = await waitingFlows();
 			const moved = await engine.moveProjects({
 				from,
 				plan: async () => {
 					await noRunsNotDone(from);
 					const ids = await projectsHere(from);
+					const found = await schedulesOf(ids);
+					unpinned = found.filter((s) => s.on).length;
+					paused = found.map(({ projectId, scheduleId }) => ({
+						projectId,
+						scheduleId,
+					}));
 					return {
 						projects: Object.fromEntries(
 							ids.map((id) => [id, { spaceId: to, projectId: id }]),
 						),
 						personMap: { [row.hostPersonId]: row.personId },
 						ownRunsOnly: true,
-						schedule: (schedule) => {
-							if (!schedule.enabled) return schedule;
-							const { person: _person, ...rest } = schedule;
-							return { ...rest, enabled: false };
-						},
 					};
 				},
 				statements: async (done) =>
@@ -141,17 +181,25 @@ export function splitSteps(deps: SplitDeps & { record: MembershipRecord }) {
 						...(rows.moved(to, {
 							projects: done.projects,
 							runs: done.runIds.length,
-							unpinned: done.schedules,
+							unpinned,
+							paused,
+							waiting: flows,
 						}) as unknown as readonly unknown[]),
 					] as unknown as RowBatch,
 			});
 			projects = moved.projects;
 			runs = moved.runIds.length;
-			unpinned = moved.schedules;
+			waiting = flows;
 			state = "moved";
 		}
 
 		if (state === "moved") {
+			for (const [source, target] of Object.entries(waiting)) {
+				await engine.flows.merge(source, target, {
+					persons: {},
+					apart: to.slice(0, 8),
+				});
+			}
 			await deps.spaces.open(to);
 			await rows.done(to);
 			state = "done";
@@ -196,6 +244,18 @@ export function splitSteps(deps: SplitDeps & { record: MembershipRecord }) {
 
 	return {
 		splitOff,
+
+		/**
+		 * Forgets a split that moved no row: the Host gave access back first,
+		 * and Personal stays there (ADR 1: one Personal per home Host). It
+		 * changed nothing but its row. The copy of the database stays.
+		 */
+		async forget(row: SplitRow): Promise<void> {
+			await rows.forget(row.toSpace);
+			console.warn(
+				`[devices] The split of ${row.fromSpace} into ${row.toSpace} is forgotten: its Host gave access back. The copy of the database: ${row.backup}`,
+			);
+		},
 
 		/**
 		 * The Space that splits off when this computer leaves its home Host

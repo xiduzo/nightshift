@@ -3,10 +3,12 @@ import * as Y from "yjs";
 import type { FlowDocument } from "../../../../documents";
 import { same } from "../../domain/flow-json";
 import {
+	apartNames,
 	type FlowMergePlan,
 	isRecord,
 	mergedSchedule,
 	sameFlow,
+	withCalls,
 	withPerson,
 } from "../../domain/flow-merge";
 import {
@@ -83,6 +85,48 @@ export function planFlowMerge(
 	return plan;
 }
 
+/** Every flow and schedule under a name of its own: those of the destination are not all here. */
+function apartPlan(
+	source: FlowDocument,
+	destination: FlowDocument,
+	apart: string,
+): FlowMergePlan {
+	const from = mapsOf(source);
+	const into = mapsOf(destination);
+	const there = flowEntries(destination);
+	const flows = apartNames(
+		flowEntries(source).map((entry) => entry.name),
+		apart,
+		new Set(there.flatMap((entry) => [entry.name, entry.stored])),
+	);
+	// A flow that is there already keeps its name there.
+	for (const { flowId, name } of flowEntries(source)) {
+		const same = there.find((entry) => entry.flowId === flowId);
+		if (same) flows[name] = same.name;
+	}
+	return {
+		flows,
+		schedules: apartNames(
+			orderedKeys(from.schedules, from.scheduleOrder),
+			apart,
+			new Set(into.schedules.keys()),
+		),
+	};
+}
+
+/** The Calls of the flow follow the flows that took another name. */
+function renameCalls(
+	flow: Y.Map<unknown>,
+	names: Readonly<Record<string, string>>,
+): void {
+	const nodes = flow.get("nodes");
+	if (!(nodes instanceof Y.Map)) return;
+	for (const [key, node] of [...nodes.entries()]) {
+		const renamed = withCalls(node, names);
+		if (renamed !== node) nodes.set(key, renamed);
+	}
+}
+
 /**
  * Merges the source's flows, their revisions and its schedules into the
  * destination. The history first, then the flows and schedules in one
@@ -92,10 +136,18 @@ export function planFlowMerge(
 export async function mergeFlowDocuments(
 	source: FlowDocument,
 	destination: FlowDocument,
-	options: { persons?: Readonly<Record<string, string>>; at: number },
+	options: {
+		persons?: Readonly<Record<string, string>>;
+		at: number;
+		/** The destination is not all here: what merges keeps apart from what comes (`domain/flow-merge.ts`). */
+		apart?: string;
+	},
 ): Promise<FlowMergePlan> {
 	const persons = options.persons ?? {};
-	const plan = planFlowMerge(source, destination, persons);
+	const plan =
+		options.apart === undefined
+			? planFlowMerge(source, destination, persons)
+			: apartPlan(source, destination, options.apart);
 
 	const history = source.history.doc;
 	const flowIds = [...history.share.keys()];
@@ -133,12 +185,21 @@ export async function mergeFlowDocuments(
 		for (const [flowId, value] of from.flows.entries()) {
 			if (into.flows.has(flowId)) continue;
 			const copy = copyOf(value);
-			const name = names.get(flowId);
+			// A copy that does not read goes with the flow it is a copy of.
+			const stored = value instanceof Y.Map ? value.get("name") : undefined;
+			const name =
+				names.get(flowId) ??
+				(options.apart !== undefined && typeof stored === "string"
+					? stored
+					: undefined);
 			const renamed = name === undefined ? undefined : plan.flows[name];
 			if (renamed !== undefined && copy instanceof Y.Map) {
 				copy.set("name", renamed);
 			}
 			into.flows.set(flowId, copy);
+			if (options.apart !== undefined && copy instanceof Y.Map) {
+				renameCalls(copy, plan.flows);
+			}
 		}
 		for (const key of orderedKeys(from.schedules, from.scheduleOrder)) {
 			const id = plan.schedules[key] ?? key;
@@ -150,7 +211,13 @@ export async function mergeFlowDocuments(
 			if (into.schedules.has(id)) continue;
 			into.schedules.set(
 				id,
-				isRecord(schedule) && id !== key ? { ...schedule, id } : schedule,
+				isRecord(schedule) && id !== key
+					? {
+							...schedule,
+							id,
+							...(options.apart === undefined ? {} : { enabled: false }),
+						}
+					: schedule,
 			);
 			into.scheduleOrder.push([id]);
 		}

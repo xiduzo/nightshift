@@ -196,6 +196,18 @@ export type ProjectDirectory = {
 };
 
 /**
+ * The Spaces whose Projects a Space move takes now.
+ * @filledBy engine/runs
+ */
+export type SpaceHolds = {
+	/**
+	 * Does `work`, which makes a Project in the Space. A move out of the Space
+	 * waits for it. Refused while a move out of the Space runs.
+	 */
+	unlessHeld<T>(spaceId: string, work: () => Promise<T>): Promise<T>;
+};
+
+/**
  * New ids.
  * @filledBy engine/wire
  */

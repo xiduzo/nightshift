@@ -373,3 +373,64 @@ describe("migration answer_cost_shared", () => {
 		]);
 	});
 });
+
+describe("migration membership_repair", () => {
+	test("an existing merge and split keep every value, and the build before it goes on with the database", async () => {
+		const db = await databaseBefore("membership_repair");
+		const merge =
+			"INSERT INTO space_merge (from_space, host_id, person_id, state, backup, project_map) VALUES";
+		const split =
+			"INSERT INTO space_split (to_space, from_space, host_id, host_name, person_id, host_person_id, state, backup, unpinned) VALUES";
+		await db.run(sql.raw(`${merge} ('a', 'h', 'p', 'moved', '/b', '{}')`));
+		await db.run(
+			sql.raw(`${split} ('t', 'f', 'h', 'H', 'p', 'q', 'planned', '/b', 2)`),
+		);
+		const old = async () => ({
+			merges: await rows(
+				db,
+				"SELECT from_space, host_id, person_id, state, to_space, project_map, person_map, joined, backup, created_at, updated_at FROM space_merge",
+			),
+			splits: await rows(
+				db,
+				"SELECT to_space, from_space, host_id, host_name, person_id, host_person_id, state, projects, runs, unpinned, backup, created_at, updated_at FROM space_split",
+			),
+		});
+		const before = await old();
+
+		await migrateDb(db);
+
+		expect(await old()).toEqual(before);
+		expect(
+			await rows(
+				db,
+				"SELECT late, paused, waiting FROM space_merge, space_split",
+			),
+		).toEqual([{ late: null, paused: null, waiting: null }]);
+
+		// The build before it: its migrations, its reads and its writes.
+		const older = mkdtempSync(join(tmpdir(), "nightshift-migrate-"));
+		roots.push(older);
+		for (const name of readdirSync(migrationsFolder).sort()) {
+			if (name.endsWith("membership_repair")) break;
+			cpSync(join(migrationsFolder, name), join(older, name), {
+				recursive: true,
+			});
+		}
+		await db.run(
+			sql.raw(
+				`UPDATE space_merge SET late = '{"projectMap":{},"personMap":{}}'`,
+			),
+		);
+		await migrateDb(db, { migrationsFolder: older });
+		expect(await old()).toEqual(before);
+		await db.run(sql.raw(`${merge} ('b', 'h', 'p', 'planned', '/b', '{}')`));
+		await db.run(
+			sql.raw(`${split} ('u', 'f', 'h', 'H', 'p', 'q', 'done', '/b', 0)`),
+		);
+		await db.run(sql.raw("UPDATE space_merge SET state = 'pushed'"));
+		expect((await old()).merges).toHaveLength(2);
+		// And this build again.
+		await migrateDb(db);
+		expect((await old()).splits).toHaveLength(2);
+	});
+});

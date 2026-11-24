@@ -19,8 +19,10 @@ export const mergeFlows =
 		source: string;
 		destination: string;
 		persons?: Readonly<Record<string, string>>;
+		apart?: string;
 	}): Promise<FlowMergePlan> =>
 		ports.merges.merge(request.source, request.destination, {
 			...(request.persons ? { persons: request.persons } : {}),
+			...(request.apart === undefined ? {} : { apart: request.apart }),
 			at: ports.clock(),
 		});

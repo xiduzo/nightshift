@@ -325,6 +325,29 @@ describe("a Space move", () => {
 	});
 });
 
+test("no Project comes into a Space while a move takes its Projects, and one under way is seen by the move", async () => {
+	const engine = makeEngine();
+	const space = engine.space(sandbox.spaceId, NIGHT_SHIFT);
+	const underWay = space.addProjectWithoutFolder({ name: "Under way" });
+	let seen: string[] = [];
+	await engine.moveProjects({
+		from: sandbox.spaceId,
+		plan: async () => {
+			seen = (await space.listProjects()).map((p) => p.name);
+			await expect(
+				space.addProjectWithoutFolder({ name: "Late" }),
+			).rejects.toThrow("moves the projects of this Space now");
+			await expect(
+				space.addProject({ repoPath: sandbox.repoPath }),
+			).rejects.toThrow("moves the projects of this Space now");
+			return { projects: {} };
+		},
+	});
+	await underWay;
+	expect(seen).toEqual(["Under way"]);
+	await space.addProjectWithoutFolder({ name: "After" });
+});
+
 describe("forgetting a Space a move emptied", () => {
 	/** What of the Space is on this Replica: the rows of each engine table that name it, and its document. */
 	async function whatIsLeft(spaceId: string) {

@@ -6,7 +6,12 @@ import {
 } from "@nightshift/flows";
 import type { FlowStore } from "../../application/ports";
 import { type FlowRevision, formatOf, same } from "../../domain/flow-json";
-import { mergedSchedule, withPerson } from "../../domain/flow-merge";
+import {
+	apartNames,
+	mergedSchedule,
+	withCalls,
+	withPerson,
+} from "../../domain/flow-merge";
 import { flowNotFound, foreignFlow } from "../../domain/flow-save";
 import { nodeWithShape, outputsWithTypes } from "../../domain/inferred";
 import type { FlowNotice } from "../../domain/notices";
@@ -25,6 +30,8 @@ type StoredDocument = {
 	schedules: Schedule[];
 	notices: FlowNotice[];
 	merged: Set<string>;
+	/** The notices that were added once (`note`). */
+	marks: Set<string>;
 };
 
 /** The in-memory `FlowStore`, with what a test sets and reads. */
@@ -45,6 +52,7 @@ const plain = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
  */
 export function inMemoryFlowStore(): InMemoryFlowStore {
 	const documents = new Map<string, StoredDocument>();
+	let notes = 0;
 	let counter = 0;
 	const next = (kind: string) => `${kind}-${++counter}`;
 
@@ -56,6 +64,7 @@ export function inMemoryFlowStore(): InMemoryFlowStore {
 				revisions: new Map(),
 				schedules: [],
 				notices: [],
+				marks: new Set(),
 				merged: new Set(),
 			};
 			documents.set(projectId, document);
@@ -200,6 +209,13 @@ export function inMemoryFlowStore(): InMemoryFlowStore {
 			return [...documentOf(projectId).notices];
 		},
 
+		async note(projectId, marker, notice) {
+			const document = documentOf(projectId);
+			if (document.marks.has(marker)) return;
+			document.marks.add(marker);
+			document.notices.push({ id: `notice-${++notes}`, ...notice });
+		},
+
 		async dismissNotice(projectId, noticeId) {
 			const document = documentOf(projectId);
 			document.notices = document.notices.filter(
@@ -243,9 +259,24 @@ export function inMemoryFlowStore(): InMemoryFlowStore {
 
 		async merge(source, destination, merge) {
 			const persons = merge.persons ?? {};
-			const plan = await store.planMerge(source, destination, persons);
+			const { apart } = merge;
 			const from = documentOf(source);
 			const into = documentOf(destination);
+			const plan =
+				apart === undefined
+					? await store.planMerge(source, destination, persons)
+					: {
+							flows: apartNames(
+								from.flows.map((flow) => flow.name),
+								apart,
+								new Set(into.flows.map((flow) => flow.name)),
+							),
+							schedules: apartNames(
+								from.schedules.map((s) => s.id),
+								apart,
+								new Set(into.schedules.map((s) => s.id)),
+							),
+						};
 			for (const [flowId, revisions] of from.revisions) {
 				const list = into.revisions.get(flowId) ?? [];
 				const known = new Set(list.map((revision) => revision.id));
@@ -260,8 +291,14 @@ export function inMemoryFlowStore(): InMemoryFlowStore {
 			if (into.merged.has(source)) return plan;
 			for (const flow of from.flows) {
 				if (into.flows.some((other) => other.flowId === flow.flowId)) continue;
+				const copy = plain(flow);
+				if (apart !== undefined && Array.isArray(copy.json.nodes)) {
+					copy.json.nodes = copy.json.nodes.map((node) =>
+						withCalls(node, plan.flows),
+					);
+				}
 				into.flows.push({
-					...plain(flow),
+					...copy,
 					name: plan.flows[flow.name] ?? flow.name,
 				});
 			}
@@ -269,7 +306,11 @@ export function inMemoryFlowStore(): InMemoryFlowStore {
 				const id = plan.schedules[schedule.id] ?? schedule.id;
 				if (into.schedules.some((other) => other.id === id)) continue;
 				const merged = mergedSchedule(plain(schedule), plan.flows, persons);
-				into.schedules.push({ ...(merged as Schedule), id });
+				into.schedules.push({
+					...(merged as Schedule),
+					id,
+					...(apart === undefined ? {} : { enabled: false }),
+				});
 			}
 			into.notices.push(
 				...from.notices.filter(

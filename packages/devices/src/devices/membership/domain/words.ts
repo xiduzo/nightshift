@@ -11,8 +11,15 @@ export const MERGE_WORDS = {
 		"Other devices use this computer as their Host. Its Personal stays as it is.",
 	olderHost:
 		"Your home Host runs an older version of Night Shift. Update it, then merge.",
+	leaving:
+		"This computer still leaves your old Host. Let the runs on this computer finish or stop them, then merge.",
+	changed: "Your projects changed while they moved. Try again in a minute.",
 	busy: "Night Shift moves your Personal now. Wait until it is done.",
 } as const;
+
+/** What the Flows page of a Project says once Night Shift moved it to the Host later than the others. */
+export const movedLate = (hostName: string) =>
+	`Night Shift moved this project to ${hostName}, with its flows, schedules and runs. It stayed on this computer when your Personal moved.`;
 
 /**
  * The statuses of a run that is not done: a merge and a split wait for them.
@@ -36,7 +43,15 @@ export const SPLIT_WORDS = {
 
 /** The check of a merge that failed: why it does not go on now. */
 export type MergeHeld = {
-	held: "noHome" | "isHost" | "merged" | "offline" | "notListed" | "notDone";
+	held:
+		| "noHome"
+		| "isHost"
+		| "merged"
+		| "leaving"
+		| "offline"
+		| "notListed"
+		| "changed"
+		| "notDone";
 	refusal: Refusal;
 };
 

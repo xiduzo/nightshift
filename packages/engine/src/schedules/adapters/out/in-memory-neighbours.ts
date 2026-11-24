@@ -11,6 +11,7 @@ import type { RunSummary } from "../../../read";
 import type { RunStatus } from "../../../run-status";
 import type {
 	Clock,
+	PausedHere,
 	PullRequestScorer,
 	ScheduledProjects,
 	ScheduledRuns,
@@ -35,6 +36,21 @@ import {
  * which gives a use-case test every port of the slice at once. Test code:
  * production code never imports this file.
  */
+
+/** The schedules paused on this computer, by project. */
+export function inMemoryPausedHere(
+	paused: Record<string, string[]>,
+): PausedHere & { paused: Record<string, string[]> } {
+	return {
+		paused,
+		of: async (projectId) => new Set(paused[projectId] ?? []),
+		async ended(projectId, ids) {
+			paused[projectId] = (paused[projectId] ?? []).filter(
+				(id) => !ids.includes(id),
+			);
+		},
+	};
+}
 
 /** A clock a test sets. */
 export type InMemoryClock = Clock & { set(at: number): void };

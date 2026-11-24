@@ -1,4 +1,4 @@
-import type { FlowSource } from "@nightshift/flows";
+import { type FlowSource, suffixedName } from "@nightshift/flows";
 import { same } from "./flow-json";
 
 /**
@@ -20,6 +20,12 @@ import { same } from "./flow-json";
  * - `persons` gives a Person of the source their id in the destination:
  *   a schedule's Person and a revision's Person take it.
  *
+ * A merge into a Project whose document is not all here (`apart`: a split
+ * of a Project whose flows still wait for the Host) keeps what it adds
+ * apart from what comes later. Each schedule takes an id of its own and is
+ * off. Each flow takes a name of its own too: its schedules and the Calls
+ * of the flows that came with it follow.
+ *
  * A merge that runs again changes nothing: a revision that the
  * destination has stays one, and the flows and schedules of a source
  * that merged into the destination before are not added again.
@@ -32,6 +38,51 @@ export type FlowMergePlan = {
 	/** A schedule of the source: the id it takes in the destination. */
 	schedules: Record<string, string>;
 };
+
+/** The longest flow name and schedule id. */
+const MAX_NAME = 60;
+
+/**
+ * The name that each name takes to keep apart (`apart`): no document that
+ * comes later has it, and no two take one. `taken`: names of the
+ * destination already.
+ */
+export function apartNames(
+	names: readonly string[],
+	apart: string,
+	taken: ReadonlySet<string>,
+): Record<string, string> {
+	const used = new Set(taken);
+	const apartName = (name: string) => {
+		const base = name.slice(0, MAX_NAME - apart.length - 1).replace(/-+$/, "");
+		const free = suffixedName(`${base}-${apart}`, used);
+		used.add(free);
+		return free;
+	};
+	return Object.fromEntries(names.map((name) => [name, apartName(name)]));
+}
+
+/** A node with the flows it calls by their new names. A kit, and a flow that did not change, stay. */
+export function withCalls(
+	node: unknown,
+	flows: Readonly<Record<string, string>>,
+): unknown {
+	if (!isRecord(node) || node.type !== "call") return node;
+	const renamed = <T>(value: T): T | string =>
+		typeof value === "string" && Object.hasOwn(flows, value)
+			? (flows[value] as string)
+			: value;
+	const call = { ...node, flow: renamed(node.flow) };
+	if (!Array.isArray(node.cascade)) return call;
+	return {
+		...call,
+		cascade: node.cascade.map((tier: unknown) =>
+			isRecord(tier) && "flow" in tier
+				? { ...tier, flow: renamed(tier.flow) }
+				: tier,
+		),
+	};
+}
 
 /** The same flow on both sides: both read, with the same content. */
 export function sameFlow(a: FlowSource | undefined, b: FlowSource | undefined) {

@@ -67,7 +67,7 @@ export function createDevices(deps: {
 	/** This computer's membership of its home Host: the merge on join, the split on leave. */
 	membership: Pick<
 		HomeMembership,
-		"pending" | "preview" | "merge" | "joined" | "leave"
+		"pending" | "preview" | "merge" | "beforeJoin" | "joined" | "leave"
 	>;
 	/** The Personal secrets this computer keeps as a Home Host. */
 	personalSecrets: PersonalSecretsHost;
@@ -196,7 +196,10 @@ export function createDevices(deps: {
 					self: deps.self,
 					links: deps.hostLinks,
 					keys: deps.keys,
-					started: (link, key) => deps.links.add(link, key),
+					started: async (link, key) => {
+						await deps.membership.beforeJoin();
+						await deps.links.add(link, key);
+					},
 					...(deps.identity ? { identity: deps.identity } : {}),
 					...(deps.localOnly ? { localOnly: true } : {}),
 				},

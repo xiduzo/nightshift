@@ -123,7 +123,7 @@ export interface Engine {
 	 * merge of Personal). Who may see the Project is the caller's check. A
 	 * person reads and saves through `space(id).flows`.
 	 */
-	readonly flows: Pick<ProjectFlows, "flows" | "schedules"> & {
+	readonly flows: Pick<ProjectFlows, "flows" | "schedules" | "note"> & {
 		/**
 		 * The names the flows of `source` and the ids its schedules take
 		 * when they merge into `destination`, only those that change.
@@ -145,7 +145,11 @@ export interface Engine {
 		merge(
 			source: string,
 			destination: string,
-			options?: { persons?: Readonly<Record<string, string>> },
+			options?: {
+				persons?: Readonly<Record<string, string>>;
+				/** `destination` is not all here: what merges keeps apart from it (`FlowStore.merge`). */
+				apart?: string;
+			},
 		): Promise<FlowMergePlan>;
 	};
 	/**

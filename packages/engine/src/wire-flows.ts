@@ -74,12 +74,16 @@ export function wireEngineFlows(deps: {
 		merge: (
 			source: string,
 			destination: string,
-			options: { persons?: Readonly<Record<string, string>> } = {},
+			options: {
+				persons?: Readonly<Record<string, string>>;
+				apart?: string;
+			} = {},
 		) =>
 			transfer.mergeFlows({
 				source,
 				destination,
 				...(options.persons ? { persons: options.persons } : {}),
+				...(options.apart === undefined ? {} : { apart: options.apart }),
 			}),
 	};
 	return { projectFlows, transfer };

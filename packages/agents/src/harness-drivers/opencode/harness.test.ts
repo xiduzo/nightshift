@@ -20,9 +20,9 @@ import {
 	opencodeHarness,
 	opencodeMcpConfig,
 	opencodeSessionConfig,
-	rewriteServe,
 } from "./harness";
 import { opencodePermission } from "./permissions";
+import { rewriteServe } from "./serve";
 
 let dir: string;
 let cwd: string;
@@ -32,21 +32,21 @@ beforeEach(async () => {
 	cwd = await mkdtemp(join(tmpdir(), "nightshift-opencode-cwd-"));
 });
 
-/** `opencode serve` processes still running with this `--port=` flag. */
-function servers(port: string): string[] {
-	return Bun.spawnSync(["ps", "-ax", "-o", "command"])
-		.stdout.toString()
-		.split("\n")
-		.filter((ps) => ps.includes("serve") && ps.split(" ").includes(port));
+/** Whether the server with this pid still runs. */
+function runs(pid: number): boolean {
+	try {
+		process.kill(pid, 0);
+		return true;
+	} catch {
+		return false;
+	}
 }
 
 /** Wait until the fake servers of a log are gone: every session stops its server. */
-async function serversStop(log: string): Promise<string[]> {
+async function serversStop(log: string): Promise<number[]> {
 	if (!(await Bun.file(log).exists())) return [];
-	const ports = (await readLog(log)).flatMap(
-		(line) => line.argv.find((arg) => arg.startsWith("--port=")) ?? [],
-	);
-	const left = () => ports.flatMap(servers);
+	const pids = (await readLog(log)).map((line) => line.pid);
+	const left = () => pids.filter(runs);
 	const deadline = now() + 5_000;
 	while (left().length > 0 && now() < deadline) await Bun.sleep(50);
 	return left();
@@ -78,6 +78,7 @@ async function collect(stream: AsyncIterable<AgentEvent>) {
 
 type LogLine = {
 	argv: string[];
+	pid: number;
 	config: Record<string, unknown> & {
 		permission: Record<string, string | Record<string, string>>;
 		mcp?: Record<string, unknown>;
@@ -348,6 +349,23 @@ describe("opencodeHarness", () => {
 		expect(line?.config.permission.bash).toBe("allow");
 		// The worktree stays clean: no marker, no opencode.json.
 		expect(await readdir(cwd)).toEqual([]);
+	});
+
+	test("given another program takes a port that was free, when sessions start, then each reaches its own server", async () => {
+		const { harness, log } = await fakeOpencode({
+			FAKE_OPENCODE_PORT_TAKEN: "1",
+		});
+		const sessions = await Promise.all(
+			["one", "two", "three"].map((prompt) =>
+				collect(harness.run(input({ prompt }))),
+			),
+		);
+		expect(sessions.map((events) => events.at(-1)?.type)).toEqual([
+			"finished",
+			"finished",
+			"finished",
+		]);
+		expect(new Set((await readLog(log)).map((line) => line.pid)).size).toBe(3);
 	});
 
 	test("the knowledge tools reach OpenCode over the bridge, named after the prompt", async () => {

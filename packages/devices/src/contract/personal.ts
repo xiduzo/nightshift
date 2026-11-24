@@ -162,4 +162,6 @@ export type LeaveResult = {
 	split: SplitResult | null;
 	/** Why the split waits. Null: it is done, or there was nothing to split. */
 	waiting: string | null;
+	/** The key of the Host stays on this computer: the next start deletes it. */
+	keyKept: boolean;
 };

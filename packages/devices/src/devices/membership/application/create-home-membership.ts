@@ -15,7 +15,7 @@ import type {
 	JoinProgress,
 	Link,
 } from "../../../links";
-import { LEAVE_WORDS, MERGE_WORDS } from "../domain/words";
+import { LEAVE_WORDS, MERGE_WORDS, mergeHeld } from "../domain/words";
 import { type MergeDeps, mergeSteps } from "./merge-steps";
 import type { Batches, DeviceCopiesPort, MembershipRecord } from "./ports";
 import { type SplitDeps, splitSteps } from "./split-steps";
@@ -23,12 +23,15 @@ import { type SplitDeps, splitSteps } from "./split-steps";
 /** How long a new join waits for its home Host to list the personal Space. */
 const LISTED_WAIT_MS = 30_000;
 
+/** How long a step waits for the store of the keys. */
+const KEY_WAIT_MS = 5_000;
+
 export type HomeMembershipDeps = MergeDeps &
 	SplitDeps & {
 		record: MembershipRecord;
 		batches: Batches;
 		links: Pick<DeviceLinks, "get" | "add">;
-		hostLinks: Pick<HostLinks, "home" | "get" | "revoked">;
+		hostLinks: Pick<HostLinks, "home" | "get" | "list" | "revoked">;
 		keys: Pick<DeviceKeyStore, "delete">;
 		/** The copies of the Person's other Devices, which only the home Host gives. */
 		copies: DeviceCopiesPort;
@@ -36,6 +39,8 @@ export type HomeMembershipDeps = MergeDeps &
 		isNotPaired(error: unknown): boolean;
 		/** How long the merge on join waits for the Host's list. Default 30 s. */
 		listedWaitMs?: number;
+		/** How long a step waits for the store of the keys. Default 5 s. */
+		keyWaitMs?: number;
 	};
 
 /**
@@ -77,11 +82,25 @@ export function createHomeMembership(deps: HomeMembershipDeps) {
 	}
 
 	/**
+	 * Forgets a split that moved no row when its Host gave access back to the
+	 * same Person: there is nothing to leave. One that moved its rows ends.
+	 */
+	async function forgetSplit(): Promise<void> {
+		const started = await record.unfinished();
+		if (started?.step !== "split" || started.row.state !== "planned") return;
+		const link = await deps.hostLinks.get(started.row.hostId);
+		if (link?.revokedAt !== null || link.role !== "home") return;
+		if (link.personId !== started.row.hostPersonId) return;
+		await splits.forget(started.row);
+	}
+
+	/**
 	 * Splits Personal off once this computer left its Host, or goes on
 	 * with a split that stopped. Without a split, a merge that never moved
 	 * a row ends when its Host is gone: it cannot go on without it.
 	 */
 	async function settle(): Promise<SplitResult | null> {
+		await forgetSplit();
 		const started = await record.unfinished();
 		const split = await splits.splitOff(
 			started?.step === "split" ? started.row : null,
@@ -97,13 +116,46 @@ export function createHomeMembership(deps: HomeMembershipDeps) {
 	}
 
 	/**
+	 * Deletes the key of a Host without access. False: it stays. A Host that
+	 * gave access back has a new key, which stays too.
+	 */
+	async function dropKey(
+		hostId: string,
+		options?: { ownOnly: boolean },
+	): Promise<boolean> {
+		const dropped = attempted("the key of a Host stays", async () => {
+			const link = await deps.hostLinks.get(hostId);
+			if (link?.revokedAt === null) return;
+			await deps.keys.delete(hostId, options);
+		});
+		// A key store may wait for a person: nothing here waits with it.
+		let timer: ReturnType<typeof setTimeout> | undefined;
+		const late = new Promise<boolean>((resolve) => {
+			timer = setTimeout(() => resolve(false), deps.keyWaitMs ?? KEY_WAIT_MS);
+		});
+		return Promise.race([dropped, late]).finally(() => clearTimeout(timer));
+	}
+
+	/** The copies of the Person's other Devices go: the home Host gave them. */
+	function dropCopies(): Promise<boolean> {
+		return attempted("the copies of other Devices stay", () =>
+			deps.copies.keep([]),
+		);
+	}
+
+	/**
 	 * Merges Personal into the home Host's, or goes on with a merge that
-	 * stopped.
+	 * stopped. A leave of another Host ends first.
 	 */
 	function merge(
 		input: { join?: readonly string[] } = {},
 	): Promise<MergeResult> {
 		return exclusive(async () => {
+			await settle().catch((error) => {
+				if (!(error instanceof Refusal)) throw error;
+				// The words of a leave: this is a merge.
+				throw mergeHeld("leaving").refusal;
+			});
 			const started = await record.unfinished();
 			if (started?.step === "merge") return merges.resume(started.row);
 			return merges.start(input);
@@ -126,6 +178,9 @@ export function createHomeMembership(deps: HomeMembershipDeps) {
 			hostId: string,
 			signal?: AbortSignal,
 		): AsyncGenerator<JoinProgress> {
+			await attempted("the leave of a Host goes on", () =>
+				exclusive(settle, "wait"),
+			);
 			const end = timeNow() + (deps.listedWaitMs ?? LISTED_WAIT_MS);
 			while (timeNow() < end && !signal?.aborted) {
 				const link = deps.links.get(hostId);
@@ -168,31 +223,72 @@ export function createHomeMembership(deps: HomeMembershipDeps) {
 
 				const told = await tell(deps.links.get(link.hostId), deps.isNotPaired);
 				await deps.hostLinks.revoked(link.hostId);
-				await deps.keys.delete(link.hostId);
-				const left = await deps.hostLinks.get(link.hostId);
-				if (left) await deps.links.add(left);
-				await deps.copies.keep([]);
+				// From here on no step stops the next one. The link stops first: it
+				// gives the copies. The key is last: its store may wait for a person.
+				await attempted("the link of a Host goes on", async () => {
+					const left = await deps.hostLinks.get(link.hostId);
+					if (left) await deps.links.add(left);
+				});
+				await dropCopies();
 
 				let waiting: string | null = null;
+				let failed: { error: unknown } | null = null;
 				try {
 					await settle();
 				} catch (error) {
-					if (!(error instanceof Refusal)) throw error;
-					waiting = error.message;
+					if (error instanceof Refusal) waiting = error.message;
+					else failed = { error };
 				}
+				const keyKept = !(await dropKey(link.hostId));
+				if (failed) throw failed.error;
 				return {
 					host: { id: link.hostId, name: link.name },
 					told,
 					split: from === null ? null : await splits.of(from),
 					waiting,
+					keyKept,
 				};
 			}, "wait");
 		},
 
+		/**
+		 * A join saved the link of a Host, and it did not start yet: what an
+		 * earlier leave left ends first.
+		 */
+		async beforeJoin(): Promise<void> {
+			await attempted("the leave of a Host goes on", () =>
+				exclusive(settle, "wait"),
+			);
+		},
+
 		async revoked(link: { role: HostRole }): Promise<SplitResult | null> {
 			if (link.role !== "home") return null;
-			await deps.copies.keep([]);
+			await dropCopies();
 			return exclusive(settle, "wait");
+		},
+
+		/**
+		 * Once at start, before the links and before a join.
+		 *
+		 * - What a leave that stopped left here goes: the copies and the key of a
+		 *   Host without access. Not later: a join saves its new key first, then
+		 *   its link.
+		 * - A split that a join came before is forgotten.
+		 */
+		async beforeLinks(): Promise<void> {
+			await attempted("a split is not forgotten yet", forgetSplit);
+			const left = (await deps.hostLinks.list()).filter(
+				(link) => link.revokedAt !== null,
+			);
+			if (
+				left.some((link) => link.role === "home") &&
+				(await deps.hostLinks.home()) === null
+			) {
+				await dropCopies();
+			}
+			await Promise.all(
+				left.map((link) => dropKey(link.hostId, { ownOnly: true })),
+			);
 		},
 
 		keepFinishing(signal: AbortSignal, everyMs = 30_000): void {
@@ -208,6 +304,7 @@ export function createHomeMembership(deps: HomeMembershipDeps) {
 					if (started?.step === "merge" && started.row.state === "moved") {
 						await merges.resume(started.row);
 					}
+					if (!started) await merges.moveLate();
 				}, "wait").catch((error) => {
 					if (!(error instanceof Refusal)) {
 						console.error("[devices] Personal did not finish its move:", error);
@@ -228,6 +325,20 @@ export function createHomeMembership(deps: HomeMembershipDeps) {
 			);
 		},
 	};
+}
+
+/** Runs a step whose failure does not stop the next one. False: it failed. */
+async function attempted(
+	failure: string,
+	work: () => Promise<unknown>,
+): Promise<boolean> {
+	try {
+		await work();
+		return true;
+	} catch (error) {
+		console.error(`[devices] ${failure}:`, error);
+		return false;
+	}
 }
 
 /** Asks the Host to remove this computer's access. False: it did not. */

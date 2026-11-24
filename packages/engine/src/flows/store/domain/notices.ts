@@ -23,6 +23,15 @@ export type FlowNotice = {
 	message: string;
 };
 
+/** A notice as Night Shift adds it. */
+export type NewNotice = {
+	/** Why it exists: the Project moved by itself. */
+	kind: "project-moved";
+	message: string;
+	deviceId: string;
+	at: number;
+};
+
 /** The stored notices, by id, as a person reads them: oldest first. One this Night Shift cannot read is left out. */
 export function readableNotices(
 	stored: Iterable<[string, unknown]>,

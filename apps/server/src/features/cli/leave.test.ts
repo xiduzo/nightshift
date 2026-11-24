@@ -35,6 +35,7 @@ describe("nightshift leave", () => {
 					backup: "/data/copy.db",
 				},
 				waiting: null,
+				keyKept: false,
 			}),
 		).toEqual([
 			"This computer left studio.",
@@ -57,6 +58,7 @@ describe("nightshift leave", () => {
 					backup: "/data/copy.db",
 				},
 				waiting: null,
+				keyKept: false,
 			}),
 		).toContain(
 			"2 schedules ran on the Host. They are paused here. Turn them on to run them on this computer.",
@@ -70,10 +72,25 @@ describe("nightshift leave", () => {
 				told: false,
 				split: null,
 				waiting: null,
+				keyKept: false,
 			}),
 		).toEqual([
 			"This computer left studio. It did not answer. Remove this computer on its Devices page too.",
 			"Your Personal stays as it is.",
 		]);
+	});
+
+	test("a key that stays on this computer is said", () => {
+		expect(
+			leaveResultLines({
+				host: { id: "h", name: "studio" },
+				told: true,
+				split: null,
+				waiting: null,
+				keyKept: true,
+			}),
+		).toContain(
+			"The old key stays on this computer. Night Shift tries again when it starts.",
+		);
 	});
 });

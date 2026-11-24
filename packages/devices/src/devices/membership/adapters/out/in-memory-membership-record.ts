@@ -37,6 +37,11 @@ export function inMemoryMembershipRecord(): MembershipRecord & {
 				);
 				return latest && { ...latest };
 			},
+			async done() {
+				return mergesRows
+					.filter((row) => row.state === "pushed")
+					.map((row) => ({ ...row }));
+			},
 			async plan(input) {
 				const row: MergeRow = {
 					fromSpace: input.fromSpace,
@@ -47,6 +52,7 @@ export function inMemoryMembershipRecord(): MembershipRecord & {
 					projectMap: {},
 					personMap: {},
 					joined: [...input.joined],
+					late: null,
 					backup: input.backup,
 					createdAt: nextTime(),
 					updatedAt: nextTime(),
@@ -69,6 +75,17 @@ export function inMemoryMembershipRecord(): MembershipRecord & {
 					if (!row) return;
 					row.state = "moved";
 					row.updatedAt = nextTime();
+				});
+			},
+			late(fromSpace, input) {
+				return inMemoryBatch(() => {
+					const row = mergesRows.find((m) => m.fromSpace === fromSpace);
+					if (!row) return;
+					Object.assign(row, {
+						state: "moved",
+						late: { ...input },
+						updatedAt: nextTime(),
+					});
 				});
 			},
 			abandon() {
@@ -101,9 +118,22 @@ export function inMemoryMembershipRecord(): MembershipRecord & {
 					projects: [],
 					runs: 0,
 					unpinned: 0,
+					paused: [],
+					waiting: {},
 				};
 				splitsRows.push(row);
 				return { ...row };
+			},
+			async paused() {
+				return splitsRows
+					.filter((row) => row.state !== "planned")
+					.map((row) => ({ ...row }));
+			},
+			async forget(toSpace) {
+				const at = splitsRows.findIndex(
+					(s) => s.toSpace === toSpace && s.state === "planned",
+				);
+				if (at >= 0) splitsRows.splice(at, 1);
 			},
 			moved(toSpace, input) {
 				return inMemoryBatch(() => {
@@ -113,6 +143,8 @@ export function inMemoryMembershipRecord(): MembershipRecord & {
 					row.projects = [...input.projects];
 					row.runs = input.runs;
 					row.unpinned = input.unpinned;
+					row.paused = [...input.paused];
+					row.waiting = { ...input.waiting };
 				});
 			},
 			async done(toSpace) {

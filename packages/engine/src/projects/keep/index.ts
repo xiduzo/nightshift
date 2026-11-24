@@ -6,6 +6,7 @@ export type {
 	ProjectLog,
 	ProjectStore,
 	Repos,
+	SpaceHolds,
 	SpaceProjects,
 	ThisDevice,
 } from "./application/ports";
