@@ -257,7 +257,7 @@ async function listed(profile: string, sessionCap = 1) {
 /** A run's plan as the walk reads it: only its Person counts here. */
 function planBy(personId: string | null): PlacedRun["plan"] {
 	const device = { id: DEVICE.id, name: DEVICE.name };
-	return { device, named: {}, devices: { [device.id]: device }, personId };
+	return { device, devices: { [device.id]: device }, personId };
 }
 
 function request(overrides: Partial<WorkRequest> = {}): WorkRequest {

@@ -126,7 +126,7 @@ describe("the node walk of a run's plan", () => {
 		);
 		expect(planned.plan).toMatchObject({
 			device: { id: "studio", name: "studio" },
-			named: { "hetzner-1": { id: "hetzner-1", name: "hetzner-1" } },
+			devices: { "hetzner-1": { id: "hetzner-1", name: "hetzner-1" } },
 			personId: "the-person",
 		});
 		expect(planned.run.id).toBe("studio");
@@ -172,7 +172,7 @@ describe("the node walk of a run's plan", () => {
 			{ ...devices(), flows: async () => sources },
 			"the-person",
 		);
-		expect(planned.plan.named).toEqual({
+		expect(planned.plan.devices).toEqual({
 			"hetzner-1": { id: "hetzner-1", name: "hetzner-1" },
 			studio: { id: "studio", name: "studio" },
 			this: { id: "this", name: "this" },
@@ -246,7 +246,6 @@ describe("the node walk of a run's plan", () => {
 			devices(["here_only"]),
 			"the-person",
 		);
-		expect(planned.plan.named).toEqual({});
 		expect(planned.plan.devices).toEqual({
 			studio: { id: "studio", name: "studio" },
 			this: { id: "this", name: "this" },

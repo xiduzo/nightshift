@@ -51,7 +51,7 @@ export type PlacementDeps = {
 	takenOverSecrets(at: { host: boolean }): string;
 };
 
-/** The Device a node names, by its id, as the plan keys it. */
+/** The Device a node names, by its id. */
 function nodeDevice(node: FlowNode): string | undefined {
 	return "device" in node ? node.device : undefined;
 }
@@ -125,17 +125,9 @@ export function createPlacement(deps: PlacementDeps) {
 			const to = fallbackList(node, run.plan).find((f) => f.id === movedTo);
 			return onFallback(to ?? { id: movedTo, name: null }, run, row);
 		}
-		const ref = profileOf(node);
-		if (ref !== undefined) {
-			return forRun(deviceOf(ref.device, run), stepRun(row));
-		}
-		const { plan } = run;
-		const key = nodeDevice(node);
-		const at =
-			(key !== undefined
-				? (plan.named[key] ?? plan.devices[key])
-				: undefined) ?? plan.device;
-		return forRun(deviceOf(at.id, run, at.name ?? undefined), stepRun(row));
+		const id =
+			profileOf(node)?.device ?? nodeDevice(node) ?? run.plan.device.id;
+		return forRun(deviceOf(id, run), stepRun(row));
 	}
 
 	function deviceById(id: string, row: RunRow): Device {

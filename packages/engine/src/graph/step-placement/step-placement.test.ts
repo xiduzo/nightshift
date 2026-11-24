@@ -80,7 +80,6 @@ function row(fields: Partial<RunRow> = {}): RunRow {
 		projectId: PROJECT,
 		walkerId: A,
 		deviceId: B,
-		placements: JSON.stringify({ [H]: H }),
 		deviceNames: JSON.stringify({ [B]: "studio-b", [H]: "hetzner-1" }),
 		startedBy: "ada",
 		fallbacks: null,
@@ -152,7 +151,7 @@ describe("the Device of a step, from the plan alone", () => {
 		expect(
 			placement.deviceFor(
 				command("x"),
-				row({ deviceId: null, placements: null, deviceNames: null }),
+				row({ deviceId: null, deviceNames: null }),
 			).id,
 		).toBe(A);
 	});
@@ -170,7 +169,6 @@ describe("the Device of a step, from the plan alone", () => {
 			takenOverSecrets,
 		});
 		const twins = row({
-			placements: null,
 			deviceNames: JSON.stringify({
 				[B]: "studio-b",
 				"twin-a": "twin",

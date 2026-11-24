@@ -62,17 +62,12 @@ export const run = sqliteTable(
 		 * foreign key, like `walker_id`.
 		 */
 		deviceId: text("device_id"),
-		/**
-		 * JSON: the Devices the run's nodes name (their `device`), by name:
-		 * `{ "hetzner-1": "<device id>" }`, resolved when the run started. A
-		 * node without one runs on `device_id`. Null: no node names one.
-		 */
+		/** Not written and not read: the nodes name their Devices by id. */
 		placements: text("placements"),
 		/**
-		 * JSON: the names of the Devices of `device_id` and `placements`, by
-		 * id, as run start knew them: `{ "<device id>": "hetzner-1" }`. With
-		 * those two and `started_by` it is the run's plan, which the walk
-		 * reads. Null: a run from before the plan, or from a Device of a
+		 * JSON: the names of every Device of the plan, by id, as run start
+		 * knew them: `{ "<device id>": "hetzner-1" }`. With `device_id` and
+		 * `started_by` it is the run's plan, which the walk reads. Null: a run from before the plan, or from a Device of a
 		 * version before it.
 		 */
 		deviceNames: text("device_names"),

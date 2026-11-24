@@ -1132,7 +1132,6 @@ describe("nodes placed on Devices, with the Hand-off", () => {
 			.where(eq(runTable.id, started.id));
 		if (!row) throw new Error("No run row.");
 		const { plan } = placedRun(row);
-		expect(plan.named).toEqual({});
 		expect(plan.devices[B]).toEqual({ id: B, name: "studio-b" });
 	});
 });
@@ -1195,15 +1194,12 @@ describe("a run's plan", () => {
 		const row = await rowOf(started.id);
 		expect(placedRun(row).plan).toMatchObject({
 			device: { id: started.device.id, name: "test" },
-			named: { [B]: { id: B, name: "studio-b" } },
 			devices: {
 				[started.device.id]: { id: started.device.id, name: "test" },
 				[B]: { id: B, name: "studio-b" },
 			},
 			personId,
 		});
-		// The nodes name their Devices by id (ADR 14): so does `placements`.
-		expect(JSON.parse(row.placements ?? "{}")).toEqual({ [B]: B });
 		await space().act(started.id, { kind: "stop" });
 	});
 
@@ -1541,7 +1537,6 @@ describe("a Device of the plan, by id", () => {
 			projectId,
 			walkerId: a.deviceId,
 			deviceId: B,
-			placements: JSON.stringify({ "device-h": "device-h" }),
 			deviceNames: JSON.stringify({ [B]: "studio-b", "device-h": "hetzner-1" }),
 			startedBy: personId,
 			...fields,

@@ -129,9 +129,6 @@ export async function planRun<D, C>(
 		plan: {
 			...(chosen.fallbacks ? { fallbacks: chosen.fallbacks } : {}),
 			device: planned(run),
-			named: Object.fromEntries(
-				[...named].map(([id, at]) => [id, planned(at)]),
-			),
 			devices: Object.fromEntries(
 				[...offPlan, run, ...named.values(), ...byId.values()].map((at) => [
 					at.id,

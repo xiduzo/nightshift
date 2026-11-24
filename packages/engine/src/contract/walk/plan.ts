@@ -8,11 +8,9 @@ import { type FlowNode, type ProfileRef, profileOf } from "@nightshift/flows";
 export type RunPlan = {
 	/** The run's Device: its worktree, and the steps of every node that names no Device. */
 	device: PlannedDevice;
-	/** The Devices the nodes name (`device`), by their id. */
-	named: Record<string, PlannedDevice>;
 	/**
-	 * Every Device of the plan by its id: the run's, the named ones, and
-	 * the Devices of the profiles the nodes name (`ProfileRef.device`).
+	 * Every Device of the plan by its id: the run's, those the nodes name
+	 * (`device`), and the Devices of their profiles (`ProfileRef.device`).
 	 * A node with a profile runs on its profile's Device, by that id.
 	 */
 	devices: Record<string, PlannedDevice>;

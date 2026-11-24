@@ -32,35 +32,20 @@ function stringsOf(text: string | null): Record<string, string> {
 
 /**
  * The run's plan, from the columns of its row that keep it: `device_id`
- * (null before Placement: the Walker), `placements`, `device_names` and
- * `started_by`. A run from before the plan, or from a Device of a version
+ * (null before Placement: the Walker), `device_names` and `started_by`. A run from before the plan, or from a Device of a version
  * before it, has no names: the walk names its Devices as the nodes do.
  */
 export function planOf(
-	row: Pick<
-		RunRow,
-		"deviceId" | "walkerId" | "placements" | "deviceNames" | "startedBy"
-	> &
+	row: Pick<RunRow, "deviceId" | "walkerId" | "deviceNames" | "startedBy"> &
 		Partial<Pick<RunRow, "fallbacks">>,
 ): RunPlan {
 	const names = stringsOf(row.deviceNames);
 	const at = (id: string): PlannedDevice => ({ id, name: names[id] ?? null });
 	const device = at(row.deviceId ?? row.walkerId);
-	const named = Object.fromEntries(
-		Object.entries(stringsOf(row.placements)).map(([name, id]) => [
-			name,
-			at(id),
-		]),
-	);
 	return {
 		device,
-		named,
 		devices: Object.fromEntries(
-			[
-				device.id,
-				...Object.values(named).map((d) => d.id),
-				...Object.keys(names),
-			].map((id) => [id, at(id)]),
+			[device.id, ...Object.keys(names)].map((id) => [id, at(id)]),
 		),
 		personId: row.startedBy,
 		...(row.fallbacks
@@ -93,32 +78,18 @@ export function placedRun(row: RunRow): PlacedRun {
 }
 
 /**
- * The columns of a run's row that keep its plan. `placements`
- * holds the Devices the nodes name, each id to itself.
- * `device_names` keeps the name of every Device of the plan, by its id.
+ * The columns of a run's row that keep its plan. `device_names` keeps the name of every Device of the plan, by its id.
  */
 export function planColumns(
 	plan: RunPlan,
-): Pick<
-	RunRow,
-	"deviceId" | "placements" | "deviceNames" | "startedBy" | "fallbacks"
-> {
-	const named = Object.entries(plan.named);
+): Pick<RunRow, "deviceId" | "deviceNames" | "startedBy" | "fallbacks"> {
 	const names = Object.fromEntries(
-		[
-			plan.device,
-			...named.map(([, at]) => at),
-			...Object.values(plan.devices),
-		].flatMap((at) => (at.name === null ? [] : [[at.id, at.name]])),
+		[plan.device, ...Object.values(plan.devices)].flatMap((at) =>
+			at.name === null ? [] : [[at.id, at.name]],
+		),
 	);
 	return {
 		deviceId: plan.device.id,
-		placements:
-			named.length > 0
-				? JSON.stringify(
-						Object.fromEntries(named.map(([name, at]) => [name, at.id])),
-					)
-				: null,
 		deviceNames: Object.keys(names).length > 0 ? JSON.stringify(names) : null,
 		startedBy: plan.personId,
 		fallbacks: plan.fallbacks ? JSON.stringify(plan.fallbacks) : null,

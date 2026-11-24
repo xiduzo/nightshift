@@ -50,7 +50,6 @@ function newRun(id: string, spaceId: string): NewRun {
 		walkerId: "walker",
 		plan: {
 			device: laptop,
-			named: {},
 			devices: { laptop },
 			personId: "person-ada",
 		},

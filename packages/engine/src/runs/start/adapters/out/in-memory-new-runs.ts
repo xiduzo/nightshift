@@ -58,6 +58,7 @@ export function inMemoryNewRuns() {
 				baseRef: run.baseRef,
 				walkerId: run.walkerId,
 				createdAt: asDate(0),
+				placements: null,
 				...planColumns(run.plan),
 			};
 			const started = {

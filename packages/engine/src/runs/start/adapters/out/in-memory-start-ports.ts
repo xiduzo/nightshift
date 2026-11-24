@@ -162,7 +162,6 @@ export function plannedOn(
 	return {
 		plan: {
 			device: planned,
-			named: {},
 			devices: { [device.id]: planned },
 			personId:
 				options.personId === undefined ? "person-ada" : options.personId,
