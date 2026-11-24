@@ -123,13 +123,13 @@ describe("a step in a run folder", () => {
 		}
 	});
 
-	test("a Device that makes no run folder fails the step and says to update it", async () => {
+	test("a Device that makes no run folder fails the step and says so", async () => {
 		const h = await startRun(sandbox, FLOW, { runFolder: true });
 		h.ctx.placement = placementOn(() => testDevice({ harnesses: {} }));
 		const { state } = await drive(h, { inputs: {} });
 		expect(state.ended).toBeNull();
 		expect(payloads(await h.events(), "StepEnded")[0]?.error).toBe(
-			"test could not make the run's folder. Update Night Shift on test to run projects without a folder.",
+			"test could not make the run's folder. test cannot run projects without a folder.",
 		);
 	});
 });

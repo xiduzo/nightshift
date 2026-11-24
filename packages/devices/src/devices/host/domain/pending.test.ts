@@ -18,6 +18,7 @@ describe("pending pairings", () => {
 			deviceId: "a",
 			name: "A",
 			platform: "darwin",
+			home: true,
 			userCode: "AAAA",
 			expiresAt: 10,
 		});
@@ -25,6 +26,7 @@ describe("pending pairings", () => {
 			deviceId: "b",
 			name: "B",
 			platform: "darwin",
+			home: true,
 			userCode: "BBBB",
 			expiresAt: 5,
 		});

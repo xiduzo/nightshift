@@ -16,12 +16,11 @@ export type HostCalls = {
 	/**
 	 * One call of a Host over its link, within `deadlineMs`. A Host without
 	 * a link here, or one that does not answer in time, throws
-	 * `HostUnreachableError`: a step then reads the secret as missing. A
-	 * Host of a version without the call says `olderHost`.
+	 * `HostUnreachableError`: a step then reads the secret as missing.
 	 */
 	ask<T>(
 		hostId: string,
 		onHost: (client: HostClient) => Promise<T>,
-		options: { deadlineMs: number; olderHost: string },
+		options: { deadlineMs: number },
 	): Promise<T>;
 };

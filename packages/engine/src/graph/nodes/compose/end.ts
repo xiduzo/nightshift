@@ -14,7 +14,6 @@ import {
 	type NodeAction,
 	type NodeKind,
 	PLAIN_KIND,
-	type Requirement,
 	type StepContext,
 } from "../../context";
 import {
@@ -192,9 +191,6 @@ async function readReport(
 		.join("/");
 	if (relative === "") return { kind: "empty" };
 	const { device } = step;
-	if (!device.readFile) {
-		return { kind: "refused", message: olderDevice(device.name) };
-	}
 	try {
 		return await device.readFile({
 			cwd: step.worktree,
@@ -242,11 +238,6 @@ function unreadable(why: Unreadable, path: string, device: string): string {
 	}
 }
 
-/** Why a Device of an older Night Shift reads no report file. */
-function olderDevice(name: string): string {
-	return `${name} runs an older version of Night Shift. Update Night Shift on ${name}.`;
-}
-
 /** The rendered message of an ended End step, or null when it has none. */
 function messageOf(outputs: StepOutputs): string | null {
 	return typeof outputs.message === "string" && outputs.message !== ""
@@ -265,14 +256,6 @@ function reportTextOf(outputs: StepOutputs): string | null {
 function readsFile(node: EndNode): boolean {
 	return node.report?.kind === "file";
 }
-
-/** A Device of an older Night Shift reads no report file. */
-const readsReportFiles: Requirement<EndNode> = (nodes, has) => {
-	const reading = nodes.filter(readsFile);
-	if (reading.length === 0 || has.readFiles) return null;
-	const where = has.elsewhere ?? "this computer";
-	return `The flow ends with a report from a file (${reading.map((n) => n.id).join(", ")}), but ${olderDevice(where)}`;
-};
 
 /**
  * The End kind. Every status is a chosen end: the run's result is the
@@ -293,5 +276,4 @@ export const END: NodeKind<EndNode> = {
 	endReason: (_node, _outcome, outputs) => messageOf(outputs),
 	endResult: (node) => node.status satisfies RunResult,
 	endReport: (_node, outputs) => reportTextOf(outputs),
-	requirements: [readsReportFiles],
 };

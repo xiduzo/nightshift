@@ -81,9 +81,7 @@ export const redeemPairing =
 			key,
 			personId: answer.personId,
 			deviceId: paired.id,
-			...(adopted
-				? { walkerSeq: await ports.registry.lastWalkerSeq(adopted.id) }
-				: {}),
+			walkerSeq: await ports.registry.lastWalkerSeq(paired.id),
 			host: {
 				id: ports.self.id,
 				name: ports.self.name,

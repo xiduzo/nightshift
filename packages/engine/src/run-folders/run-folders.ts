@@ -42,12 +42,9 @@ export type RunFolderList = {
 /** Why a path is not one of a file of the run's folder. */
 export const NOT_A_RUN_FILE = "That is not a file of this run.";
 
-/**
- * Why a Device makes no run folder: it runs an older Night Shift, which
- * does not know the call (or a test's Device, which has none).
- */
+/** Why a Device makes no run folder. */
 export function noRunFolders(deviceName: string): string {
-	return `Update Night Shift on ${deviceName} to run projects without a folder.`;
+	return `${deviceName} cannot run projects without a folder.`;
 }
 
 /** A run id as a folder name: no separator, no `..`. */

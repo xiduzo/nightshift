@@ -4,12 +4,11 @@ import { ORPCError } from "@orpc/server";
 
 /**
  * The error a Device gets for `error`, thrown by the procedure at `path`,
- * in the codes older Devices know:
+ * in the codes of the contract:
  * - An ORPCError passes on as it is.
  * - A HostUnreachableError is HOST_UNREACHABLE (503).
  * - Any other Refusal is a BAD_REQUEST with its words and its kind
- *   beside them, a not-found included: an older Device reads every
- *   refusal so, a FORBIDDEN or an UNAUTHORIZED only ever means the key,
+ *   beside them, a not-found included. A FORBIDDEN or an UNAUTHORIZED only ever means the key,
  *   and a NOT_FOUND means a Host too old to serve the procedure.
  * - Any other error is a failure: INTERNAL_SERVER_ERROR with plain
  *   words, and the details go to the Host's log.

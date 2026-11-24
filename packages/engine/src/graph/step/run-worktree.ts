@@ -167,8 +167,7 @@ function restoredWarning(
  * gone (`Device.restoreWorktree`): the cleanup removes the copy a day
  * after the run ended, and a resume or a rerun needs it back. The cleanup
  * never touches a run that goes on, so each drive asks each Device once.
- * The run warns where the copy came from (`RunWarned`, `base-ref`). A
- * Device without the call (an older Night Shift) keeps its copy as is.
+ * The run warns where the copy came from (`RunWarned`, `base-ref`).
  */
 export async function restoreRunCopy(
 	ctx: StepContext,
@@ -176,7 +175,6 @@ export async function restoreRunCopy(
 	cwd: string,
 	runState: RunState,
 ): Promise<RestoredCopy> {
-	if (!at.restoreWorktree) return THERE;
 	const signal = ctx.signal();
 	const there = found.get(signal) ?? new Set<string>();
 	found.set(signal, there);
@@ -205,7 +203,7 @@ async function restore(
 	let restored: RestoredWorktree | null;
 	try {
 		restored =
-			(await at.restoreWorktree?.({
+			(await at.restoreWorktree({
 				run: {
 					id: row.id,
 					projectId: row.projectId,

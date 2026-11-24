@@ -1,6 +1,5 @@
 import { Refusal } from "@nightshift/refusal";
 import type { OwnDevice } from "../../../../contract";
-import { UNADVERTISED_FLOW_VERSION } from "../../../../graph";
 import type { MoveDevices } from "../../application/ports";
 
 /** A Device as the twin keeps it: whose it is, and what it says it walks. */
@@ -57,7 +56,7 @@ export function inMemoryMoveDevices() {
 		async capabilities(target: { id: string; name: string }) {
 			const device = devices.get(target.id);
 			return {
-				flowVersion: device?.flowVersion ?? UNADVERTISED_FLOW_VERSION,
+				flowVersion: device?.flowVersion ?? 0,
 				testRuns: device?.testRuns === true,
 			};
 		},

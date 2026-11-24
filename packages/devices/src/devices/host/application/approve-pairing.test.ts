@@ -10,6 +10,7 @@ describe("approvePairing", () => {
 			deviceId: "laptop",
 			name: "LE2316",
 			platform: "darwin",
+			home: true,
 		});
 		await approvePairing(p)({
 			headers: new Headers(),

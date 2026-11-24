@@ -67,7 +67,7 @@ describe("the error a person gets for a Host's error", () => {
 		).toMatchObject({ kind: "invalid" });
 	});
 
-	test("a procedure the Host does not know is a Host of an older version: the caller's words, or the one sentence", () => {
+	test("a procedure the Host does not know is a Host of an older version: the one sentence", () => {
 		for (const error of [
 			new ORPCError("NOT_FOUND", { message: "Not found" }),
 			// A route the Host does not serve: its server's own 404, no code.
@@ -77,10 +77,8 @@ describe("the error a person gets for a Host's error", () => {
 			expect(older).toBeInstanceOf(OlderHostError);
 			expect(older).toMatchObject({
 				kind: "unavailable",
-				message: new OlderHostError().message,
-			});
-			expect(fromHost(error, "Update it to use leases.")).toMatchObject({
-				message: "Update it to use leases.",
+				message:
+					"This Host runs an older version of Night Shift. Update Night Shift there.",
 			});
 		}
 	});
@@ -238,22 +236,14 @@ describe("one call on the Host, within its deadline", () => {
 		expect(signal?.aborted).toBe(false);
 	});
 
-	test("a Host of an older version says the caller's words for the procedure", async () => {
-		const older = () => Promise.reject(new OlderHostError());
-		const said = await hostCall(client, older, {
-			olderHost: "Update it to use leases.",
-		}).catch((error: unknown) => error);
-		expect(said).toBeInstanceOf(OlderHostError);
-		expect(said).toMatchObject({ message: "Update it to use leases." });
-		// Without words of its own, the Link's: as they came.
-		const thrown = new OlderHostError();
-		await expect(hostCall(client, () => Promise.reject(thrown))).rejects.toBe(
-			thrown,
-		);
-		// Any other error passes as it is.
-		const refused = new Refusal("forbidden", "Your role…");
-		await expect(
-			hostCall(client, () => Promise.reject(refused), { olderHost: "Update." }),
-		).rejects.toBe(refused);
+	test("the call's own error passes as it is", async () => {
+		for (const thrown of [
+			new OlderHostError(),
+			new Refusal("forbidden", "Your role…"),
+		]) {
+			await expect(hostCall(client, () => Promise.reject(thrown))).rejects.toBe(
+				thrown,
+			);
+		}
 	});
 });

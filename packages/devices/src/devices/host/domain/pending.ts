@@ -11,8 +11,8 @@ export type Pending = {
 	deviceId: string;
 	name: string;
 	platform: string;
-	/** It asks this Host to be its home Host. Undefined: an older Device did not say. */
-	home?: boolean;
+	/** It asks this Host to be its home Host. */
+	home: boolean;
 	/** The fingerprint of its computer (ADR 20). Undefined: it did not say. */
 	machine?: string;
 	userCode: string;

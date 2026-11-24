@@ -4,7 +4,6 @@ import {
 	atKeeper,
 	type NamedSecret,
 	namedSecrets,
-	OLDER_HOST_PROJECT_SECRETS,
 	type ProjectAt,
 	projectAccess,
 	settersOf,
@@ -60,7 +59,6 @@ export const listProjectSecrets =
 			(hostId) =>
 				ports.calls.ask(hostId, (client) => client.projectSecrets.list(at), {
 					deadlineMs: ports.deadlineMs,
-					olderHost: OLDER_HOST_PROJECT_SECRETS,
 				}),
 		);
 	};

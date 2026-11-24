@@ -80,26 +80,12 @@ const ownDeviceSchema = exact<OwnDevice>()(
 
 /** The procedures of `hostContract.sync`. */
 export const syncProcedures = {
-	pull: sync
-		.route({
-			summary:
-				"Gives a paired Device the rows of other Walkers after its cursors, and its commands.",
-		})
-		.input(z.object({ cursors: syncCursorsSchema }))
-		.output(described(syncBatchSchema)),
 	stream: sync
 		.route({
 			summary:
 				"Streams the rows of other Walkers after a Device's cursors, then each new batch.",
 		})
-		.input(
-			z.object({
-				cursors: syncCursorsSchema,
-				// False: the Device takes its Commands from `sync.commands`, so
-				// they never wait behind rows. An older Device sends none.
-				commands: z.boolean().optional(),
-			}),
-		)
+		.input(z.object({ cursors: syncCursorsSchema }))
 		.output(describedStream(syncBatchSchema)),
 	/** The Device's own rows: runs it walks, in Spaces its owner is in. */
 	push: sync
@@ -128,8 +114,8 @@ export const syncProcedures = {
 		.output(described(z.void())),
 	/**
 	 * The Commands for the runs the Device walks, on their own stream:
-	 * the whole set, then again each time it changes. An older Host has
-	 * none: its Commands come with the rows.
+	 * the whole set, then again each time it changes. They never wait
+	 * behind rows.
 	 */
 	commands: sync
 		.route({
@@ -141,8 +127,7 @@ export const syncProcedures = {
 	/**
 	 * The Commands that wait for other Devices, in the Spaces of the
 	 * key's Person: the whole set, then again each time it changes. The
-	 * Device shows an action on its way until its Walker applies it. An
-	 * older Host has none: the Device knows only its own.
+	 * Device shows an action on its way until its Walker applies it.
 	 */
 	pending: sync
 		.route({
@@ -161,8 +146,7 @@ export const syncProcedures = {
 	/**
 	 * Starts a test run (ADR 27) placed on another Device, for the key's
 	 * Person: this Host walks it, and reads the pinned outputs from its
-	 * own log. Its own procedure, so an older Host refuses it instead
-	 * of dropping the pins and skips: the Device says to update it.
+	 * own log.
 	 */
 	startTest: sync
 		.route({
@@ -189,8 +173,7 @@ export const syncProcedures = {
 			offerRefSchema.extend({
 				...offerCapsSchema.shape,
 				deviceName,
-				// Optional: a Device from before profile ids sends none.
-				profileName: nameSchema.optional(),
+				profileName: nameSchema,
 			}),
 		)
 		.output(described(z.void())),
@@ -227,7 +210,7 @@ export const syncProcedures = {
 	/**
 	 * A Person on the Device adds a Project without a folder to a Space
 	 * here (ADR 22): this Host defines it. Each call adds another
-	 * Project. An older Host has none: the Device says to update it.
+	 * Project.
 	 */
 	addWithoutFolder: sync
 		.route({
@@ -259,8 +242,7 @@ export const syncProcedures = {
 	 * The Device's Clones in a Space here are exactly these Projects: a
 	 * Clone the Host missed is added, one the Device no longer has goes.
 	 * The Device says it each time its link comes online; saying it again
-	 * changes nothing. An older Host has none: its `addClone` stays the
-	 * only way in.
+	 * changes nothing.
 	 */
 	setClones: sync
 		.route({
@@ -272,7 +254,8 @@ export const syncProcedures = {
 				spaceId: z.string().min(1),
 				projectIds: z.array(z.string().min(1)).max(1000),
 				deviceName,
-				dev: z.boolean().optional(),
+				/** It is a development install (ADR 17). */
+				dev: z.boolean(),
 				/** The fingerprint of its computer (ADR 20). Only to a home Host. */
 				machine: machineFingerprintSchema.optional(),
 			}),
@@ -289,8 +272,7 @@ export const syncProcedures = {
 	 * Takes the Projects of a home Device's own personal Space into the
 	 * key's Person's personal Space here (ADR 1): each by its remote, a
 	 * Project here with the same remote takes its place. Runs again
-	 * with the same answer. `dryRun` changes nothing. An older Host has
-	 * none: the Device keeps its own personal Space.
+	 * with the same answer. `dryRun` changes nothing.
 	 */
 	mergePersonal: sync
 		.route({
@@ -304,7 +286,6 @@ export const syncProcedures = {
 	 * this Host keeps: the Device gives its own rows the Host lacks, and
 	 * gets the rows of its Person's Spaces after its cursors. A row is
 	 * one answer by its key, so a call that comes again changes nothing.
-	 * An older Host has none: the rows wait on the Device.
 	 */
 	answerCosts: sync
 		.route({

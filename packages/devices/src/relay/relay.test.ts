@@ -11,21 +11,11 @@ import {
 import { createSandbox, waitFor } from "@nightshift/engine/testing";
 import { Refusal } from "@nightshift/refusal";
 import { ORPCError } from "@orpc/client";
-import type {
-	HostClient,
-	HostHello,
-	WorkReply,
-	WorkRequest,
-} from "../contract";
+import type { HostClient, WorkReply, WorkRequest } from "../contract";
 import type { DeviceLinks } from "../links";
 import { hostCall, NOT_PAIRED, translated } from "../links/from-host";
 import { pairedReplicas } from "../testing";
-import {
-	createRelay,
-	OLDER_HOST_NO_FOLDER,
-	OLDER_HOST_PROJECTS,
-	OLDER_HOST_TEST_RUN,
-} from "./relay";
+import { createRelay } from "./relay";
 import { createSpaceRoutes } from "./route";
 import { createWorkRelay } from "./work-relay";
 
@@ -149,8 +139,6 @@ type InStepFake = {
 function fakeLinks(
 	clients: Record<string, HostClient | null>,
 	inStep: InStepFake = { answer: async () => true, asked: [] },
-	/** What each Host said of itself last. Default: nothing yet. */
-	hellos: Record<string, Partial<HostHello>> = {},
 ): Pick<DeviceLinks, "get"> {
 	return {
 		get(hostId) {
@@ -165,7 +153,6 @@ function fakeLinks(
 					since: 0,
 				}),
 				client: () => client,
-				hello: () => (client ? ((hellos[hostId] as HostHello) ?? null) : null),
 				// The relays read `client()` only.
 				stream: () => () => {},
 				call: (use, options) =>
@@ -533,25 +520,7 @@ describe("the relay, for a Space a Host keeps", () => {
 		expect(sent).toEqual([]);
 	});
 
-	test("a Host of an older version, which cannot add a project, says to update it", async () => {
-		const host = fakeHost();
-		// The Link says so for a Host that does not know the procedure.
-		Object.assign(host.client.sync, {
-			addProject: async () => {
-				throw new OlderHostError();
-			},
-		});
-		const { relay } = relayWith(host);
-		await expect(
-			relay.addProject({
-				spaceId: "space-team",
-				name: "app",
-				remote: "github.com/acme/app",
-			}),
-		).rejects.toThrow(OLDER_HOST_PROJECTS);
-	});
-
-	test("a project without a folder goes to the Host, and an older Host says to update it", async () => {
+	test("a project without a folder goes to the Host", async () => {
 		const host = fakeHost();
 		const { relay } = relayWith(host);
 		expect(
@@ -563,16 +532,6 @@ describe("the relay, for a Space a Host keeps", () => {
 				input: { spaceId: "space-team", name: "Leads" },
 			},
 		]);
-
-		// The Link says so for a Host that does not know the procedure.
-		Object.assign(host.client.sync, {
-			addWithoutFolder: async () => {
-				throw new OlderHostError();
-			},
-		});
-		await expect(
-			relay.addWithoutFolder({ spaceId: "space-team", name: "Leads" }),
-		).rejects.toThrow(OLDER_HOST_NO_FOLDER);
 	});
 
 	test("a Host of an older version, which does not know the knowledge procedures, says so: not a failed sync", async () => {
@@ -590,7 +549,6 @@ describe("the relay, for a Space a Host keeps", () => {
 		for (const call of [act.contentPut, act.contentGet]) {
 			const older = await call().catch((error: unknown) => error);
 			expect(older).toBeInstanceOf(OlderHostError);
-			// The engine's own words for knowledge it cannot share yet.
 			expect(older).toMatchObject({ message: OLDER_HOST });
 		}
 
@@ -657,7 +615,7 @@ describe("the relay, for a Space a Host keeps", () => {
 			} as never)
 			.catch((error: unknown) => error);
 		expect(older).toBeInstanceOf(OlderHostError);
-		expect(older).toMatchObject({ message: OLDER_HOST_TEST_RUN });
+		expect(older).toMatchObject({ message: OLDER_HOST });
 		// Its plain start, which would run every node for real, was never asked.
 		expect(host.taken).toEqual([]);
 	});
@@ -720,7 +678,6 @@ const request = (spaceId: string): WorkRequest => ({
 
 function workRelayWith(
 	host: { client: HostClient; taken: Taken[] } = fakeHost(),
-	hello: Partial<HostHello> = {},
 ) {
 	const hubCalls: string[] = [];
 	const relay = createWorkRelay({
@@ -732,10 +689,7 @@ function workRelayWith(
 			online: (deviceId) => deviceId === "device-here",
 		},
 		engine: () => ({ hostSpaces }),
-		links: () =>
-			fakeLinks({ "host-1": host.client, "host-3": null }, undefined, {
-				"host-1": hello,
-			}),
+		links: () => fakeLinks({ "host-1": host.client, "host-3": null }),
 	});
 	return { relay, host, hubCalls };
 }
@@ -919,9 +873,9 @@ describe("the work relay", () => {
 		).toEqual([]);
 	});
 
-	test("a stop through a Host whose hello says stopWaits: the call names a stopId, the stop goes to the Host, and the replies come until the Device ends the call", async () => {
+	test("a stop through a Host: the call names a stopId, the stop goes to the Host, and the replies come until the Device ends the call", async () => {
 		const host = stoppingHost();
-		const { relay } = workRelayWith(host, { stopWaits: true });
+		const { relay } = workRelayWith(host);
 		const call = readCall(relay);
 		await waitFor(() => call.replies.length === 1, {
 			label: "the first reply",
@@ -949,27 +903,9 @@ describe("the work relay", () => {
 		]);
 	});
 
-	test("a stop through a Host of an older version closes the stream, as before: no stopId goes", async () => {
-		const host = stoppingHost();
-		const { relay } = workRelayWith(host);
-		const call = readCall(relay);
-		await waitFor(() => call.replies.length === 1, {
-			label: "the first reply",
-		});
-		call.stop.abort();
-		await call.reading;
-		expect(call.replies).toEqual([{ kind: "item", item: "ready" }]);
-		expect(host.taken).toEqual([
-			{
-				procedure: "devices.call",
-				input: { deviceId: "device-b", request: request("space-team") },
-			},
-		]);
-	});
-
 	test("a stop the Host does not know closes the stream", async () => {
 		const host = stoppingHost(false);
-		const { relay } = workRelayWith(host, { stopWaits: true });
+		const { relay } = workRelayWith(host);
 		const call = readCall(relay);
 		await waitFor(() => call.replies.length === 1, {
 			label: "the first reply",

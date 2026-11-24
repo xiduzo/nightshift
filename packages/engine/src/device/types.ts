@@ -10,7 +10,6 @@ import type {
 } from "@nightshift/agents/types";
 import type {
 	AnswerFile,
-	FlowSources,
 	JsonValue,
 	ModelAddress,
 	ModelPick,
@@ -48,13 +47,6 @@ export type Device = {
 	/** What a run start checks before it writes anything. */
 	capabilities(query?: CapabilityQuery): Promise<Capabilities>;
 	/**
-	 * The project's flows on this Device, unparsed: its flow document. A
-	 * run starts from the flow document of its Walker (`PlanDevices.flows`):
-	 * this answers a Walker of an older Night Shift that asks over the
-	 * wire. It goes one release after ADR 2.
-	 */
-	flows(projectId: string): Promise<FlowSources>;
-	/**
 	 * One harness session. The first item says whether the session can
 	 * start: `refused` (the stream ends there) or `ready`; the harness
 	 * starts when the next item is read, so a caller records the session
@@ -75,8 +67,7 @@ export type Device = {
 	 * One HTTP request from this Device (a Web request node, a Wait for a
 	 * URL): the Device fills the secret parts, checks every address it
 	 * reaches, follows redirects and keeps at most `maxBytes` of the
-	 * answer. Never throws. A Device of an older Night Shift has no
-	 * `requests` capability and cannot read the call.
+	 * answer. Never throws.
 	 */
 	request(input: WebRequestInput): Promise<WebRequestResult>;
 	/**
@@ -84,11 +75,9 @@ export type Device = {
 	 * folder or its copy of the project on this Device (an End node's
 	 * report from a file). Only a regular file inside that folder, never
 	 * through a link or in `.git`. A file problem is a result, not an
-	 * error. Absent: this Device reads no files (a test's). A Device of an
-	 * older Night Shift has no `readFiles` capability and cannot read the
-	 * call.
+	 * error.
 	 */
-	readFile?(input: ReadFileInput): Promise<ReadFileResult>;
+	readFile(input: ReadFileInput): Promise<ReadFileResult>;
 	/**
 	 * Asks the decider: a label for a Decision, data for a Value. Never
 	 * throws: a failure is `kind: "error"`.
@@ -106,19 +95,16 @@ export type Device = {
 	 * folder `cwd` (where the run's log says it is) is gone: the cleanup
 	 * removed it a day after the run ended. From its branch here, the work
 	 * the cleanup kept, its branch on origin, or `run.baseRef`, the commit
-	 * it started from. Null when `cwd` is there: nothing changes. Absent,
-	 * or null from a Device of an older Night Shift: the step works as
-	 * before.
+	 * it started from. Null when `cwd` is there: nothing changes.
 	 */
-	restoreWorktree?(input: {
+	restoreWorktree(input: {
 		run: RunRef;
 		cwd: string;
 	}): Promise<RestoredWorktree | null>;
 	/**
 	 * The run's own folder on this Device, made when it is not there: a run
 	 * of a project without a folder works in it (ADR 22). It has no git, so
-	 * no branch and no base. Absent: this Device cannot run such a project
-	 * (a test's). A Device of an older Night Shift refuses the call.
+	 * no branch and no base. Absent: this Device cannot run such a project.
 	 */
 	runFolder?(run: RunRef): Promise<RunFolder>;
 	/**
@@ -158,9 +144,7 @@ export type Device = {
 	 * staged, what is not, and the new files git does not ignore, as the id
 	 * of a git tree. Nothing in the worktree, its index or its branch
 	 * changes. Refuses a worktree with too many new files. Absent: this
-	 * Device does not tell what a step changed (a test's), and a step shows
-	 * only its agent's own edits. A Device of an older Night Shift refuses
-	 * the call.
+	 * Device takes no snapshots, and a step shows only its agent's own edits.
 	 */
 	snapshotWorktree?(input: {
 		cwd: string;
@@ -211,24 +195,16 @@ export type Capabilities = {
 	/**
 	 * Whether the server at each asked address answers, by `addressKey`:
 	 * null when it does, else why not. Absent: the Device did not check
-	 * (no decider, or an older Night Shift).
+	 * (no decider).
 	 */
 	addresses?: Record<string, string | null>;
-	/** It sends web requests (`Device.request`). Absent: an older Night Shift. */
-	requests?: true;
-	/** It reads a file the run wrote (`Device.readFile`). Absent: an older Night Shift. */
-	readFiles?: true;
-	/**
-	 * The newest flow format the Device reads (`FLOW_VERSION`). Absent: an
-	 * older Night Shift, which reads format 8 at most.
-	 */
-	flowVersion?: number;
+	/** The newest flow format the Device reads (`FLOW_VERSION`). */
+	flowVersion: number;
 	/**
 	 * It walks a test run (ADR 27): its pinned and skipped nodes stand in
-	 * and do not run. Absent: an older Night Shift, which would run every
-	 * node for real, so no test run moves there.
+	 * and do not run. No test run moves to a Device that does not say so.
 	 */
-	testRuns?: true;
+	testRuns: true;
 };
 
 /** A Model Profile's address to check, with the decider that asks it. */
@@ -367,14 +343,12 @@ export type ExecInput = {
 	/**
 	 * The step the command runs for (a Command step): it gets a new, empty
 	 * folder in `NS_ARTIFACTS`, and the files it puts there become artifacts
-	 * of that step when it exits. The Device that runs it keeps them. A
-	 * Device of an older Night Shift gives no folder.
+	 * of that step when it exits. The Device that runs it keeps them.
 	 */
 	artifacts?: { runId: string; stepId: string };
 	/**
 	 * Yields a `started` event with the process id first (a service, ADR 9):
-	 * its process group has the same id. A Device of an older Night Shift
-	 * sends none.
+	 * its process group has the same id.
 	 */
 	pid?: boolean;
 	/**
@@ -551,8 +525,8 @@ export type Worktree = {
 	/**
 	 * Why the run does not start from the newest commit of its base branch:
 	 * the fetch failed, or the branch here went apart from the remote's. The
-	 * run logs it as a warning (`RunWarned`, `base-ref`). Absent from an
-	 * older Device, and when the run starts from the newest commit.
+	 * run logs it as a warning (`RunWarned`, `base-ref`). Absent when the
+	 * run starts from the newest commit.
 	 */
 	warning?: string;
 };

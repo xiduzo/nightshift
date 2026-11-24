@@ -21,9 +21,6 @@ const NOT_A_RUN_CALL = "This device moves its secrets only for its owner.";
 /** The words of a snapshot call on a Device that takes none. */
 const NO_SNAPSHOTS = "This device does not tell what a step changed.";
 
-/** The words of a file call on a Device that reads none. */
-const NO_FILES = "This device does not read the files of a run.";
-
 /**
  * Serves one call on this computer's Device, as the placed Device does
  * for a Walker elsewhere: after its own checks (the caller's), the local
@@ -55,16 +52,12 @@ export async function* serveWork(
 			case "capabilities":
 				yield result(await device.capabilities(call.query));
 				return;
-			case "flows":
-				yield result(await device.flows(request.projectId));
-				return;
 			case "worktree":
 				yield result(await device.worktree(call.run));
 				return;
 			case "restoreWorktree":
 				yield result(
-					(await device.restoreWorktree?.({ run: call.run, cwd: call.cwd })) ??
-						null,
+					await device.restoreWorktree({ run: call.run, cwd: call.cwd }),
 				);
 				return;
 			case "runFolder":
@@ -150,7 +143,6 @@ export async function* serveWork(
 				);
 				return;
 			case "readFile":
-				if (!device.readFile) throw new Refusal("conflict", NO_FILES);
 				yield result(await device.readFile({ ...call.input, signal }));
 				return;
 			case "decide":

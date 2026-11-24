@@ -241,30 +241,26 @@ describe("another Person's run on the computer that walks it", () => {
 		).map((row) => parseEventRow(row).payload);
 	}
 
-	test("a node may name this computer only when its profile is offered, and the Person may use Offers", async () => {
+	test("a node without an offered profile may name this computer only for its owner", async () => {
 		await offer();
 		const { id: projectId } = await engine
 			.space(sandbox.spaceId, NIGHT_SHIFT)
 			.addProject({ repoPath: sandbox.repoPath });
-		const names = async (personId: string, forNode?: { profile?: string }) =>
+		const names = async (personId: string, ownOnly?: boolean) =>
 			(
 				await engine
 					.space(sandbox.spaceId, { personId, door: "session" })
-					.listDevices(projectId, forNode)
+					.listDevices(projectId, ownOnly)
 			).map((d) => [d.name, d.offers]);
-		expect(await names(carol, { profile: "coder" })).toEqual([
-			["test", ["coder"]],
-		]);
-		// Another profile, and a node with none (a Command): not here.
-		expect(await names(carol, { profile: "reviewer" })).toEqual([]);
-		expect(await names(carol, {})).toEqual([]);
+		// A node that runs no offered profile (a Command): not here.
+		expect(await names(carol, true)).toEqual([]);
 		// Every Device of the Person's, for Move to.
 		expect(await names(carol)).toEqual([["test", ["coder"]]]);
 		// Its owner's own computer takes every node.
 		const owner = (await wireRegistry({
 			db: sandbox.db,
 		}).readSelfOwner()) as string;
-		expect(await names(owner, {})).toEqual([["test", undefined]]);
+		expect(await names(owner, true)).toEqual([["test", undefined]]);
 	});
 
 	test("without an Offer it is refused at start", async () => {

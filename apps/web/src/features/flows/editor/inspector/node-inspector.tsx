@@ -95,7 +95,7 @@ export function NodeInspector({
 	const named = "profile" in node ? node.profile : undefined;
 	const onDevice = runsOnDevice(node) && named === undefined;
 	const nodeDevices = useQuery({
-		...runQueries.devices(projectId, {}),
+		...runQueries.devices(projectId, true),
 		enabled: onDevice,
 		meta: { quietErrors: true },
 	});

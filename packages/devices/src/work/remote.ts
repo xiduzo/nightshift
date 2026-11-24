@@ -4,31 +4,24 @@ import type {
 	ValueInput,
 	ValueResult,
 } from "@nightshift/agents/types";
-import {
-	type Capabilities,
-	type Device,
-	type ExecEvent,
-	type ExecInput,
-	noRunFolders,
-	type OfferedSessionInput,
-	type ReadFileResult,
-	type RestoredWorktree,
-	type RunFolder,
-	type SessionEvent,
-	type SessionInput,
-	type ToolResult,
-	type WebRequestResult,
-	type Worktree,
-	type WorktreeChanges,
+import type {
+	Capabilities,
+	Device,
+	ExecEvent,
+	ExecInput,
+	OfferedSessionInput,
+	ReadFileResult,
+	RestoredWorktree,
+	RunFolder,
+	SessionEvent,
+	SessionInput,
+	ToolResult,
+	WebRequestResult,
+	Worktree,
+	WorktreeChanges,
 } from "@nightshift/engine";
-import type { FlowSources } from "@nightshift/flows";
 import { Refusal, wordsFor } from "@nightshift/refusal";
-import {
-	UNREADABLE_REQUEST,
-	type WorkCall,
-	type WorkFor,
-	type WorkRelay,
-} from "../contract";
+import type { WorkCall, WorkFor, WorkRelay } from "../contract";
 import { pause } from "../links";
 
 /**
@@ -83,7 +76,6 @@ function noAnswer(name: string): string {
  */
 export const CALL_DEADLINES_MS: Partial<Record<WorkCall["kind"], number>> = {
 	capabilities: 60_000,
-	flows: 60_000,
 	itemBranch: 2 * 60_000,
 	snapshotWorktree: 2 * 60_000,
 	worktreeChanges: 2 * 60_000,
@@ -117,17 +109,12 @@ export function remoteDevice(
 	} = {},
 ): Device {
 	const wait = options.pause ?? pause;
-	const ask = (call: WorkCall, signal?: AbortSignal, projectId?: string) =>
-		relay.call(
-			device.id,
-			{ ...forRun, ...(projectId ? { projectId } : {}), call },
-			signal,
-		);
+	const ask = (call: WorkCall, signal?: AbortSignal) =>
+		relay.call(device.id, { ...forRun, call }, signal);
 
 	/**
 	 * The replies of a streaming call (`session`, `exec`). A placed Device
-	 * ends a call only after its cleanup there, as every version does
-	 * (`createWorkServer`): the end of the call is its "cleaned up". So
+	 * ends a call only after its cleanup there (`createWorkServer`): the end of the call is its "cleaned up". So
 	 * once the call's last event came, `close` reads on until the call
 	 * ends, and the step ends after the cleanup, as it does on this
 	 * computer. It waits `CLEANUP_WAIT_MS` at most, then cancels the call
@@ -135,8 +122,8 @@ export function remoteDevice(
 	 *
 	 * A stop cancels the call there. Through a relay that takes a stop
 	 * (`WorkRelay.stops`), the stream goes on until the Device ended the
-	 * call after its cleanup, when every hop can: `CLEANUP_WAIT_MS` after
-	 * the stop at most, then it closes. Else the stream ends at the stop.
+	 * call after its cleanup: `CLEANUP_WAIT_MS` after the stop at most, then
+	 * it closes. Else the stream ends at the stop.
 	 */
 	function streamed(call: WorkCall, signal: AbortSignal) {
 		const giveUp = new AbortController();
@@ -204,11 +191,7 @@ export function remoteDevice(
 	}
 
 	/** The one result of a call; throws its error as a refusal (`refusalOf`). */
-	async function once<T>(
-		call: WorkCall,
-		signal?: AbortSignal,
-		projectId?: string,
-	): Promise<T> {
+	async function once<T>(call: WorkCall, signal?: AbortSignal): Promise<T> {
 		const limit = CALL_DEADLINES_MS[call.kind];
 		const deadline =
 			limit === undefined ? undefined : AbortSignal.timeout(limit);
@@ -216,7 +199,7 @@ export function remoteDevice(
 			signal && deadline
 				? AbortSignal.any([signal, deadline])
 				: (signal ?? deadline);
-		for await (const reply of ask(call, ended, projectId)) {
+		for await (const reply of ask(call, ended)) {
 			if (reply.kind === "result") return reply.value as T;
 			if (reply.kind === "error") throw refusalOf(reply);
 		}
@@ -342,8 +325,6 @@ export function remoteDevice(
 			const has = await once<Capabilities>({ kind: "capabilities", query });
 			return { ...has, elsewhere: device.name };
 		},
-		flows: (projectId) =>
-			once<FlowSources>({ kind: "flows" }, undefined, projectId),
 		session,
 		exec,
 		async callTool(input): Promise<ToolResult> {
@@ -361,12 +342,7 @@ export function remoteDevice(
 				};
 			}
 		},
-		/**
-		 * A web request on that Device. A Device of an older Night Shift
-		 * cannot read the call: run start refuses it first (its
-		 * capabilities say no `requests`), and the call says to update it.
-		 * One that went away is a network failure: the step waits for it.
-		 */
+		/** A web request on that Device. One that went away is a network failure: the step waits for it. */
 		async request(input): Promise<WebRequestResult> {
 			const { signal, ...rest } = input;
 			try {
@@ -375,12 +351,6 @@ export function remoteDevice(
 					signal,
 				);
 			} catch (error) {
-				if (error instanceof Refusal && error.message === UNREADABLE_REQUEST) {
-					return {
-						kind: "refused",
-						message: `${device.name} runs an older version of Night Shift. Update Night Shift on ${device.name}.`,
-					};
-				}
 				return {
 					kind: "failed",
 					message: failureWords(error, `a web request on ${device.name}`),
@@ -388,37 +358,17 @@ export function remoteDevice(
 				};
 			}
 		},
-		/**
-		 * A file the run wrote in its folder on that Device. A Device of an
-		 * older Night Shift cannot read the call: run start refuses it
-		 * first (its capabilities say no `readFiles`), and the call says to
-		 * update it. One that went away throws an `unavailable` refusal.
-		 */
-		async readFile(input): Promise<ReadFileResult> {
-			const { signal, ...rest } = input;
-			try {
-				return await once<ReadFileResult>(
-					{ kind: "readFile", input: rest },
-					signal,
-				);
-			} catch (error) {
-				if (error instanceof Refusal && error.message === UNREADABLE_REQUEST) {
-					throw new Refusal(
-						"conflict",
-						`${device.name} runs an older version of Night Shift. Update Night Shift on ${device.name}.`,
-					);
-				}
-				throw error;
-			}
+		/** A file the run wrote in its folder on that Device. One that went away throws an `unavailable` refusal. */
+		readFile({ signal, ...input }) {
+			return once<ReadFileResult>({ kind: "readFile", input }, signal);
 		},
 		decide,
 		worktree: (run) => once<Worktree>({ kind: "worktree", run }),
 		/**
-		 * The run's copy there, made again when it is gone. A Device or a
-		 * Host of an older Night Shift cannot read the call: the copy stays
-		 * as it is, and the step works as before: so does a call that did not
-		 * reach the Device. Only the Device's own answer (git could not make
-		 * the copy, a `conflict`) fails the step.
+		 * The run's copy there, made again when it is gone. A call that did
+		 * not reach the Device leaves the copy as it is, and the step works.
+		 * The Device's own answer (git could not make the copy, a `conflict`)
+		 * fails the step.
 		 */
 		async restoreWorktree(input) {
 			try {
@@ -427,13 +377,7 @@ export function remoteDevice(
 					...input,
 				});
 			} catch (error) {
-				if (
-					error instanceof Refusal &&
-					error.kind === "conflict" &&
-					error.message !== UNREADABLE_REQUEST
-				) {
-					throw error;
-				}
+				if (error instanceof Refusal && error.kind === "conflict") throw error;
 				console.warn(
 					`[devices] ${device.name} did not take the call to make a run's copy again:`,
 					error instanceof Error ? error.message : error,
@@ -441,24 +385,13 @@ export function remoteDevice(
 				return null;
 			}
 		},
-		// A Device of an older Night Shift cannot read the call: it says to update it.
-		async runFolder(run) {
-			try {
-				return await once<RunFolder>({ kind: "runFolder", run });
-			} catch (error) {
-				if (error instanceof Refusal && error.message === UNREADABLE_REQUEST) {
-					throw new Refusal("conflict", noRunFolders(device.name));
-				}
-				throw error;
-			}
-		},
+		runFolder: (run) => once<RunFolder>({ kind: "runFolder", run }),
 		handOff: (input) =>
 			once<{ commit: string; branch: string }>({ kind: "handOff", ...input }),
 		receiveHandOff: (input) =>
 			once<Worktree>({ kind: "receiveHandOff", ...input }),
 		itemBranch: (input) =>
 			once<{ branch: string; base: string }>({ kind: "itemBranch", ...input }),
-		// A Device of an older Night Shift cannot read these calls: an error, which the step runner skips.
 		snapshotWorktree: ({ cwd, signal }) =>
 			once<{ tree: string }>({ kind: "snapshotWorktree", cwd }, signal),
 		worktreeChanges: ({ cwd, from, signal }) =>

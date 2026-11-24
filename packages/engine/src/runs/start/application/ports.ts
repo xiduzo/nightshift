@@ -1,10 +1,5 @@
 import type { FlowNode } from "@nightshift/flows";
-import type {
-	NodeToPlace,
-	OwnDevice,
-	Placement,
-	StartRunInput,
-} from "../../../contract";
+import type { OwnDevice, Placement, StartRunInput } from "../../../contract";
 import type { Device } from "../../../device";
 import type { RunRow, RunState } from "../../../log";
 import type { RunSummary } from "../../../read";
@@ -36,12 +31,12 @@ export type RunPlanner = {
 		personId: string,
 		projectId: string,
 	): Promise<Placement[]>;
-	/** The Devices a Person may place a run's steps on. With `forNode`, those that node may name. */
+	/** The Devices a Person may place a run's steps on. With `ownOnly`, those that node may name. */
 	devicesFor(
 		spaceId: string,
 		personId: string,
 		projectId: string,
-		forNode?: NodeToPlace,
+		ownOnly?: boolean,
 	): Promise<OwnDevice[]>;
 	/** The Device the project's latest run ran on, or null. */
 	lastRunDevice(projectId: string): Promise<string | null>;

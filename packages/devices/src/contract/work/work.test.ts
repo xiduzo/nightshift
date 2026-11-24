@@ -27,7 +27,6 @@ const calls: WorkRequest[] = [
 		runId: null,
 		call: { kind: "capabilities", query: { programs: ["gh"], profiles: [] } },
 	},
-	{ ...forRun, runId: null, call: { kind: "flows" } },
 	{ ...forRun, call: { kind: "worktree", run } },
 	{ ...forRun, call: { kind: "restoreWorktree", run, cwd: "/work" } },
 	{
@@ -181,7 +180,7 @@ const calls: WorkRequest[] = [
 describe("the work relay's output schema", () => {
 	test("checks a call of every kind", () => {
 		const kinds = new Set(calls.map((request) => request.call.kind));
-		expect(kinds.size).toBe(16);
+		expect(kinds.size).toBe(15);
 		for (const request of calls) {
 			const delivery = { kind: "call", id: "call-1", request };
 			expect(workDeliverySchema.safeParse(delivery).error).toBeUndefined();

@@ -14,14 +14,13 @@ import { type HostClient, hostContract, refusalDataSchema } from "../contract";
  *   pair this computer again. Never a 401: the screen would send the
  *   person to sign in here.
  * - NOT_FOUND, or any 404: the Host runs an older version of Night Shift
- *   and does not know the procedure. `OlderHostError`, with the words the
- *   caller gives for its procedure, else its one sentence. This is the
- *   one test of a Host's version: a refusal of this version's Host comes
+ *   and does not know the procedure. `OlderHostError`, with its one
+ *   sentence. This is the one test of a Host's version: a refusal comes
  *   as BAD_REQUEST with its kind, never as NOT_FOUND.
  * - HOST_UNREACHABLE: `HostUnreachableError`, the same here.
  * - BAD_REQUEST, FORBIDDEN, CONFLICT: a `Refusal` with the Host's words. A
- *   BAD_REQUEST carries its kind (`refusalDataSchema`) from a Host of this
- *   version. An older Host's is `invalid`.
+ *   BAD_REQUEST carries its kind (`refusalDataSchema`). Without one it is
+ *   `invalid`: the Host could not read the call.
  * - Any other error of the Host is a failure: an `Error` with the Host's
  *   error as its cause, so the person sees plain words and the details go
  *   to the log.
@@ -66,8 +65,6 @@ export type CallOptions = {
 	deadlineMs?: number;
 	/** The error when it does not settle in time. Default: a refusal (`unavailable`) with `HOST_TOO_SLOW`. */
 	late?(): Error;
-	/** What a person reads when the Host runs a version without the procedure. Default: the one sentence of `OlderHostError`. */
-	olderHost?: string;
 };
 
 /** The kind of refusal each code of the peer protocol is (`hostContract`). */
@@ -78,13 +75,13 @@ const KIND_OF_CODE: Record<string, RefusalKind> = {
 };
 
 /** The error a person gets on this computer for `error`, the error of a call this computer made to a Host (see above). */
-export function fromHost(error: unknown, olderHost?: string): unknown {
+export function fromHost(error: unknown): unknown {
 	if (!(error instanceof ORPCError)) return error;
 	if (error.code === "HOST_UNREACHABLE") {
 		return new HostUnreachableError();
 	}
 	if (error.code === "NOT_FOUND" || error.status === 404) {
-		return new OlderHostError(olderHost, { cause: error });
+		return new OlderHostError({ cause: error });
 	}
 	const data = refusalDataSchema.safeParse(error.data);
 	const kind =
@@ -158,8 +155,7 @@ function isStream(value: unknown): value is AsyncIterable<unknown> {
  * One call on a Host whose answers are in this computer's words
  * (`translated`), within its deadline (`CallOptions`). The deadline's
  * error wins the race, and only then `signal` aborts: a stream that
- * opened in time runs on. A Host of a version without the procedure says
- * the caller's words for it.
+ * opened in time runs on.
  */
 export async function hostCall<T>(
 	client: HostClient,
@@ -178,11 +174,6 @@ export async function hostCall<T>(
 	});
 	try {
 		return await Promise.race([use(client, late.signal), deadline]);
-	} catch (error) {
-		if (error instanceof OlderHostError && options.olderHost) {
-			throw new OlderHostError(options.olderHost, { cause: error });
-		}
-		throw error;
 	} finally {
 		clearTimeout(timer);
 	}

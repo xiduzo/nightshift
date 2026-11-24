@@ -703,7 +703,7 @@ const ROUTES: Route[] = [
 	route("runs.move", { ...run, deviceId: "d2" }, { run: ["move"] }, "space.runs.move", [ASKING, { ...run, to: "d2" }]),
 	route("runs.releaseLease", { ...run, name: "deploy" }, STOP, "space.runs.releaseLease", [ASKING, { ...run, name: "deploy" }]),
 	route("runs.moveTargets", run, "session", "space.runs.moveTargets", [ASKING, run]),
-	route("runs.devices", { ...project, forNode: { profile: "fast" } }, "session", "space.listDevices", ["p1", { profile: "fast" }]),
+	route("runs.devices", { ...project, ownOnly: true }, "session", "space.listDevices", ["p1", true]),
 	route("runs.resume", { ...run, prompt: "Go." }, RESUME, "space.runs.resume", [ASKING, { ...run, prompt: "Go." }]),
 	route("runs.restartStep", { ...run, stepId: "s", prompt: "Report now." }, RESUME, "space.runs.restartStep", [ASKING, { ...run, stepId: "s", prompt: "Report now." }]),
 	route("runs.restartStep", run, RESUME, "space.runs.restartStep", [ASKING, run]),

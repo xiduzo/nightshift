@@ -26,6 +26,7 @@ describe("startPairing", () => {
 				deviceId: "host-a",
 				name: "Studio",
 				platform: "darwin",
+				home: true,
 			}),
 		).rejects.toThrow(SELF_PAIR);
 		p.settings.enabled = false;
@@ -34,6 +35,7 @@ describe("startPairing", () => {
 				deviceId: "laptop",
 				name: "LE2316",
 				platform: "darwin",
+				home: true,
 			}),
 		).rejects.toBeInstanceOf(Refusal);
 		p.settings.enabled = false;
@@ -42,6 +44,7 @@ describe("startPairing", () => {
 				deviceId: "laptop",
 				name: "LE2316",
 				platform: "darwin",
+				home: true,
 			}),
 		).rejects.toThrow(NOT_A_HOST);
 	});

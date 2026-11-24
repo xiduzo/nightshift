@@ -15,10 +15,10 @@ import {
 } from "@nightshift/engine/testing";
 import type { AgentProfile } from "@nightshift/flows";
 import { asDate } from "@nightshift/time";
+import { engineOffersOf } from "../../wire-offers";
 import { wireRegistry } from "../registry";
 import {
 	deviceOffers,
-	offeredProfile,
 	type SpaceOffer,
 	setDeviceOffer,
 	spaceOffers,
@@ -117,7 +117,7 @@ describe("withdraw", () => {
 				},
 			},
 			stopUnder: async (offer) => {
-				order.push(`stop the runs under ${offer.profileName}`);
+				order.push(`stop the runs under ${offer.profile}`);
 			},
 		});
 		const offers = wireOffers().createOffers({
@@ -162,7 +162,7 @@ const coder: AgentProfile = {
 const { name: _name, ...coderSettings } = coder;
 
 describe("Offers by profile id", () => {
-	test("an Offer made before profiles had ids reads unchanged: it names the profile by its name, which is its id", async () => {
+	test("a profile may have its name as its id, and an Offer in the Space without the profile's name is not listed", async () => {
 		const document = await sandbox.openDocument();
 		await document.change(() => {
 			document.profiles.set("coder", {
@@ -179,8 +179,7 @@ describe("Offers by profile id", () => {
 			});
 		});
 		const profiles = createProfileStore({ document });
-		const nameOf = (profile: string) =>
-			offeredProfile(profiles, profile)?.name ?? null;
+		const nameOf = (profile: string) => profiles.get(profile)?.name ?? null;
 		expect(deviceOffers(document, nameOf)).toEqual([
 			{
 				spaceId: "space-team",
@@ -207,7 +206,7 @@ describe("Offers by profile id", () => {
 			spaceOffers({
 				offers: published,
 			} as unknown as Pick<SpaceDocument, "offers">),
-		).toMatchObject([{ profile: "coder", profileName: "coder" }]);
+		).toEqual([]);
 		await document.close();
 	});
 
@@ -221,16 +220,15 @@ describe("Offers by profile id", () => {
 			...caps,
 			offeredAt: 1,
 		});
-		const nameOf = (profile: string) =>
-			offeredProfile(profiles, profile)?.name ?? null;
+		const { ownOffers } = engineOffersOf({ document, profiles } as never);
 		await profiles.save({ ...coder, name: "maker" }, saved.id);
-		expect(deviceOffers(document, nameOf)).toMatchObject([
+		expect(ownOffers()).toMatchObject([
 			{ profile: saved.id, profileName: "maker" },
 		]);
 		await profiles.remove(saved.id);
 		// Another profile may take the name of the removed one: it is not offered.
 		await profiles.save({ ...coder, name: "maker" });
-		expect(deviceOffers(document, nameOf)).toEqual([]);
+		expect(ownOffers()).toEqual([]);
 		await document.close();
 	});
 

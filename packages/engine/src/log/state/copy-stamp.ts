@@ -42,8 +42,7 @@ export function copyStamps(run: RunState): ReadonlyMap<string, CopyStamp> {
 /**
  * Whether a copy with `stamp` holds the step as a reader knows it
  * (`known`, from the reader's log): the same opening, ended when the
- * reader knows it ended. A copy without a stamp comes from a peer of an
- * older version: it holds, as every copy did before stamps.
+ * reader knows it ended. A copy without a stamp holds every end.
  */
 export function stampHolds(
 	stamp: CopyStamp | undefined,

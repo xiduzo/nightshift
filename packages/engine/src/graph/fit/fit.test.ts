@@ -71,20 +71,21 @@ describe("REQUIREMENTS", () => {
 	test("lists the flow format and the shared connections check, then every kind's own, once each", async () => {
 		expect(REQUIREMENTS[0]).toBe(readsTheFlow);
 		expect(REQUIREMENTS[1]).toBe(connectionsExist);
-		// The Agent's two, the model Decision's, the model Value's, a Wait for
-		// a URL's, the Web request's and an End's report file.
-		expect(REQUIREMENTS).toHaveLength(9);
+		// The Agent's two, the model Decision's, the model Value's.
+		expect(REQUIREMENTS).toHaveLength(6);
 		expect(AGENT.requirements).toEqual([cliToolsInstalled, harnessesAdded]);
 		expect(DECISION.requirements).toEqual([modelDecisionsHaveDecider]);
 		expect(VALUE.requirements).toEqual([modelValuesHaveDecider]);
 	});
 
-	test("a Device of an older Night Shift takes no step of this build's flows", async () => {
-		const older = { ...(await has()), elsewhere: "nas" };
-		delete older.flowVersion;
-		expect(refusalOf([decision("d", "rule")], older)).toBe(
-			"nas runs an older version of Night Shift. Update Night Shift on nas.",
-		);
+	test("a Device that does not say it reads this build's flows takes no step of them", async () => {
+		const { flowVersion: _, ...silent } = await has();
+		const older = { ...silent, elsewhere: "nas" } as Capabilities;
+		for (const there of [older, { ...older, flowVersion: FLOW_VERSION - 1 }]) {
+			expect(refusalOf([decision("d", "rule")], there)).toBe(
+				"nas runs an older version of Night Shift. Update Night Shift on nas.",
+			);
+		}
 		expect(
 			refusalOf([decision("d", "rule")], {
 				...older,

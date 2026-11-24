@@ -6,7 +6,7 @@ import type { DeviceLinks, HostSpaces } from "../links";
 import type { WorkHub } from "../work";
 import { createSpaceRoutes } from "./route";
 
-/** How long the Host may take to take a stop. Then the stream closes: the stop of before. */
+/** How long the Host may take to take a stop. Then the stream closes. */
 const STOP_DEADLINE_MS = 10_000;
 
 /**
@@ -22,11 +22,10 @@ const STOP_DEADLINE_MS = 10_000;
  * - A Host that cannot be reached: the call answers with one `offline`
  *   error, so the step waits for its Device. The Device is not online.
  *
- * A stop (`stop`) cancels the call on the Device. Through a Host whose
- * hello says `stopWaits`, the call names a `stopId`, the stop goes as
- * `devices.stop`, and the stream goes on until the Device ended the call
- * after its cleanup. Through an older Host, or when the Host does not know
- * the call, closing the stream is the stop, as before.
+ * A stop (`stop`) cancels the call on the Device. Through a Host, the call
+ * names a `stopId`, the stop goes as `devices.stop`, and the stream goes
+ * on until the Device ended the call after its cleanup. When the Host does
+ * not know the call, closing the stream is the stop.
  */
 export function createWorkRelay(deps: {
 	hub: Pick<WorkHub, "call" | "online">;
@@ -58,15 +57,13 @@ export function createWorkRelay(deps: {
 				yield { kind: "error", message: "A run does not move secrets." };
 				return;
 			}
-			const stopId =
-				stop && to.hello?.stopWaits === true ? randomUUID() : undefined;
+			const stopId = stop ? randomUUID() : undefined;
 			/** A stop the Host did not take: closing the stream is the stop. */
 			const closed = new AbortController();
-			/** Ends the stream: `signal`, and a stop through an older Host. */
+			/** Ends the stream. */
 			const ends = AbortSignal.any([
 				closed.signal,
 				...(signal ? [signal] : []),
-				...(stop && stopId === undefined ? [stop] : []),
 			]);
 			const onStop = () => {
 				if (stopId === undefined) return;

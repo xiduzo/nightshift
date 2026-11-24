@@ -104,9 +104,9 @@ An older Night Shift made it, and this one does not read it. Nothing is lost:
 
 Another install of the same computer is online. One computer is one Device, and only one Night Shift at a time can be that Device. Quit the other install, then pair again.
 
-### "Update Night Shift" for a project without a folder
+### "Update Night Shift on both computers"
 
-The computer or the Host runs an older version of Night Shift. It cannot add a project without a folder, or run the steps of one. Update Night Shift there.
+One of your computers runs an older version of Night Shift. Update Night Shift on each of them, the Host first.
 
 ## Runs
 
@@ -119,13 +119,9 @@ The End node reads its report from a file, but it did not get a text file from t
 3. In a project without a folder, the step that writes the file runs on the same computer as the run. Each computer has its own folder of the run.
 4. The computer with the file stays on until the run ends. "Could not read the report file on" a computer means that it was offline or did not answer. Night Shift waited for it as long as the **Network** limit of the [run policy](Runs-and-schedules.md#run-policy).
 
-"Update Night Shift" in the message means that the computer runs an older version. Update Night Shift there.
+### A run says "runs an older version of Night Shift"
 
-### "Update Night Shift there to run a test."
-
-The computer that keeps this Space runs an older version of Night Shift. It cannot run a test with pinned outputs or skipped nodes, so nothing starts. Update Night Shift on that computer. Or start the run without pins and skips.
-
-A test run also moves only to a computer that can run one. A move to a computer with an older version says "runs an older version of Night Shift".
+A test run moves only to a computer that can run one. A move to a computer with an older version says "runs an older version of Night Shift".
 
 ## Schedules
 

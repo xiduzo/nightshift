@@ -1,5 +1,5 @@
 import type { FlowNode } from "@nightshift/flows";
-import type { NodeToPlace, OwnDevice, Placement } from "../../../../contract";
+import type { OwnDevice, Placement } from "../../../../contract";
 import type { Device } from "../../../../device";
 import type { PlanInput, PlannedRun } from "../../..";
 import type { RunPlanner } from "../../application/ports";
@@ -29,7 +29,7 @@ export function inMemoryRunPlanner() {
 			spaceId: string;
 			personId: string;
 			projectId: string;
-			forNode?: NodeToPlace;
+			ownOnly?: boolean;
 		}[],
 		/** From now on a plan is what `plan` gives, or what it throws. */
 		planWith(plan: (input: Omit<PlanInput, "lastRun">) => Promise<PlannedRun>) {
@@ -66,13 +66,13 @@ export function inMemoryRunPlanner() {
 			spaceId: string,
 			personId: string,
 			projectId: string,
-			forNode?: NodeToPlace,
+			ownOnly?: boolean,
 		) {
 			twin.listed.push({
 				spaceId,
 				personId,
 				projectId,
-				...(forNode ? { forNode } : {}),
+				...(ownOnly ? { ownOnly } : {}),
 			});
 			return devices.map((d) => ({ ...d }));
 		},

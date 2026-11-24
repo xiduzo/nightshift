@@ -3,7 +3,6 @@
 export { COMMAND } from "./command";
 export { TOOL } from "./tool";
 export {
-	sendsRequests,
 	shownUrl,
 	statusLine,
 	urlWaitRequest,

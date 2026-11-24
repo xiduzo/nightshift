@@ -268,8 +268,6 @@ export function linksTo(
 			hostId,
 			state: () => ({ status: "online", address: "memory", since: 0 }),
 			client: () => client,
-			// It keeps no hello: a relay reads it as an older Host's.
-			hello: () => null,
 			stream: () => {
 				throw new Error("This link runs no streams in memory.");
 			},

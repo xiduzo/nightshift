@@ -4,7 +4,6 @@ import type {
 	PeerContext,
 	PeerProjects,
 	PlacedRun,
-	ReadFileInput,
 	RunRef,
 	SpaceDocument,
 	SpaceDocuments,
@@ -20,7 +19,6 @@ import type {
 import { createOfferUse, type OfferUse, offerKey } from "../domain/offer-use";
 import {
 	cwdOf,
-	filesOf,
 	GIT_CALLS,
 	NEEDS_CLONE,
 	NO_STARTER,
@@ -37,7 +35,6 @@ import {
 	spaceOffers,
 } from "../domain/offers";
 
-type RestoreInput = Parameters<NonNullable<Device["restoreWorktree"]>>[0];
 type SnapshotInput = Parameters<NonNullable<Device["snapshotWorktree"]>>[0];
 type ChangesInput = Parameters<NonNullable<Device["worktreeChanges"]>>[0];
 
@@ -297,9 +294,7 @@ export function admitOfferedCall(ports: AdmitOfferedCallPorts): OfferAdmission {
 				return;
 			}
 			// Another Person's session: this computer's own profile, its caps.
-			// The node names the profile by its id. A Walker of an older
-			// Night Shift names it by its name, which `ownOffers` keeps
-			// current: both find the offered profile, also after a rename.
+			// The node names the profile by its id: found also after a rename.
 			const { profile } = call.input.offered;
 			const offer = offerFor(admitted.offers, profile);
 			const found = offer ? (ports.profileFor?.(offer.profile) ?? null) : null;
@@ -396,7 +391,6 @@ export function admitOfferedCall(ports: AdmitOfferedCallPorts): OfferAdmission {
 				name: device.name,
 				state: async () => (await pick()).state(),
 				capabilities: async (query) => (await pick()).capabilities(query),
-				flows: async (projectId) => (await pick()).flows(projectId),
 				async *session(input) {
 					yield* (await pick()).session(input);
 				},
@@ -405,23 +399,11 @@ export function admitOfferedCall(ports: AdmitOfferedCallPorts): OfferAdmission {
 				},
 				callTool: async (input) => (await pick()).callTool(input),
 				request: async (input) => (await pick()).request(input),
-				// Only when this computer reads files.
-				...(device.readFile
-					? {
-							readFile: async (input: ReadFileInput) =>
-								filesOf(await pick()).readFile(input),
-						}
-					: {}),
+				readFile: async (input) => (await pick()).readFile(input),
 				decide: (async (input: Parameters<Device["decide"]>[0]) =>
 					(await pick()).decide(input as never)) as Device["decide"],
 				worktree: async (run) => (await pick()).worktree(run),
-				// Only when this computer makes a run's copy again.
-				...(device.restoreWorktree
-					? {
-							restoreWorktree: async (input: RestoreInput) =>
-								(await (await pick()).restoreWorktree?.(input)) ?? null,
-						}
-					: {}),
+				restoreWorktree: async (input) => (await pick()).restoreWorktree(input),
 				// Only when this computer makes run folders.
 				...(device.runFolder
 					? {

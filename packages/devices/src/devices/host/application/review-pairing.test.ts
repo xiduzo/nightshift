@@ -25,13 +25,15 @@ describe("reviewPairing", () => {
 		});
 	});
 
-	test("an older Device that did not say home leaves home null", async () => {
+	test("a Host that started again since does not know what the Device asked: home is null", async () => {
 		const p = inMemoryHostPorts();
 		const code = await startPairing(p)({
 			deviceId: "laptop",
 			name: "LE2316",
 			platform: "darwin",
+			home: true,
 		});
+		p.pending.delete(code.deviceCode);
 		expect(
 			await reviewPairing(p)({
 				headers: new Headers(),

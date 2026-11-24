@@ -118,8 +118,7 @@ export interface Engine {
 	forgetSpace(spaceId: string): Promise<boolean>;
 	/**
 	 * The flows of every Project of this Replica, by Project, whatever its
-	 * Space (`ProjectFlows`): what another Device's older Walker asks this
-	 * one for, and the merge of one Project's flows into another's (the
+	 * Space (`ProjectFlows`), and the merge of one Project's flows into another's (the
 	 * merge of Personal). Who may see the Project is the caller's check. A
 	 * person reads and saves through `space(id).flows`.
 	 */

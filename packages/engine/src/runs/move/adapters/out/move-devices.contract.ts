@@ -96,18 +96,18 @@ export function moveDevicesContract(
 			});
 		});
 
-		test("a target says what it walks, and one that does not say reads format 8 and no test runs", async () => {
+		test("a target says what it walks, and one that does not say so walks no test runs", async () => {
 			under = await make();
 			await under.add([
 				device("laptop", { flowVersion: 10, testRuns: true }),
-				device("old"),
+				device("silent", { flowVersion: 10 }),
 			]);
 			expect(
 				await under.devices.capabilities({ id: "laptop", name: "laptop" }, RUN),
 			).toEqual({ flowVersion: 10, testRuns: true });
 			expect(
-				await under.devices.capabilities({ id: "old", name: "old" }, RUN),
-			).toEqual({ flowVersion: 8, testRuns: false });
+				await under.devices.capabilities({ id: "silent", name: "silent" }, RUN),
+			).toEqual({ flowVersion: 10, testRuns: false });
 		});
 
 		test("the Person's own Devices are listed online and offline", async () => {

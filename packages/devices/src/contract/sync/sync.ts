@@ -46,13 +46,11 @@ export const transcriptEntrySchema = z.object({
 	event: z.record(z.string(), z.unknown()),
 });
 
-/** One answer of the exchange: rows after the Device's cursors, and its commands. */
+/** One answer of the exchange: rows after the Device's cursors. */
 export type SyncBatch = {
 	rows: RunRows;
 	/** The cursors moved past these rows. */
 	cursors: SyncCursors;
-	/** The commands that wait for the Device, as the Walker of their runs. */
-	commands: RunCommand[];
 	/**
 	 * The steps of runs the Device walks that someone follows now, with the
 	 * `seq` to send from: their live transcripts go to `archive.tail`.
@@ -123,7 +121,6 @@ export const syncBatchSchema = exact<SyncBatch>()(
 	z.object({
 		rows: runRowsSchema,
 		cursors: syncCursorsSchema,
-		commands: z.array(keptCommandSchema),
 		follows: z.array(followWantSchema),
 	}),
 );

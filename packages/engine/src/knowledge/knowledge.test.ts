@@ -370,10 +370,10 @@ describe("a Host of an older version", () => {
 	test("takes no knowledge: the Device works on its own copy, and a file it must fetch says why", async () => {
 		const older: ArchiveHost = {
 			async archivePut() {
-				throw new OlderHostError(OLDER_HOST);
+				throw new OlderHostError();
 			},
 			async archiveGet() {
-				throw new OlderHostError(OLDER_HOST);
+				throw new OlderHostError();
 			},
 		};
 		const a = await device(older);

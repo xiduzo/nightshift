@@ -1477,7 +1477,7 @@ describe("the owner's other Devices in a Space of the home Host", () => {
 		await spaceDocuments.flush();
 	});
 
-	test("a project without a folder: every Device has it, also when a Host of an older version says no (ADR 22)", async () => {
+	test("a project without a folder: this computer has it too (ADR 22)", async () => {
 		const { placement, spaceDocuments } = await deviceInHostSpace({
 			folder: false,
 			devices: async () => [
@@ -1486,7 +1486,7 @@ describe("the owner's other Devices in a Space of the home Host", () => {
 					name: "Laptop",
 					thisDevice: false,
 					online: true,
-					hasClone: false,
+					hasClone: true,
 				},
 			],
 		});

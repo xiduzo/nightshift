@@ -1,11 +1,6 @@
 import { Refusal } from "@nightshift/refusal";
 import type { Access } from "../../../access";
-import {
-	type Actor,
-	type NodeToPlace,
-	type OwnDevice,
-	personOf,
-} from "../../../contract";
+import { type Actor, type OwnDevice, personOf } from "../../../contract";
 import type { RunPlanner } from "./ports";
 
 export type ListDevicesPorts = {
@@ -17,23 +12,23 @@ export type ListDevicesPorts = {
 export type ListDevices = {
 	spaceId: string;
 	projectId: string;
-	forNode?: NodeToPlace;
+	ownOnly?: boolean;
 };
 
 /**
  * The Devices the Person may place a run's steps on: their own, then
- * others' through Offers. With `forNode`, the Devices that node may name.
+ * others' through Offers. With `ownOnly`, the Devices that node may name.
  * Needs a Person (`signed-out`) who is a Member of the Space
  * (`SpaceNotFound`).
  */
 export const listDevices =
 	(ports: ListDevicesPorts) =>
 	async (actor: Actor, request: ListDevices): Promise<OwnDevice[]> => {
-		const { spaceId, projectId, forNode } = request;
+		const { spaceId, projectId, ownOnly } = request;
 		const personId = personOf(actor);
 		if (personId === null) {
 			throw new Refusal("signed-out", "Sign in to see your devices.");
 		}
 		await ports.openSpace(actor, { spaceId });
-		return ports.planner.devicesFor(spaceId, personId, projectId, forNode);
+		return ports.planner.devicesFor(spaceId, personId, projectId, ownOnly);
 	};

@@ -1,4 +1,4 @@
-import { OlderHostError, type PeerProjects } from "@nightshift/engine";
+import type { PeerProjects } from "@nightshift/engine";
 import { Refusal } from "@nightshift/refusal";
 import type { HostClient } from "../contract";
 
@@ -11,9 +11,8 @@ import type { HostClient } from "../contract";
  *
  * Run it as a stream of the link (`Link.stream`): it says it once, then
  * waits until the link drops. A failure throws, and the link tries again
- * after its backoff. An older Host, which has no `setClones`
- * (`OlderHostError`), and a Space where the person may not add projects
- * (a refusal, `forbidden`) are left alone.
+ * after its backoff. A Space where the person may not add projects (a
+ * refusal, `forbidden`) is left alone.
  */
 export function tellClones(deps: {
 	/** The Spaces this Host keeps for this computer (`HostSpaces.ofHost`). */
@@ -37,13 +36,12 @@ export function tellClones(deps: {
 						spaceId,
 						projectIds,
 						deviceName,
-						...(deps.dev ? { dev: true } : {}),
+						dev: deps.dev ?? false,
 						...(deps.machine ? { machine: deps.machine } : {}),
 					},
 					{ signal },
 				);
 			} catch (error) {
-				if (error instanceof OlderHostError) break;
 				if (error instanceof Refusal && error.kind === "forbidden") continue;
 				throw error;
 			}

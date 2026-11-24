@@ -276,12 +276,12 @@ export function createSpaces(deps: SpacesDeps) {
 			},
 
 			// --- start (R3) ---
-			async listDevices(projectId, forNode) {
+			async listDevices(projectId, ownOnly) {
 				await ready;
 				return deps.start.listDevices(actor, {
 					spaceId,
 					projectId,
-					...(forNode !== undefined ? { forNode } : {}),
+					...(ownOnly !== undefined ? { ownOnly } : {}),
 				});
 			},
 

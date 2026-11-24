@@ -46,7 +46,7 @@ export type JoinProgress =
 			 * This computer's owner is the Host admin there. When not, the Host
 			 * admin can read their personal runs. Null: the Host did not say.
 			 */
-			hostAdmin: boolean | null;
+			hostAdmin: boolean;
 			/**
 			 * This install took over the Device the Host knows this computer as
 			 * (ADR 20). It connects as that Device from its next start.

@@ -40,9 +40,7 @@ export type OfferDocument = {
  *   Replica that keeps the Space writes it, through the procedures.
  *
  * Both name the profile by its id (`profile`), so an Offer outlives a
- * rename. An Offer made before profiles had ids names the profile by its
- * name, which is that profile's id. Flows still name a profile by its
- * name, so the checks of a node match the Offer's `profileName`.
+ * rename.
  *
  * An Offer is in force when both hold it (`inForce`): withdrawing on
  * either side ends it.
@@ -91,43 +89,23 @@ export type DeviceOfferEntry = z.infer<typeof deviceOfferSchema>;
  */
 export type DeviceOffer = DeviceOfferEntry & { profileName: string };
 
-const spaceOfferSchema = offerCapsSchema
-	.extend({
-		deviceId: z.string().min(1),
-		deviceName: z.string(),
-		/** The profile's id. */
-		profile: z.string().min(1),
-		/** The profile's name. An Offer published before ids has none: its id is its name. */
-		profileName: nameSchema.optional(),
-		offeredAt: z.number(),
-		/** The Person who made it. */
-		by: z.string().nullable(),
-	})
-	.transform((offer) => ({
-		...offer,
-		profileName: offer.profileName ?? offer.profile,
-	}));
+const spaceOfferSchema = offerCapsSchema.extend({
+	deviceId: z.string().min(1),
+	deviceName: z.string(),
+	/** The profile's id. */
+	profile: z.string().min(1),
+	/** The profile's name. */
+	profileName: nameSchema,
+	offeredAt: z.number(),
+	/** The Person who made it. */
+	by: z.string().nullable(),
+});
 /** An Offer as the Space document publishes it to the Members. */
 export type SpaceOffer = z.output<typeof spaceOfferSchema>;
 
 const deviceKey = (spaceId: string, profile: string) => `${spaceId}/${profile}`;
 const spaceKey = (deviceId: string, profile: string) =>
 	`${deviceId}/${profile}`;
-
-/**
- * The profile an Offer names: by its id, else by its name. An Offer made
- * before profiles had ids names the profile by its name, which is that
- * profile's id, or the name of the profile that took it over.
- */
-export function offeredProfile<P>(
-	profiles: {
-		get(id: string): P | null | undefined;
-		byName(name: string): P | null | undefined;
-	},
-	profile: string,
-): P | null {
-	return profiles.get(profile) ?? profiles.byName(profile) ?? null;
-}
 
 /**
  * The Device's own Offers, every Space, with the name of each profile
@@ -247,32 +225,12 @@ const OWN_SETTINGS = [
 	"connections",
 ] as const satisfies readonly (keyof AgentNode)[];
 
-/**
- * Whether a node may name another Person's Device: it is an Agent node
- * whose profile that Device offers to the Space (`offers`: the names of
- * the offered profiles), and the Person's role uses Offers. The rule `offerRefusal` holds at run start, for the choice
- * of a node's Device; the node's other settings are checked at start.
- */
-export function offerTakes(
-	node: { profile?: string },
-	offers: readonly string[],
-	mayUse: boolean,
-): boolean {
-	return mayUse && node.profile !== undefined && offers.includes(node.profile);
-}
-
-/**
- * The Offer of a profile, by the profile's id, as a node names it, or by
- * its name, as a Walker of an older Night Shift names it.
- */
-export function offerFor<O extends { profile: string; profileName: string }>(
+/** The Offer of a profile, by the profile's id, as a node names it. */
+export function offerFor<O extends { profile: string }>(
 	offers: readonly O[],
 	profile: string,
 ): O | undefined {
-	return (
-		offers.find((o) => o.profile === profile) ??
-		offers.find((o) => o.profileName === profile)
-	);
+	return offers.find((o) => o.profile === profile);
 }
 
 /** The refusal of a run on another Person's Device that offers nothing to the Space. */

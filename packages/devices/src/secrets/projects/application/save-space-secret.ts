@@ -1,10 +1,6 @@
 import type { HostCalls } from "../../calls";
 import type { SpaceSecretStore } from "../../kept";
-import {
-	atKeeper,
-	OLDER_HOST_PROJECT_SECRETS,
-	spaceAccess,
-} from "../domain/project-secrets";
+import { atKeeper, spaceAccess } from "../domain/project-secrets";
 import type { KeeperSpaces, Members, RoleRules } from "./ports";
 
 export type SaveSpaceSecretPorts = {
@@ -68,7 +64,6 @@ export const saveSpaceSecret =
 						}),
 					{
 						deadlineMs: ports.deadlineMs,
-						olderHost: OLDER_HOST_PROJECT_SECRETS,
 					},
 				),
 		);

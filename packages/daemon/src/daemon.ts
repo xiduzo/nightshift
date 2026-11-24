@@ -332,7 +332,6 @@ async function makeDaemon(
 		telemetry,
 		ollama,
 		// The engine's flows (made below, before anyone can ask).
-		flows: (projectId) => devices.engine.flows.flows(projectId),
 	});
 
 	/**

@@ -37,16 +37,15 @@ export type WorkFor = {
 	projectId: string;
 	/** The Person who starts (or started) the run, as the Host knows them. */
 	personId: string;
-	/** Null before the run exists: its start asks for capabilities and flows first. */
+	/** Null before the run exists: its start asks for capabilities first. */
 	runId: string | null;
 };
 
 /** One call of the Device port, as plain data. */
 export type WorkCall =
 	| { kind: "capabilities"; query: CapabilityQuery }
-	| { kind: "flows" }
 	| { kind: "worktree"; run: RunRef }
-	/** The run's worktree, made again when its folder is gone. An older Device cannot read it. */
+	/** The run's worktree, made again when its folder is gone. */
 	| { kind: "restoreWorktree"; run: RunRef; cwd: string }
 	/** The run's own folder, for a project without a folder (ADR 22). */
 	| { kind: "runFolder"; run: RunRef }
@@ -89,7 +88,6 @@ export type WorkRequest = WorkFor & { call: WorkCall };
 
 export const WORK_KINDS = [
 	"capabilities",
-	"flows",
 	"worktree",
 	"restoreWorktree",
 	"runFolder",
@@ -134,8 +132,8 @@ export const secretRequestSchema = z.object({
 });
 
 /**
- * What a Device of an older version answers to a call it cannot read: a
- * secret call, for one. The Host reads it as "update that Device".
+ * What a Device answers to a call it cannot read: its Night Shift does not
+ * know that call.
  */
 export const UNREADABLE_REQUEST =
 	"This device cannot read that request. Update Night Shift on both computers.";
@@ -171,8 +169,7 @@ export type WorkRelay = {
 	 *
 	 * Aborting `stop` (a relay with `stops` only) cancels the call on the
 	 * Device too. The stream goes on until the Device ended the call there,
-	 * after its cleanup, when every hop says it can (`stopWaits`: the Host
-	 * in its hello, the Device in its `devices.work`). Else it ends at the
+	 * after its cleanup. A call the Device did not take yet ends at the
 	 * stop, as at `signal`.
 	 */
 	call(
@@ -362,7 +359,6 @@ const webRequestInputSchema = z.object({
 /** One call of the Device port, as plain data: the call without its signal. */
 const workCallSchema = z.discriminatedUnion("kind", [
 	z.object({ kind: z.literal("capabilities"), query: capabilityQuerySchema }),
-	z.object({ kind: z.literal("flows") }),
 	z.object({ kind: z.literal("worktree"), run: runRefSchema }),
 	z.object({
 		kind: z.literal("restoreWorktree"),

@@ -73,14 +73,14 @@ type Step =
 	| {
 			kind: "merging";
 			hostName: string;
-			hostAdmin: boolean | null;
+			hostAdmin: boolean;
 			preview: MergePreview | null;
 	  }
 	/** Paired, with what the Person must read: the merge, or a Host admin who is someone else. */
 	| {
 			kind: "joined";
 			hostName: string;
-			hostAdmin: boolean | null;
+			hostAdmin: boolean;
 			merged: MergeResult | null;
 			notMerged: string | null;
 			/** This computer has a Device there already: it uses it after a restart. */

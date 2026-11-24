@@ -1,10 +1,6 @@
 import type { HostRelay } from "../../../contract";
 import type { OfferRef } from "../domain/offered-sessions";
-import {
-	type OfferDocument,
-	spaceOffers,
-	unpublishOffer,
-} from "../domain/offers";
+import { type OfferDocument, unpublishOffer } from "../domain/offers";
 
 export type RetractOfferInput = {
 	spaceId: string;
@@ -37,18 +33,7 @@ export const retractOffer =
 	async (input: RetractOfferInput): Promise<void> => {
 		await ports.ready;
 		const { spaceId, deviceId, profile, by } = input;
-		const document = await ports.open(spaceId);
-		// A session names the profile by its id, one from before ids by
-		// its name, as the Space lists it.
-		const listed = spaceOffers(document, deviceId).find(
-			(o) => o.profile === profile,
-		);
-		const stop = {
-			spaceId,
-			deviceId,
-			profile,
-			profileName: listed?.profileName ?? profile,
-		};
+		const stop = { spaceId, deviceId, profile };
 		if ((await ports.hostOf(spaceId)) !== null) {
 			if (!ports.relay || deviceId !== ports.deviceId) {
 				ports.unreachable();
@@ -62,6 +47,7 @@ export const retractOffer =
 			}
 			return;
 		}
+		const document = await ports.open(spaceId);
 		let removed = false;
 		await document.change(() => {
 			removed = unpublishOffer(document, deviceId, profile);

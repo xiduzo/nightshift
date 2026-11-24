@@ -61,11 +61,6 @@ export type Link = {
 	/** The Host's procedures at the address that answers, with the key, in this computer's words. Null while offline. */
 	client(): HostClient | null;
 	/**
-	 * The Host's last answer to the link's hello or heartbeat: who it is and
-	 * what its version can do. Null while offline.
-	 */
-	hello(): HostHello | null;
-	/**
 	 * Keeps `open` running while the link is online. It starts when the
 	 * link is online, and its signal aborts when the link drops or closes.
 	 * It starts again when the link is back, and when it ends: at once
@@ -82,8 +77,6 @@ export type Link = {
 	 * One call on the Host. Rejects at once with `HostUnreachableError`
 	 * while the link is offline, and with the deadline's error when the
 	 * call does not settle in time (`CallOptions`): then `signal` aborts.
-	 * A Host of a version without the procedure says the caller's words
-	 * for it (`olderHost`).
 	 */
 	call<T>(
 		use: (client: HostClient, signal: AbortSignal) => Promise<T>,
@@ -220,8 +213,6 @@ export function httpsLink(options: HttpsLinkOptions): Link {
 	let wire: HostClient | null = null;
 	/** The same, in this computer's words: what the link hands out. */
 	let current: HostClient | null = null;
-	/** Its last answer to the hello or a heartbeat. */
-	let answered: HostHello | null = null;
 	const openChannel = options.documentChannel ?? hocuspocusChannel;
 	let channel: DocumentChannel | null = null;
 	/** Aborts when the link drops: every stream stops. */
@@ -357,14 +348,12 @@ export function httpsLink(options: HttpsLinkOptions): Link {
 		});
 		wire = client;
 		current = translated(client);
-		answered = hello;
 		return hello;
 	}
 
 	function lose() {
 		wire = null;
 		current = null;
-		answered = null;
 	}
 
 	async function run() {
@@ -395,7 +384,6 @@ export function httpsLink(options: HttpsLinkOptions): Link {
 							AbortSignal.timeout(answerTimeoutMs),
 						]),
 					});
-					answered = hello;
 					learn(hello, address);
 					await syncDocuments(address, hello);
 				}
@@ -424,7 +412,6 @@ export function httpsLink(options: HttpsLinkOptions): Link {
 		hostId: link.hostId,
 		state: () => state,
 		client: () => current,
-		hello: () => (current ? answered : null),
 		stream(name, open) {
 			const stream: Stream = {
 				name,

@@ -71,16 +71,14 @@ export type ArchiveHost = {
 	 * Keeps a file in the archive of the Host that keeps its Space. False
 	 * for a Space this Replica keeps: nothing went. Throws
 	 * `HostUnreachableError` when that Host cannot be reached,
-	 * `OlderHostError` when it cannot keep knowledge content yet, and the
-	 * Host's refusal.
+	 * and the Host's refusal.
 	 */
 	archivePut(entry: ArchiveEntry): Promise<boolean>;
 	/**
 	 * A file from the archive of the Host that keeps its Space: the Host
 	 * checks a step's file against its own log. Null for a Space this
 	 * Replica keeps, and when that Host has none. Throws when that Host
-	 * cannot be reached, and `OlderHostError` for knowledge content it
-	 * cannot keep yet.
+	 * cannot be reached.
 	 */
 	archiveGet(ref: ArchiveRef): Promise<string | Uint8Array | null>;
 };
@@ -193,8 +191,7 @@ export function createSpaceArchive(dataDir: string) {
 	/**
 	 * This Replica's copy of a file. A copy of a step's file only when its
 	 * stamp holds the step as the reader knows it (`known`, `stampHolds`):
-	 * a copy without a stamp (from a Walker of an older version) holds
-	 * every end. A checkpoint has no stamp. Null when there is none.
+	 * a copy without a stamp holds every end. A checkpoint has no stamp. Null when there is none.
 	 */
 	async function readHere(
 		ref: ArchiveRef,
@@ -220,7 +217,7 @@ export function createSpaceArchive(dataDir: string) {
 	 * file goes with its stamp: the content before its stamp, and an old
 	 * stamp before the content, so a reader that reads the stamp first
 	 * never takes a copy of an earlier end for a later one. Without a stamp
-	 * (from a Walker of an older version) the copy has none.
+	 * the copy has none.
 	 */
 	async function writeHere(entry: ArchiveEntry): Promise<void> {
 		const path = pathOf(dataDir, entry.ref);

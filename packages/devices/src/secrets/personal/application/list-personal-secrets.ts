@@ -1,7 +1,6 @@
 import type { PersonalSecretName } from "../../../contract";
 import type { HostCalls } from "../../calls";
 import type { PersonalSecretStore } from "../../kept";
-import { OLDER_HOST_SECRETS } from "../domain/personal-secrets";
 
 export type ListPersonalSecretsPorts = {
 	store: Pick<PersonalSecretStore, "list">;
@@ -24,6 +23,5 @@ export const listPersonalSecrets =
 		if (!home) return ports.store.list(ports.ownerId);
 		return ports.calls.ask(home.hostId, (client) => client.secrets.list(), {
 			deadlineMs: ports.deadlineMs,
-			olderHost: OLDER_HOST_SECRETS,
 		});
 	};

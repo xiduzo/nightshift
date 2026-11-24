@@ -45,8 +45,6 @@ describe("listProjectSecrets", () => {
 			{
 				hostId: "host-1",
 				deadlineMs: 20_000,
-				olderHost:
-					"The Host of this Space runs an older version of Night Shift. Update Night Shift there to use project secrets.",
 			},
 		]);
 		who = "person-bob";

@@ -22,10 +22,6 @@ export const NOT_IN_SPACE =
 export const NOT_A_SPACE_HERE =
 	"This computer does not keep that Space. Check that you work in the right Space.";
 
-/** What a person reads when the Host of the Space does not know Project secrets yet. */
-export const OLDER_HOST_PROJECT_SECRETS =
-	"The Host of this Space runs an older version of Night Shift. Update Night Shift there to use project secrets.";
-
 /** The refusal of a change through this computer by someone who does not own it. */
 export const OWNER_ONLY =
 	"Only the owner of this computer can change this project's secrets here.";

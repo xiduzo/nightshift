@@ -21,8 +21,8 @@ export const NOT_A_HOST =
 
 /**
  * The kind of a refusal a Host sends as a BAD_REQUEST (`Refusal.kind`).
- * An older Device reads only the code and the words, and ignores it. An
- * older Host sends none: the Device reads its refusal as `invalid`.
+ * A call that does not fit its input schema has none: the Device reads it
+ * as `invalid`.
  */
 export const refusalDataSchema = exact<{ kind: RefusalKind }>()(
 	z.object({

@@ -1,10 +1,6 @@
 import { roleAllows } from "@nightshift/auth";
 import { memberRole } from "@nightshift/engine";
-import {
-	wireOffers as bindOffers,
-	deviceOffers,
-	offeredProfile,
-} from "./devices";
+import { wireOffers as bindOffers, deviceOffers } from "./devices";
 import type { DevicesDeps } from "./devices-runtime";
 import type { PeerEngine } from "./wire-peers-engine";
 
@@ -24,7 +20,7 @@ export function engineOffersOf(
 		ownOffers: () =>
 			deviceOffers(
 				deps.document,
-				(profile) => offeredProfile(deps.profiles, profile)?.name ?? null,
+				(profile) => deps.profiles.get(profile)?.name ?? null,
 			),
 		mayUseOffers: async (spaceId: string, personId: string) => {
 			const role = memberRole(await deps.spaces.open(spaceId), personId);

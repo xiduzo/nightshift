@@ -51,6 +51,5 @@ export const answerHello =
 						),
 					}
 				: {}),
-			stopWaits: true,
 		};
 	};

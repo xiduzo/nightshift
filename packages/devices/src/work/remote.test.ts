@@ -11,10 +11,9 @@ import {
 } from "@nightshift/engine/testing";
 import { Refusal } from "@nightshift/refusal";
 import {
-	type HostHello,
-	UNREADABLE_REQUEST,
 	type WorkFor,
 	type WorkRelay,
+	type WorkReply,
 	type WorkRequest,
 	workRequestSchema,
 } from "../contract";
@@ -165,33 +164,6 @@ describe("a web request on a remote Device", () => {
 		}
 	});
 
-	test("a Device of an older Night Shift says to update it", async () => {
-		const older: WorkRelay = {
-			async *call() {
-				yield { kind: "error", message: UNREADABLE_REQUEST };
-			},
-			online: () => true,
-		};
-		const device = remoteDevice(
-			older,
-			{ id: "laptop", name: "laptop" },
-			FOR_RUN,
-		);
-		expect(
-			await device.request({
-				method: "GET",
-				url: [{ text: "https://api.example.com" }],
-				timeoutMs: 1_000,
-				maxBytes: 1_024,
-				signal: new AbortController().signal,
-			}),
-		).toEqual({
-			kind: "refused",
-			message:
-				"laptop runs an older version of Night Shift. Update Night Shift on laptop.",
-		});
-	});
-
 	test("a Device that cannot answer is a network failure", async () => {
 		const gone: WorkRelay = {
 			async *call() {},
@@ -268,33 +240,6 @@ describe("a file the run wrote, on a remote Device", () => {
 		expect(await read("../escape.md")).toEqual({ kind: "outside" });
 	});
 
-	test("a Device of an older Night Shift, or one that reads none, says to update it", async () => {
-		const older = remoteDevice(
-			{
-				async *call() {
-					yield { kind: "error", message: UNREADABLE_REQUEST };
-				},
-				online: () => true,
-			},
-			{ id: "laptop", name: "laptop" },
-			FOR_RUN,
-		);
-		await expect(
-			older.readFile?.({ cwd: "/work", path: "report.md", maxBytes: 1_024 }),
-		).rejects.toThrow(
-			"laptop runs an older version of Night Shift. Update Night Shift on laptop.",
-		);
-		const { readFile: _, ...none } = testDevice({ harnesses: {} });
-		const reads = remoteDevice(
-			relayTo(none),
-			{ id: "test", name: "test" },
-			FOR_RUN,
-		);
-		await expect(
-			reads.readFile?.({ cwd: "/work", path: "report.md", maxBytes: 1_024 }),
-		).rejects.toThrow("This device does not read the files of a run.");
-	});
-
 	test("a Device that does not answer in 30 s: an unavailable refusal", async () => {
 		expect(CALL_DEADLINES_MS.readFile).toBe(30_000);
 		const before = CALL_DEADLINES_MS.readFile;
@@ -348,7 +293,7 @@ describe("the run folder of a remote Device", () => {
 		expect((await device.runFolder?.(run))?.made).toBe(false);
 	});
 
-	test("on a Device that makes none, or of an older Night Shift, says to update it", async () => {
+	test("on a Device that makes none says so", async () => {
 		const run = { id: "run-1", projectId: "project-1" };
 		// The placed Device names itself: the test's is "test".
 		const none = remoteDevice(
@@ -356,22 +301,38 @@ describe("the run folder of a remote Device", () => {
 			{ id: "test", name: "test" },
 			FOR_RUN,
 		);
-		const older = remoteDevice(
+		await expect(none.runFolder?.(run)).rejects.toThrow(
+			"test cannot run projects without a folder.",
+		);
+	});
+});
+
+describe("a run's copy made again on another Device", () => {
+	const restore = (reply: WorkReply) =>
+		remoteDevice(
 			{
 				async *call() {
-					// What an older Device answers to a call it cannot read.
-					yield { kind: "error", message: UNREADABLE_REQUEST };
+					yield reply;
 				},
 				online: () => true,
 			},
 			{ id: "laptop", name: "laptop" },
 			FOR_RUN,
-		);
-		for (const device of [none, older]) {
-			await expect(device.runFolder?.(run)).rejects.toThrow(
-				`Update Night Shift on ${device.name} to run projects without a folder.`,
-			);
-		}
+		).restoreWorktree({
+			run: { id: "run-1", projectId: "project-1" },
+			cwd: "/work",
+		});
+
+	test("the Device's own answer fails the step", async () => {
+		await expect(
+			restore({ kind: "error", message: "git could not make the copy." }),
+		).rejects.toThrow("git could not make the copy.");
+	});
+
+	test("a call that did not reach the Device leaves the copy as it is", async () => {
+		expect(
+			await restore({ kind: "error", message: "offline", offline: true }),
+		).toBeNull();
 	});
 });
 
@@ -382,18 +343,15 @@ const turn = () => new Promise<void>((resolve) => setImmediate(resolve));
  * A Host's hub, and a placed Device that serves `device` through it as the
  * daemon does: its work server takes the calls over its link and sends the
  * replies back, a batch at a time. `cancelled`: the calls the Host
- * cancelled there. `stopWaits`: the Host says so in its hello, and the
- * Device's work server tells it in turn; else both are of an older version.
+ * cancelled there.
  */
-async function placedOn(device: Device, options: { stopWaits?: true } = {}) {
+async function placedOn(device: Device) {
 	const back = Promise.withResolvers<void>();
 	const hub = createWorkHub({ onBack: () => back.resolve() });
 	const client = partialHostClient({
 		devices: {
 			work: async (input, options) =>
-				hub.take("laptop", options?.signal as AbortSignal, input?.running, {
-					stopWaits: input?.stopWaits === true,
-				}),
+				hub.take("laptop", options?.signal as AbortSignal, input.running),
 			workReply: async (input) => ({ known: hub.reply("laptop", input) }),
 		},
 	});
@@ -411,8 +369,6 @@ async function placedOn(device: Device, options: { stopWaits?: true } = {}) {
 			return () => closed.abort();
 		},
 		ready: async () => client,
-		hello: () =>
-			options.stopWaits ? ({ stopWaits: true } as HostHello) : null,
 	});
 	await back.promise;
 	return { hub, cancelled, detach };
@@ -576,27 +532,7 @@ describe("a session or a command on a remote Device", () => {
 		placed.detach();
 	});
 
-	test("a stop during the cleanup of a Device of an older version ends the step at once", async () => {
-		const order: string[] = [];
-		const placed = await placedOn(sessionDevice(() => new Promise(() => {})));
-		const held = heldPause();
-		const walker = remoteDevice(
-			placed.hub,
-			{ id: "laptop", name: "laptop" },
-			FOR_RUN,
-			{ pause: held.pause },
-		);
-		const stop = new AbortController();
-		const reading = readSession(walker, stop.signal, order);
-		await held.asked;
-		stop.abort();
-		await reading;
-		expect(order).toEqual(["ready", "finished", "step ended"]);
-		expect(placed.cancelled).toEqual(["session"]);
-		placed.detach();
-	});
-
-	test("a stop during the cleanup of a Device that says stopWaits waits for that cleanup", async () => {
+	test("a stop during the cleanup of a Device waits for that cleanup", async () => {
 		const order: string[] = [];
 		const cleaned = Promise.withResolvers<void>();
 		const placed = await placedOn(
@@ -604,7 +540,6 @@ describe("a session or a command on a remote Device", () => {
 				await cleaned.promise;
 				order.push("cleanup");
 			}),
-			{ stopWaits: true },
 		);
 		const held = heldPauses();
 		const walker = remoteDevice(
@@ -686,7 +621,6 @@ describe("a stop of a step on a remote Device", () => {
 				await turn();
 				order.push("cleanup");
 			}),
-			{ stopWaits: true },
 		);
 		const walker = remoteDevice(
 			placed.hub,
@@ -706,7 +640,6 @@ describe("a stop of a step on a remote Device", () => {
 				await turn();
 				order.push("cleanup");
 			}),
-			{ stopWaits: true },
 		);
 		const walker = remoteDevice(
 			placed.hub,
@@ -730,35 +663,9 @@ describe("a stop of a step on a remote Device", () => {
 		placed.detach();
 	});
 
-	test("on a Device of an older version, or through a Host of one, the step ends at the stop, as before", async () => {
-		const order: string[] = [];
-		const cleaned = Promise.withResolvers<void>();
-		const placed = await placedOn(
-			stoppableDevice(async () => {
-				await cleaned.promise;
-				order.push("cleanup");
-			}),
-		);
-		const walker = remoteDevice(
-			placed.hub,
-			{ id: "laptop", name: "laptop" },
-			FOR_RUN,
-		);
-		await readStopped(walker, order);
-		expect(order).toEqual(["ready", "error", "step ended"]);
-		await until(() => placed.cancelled.length === 1);
-		// The Device still cleans up, after the step.
-		cleaned.resolve();
-		await until(() => order.includes("cleanup"));
-		placed.detach();
-	});
-
 	test("a Device that does not end the stopped call holds the step for the cleanup wait only", async () => {
 		const order: string[] = [];
-		const placed = await placedOn(
-			stoppableDevice(() => new Promise(() => {})),
-			{ stopWaits: true },
-		);
+		const placed = await placedOn(stoppableDevice(() => new Promise(() => {})));
 		const held = heldPauses();
 		const walker = remoteDevice(
 			placed.hub,

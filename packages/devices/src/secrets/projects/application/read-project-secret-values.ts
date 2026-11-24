@@ -4,7 +4,6 @@ import type { ProjectSecretStore, SpaceSecretStore } from "../../kept";
 import {
 	keptStepValues,
 	NOT_YOUR_STEP,
-	OLDER_HOST_PROJECT_SECRETS,
 	type StepAt,
 } from "../domain/project-secrets";
 import type { EnginePlaces, KeeperSpaces } from "./ports";
@@ -63,7 +62,6 @@ export const readProjectSecretValues =
 				}),
 			{
 				deadlineMs: ports.deadlineMs,
-				olderHost: OLDER_HOST_PROJECT_SECRETS,
 			},
 		);
 	};

@@ -5,7 +5,7 @@
  * `startRunInputSchema`), the Command (`command.ts`: what a person asks of
  * a run, the kinds that travel to its Walker, the permission each needs
  * and its wire schema), where a run can be placed (`Placement`,
- * `OwnDevice`, `NodeToPlace`), and the ports a vertical asks of the
+ * `OwnDevice`), and the ports a vertical asks of the
  * devices: the Device rows (`DeviceDirectory`), the Hosts (`Relay`, and
  * `HostUnreachableError` when one cannot be reached), the leases a Host
  * keeps (`LeaseHost`, ADR 7), the Offer rule of a schedule (`OffersPort`) and the name of the branch of one item of a Call (`itemBranchName`, in `branches/`).
@@ -45,7 +45,6 @@ export type {
 export type { OffersPort } from "./offers";
 export type {
 	DeviceProfile,
-	NodeToPlace,
 	OwnDevice,
 	Placement,
 } from "./placement";

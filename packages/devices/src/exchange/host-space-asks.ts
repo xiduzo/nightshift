@@ -70,7 +70,7 @@ export function hostSpaceAsks(
 			// The Device's own name and kind, as it says them each time it links.
 			await registry.describe(caller.deviceId, {
 				name: input.deviceName,
-				dev: input.dev === true,
+				dev: input.dev,
 				machine: input.machine,
 			});
 			// Only the Caller's own Device: never another Device's Clones.
@@ -89,7 +89,6 @@ export function hostSpaceAsks(
 			);
 			await engine.offers.publish({
 				...input,
-				profileName: input.profileName ?? input.profile,
 				deviceId: caller.deviceId,
 				by: caller.personId,
 			});

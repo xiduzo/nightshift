@@ -1,18 +1,10 @@
 import { Refusal } from "@nightshift/refusal";
-import {
-	type SecretMove,
-	UNREADABLE_REQUEST,
-	type WorkReply,
-} from "../../../contract";
+import type { SecretMove, WorkReply } from "../../../contract";
 
 /**
  * The rules and the words of the moves of a secret saved on another of
  * the Person's Devices (ADR 13, decision 7).
  */
-
-/** What a person reads when their Home Host cannot move secrets between devices yet. */
-export const OLDER_HOST_MOVES =
-	"Your home Host runs an older version of Night Shift. Update Night Shift there to move secrets between your devices.";
 
 /** The refusal of a Device that is not another of the Person's own here. */
 export const NOT_YOUR_OTHER_DEVICE =
@@ -42,11 +34,6 @@ export function offlineWords(device: string, move: SecretMove): string {
 	return `${device} is offline. ${verbOf(move)} it when ${device} is online.`;
 }
 
-/** What a person reads when the Device with the value runs an older version. */
-export function olderDeviceWords(device: string): string {
-	return `Update Night Shift on ${device} to move its secrets from here.`;
-}
-
 /** What a person reads when the Device took the call and did not answer in time. */
 export function noAnswerWords(device: string): string {
 	return `${device} did not answer. Check that ${device} is online, then try again.`;
@@ -62,9 +49,6 @@ export function refusalOf(
 	if (reply.kind !== "error") return undefined;
 	if (reply.offline) {
 		return new Refusal("unavailable", offlineWords(device, move));
-	}
-	if (reply.message === UNREADABLE_REQUEST) {
-		return new Refusal("unavailable", olderDeviceWords(device));
 	}
 	return new Refusal("conflict", reply.message);
 }

@@ -33,6 +33,7 @@ import { createPeerEngine, type PeerEngine } from "../wire-peers-engine";
 import { createWorkHub } from "../work";
 import { shareAnswerCosts } from "./answer-costs";
 import { createHostExchange } from "./host-exchange";
+import type { HostExchange } from "./types";
 
 /**
  * The Host's privacy rule, in one process: a Walker's paths reach the
@@ -154,6 +155,28 @@ const commandFlow = {
 	edges: [],
 } as never;
 
+/** The first batch of the Device's stream: the rows it lacks and the steps it must send. Empty: none came. */
+async function batchFor(
+	exchange: HostExchange,
+	caller: Caller,
+): Promise<Pick<SyncBatch, "rows" | "follows">> {
+	const over = new AbortController();
+	const stream = exchange
+		.stream(caller, { cursors: {} }, over.signal)
+		[Symbol.asyncIterator]();
+	const first = await Promise.race([
+		stream.next(),
+		Bun.sleep(200).then(() => null),
+	]);
+	over.abort();
+	return (
+		first?.value ?? {
+			rows: { runs: [], steps: [], sessions: [], events: [] },
+			follows: [],
+		}
+	);
+}
+
 describe("a Walker's paths", () => {
 	test("are served to its owner's Devices only", async () => {
 		const started = await engine
@@ -164,12 +187,11 @@ describe("a Walker's paths", () => {
 				(await engine.space(sandbox.spaceId, NIGHT_SHIFT).getRun(started.id))
 					.status === "finished",
 		);
-		const mine = await host().pull(keyOf("device-mine", ownerId), {
-			cursors: {},
-		});
-		const theirs = await host().pull(keyOf("device-colleague", "colleague"), {
-			cursors: {},
-		});
+		const mine = await batchFor(host(), keyOf("device-mine", ownerId));
+		const theirs = await batchFor(
+			host(),
+			keyOf("device-colleague", "colleague"),
+		);
 		const payload = (rows: typeof mine.rows, type: string) =>
 			JSON.parse(rows.events.find((e) => e.type === type)?.payload ?? "{}");
 
@@ -353,7 +375,7 @@ describe("live transcripts", () => {
 		const step = await colleagueRun();
 		const exchange = host();
 		const walker = keyOf("device-colleague", "colleague");
-		expect((await exchange.pull(walker, { cursors: {} })).follows).toEqual([]);
+		expect((await batchFor(exchange, walker)).follows).toEqual([]);
 
 		const controller = new AbortController();
 		const got: number[] = [];
@@ -368,10 +390,9 @@ describe("live transcripts", () => {
 		})();
 		// The Walker's stream now names the step.
 		await waitFor(
-			async () =>
-				(await exchange.pull(walker, { cursors: {} })).follows.length === 1,
+			async () => (await batchFor(exchange, walker)).follows.length === 1,
 		);
-		expect((await exchange.pull(walker, { cursors: {} })).follows).toEqual([
+		expect((await batchFor(exchange, walker)).follows).toEqual([
 			{ ...step, afterSeq: 0 },
 		]);
 
@@ -397,7 +418,7 @@ describe("live transcripts", () => {
 		});
 		await following;
 		expect(got).toEqual([1, 2, 3]);
-		expect((await exchange.pull(walker, { cursors: {} })).follows).toEqual([]);
+		expect((await batchFor(exchange, walker)).follows).toEqual([]);
 		controller.abort();
 	});
 
@@ -471,11 +492,7 @@ describe("live transcripts", () => {
 		};
 		await expect(follow()).rejects.toThrow("not a member");
 		expect(
-			(
-				await host().pull(keyOf("device-colleague", "colleague"), {
-					cursors: {},
-				})
-			).follows,
+			(await batchFor(host(), keyOf("device-colleague", "colleague"))).follows,
 		).toEqual([]);
 	});
 });
@@ -565,7 +582,7 @@ describe("a Command for a run this Host walks (the Host door)", () => {
 });
 
 describe("the Commands that wait for a Device", () => {
-	test("come on their own stream, again each time they change; an older Device gets them with the rows", async () => {
+	test("come on their own stream, again each time they change", async () => {
 		const key = keyOf("device-mine", ownerId);
 		const kept = await engine.exchange.commands.enqueue({
 			kind: "signal.send",
@@ -584,20 +601,6 @@ describe("the Commands that wait for a Device", () => {
 			const next = commands.next();
 			await engine.exchange.commands.done(kept.id, "device-mine", null);
 			expect((await next).value).toEqual({ commands: [] });
-
-			// An older Device asks for rows only, without the option.
-			const again = await engine.exchange.commands.enqueue({
-				kind: "signal.send",
-				payload: { name: "go" },
-				spaceId: sandbox.spaceId,
-				runId: "run-1",
-				walkerId: "device-mine",
-				personId: ownerId,
-			});
-			const rows = host()
-				.stream(key, { cursors: {} }, stop.signal)
-				[Symbol.asyncIterator]();
-			expect((await rows.next()).value?.commands).toEqual([again]);
 		} finally {
 			stop.abort();
 		}

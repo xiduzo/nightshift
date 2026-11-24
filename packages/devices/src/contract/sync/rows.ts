@@ -14,10 +14,10 @@ const runRowSchema = z.object({
 	flowName: z.string().nullable(),
 	flow: z.string(),
 	bodyFlows: z.string(),
-	/** Its Flow revision (null: none). A Device of a version before revisions sends none. */
-	flowRevision: z.string().nullable().default(null),
-	/** The Flow revisions of its called flows, by name (JSON). A Device of a version before revisions sends none. */
-	bodyFlowRevisions: z.string().default("{}"),
+	/** Its Flow revision (null: none). */
+	flowRevision: z.string().nullable(),
+	/** The Flow revisions of its called flows, by name (JSON). */
+	bodyFlowRevisions: z.string(),
 	title: z.string(),
 	worktreePath: z.string(),
 	branch: z.string(),
@@ -25,20 +25,17 @@ const runRowSchema = z.object({
 	walkerId: z.string().min(1),
 	/**
 	 * The Person who started it, as the Host knows them (null: a schedule,
-	 * or before Members). A Device of a version before it sends none.
+	 * or before Members).
 	 */
-	startedBy: z.string().nullable().default(null),
-	/** The Device its steps run on (null: the Walker). A Device of a version before it sends none. */
-	deviceId: z.string().nullable().default(null),
-	/** The Devices its nodes name, by name (JSON). A Device of a version before it sends none. */
-	placements: z.string().nullable().default(null),
-	/**
-	 * The names of its Devices, by id (JSON): with the three above, its
-	 * plan. A Device of a version before it sends none; one of a version
-	 * before it drops it.
-	 */
-	deviceNames: z.string().nullable().default(null),
-	fallbacks: z.string().nullable().default(null),
+	startedBy: z.string().nullable(),
+	/** The Device its steps run on (null: the Walker). */
+	deviceId: z.string().nullable(),
+	/** The Devices its nodes name (JSON). */
+	placements: z.string().nullable(),
+	/** The names of its Devices, by id (JSON): with the two above, its plan. */
+	deviceNames: z.string().nullable(),
+	/** The fallbacks of its plan (JSON). */
+	fallbacks: z.string().nullable(),
 	createdAt: z.number(),
 });
 

@@ -23,9 +23,8 @@ import type { OpenStep } from "./step-handle";
  * - Parallel branches share one worktree. When another step that works
  *   in it was active meanwhile, the changes say so (`overlapped`): they
  *   can hold that step's changes too.
- * - A snapshot never fails a step. A Device that takes none (a test's, an
- *   older Night Shift's) or a worktree too large for one: the step shows
- *   its agent's own edits only, and the log says why.
+ * - A snapshot never fails a step. Without one (a Device that takes none,
+ *   a worktree too large for it), the step shows its agent's own edits only, and the log says why.
  * - A run folder has no git (ADR 22): a step there takes no snapshot.
  */
 

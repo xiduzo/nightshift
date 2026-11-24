@@ -40,6 +40,7 @@ function deviceOf(name: string, flowVersion: number): Device {
 		profiles: {},
 		decider: null,
 		flowVersion,
+		testRuns: true,
 	};
 	return {
 		id: name,

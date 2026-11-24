@@ -4,7 +4,6 @@ import {
 	authEndpointAllowed,
 	PEER_ADDRESS_HEADER,
 } from "@nightshift/auth";
-import { READS, READS_HEADER } from "@nightshift/devices";
 import { WEBHOOK_PATH } from "@nightshift/flows";
 import { OpenAPIHandler } from "@orpc/openapi/fetch";
 import { OpenAPIReferencePlugin } from "@orpc/openapi/plugins";
@@ -230,9 +229,7 @@ export function createHttp(
 	});
 
 	// The procedures: only a call to one reads the request's session. The
-	// API reference (its page and its spec) needs none. Each answer says
-	// what this daemon reads (`READS_HEADER`): a caller of a newer version
-	// batches its calls and compresses its large bodies then.
+	// API reference (its page and its spec) needs none.
 	app.use("/rpc/*", async (c, next) => {
 		let request: Request;
 		try {
@@ -246,7 +243,6 @@ export function createHttp(
 			context: await createContext(c),
 		});
 		if (rpcResult.matched) {
-			c.header(READS_HEADER, READS);
 			return c.newResponse(rpcResult.response.body, rpcResult.response);
 		}
 		await next();

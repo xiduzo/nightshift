@@ -162,7 +162,7 @@ describe("a Host in memory", () => {
 		expect(seen.length).toBeLessThanOrEqual(1);
 	});
 
-	test("checks every input as the API does: defaults fill in, unknown keys go, transforms apply", async () => {
+	test("checks every input as the API does: unknown keys go, transforms apply", async () => {
 		const seen: { rows?: RunRows; command?: object; clone?: object } = {};
 		let running: unknown;
 		const client = inMemoryHostClient(
@@ -186,26 +186,15 @@ describe("a Host in memory", () => {
 			paired.key,
 		);
 
-		// A Device of an older version sends a run without the fields it did
-		// not know yet, and one of a newer version a field this Host does not.
+		// A field this Host does not know goes.
 		const rows = rowsOf(b.deviceId);
 		const [run] = rows.runs;
 		if (!run) throw new Error("No run.");
-		const { startedBy, deviceId, placements, deviceNames, ...older } = run;
 		await client.sync.push({
 			...rows,
-			runs: [{ ...older, newer: true } as unknown as typeof run],
+			runs: [{ ...run, newer: true } as unknown as typeof run],
 		});
-		expect(seen.rows?.runs).toEqual([
-			{
-				...older,
-				startedBy: null,
-				deviceId: null,
-				placements: null,
-				deviceNames: null,
-				fallbacks: null,
-			},
-		]);
+		expect(seen.rows?.runs).toEqual([run]);
 
 		// A command names its run: the Host acts in the key's Person's name,
 		// in the run's own Space, never one the Device names.
@@ -237,8 +226,7 @@ describe("a Host in memory", () => {
 			deviceName: "B",
 		});
 
-		// A Device that serves no calls yet sends no list of them.
-		for await (const _ of await client.devices.work()) break;
+		for await (const _ of await client.devices.work({ running: [] })) break;
 		expect(running).toEqual([]);
 	});
 

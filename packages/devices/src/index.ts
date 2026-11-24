@@ -28,8 +28,6 @@ export {
 	type PairingStart,
 	type PhoneView,
 	phoneSchema,
-	READS,
-	READS_HEADER,
 	type RunCommand,
 	type RunRows,
 	type SyncBatch,

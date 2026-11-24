@@ -14,8 +14,7 @@ export type DeviceCopy = {
 	deviceId: string;
 	/**
 	 * The name it reports, else the name the Host last gave it. Null: neither
-	 * is known (a Device of an older version, and no answer of the Host since
-	 * this computer started).
+	 * is known.
 	 */
 	name: string | null;
 	/** `process.platform`. Null: not reported yet. */

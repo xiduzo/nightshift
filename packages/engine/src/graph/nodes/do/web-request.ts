@@ -12,7 +12,6 @@ import {
 import { parseInstant } from "@nightshift/time";
 
 import type {
-	Capabilities,
 	RequestField,
 	RequestPart,
 	RequestText,
@@ -67,17 +66,6 @@ export function webRequestNode(
 		});
 }
 
-/** The words of a Device too old to send web requests, or null when it can. */
-export function sendsRequests(
-	what: string,
-	nodes: readonly { id: string }[],
-	has: Capabilities,
-): string | null {
-	if (nodes.length === 0 || has.requests) return null;
-	const where = has.elsewhere ?? "this computer";
-	return `${what} (${nodes.map((n) => n.id).join(", ")}), but ${where} runs an older version of Night Shift. Update Night Shift on ${where}.`;
-}
-
 /**
  * The Web request kind. A wait node for its policy waits (a 429, a server
  * that is down), the Device only, and a Device that sends web requests.
@@ -89,9 +77,6 @@ export const WEB_REQUEST: NodeKind<WebRequestNode> = {
 	works: () => "device",
 	aux: () => [{ kind: "wait" }],
 	resumeRules: () => RESUME_RULES.fresh,
-	requirements: [
-		(nodes, has) => sendsRequests("The flow sends web requests", nodes, has),
-	],
 };
 
 /** A node's own text as parts: `${NAME}` a secret, every other piece with its templates rendered. */

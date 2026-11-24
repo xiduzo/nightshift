@@ -64,7 +64,6 @@ export type Memberships = {
  */
 export type Profiles = {
 	get(id: string): { id: string; name: string } | null;
-	byName(name: string): { id: string; name: string } | null;
 	/**
 	 * The profile when it is an agent profile, else null. Non-agent
 	 * profiles (Decision / Value) cannot be offered.

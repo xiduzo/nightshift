@@ -1,9 +1,4 @@
-import type {
-	NodeToPlace,
-	OwnDevice,
-	PersonActor,
-	Placement,
-} from "../../../contract";
+import type { OwnDevice, PersonActor, Placement } from "../../../contract";
 import type { Capabilities, Device } from "../../../device";
 import type { PlacedRun } from "../../../log";
 import type { PlanRules } from "../domain/plan-shapes";
@@ -52,7 +47,7 @@ export type PlacementPort = {
 	): Promise<{ id: string; name: string } | null>;
 	/**
 	 * The Devices a Person may place a run's steps on: their own, then
-	 * others' through Offers. With `forNode`, the Devices that node may
+	 * others' through Offers. With `ownOnly`, the Devices that node may
 	 * name: another Person's only when the Person may run the node's
 	 * profile there through its Offers.
 	 */
@@ -60,7 +55,7 @@ export type PlacementPort = {
 		spaceId: string,
 		personId: string,
 		projectId: string,
-		forNode?: NodeToPlace,
+		ownOnly?: boolean,
 	): Promise<OwnDevice[]>;
 	/** The Devices a run of the project can run on: online, with a Clone. */
 	placements(

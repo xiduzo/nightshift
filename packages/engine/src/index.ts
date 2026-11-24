@@ -34,7 +34,6 @@ export type {
 	LeaseAnswer,
 	LeaseHost,
 	LeaseTake,
-	NodeToPlace,
 	OwnDevice,
 	PersonActor,
 	Placement,

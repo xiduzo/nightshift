@@ -62,7 +62,7 @@ test("a local withdraw logs only when the Offer was listed", async () => {
 			logged.push("OfferWithdrawn");
 		},
 		stopUnder: async (offer) => {
-			stopped.push(offer.profileName);
+			stopped.push(offer.profile);
 		},
 		unreachable: () => {
 			throw new Error("unreachable");
@@ -70,5 +70,5 @@ test("a local withdraw logs only when the Offer was listed", async () => {
 	})({ spaceId: "team", deviceId: "self", profile: "coder", by: "ada" });
 	expect(doc.offers.has("self/coder")).toBe(false);
 	expect(logged).toEqual(["OfferWithdrawn"]);
-	expect(stopped).toEqual(["maker"]);
+	expect(stopped).toEqual(["coder"]);
 });

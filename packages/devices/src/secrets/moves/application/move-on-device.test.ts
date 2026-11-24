@@ -4,9 +4,6 @@ import { inMemoryMovesPorts } from "../adapters/out/in-memory-neighbours";
 import { moveOnDevice } from "./move-on-device";
 import type { RelaySecretMove } from "./relay-secret-move";
 
-const OLDER =
-	"Your home Host runs an older version of Night Shift. Update Night Shift there to move secrets between your devices.";
-
 function portsOf() {
 	const relayed: RelaySecretMove[] = [];
 	return {
@@ -42,9 +39,7 @@ describe("moveOnDevice", () => {
 		});
 		await moveOnDevice(p)(move);
 		expect(asked).toEqual([move]);
-		expect(p.calls.asked).toEqual([
-			{ hostId: "host-1", deadlineMs: 11_000, olderHost: OLDER },
-		]);
+		expect(p.calls.asked).toEqual([{ hostId: "host-1", deadlineMs: 11_000 }]);
 		expect(p.relayed).toEqual([]);
 	});
 

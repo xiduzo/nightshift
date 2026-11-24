@@ -12,10 +12,8 @@ export {
 	type DeviceOffer,
 	deviceOffers,
 	hostOffersNothing,
-	offeredProfile,
 	offerRefusal,
 	offersNothing,
-	offerTakes,
 	spaceOffers,
 } from "./domain/offers";
 export {

@@ -52,7 +52,7 @@ export type RelayDeps = {
 export type SecretMoves = {
 	/**
 	 * Asks one of the owner's other Devices to move a secret saved there.
-	 * Resolves when that Device moved it. Refuses when it is offline, older,
+	 * Resolves when that Device moved it. Refuses when it is offline,
 	 * or not one of the owner's.
 	 */
 	move(deviceId: string, name: string, move: SecretMove): Promise<void>;

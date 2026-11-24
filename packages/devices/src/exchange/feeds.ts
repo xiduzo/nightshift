@@ -76,8 +76,7 @@ export type FeedPorts = {
 	retryMs?: number;
 	/**
 	 * How long the feed of a step that ended may stay silent before a
-	 * viewer looks in the archive again (a Walker of an older version, a
-	 * Host away). Default five seconds.
+	 * viewer looks in the archive again (a Host away). Default five seconds.
 	 */
 	graceMs?: number;
 };

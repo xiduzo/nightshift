@@ -18,7 +18,7 @@ export type ArchiveRef = z.infer<typeof archiveRefSchema>;
 
 /**
  * Which end of its step a copy of a step's file holds (the engine's
- * `CopyStamp`). A Walker of an older version puts none.
+ * `CopyStamp`).
  */
 export const copyStampSchema = z.object({
 	opening: z.number().int().positive(),

@@ -35,7 +35,7 @@ import {
 	type StepHandle,
 } from "../../step";
 
-import { sendsRequests, shownUrl, statusLine, urlWaitRequest } from "../do";
+import { shownUrl, statusLine, urlWaitRequest } from "../do";
 
 /**
  * The Wait node: the first node whose whole job is the engine's park-and-wake
@@ -116,14 +116,6 @@ export const WAIT: NodeKind<WaitNode> = {
 			: waitUrlOf(node.until)
 				? "device"
 				: null,
-	requirements: [
-		(nodes, has) =>
-			sendsRequests(
-				"The flow waits for a URL",
-				nodes.filter((node) => waitUrlOf(node.until) !== null),
-				has,
-			),
-	],
 	resumeRules: () => RESUME_RULES.wait,
 	aux: () => [{ kind: "wait" }],
 	endReason: (node, outcome) =>

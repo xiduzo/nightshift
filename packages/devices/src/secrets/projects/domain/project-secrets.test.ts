@@ -10,7 +10,6 @@ import {
 	NOT_IN_SPACE,
 	NOT_YOUR_STEP,
 	namedSecrets,
-	OLDER_HOST_PROJECT_SECRETS,
 	OWNER_ONLY,
 	settersOf,
 	spaceAccess,
@@ -34,9 +33,6 @@ describe("the words of the Project secrets", () => {
 		);
 		expect(NOT_A_SPACE_HERE).toBe(
 			"This computer does not keep that Space. Check that you work in the right Space.",
-		);
-		expect(OLDER_HOST_PROJECT_SECRETS).toBe(
-			"The Host of this Space runs an older version of Night Shift. Update Night Shift there to use project secrets.",
 		);
 		expect(OWNER_ONLY).toBe(
 			"Only the owner of this computer can change this project's secrets here.",

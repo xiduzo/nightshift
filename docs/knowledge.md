@@ -64,10 +64,6 @@ cannot copy waits. Night Shift tries again each minute and at the next
 reconcile. A file whose content it cannot fetch keeps its old version
 until the next reconcile. The step continues.
 
-A Host of an older version does not know the knowledge procedures. The
-computer works on its own copy, as when it cannot reach its Host. A file that
-it must fetch says that the Host needs an update.
-
 The first start after the upgrade reconciles each folder a computer has,
 and so publishes its files. When two computers have one path, the later
 change wins.
@@ -283,8 +279,6 @@ The rules:
   folder if it looks for it. Keep data that no agent may see out of the
   knowledge.
 - The list goes to the computer that runs the step in a field of its own.
-  A computer with an older Night Shift gives such a step no knowledge,
-  never the whole folder.
 
 ## Filling it
 

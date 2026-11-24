@@ -2,7 +2,6 @@ import type { Schedule, ScheduleIssue } from "@nightshift/flows";
 import type { Artifact } from "./artifacts";
 import type { AnswerCost } from "./assistant";
 import type {
-	NodeToPlace,
 	OwnDevice,
 	Placement,
 	RunActionRequest,
@@ -81,11 +80,11 @@ export interface SpaceEngine {
 	/**
 	 * The actor's Devices for a project: this computer first, each with
 	 * whether it is online and has a Clone, then other Persons' that offer
-	 * profiles to the Space. With `forNode`, the Devices a node may name
+	 * profiles to the Space. With `ownOnly`, the Devices a node may name
 	 * (a node's Device picker): another Person's only when the actor may
 	 * run the node's profile there through its Offers.
 	 */
-	listDevices(projectId: string, forNode?: NodeToPlace): Promise<OwnDevice[]>;
+	listDevices(projectId: string, ownOnly?: boolean): Promise<OwnDevice[]>;
 
 	/**
 	 * The local and remote branches of the project's clone, newest first.

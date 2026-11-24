@@ -27,8 +27,8 @@ export function placementRunPlanner(deps: PlacementRunPlannerDeps): RunPlanner {
 			refusalOf(nodes, await capabilitiesFor(nodes, device)),
 		placements: (spaceId, personId, projectId) =>
 			devices.placements(spaceId, personId, projectId),
-		devicesFor: (spaceId, personId, projectId, forNode) =>
-			devices.devicesFor(spaceId, personId, projectId, forNode),
+		devicesFor: (spaceId, personId, projectId, ownOnly) =>
+			devices.devicesFor(spaceId, personId, projectId, ownOnly),
 		lastRunDevice: (projectId) => lastRunDevice(db, projectId),
 	};
 }

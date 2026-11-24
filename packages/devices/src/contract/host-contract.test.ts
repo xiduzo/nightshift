@@ -3,9 +3,8 @@ import { hostContract } from "./host-contract";
 import { commandBatchSchema } from "./sync/sync";
 
 /**
- * The Host's contract is the wire format between daemons of different
- * versions: a Host from main serves Devices of older builds, which call
- * these paths with these Device key permissions.
+ * The Host's contract is the wire format between daemons: the paths a
+ * Device calls, with the Device key permission of each.
  */
 
 const procedures = Object.entries(hostContract).flatMap(([group, entries]) =>
@@ -15,7 +14,7 @@ const procedures = Object.entries(hostContract).flatMap(([group, entries]) =>
 );
 
 describe("the Host's contract", () => {
-	test("keeps the paths older Devices call", () => {
+	test("names the paths a Device calls", () => {
 		expect(procedures.map(([path]) => path)).toEqual([
 			"link.hello",
 			"link.heartbeat",
@@ -24,16 +23,13 @@ describe("the Host's contract", () => {
 			"link.leave",
 			"pairing.start",
 			"pairing.redeem",
-			"sync.pull",
 			"sync.stream",
 			"sync.push",
 			"sync.command",
 			"sync.commandDone",
 			"sync.commands",
-			// An older Host has none: the Device knows only its own Commands.
 			"sync.pending",
 			"sync.startRun",
-			// ADR 27: an older Host has none, and the Device says to update it.
 			"sync.startTest",
 			"sync.devices",
 			"sync.offer",
@@ -53,7 +49,6 @@ describe("the Host's contract", () => {
 			"archive.knowledgeGet",
 			"archive.follow",
 			"archive.tail",
-			// ADR 13: an older Host has none, and the Device says to update it.
 			"secrets.list",
 			"secrets.values",
 			"secrets.set",
@@ -106,9 +101,8 @@ describe("the Host's contract", () => {
 		}
 	});
 
-	test("keeps the Command shapes older Devices send, and reads back", async () => {
-		// Each kind, with every field an older Device may send, as it sent it.
-		const older = [
+	test("reads a Command of every kind, as a Device sends it and as the Host keeps it", async () => {
+		const sentCommands = [
 			{
 				kind: "gate.resolve",
 				payload: {
@@ -133,7 +127,7 @@ describe("the Host's contract", () => {
 		];
 		const input = hostContract.sync.command["~orpc"].inputSchema;
 		expect(input).toBeDefined();
-		for (const command of older) {
+		for (const command of sentCommands) {
 			const sent = { runId: "run-1", ...command };
 			const result = await input?.["~standard"].validate(sent);
 			expect(
@@ -150,7 +144,7 @@ describe("the Host's contract", () => {
 			createdAt: 1_700_000_000_000,
 		};
 		const batch = commandBatchSchema.safeParse({
-			commands: older.map((command) => ({ ...kept, ...command })),
+			commands: sentCommands.map((command) => ({ ...kept, ...command })),
 		});
 		expect(batch.error?.issues).toBeUndefined();
 	});

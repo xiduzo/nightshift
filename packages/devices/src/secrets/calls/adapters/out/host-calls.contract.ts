@@ -11,7 +11,7 @@ export type HostCallsUnderTest = {
 	setHome(home: { hostId: string; personId: string } | null): void;
 };
 
-const OPTIONS = { deadlineMs: 1_000, olderHost: "Update Night Shift there." };
+const OPTIONS = { deadlineMs: 1_000 };
 
 /**
  * What every adapter of `HostCalls` does.

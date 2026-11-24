@@ -253,24 +253,24 @@ export const runs = {
 		),
 	/**
 	 * The Person's Devices for the project: online, with a Clone or not.
-	 * With `forNode`, the Devices that node may name (a node's Device):
-	 * another person's only when it offers the node's profile.
+	 * With `ownOnly`, without other persons' Devices: the ones a node that
+	 * runs no offered profile may name.
 	 */
 	devices: protectedProcedure
 		.route({
 			summary:
-				"Lists the Person's Devices for a project: online or not, with a Clone or not. With forNode, the Devices that node may name.",
+				"Lists the Person's Devices for a project: online or not, with a Clone or not. With ownOnly, without other persons' Devices.",
 		})
 		.output(output(z.array(ownDeviceSchema)))
 		.input(
 			z.object({
 				projectId: z.string(),
-				/** The node the Device is for: an Agent node's profile, or none. */
-				forNode: z.object({ profile: z.string().min(1).optional() }).optional(),
+				/** Only the Person's own Devices. */
+				ownOnly: z.boolean().optional(),
 			}),
 		)
 		.handler(({ context, input }) =>
-			context.space.listDevices(input.projectId, input.forNode),
+			context.space.listDevices(input.projectId, input.ownOnly),
 		),
 	resume: runProcedure(
 		z.object({ runId: z.string(), prompt: z.string().min(1).optional() }),

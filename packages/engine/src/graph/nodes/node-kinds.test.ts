@@ -551,59 +551,6 @@ describe("connections and requirements: what run start asks", () => {
 			expect(NODE_KINDS[type].requirements).toEqual([]);
 		}
 	});
-
-	test("an End that reads its report from a file requires a Device that reads files", async () => {
-		const current = await has();
-		const older = { ...current, readFiles: undefined, elsewhere: "nas" };
-		const report = { kind: "text" as const, text: "## News" };
-		expect(
-			NODE_KINDS.end.requirements.map((r) =>
-				r([end(), { ...end(), report }], older),
-			),
-		).toEqual([null]);
-		expect(
-			NODE_KINDS.end.requirements.map((r) => r([reportFile()], older)),
-		).toEqual([
-			"The flow ends with a report from a file (n), but nas runs an older version of Night Shift. Update Night Shift on nas.",
-		]);
-		expect(
-			NODE_KINDS.end.requirements.map((r) => r([reportFile()], current)),
-		).toEqual([null]);
-	});
-
-	test("a Web request and a Wait for a URL require a Device that sends web requests", async () => {
-		const older = { ...(await has()), requests: undefined, elsewhere: "nas" };
-		expect(
-			NODE_KINDS["web-request"].requirements.map((r) =>
-				r([webRequest({ id: "fetch" })], older),
-			),
-		).toEqual([
-			"The flow sends web requests (fetch), but nas runs an older version of Night Shift. Update Night Shift on nas.",
-		]);
-		const url = wait({
-			kind: "url",
-			url: "https://x.example",
-			everyMinutes: 5,
-		});
-		expect(
-			NODE_KINDS.wait.requirements.map((r) =>
-				r([url, wait({ kind: "duration", minutes: 1 })], older),
-			),
-		).toEqual([
-			"The flow waits for a URL (n), but nas runs an older version of Night Shift. Update Night Shift on nas.",
-		]);
-		expect(
-			NODE_KINDS.wait.requirements.map((r) =>
-				r([wait({ kind: "duration", minutes: 1 })], older),
-			),
-		).toEqual([null]);
-		const caps = await has();
-		expect(
-			NODE_KINDS["web-request"].requirements.map((r) =>
-				r([webRequest()], caps),
-			),
-		).toEqual([null]);
-	});
 });
 
 describe("works: what a step needs of its Device", () => {

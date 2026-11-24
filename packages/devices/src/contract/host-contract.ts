@@ -20,9 +20,8 @@ import { workProcedures } from "./work";
  *   (`links/host-client.ts`), or in memory on the same router in tests
  *   (`inMemoryHost`).
  *
- * The paths and the shapes are the wire format between daemons of
- * different versions: a Host from main serves Devices of older builds.
- * A change keeps what an older Device sends valid, and what it reads there.
+ * The paths and the shapes are the wire format between daemons. Each side
+ * reads the current shape only: a change goes to every install.
  */
 
 export const hostContract = {
@@ -44,8 +43,7 @@ export const hostContract = {
 	/**
 	 * The leases of the Spaces this Host keeps (ADR 7), for the runs a
 	 * Device walks: the key's Device is their Walker, which renews them.
-	 * Needs a role that may start runs in the Space. An older Host has
-	 * none: a run of its Space cannot take a lease.
+	 * Needs a role that may start runs in the Space.
 	 */
 	leases: leaseProcedures,
 	/** The archive: the run state of runs walked elsewhere, per Space, and live transcripts. */
@@ -55,8 +53,7 @@ export const hostContract = {
 	 * keeps as their Home Host. Only a Device of that Person, paired here as
 	 * its Home Host and with access, gets an answer: any other key is
 	 * FORBIDDEN, and a Guest Host keeps none. A value goes to a Device for a
-	 * use, and the Device keeps it in memory for that use only. An older
-	 * Host has none: the Device says to update it.
+	 * use, and the Device keeps it in memory for that use only.
 	 */
 	secrets: personalSecretProcedures,
 	/**
@@ -64,8 +61,7 @@ export const hostContract = {
 	 * A Member's Device lists their names. One whose Person's role saves
 	 * Flows sets, removes and moves them. Values go only to a Device with a
 	 * step of a run of the Project placed on it now (`values`), or to a
-	 * move (`take`). Any other key is FORBIDDEN. An older Host has none:
-	 * the Device says to update it.
+	 * move (`take`). Any other key is FORBIDDEN.
 	 */
 	projectSecrets: projectSecretProcedures,
 	/** A Space's secrets (ADR 18). A step reads them through `projectSecrets.values`. */

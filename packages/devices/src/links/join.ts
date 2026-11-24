@@ -128,9 +128,7 @@ export async function* joinHost(
 			case "joined": {
 				// Another Device than this install: its key goes under that Device.
 				const adopted =
-					deps.identity &&
-					answer.deviceId !== undefined &&
-					answer.deviceId !== deps.self.id
+					deps.identity && answer.deviceId !== deps.self.id
 						? answer.deviceId
 						: null;
 				const keys =
@@ -152,7 +150,7 @@ export async function* joinHost(
 				});
 				// Last: a failure before it leaves this install what it was.
 				if (adopted !== null) {
-					await deps.identity?.adopt(adopted, answer.walkerSeq ?? 0);
+					await deps.identity?.adopt(adopted, answer.walkerSeq);
 				}
 				// This process keeps the old id, so that link waits for the next start.
 				else await deps.started(link, answer.key);
@@ -161,7 +159,7 @@ export async function* joinHost(
 					hostId: link.hostId,
 					hostName: link.name,
 					role: link.role,
-					hostAdmin: answer.hostAdmin ?? null,
+					hostAdmin: answer.hostAdmin,
 					...(adopted !== null ? { restart: true } : {}),
 				};
 				return;

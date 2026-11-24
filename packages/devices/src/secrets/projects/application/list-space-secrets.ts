@@ -4,7 +4,6 @@ import {
 	atKeeper,
 	type NamedSecret,
 	namedSecrets,
-	OLDER_HOST_PROJECT_SECRETS,
 	settersOf,
 	spaceAccess,
 } from "../domain/project-secrets";
@@ -57,7 +56,6 @@ export const listSpaceSecrets =
 					(client) => client.spaceSecrets.list({ spaceId }),
 					{
 						deadlineMs: ports.deadlineMs,
-						olderHost: OLDER_HOST_PROJECT_SECRETS,
 					},
 				),
 		);

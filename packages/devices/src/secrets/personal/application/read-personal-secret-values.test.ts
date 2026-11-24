@@ -14,9 +14,6 @@ function portsOf() {
 	};
 }
 
-const OLDER =
-	"Your home Host runs an older version of Night Shift. Update Night Shift there to use Personal secrets.";
-
 describe("readPersonalSecretValues", () => {
 	test("without a Home Host, this computer gives its owner's values itself", async () => {
 		const p = portsOf();
@@ -41,7 +38,6 @@ describe("readPersonalSecretValues", () => {
 		expect(await readPersonalSecretValues(p)({ names: ["A_TOKEN"] })).toEqual({
 			A_TOKEN: "value-a",
 		});
-		expect(p.calls.asked[0]?.olderHost).toBe(OLDER);
 		expect(askedFor).toEqual([{ names: ["A_TOKEN"] }]);
 		expect(p.store.rows.size).toBe(0);
 	});

@@ -20,7 +20,7 @@ import { readable } from "./readable";
  * name to the call it makes. What every keyed call crosses sits before
  * it, once (`keyed-call.ts`): the admission of the key as a `Caller`,
  * with the permission the procedure's meta names, and every error in the
- * codes older Devices know (`readable`). Pairing needs no key. The
+ * contract's codes (`readable`). Pairing needs no key. The
  * contract's input schemas check every input, with their defaults and
  * their transforms. Its output schemas describe a reply and never change
  * it.
@@ -104,9 +104,6 @@ export const hostRouter = os.router({
 		),
 	},
 	sync: {
-		pull: keyed.sync.pull.handler(({ context, input }) =>
-			context.exchange.pull(context.caller, input),
-		),
 		// A stream's handler yields: the web client reads that shape to keep a
 		// stream out of a batch.
 		stream: keyed.sync.stream.handler(async function* ({

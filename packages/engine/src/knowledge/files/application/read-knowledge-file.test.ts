@@ -78,7 +78,7 @@ describe("readKnowledgeFile", () => {
 		await expect(read()).rejects.toThrow(
 			"Night Shift cannot get this file now. Try again when the computer that keeps this Space is online.",
 		);
-		ports.archive.failWith = new OlderHostError(OLDER_HOST);
+		ports.archive.failWith = new OlderHostError();
 		await expect(read()).rejects.toThrow(OLDER_HOST);
 	});
 });

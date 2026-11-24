@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { clone } from "@nightshift/db/schema";
-import { NIGHT_SHIFT, OlderHostError } from "@nightshift/engine";
+import { NIGHT_SHIFT } from "@nightshift/engine";
 import { createSandbox, type Sandbox } from "@nightshift/engine/testing";
 import { Refusal } from "@nightshift/refusal";
 import { eq } from "drizzle-orm";
@@ -64,14 +64,8 @@ test("a Clone the Host missed heals when the link comes online, and one the Devi
 	expect(await devicesWithClone(projectId)).not.toContain(b.deviceId);
 });
 
-test("an older Host without setClones, or a Space where the person may not add projects, is left alone; another failure throws, for the link to try again", async () => {
+test("a Space where the person may not add projects is left alone; another failure throws, for the link to try again", async () => {
 	// The Host's answers come as the link hands them out: in this computer's words.
-	const older = partialHostClient({
-		sync: {
-			setClones: () => Promise.reject(new OlderHostError()),
-		},
-	});
-	await tellOnce(older);
 	const forbidden = partialHostClient({
 		sync: {
 			setClones: () =>
@@ -96,12 +90,12 @@ test("an older Host without setClones, or a Space where the person may not add p
 	).rejects.toThrow("Unable to connect.");
 });
 
-test("says the computer's fingerprint when it has one, and nothing without one", async () => {
-	const told: { machine?: string | undefined }[] = [];
+test("says whether it is a development install, and the computer's fingerprint when it has one", async () => {
+	const told: { dev: boolean; machine?: string | undefined }[] = [];
 	const client = partialHostClient({
 		sync: {
-			setClones: async (input: { machine?: string }) => {
-				told.push({ machine: input.machine });
+			setClones: async (input: { dev: boolean; machine?: string }) => {
+				told.push({ dev: input.dev, machine: input.machine });
 				return { added: [], removed: [] };
 			},
 		},
@@ -112,11 +106,15 @@ test("says the computer's fingerprint when it has one, and nothing without one",
 			spaces: async () => [a.spaceId],
 			projects: paired.device.projects,
 			deviceName: async () => "B",
+			...(machine ? { dev: true } : {}),
 			machine,
 		})(client, online.signal);
 		await Bun.sleep(20);
 		online.abort();
 		await said;
 	}
-	expect(told).toEqual([{ machine: "a".repeat(64) }, { machine: undefined }]);
+	expect(told).toEqual([
+		{ dev: true, machine: "a".repeat(64) },
+		{ dev: false, machine: undefined },
+	]);
 });

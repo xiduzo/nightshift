@@ -25,7 +25,6 @@ export function hostWork(
 				caller.deviceId,
 				signal ?? new AbortController().signal,
 				input.running,
-				{ stopWaits: input.stopWaits === true },
 			);
 		},
 

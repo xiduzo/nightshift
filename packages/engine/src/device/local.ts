@@ -16,7 +16,6 @@ import {
 	type AgentHarnessName,
 	deciderNameSchema,
 	FLOW_VERSION,
-	type FlowSources,
 	type JsonValue,
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
@@ -137,11 +136,6 @@ export type LocalDeviceDeps = {
 	 * cannot run such a project.
 	 */
 	runFolders?: Pick<RunFolders, "make">;
-	/**
-	 * The project's flows: its flow document (ADR 2), for a Walker of an
-	 * older Night Shift that asks this Device for them. Without it: none.
-	 */
-	flows?: (projectId: string) => Promise<FlowSources>;
 	/**
 	 * The git port: worktrees, Hand-offs and item branches, and finding git
 	 * before a worktree is added. Default: the git programs on this computer.
@@ -754,8 +748,6 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 				decider: deciderFacts
 					? { ...deciderFacts, builtin: deps.builtinModels?.() ?? {} }
 					: null,
-				requests: true,
-				readFiles: true,
 				flowVersion: FLOW_VERSION,
 				testRuns: true,
 				...(query.addresses?.length && decider?.checkAddress
@@ -815,7 +807,6 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 		readFile: ({ cwd, path, maxBytes }) =>
 			readFolderFile({ cwd, path, maxBytes }),
 		decide,
-		flows: async (projectId) => deps.flows?.(projectId) ?? {},
 		async worktree(run) {
 			const repoPath = await cloneOf(run.projectId);
 			const readiness = deps.checkProject

@@ -75,7 +75,7 @@ export function yjsSpaceProjects(
 			) {
 				return "unknown";
 			}
-			// An older Device may give a folder to a project without one.
+			// A Device may give a folder to a project without one.
 			if (withoutFolder(document, record.projectId)) return "without-folder";
 			await document.change(() => recordClone(document, record));
 			return "recorded";

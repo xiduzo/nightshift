@@ -58,7 +58,7 @@ describe("the procedures over HTTP", () => {
 		expect(missing.status).toBe("rejected");
 	});
 
-	test("an answer says what the daemon reads, and a large one comes compressed", async () => {
+	test("a large answer comes compressed", async () => {
 		const response = await fetch(`${daemon.url}/rpc/__batch__`, {
 			method: "POST",
 			headers: {
@@ -74,7 +74,6 @@ describe("the procedures over HTTP", () => {
 			),
 			decompress: false,
 		});
-		expect(response.headers.get("x-nightshift-reads")).toBe("batch, gzip");
 		expect(response.headers.get("content-encoding")).toBe("gzip");
 		expect(response.headers.get("vary")).toContain("Accept-Encoding");
 	});

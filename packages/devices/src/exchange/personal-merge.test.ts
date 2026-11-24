@@ -58,6 +58,7 @@ const local = (
 	createdAt: 1_000,
 	removedAt: null,
 	clone: true,
+	folder: true,
 	...extra,
 });
 
@@ -102,12 +103,12 @@ describe("sync.mergePersonal", () => {
 		expect(project?.clones.map((c) => c.deviceId)).toEqual([b.deviceId]);
 	});
 
-	test("a project without a folder stays one; an older Device's project has a folder", async () => {
+	test("a project without a folder stays one, and one with a folder has it", async () => {
 		await call().mergePersonal({
 			personId: localPerson,
 			projects: [
 				local("p-feeds", null, { clone: false, folder: false }),
-				local("p-older", null),
+				local("p-app", null),
 			],
 		});
 
@@ -116,7 +117,7 @@ describe("sync.mergePersonal", () => {
 			.listProjects();
 		expect(projects.map((p) => [p.id, p.folder, p.clones])).toEqual([
 			["p-feeds", false, []],
-			["p-older", true, [expect.objectContaining({ deviceId: b.deviceId })]],
+			["p-app", true, [expect.objectContaining({ deviceId: b.deviceId })]],
 		]);
 	});
 

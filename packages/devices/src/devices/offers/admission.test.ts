@@ -62,10 +62,6 @@ const device = {
 		ran.push({ kind: "capabilities" });
 		return { elsewhere: null, harnesses: [], connections: [], clis: [] };
 	},
-	async flows() {
-		ran.push({ kind: "flows" });
-		return {};
-	},
 	async *session(input: SessionInput) {
 		ran.push({ kind: "session", input });
 		yield { type: "ready", harness: input.harness };
@@ -249,6 +245,7 @@ async function listed(profile: string, sessionCap = 1) {
 			deviceId: DEVICE.id,
 			deviceName: DEVICE.name,
 			profile,
+			profileName: "coder",
 			permissionCap: "acceptEdits",
 			sessionCap,
 			offeredAt: 1,
@@ -359,8 +356,8 @@ for (const [path, call] of Object.entries(paths)) {
 	}
 
 	describe(`Offer admission, a run ${path}`, () => {
-		test("a renamed profile stays offered: a node names its id, a Walker of an older Night Shift its new name", async () => {
-			// "builder", offered before profiles had ids, is now named "coder".
+		test("a renamed profile stays offered by its id, and its name names no profile", async () => {
+			// The profile "builder" is now named "coder".
 			own = [
 				{
 					spaceId: SPACE,
@@ -377,12 +374,13 @@ for (const [path, call] of Object.entries(paths)) {
 					request({ call: offered("Do the work.", { profile: "builder" }) }),
 				),
 			).toBe("served");
-			expect(await outcome(request({ call: offered() }))).toBe("served");
-			expect(
-				await outcome(
-					request({ call: offered("Do the work.", { profile: "maker" }) }),
-				),
-			).toBe('hetzner-1 offers "coder" to this Space, not "maker".');
+			for (const profile of ["coder", "maker"]) {
+				expect(
+					await outcome(
+						request({ call: offered("Do the work.", { profile }) }),
+					),
+				).toBe(`hetzner-1 offers "coder" to this Space, not "${profile}".`);
+			}
 		});
 
 		test("another Person's run takes an Offer in force: its offered sessions and the run's own folder work", async () => {
@@ -411,9 +409,6 @@ for (const [path, call] of Object.entries(paths)) {
 					}),
 				),
 			).toBe("served");
-			expect(await outcome(request({ call: { kind: "flows" } }))).toBe(
-				"served",
-			);
 			// What a step changed in the run's folder: its own folder work too.
 			expect(
 				await outcome(
@@ -437,7 +432,6 @@ for (const [path, call] of Object.entries(paths)) {
 			expect(ran.map((r) => r.kind)).toEqual([
 				"session",
 				"worktree",
-				"flows",
 				"snapshotWorktree",
 				"worktreeChanges",
 				"readFile",
@@ -555,16 +549,23 @@ for (const [path, call] of Object.entries(paths)) {
 			expect(await outcome(request({ call: offered() }))).toBe("served");
 			// The colleague's role changes while the run walks: the next call is refused.
 			await mirror({ colleague: "viewer" });
-			expect(await outcome(request({ call: { kind: "flows" } }))).toBe(
-				"Your role in this Space does not let you use what others offer.",
-			);
+			expect(
+				await outcome(
+					request({
+						call: { kind: "worktree", run: { id: RUN, projectId: "p1" } },
+					}),
+				),
+			).toBe("Your role in this Space does not let you use what others offer.");
 		});
 
 		test("a call whose run names no starter is refused, and nothing runs", async () => {
 			await offer();
 			for (const r of [
 				request({ personId: "", call: offered() }),
-				request({ personId: "", call: { kind: "flows" } }),
+				request({
+					personId: "",
+					call: { kind: "worktree", run: { id: RUN, projectId: "p1" } },
+				}),
 			]) {
 				expect(await outcome(r)).toBe(NO_STARTER);
 			}

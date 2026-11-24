@@ -241,7 +241,7 @@ export function requestOf(
 
 /**
  * The payload of each Command kind on the wire, as a Device sends it and
- * a Host keeps it: what an older Device sends stays valid.
+ * a Host keeps it.
  */
 const payloads: { [K in RunCommandKind]: z.ZodType<PayloadOf<K>> } = {
 	"gate.resolve": z.object({

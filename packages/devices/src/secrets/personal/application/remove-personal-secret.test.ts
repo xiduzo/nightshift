@@ -14,9 +14,6 @@ function portsOf() {
 	};
 }
 
-const OLDER =
-	"Your home Host runs an older version of Night Shift. Update Night Shift there to use Personal secrets.";
-
 describe("removePersonalSecret", () => {
 	test("without a Home Host, this computer removes its owner's value itself", async () => {
 		const p = portsOf();
@@ -34,7 +31,6 @@ describe("removePersonalSecret", () => {
 			secrets: { remove: async (input: unknown) => void removed.push(input) },
 		});
 		await removePersonalSecret(p)({ name: "A_TOKEN" });
-		expect(p.calls.asked[0]?.olderHost).toBe(OLDER);
 		expect(removed).toEqual([{ name: "A_TOKEN" }]);
 		expect(await p.store.list("person-ada")).toHaveLength(1);
 	});

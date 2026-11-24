@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto";
 import {
 	type FlowDocuments,
 	HostUnreachableError,
-	OLDER_HOST,
 	START_DEADLINE_MS,
 	type WalkFile,
 } from "@nightshift/engine";
@@ -27,25 +26,8 @@ import { createSpaceRoutes } from "./route";
  *
  * The Host's errors come back in this computer's words: the Link's. Its
  * refusals keep their words and their kind, and a key the Host no longer
- * knows asks the person to pair this computer again. Each call here adds
- * only what a Host of a version without its procedure says.
+ * knows asks the person to pair this computer again.
  */
-
-/** What a person reads when the Host that keeps the Space cannot add a project for this computer. */
-export const OLDER_HOST_PROJECTS =
-	"Your Host runs an older version of Night Shift. Update Night Shift there, or add this repository on your Host.";
-
-/** What a person reads when the Host that keeps the Space cannot add a project without a folder. */
-export const OLDER_HOST_NO_FOLDER =
-	"Your Host runs an older version of Night Shift. Update Night Shift there to add a project without a folder.";
-
-/** What a person reads when the Host that keeps the Space cannot start a test run (ADR 27). */
-export const OLDER_HOST_TEST_RUN =
-	"The computer that keeps this Space runs an older version of Night Shift. Update Night Shift there to run a test.";
-
-/** What a run reads when the Host that keeps its Space does not know leases. */
-export const OLDER_HOST_LEASES =
-	"The computer that keeps this Space runs an older version of Night Shift. Update Night Shift there to use a Lease node.";
 
 export function createRelay(deps: {
 	/** Lazy: the engine is made with this relay. */
@@ -84,9 +66,7 @@ export function createRelay(deps: {
 	}
 
 	/**
-	 * A lease call to the Host that keeps the Space (ADR 7). A Host of a
-	 * version before leases does not know the procedure: the run reads that
-	 * it must update the Host. A call the network cuts, or that does not
+	 * A lease call to the Host that keeps the Space (ADR 7). A call the network cuts, or that does not
 	 * settle in time, is a Host that cannot be reached, so the run waits
 	 * for it, as it does without a Link.
 	 */
@@ -96,7 +76,6 @@ export function createRelay(deps: {
 	): Promise<T> {
 		try {
 			return await onHost(spaceId, use, {
-				olderHost: OLDER_HOST_LEASES,
 				late: () => new HostUnreachableError(),
 			});
 		} catch (error) {
@@ -137,19 +116,15 @@ export function createRelay(deps: {
 
 		async addProject({ spaceId, name, remote }) {
 			// The Host adds it in the name of the key's Person.
-			return onHost(
-				spaceId,
-				(client) => client.sync.addProject({ spaceId, name, remote }),
-				{ olderHost: OLDER_HOST_PROJECTS },
+			return onHost(spaceId, (client) =>
+				client.sync.addProject({ spaceId, name, remote }),
 			);
 		},
 
 		async addWithoutFolder({ spaceId, name }) {
 			// The Host adds it in the name of the key's Person.
-			return onHost(
-				spaceId,
-				(client) => client.sync.addWithoutFolder({ spaceId, name }),
-				{ olderHost: OLDER_HOST_NO_FOLDER },
+			return onHost(spaceId, (client) =>
+				client.sync.addWithoutFolder({ spaceId, name }),
 			);
 		},
 
@@ -175,12 +150,10 @@ export function createRelay(deps: {
 			if (ref.kind !== "content") {
 				return to.ask((client) => client.archive.get({ ref }));
 			}
-			// Knowledge content travels in base64. A Host of a version before
-			// knowledge in the Space (ADR 4) says so: not a failed sync.
+			// Knowledge content travels in base64.
 			const { spaceId, sha256 } = ref;
-			const content = await to.ask(
-				(client) => client.archive.knowledgeGet({ spaceId, sha256 }),
-				{ olderHost: OLDER_HOST },
+			const content = await to.ask((client) =>
+				client.archive.knowledgeGet({ spaceId, sha256 }),
 			);
 			return content === null
 				? null
@@ -196,9 +169,8 @@ export function createRelay(deps: {
 				const content = Buffer.from(entry.content as Uint8Array).toString(
 					"base64",
 				);
-				await to.ask(
-					(client) => client.archive.knowledgePut({ spaceId, sha256, content }),
-					{ olderHost: OLDER_HOST },
+				await to.ask((client) =>
+					client.archive.knowledgePut({ spaceId, sha256, content }),
 				);
 			} else {
 				const { ref, content, stamp } = entry as WalkFile;
@@ -245,8 +217,7 @@ export function createRelay(deps: {
 					);
 				}
 			}
-			// A test run goes on its own procedure (ADR 27): the start of an
-			// older Host would drop its pins and skips and run every node.
+			// A test run goes on its own procedure (ADR 27).
 			// Longer than the Host's own limit on a start, so its refusal comes first.
 			return to.ask(
 				(client, signal) =>
@@ -260,9 +231,6 @@ export function createRelay(deps: {
 							"unavailable",
 							"The computer that keeps this Space did not answer in time. Check the run list, then start the run again.",
 						),
-					...(start.test !== undefined
-						? { olderHost: OLDER_HOST_TEST_RUN }
-						: {}),
 				},
 			);
 		},

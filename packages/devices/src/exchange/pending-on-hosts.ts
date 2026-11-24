@@ -14,8 +14,6 @@ import type { CommandsChange } from "./commands";
  *   next set replaces it. It also goes by itself after `sentMs`: the
  *   Host sends a set only when it changes, and the sets with this action
  *   may have come before it, the last one without it.
- * - A Host of an older version says nothing: this Device knows only its
- *   own table, as before.
  * - A link that drops keeps the last set: the next one replaces it when
  *   the link is back. A reload starts empty and asks again.
  */
@@ -28,8 +26,6 @@ export type PendingOnHosts = {
 	 * the set has no action of that kind for the run yet.
 	 */
 	add(hostId: string, command: PendingElsewhere): void;
-	/** Forgets a Host's set: it does not say what waits there. */
-	forget(hostId: string): void;
 	/** The Commands of these runs that wait on a Host, by run id, oldest first. */
 	of(runIds: readonly string[]): Map<string, PendingElsewhere[]>;
 	/**
@@ -82,21 +78,17 @@ export function createPendingOnHosts(
 	}
 
 	/** Puts a Host's set in place, and tells of each run whose Commands changed. */
-	function replace(
-		hostId: string,
-		next: readonly PendingElsewhere[] | undefined,
-	) {
+	function replace(hostId: string, next: readonly PendingElsewhere[]) {
 		const before = idsByRun(byHost.get(hostId) ?? []);
 		// A sent action the next set leaves out has no end to wait for.
-		const kept = new Set((next ?? []).map((c) => c.id));
+		const kept = new Set(next.map((c) => c.id));
 		for (const c of byHost.get(hostId) ?? []) {
 			if (kept.has(c.id)) continue;
 			sent.get(c.id)?.();
 			sent.delete(c.id);
 		}
-		if (next) byHost.set(hostId, next);
-		else byHost.delete(hostId);
-		const after = idsByRun(next ?? []);
+		byHost.set(hostId, next);
+		const after = idsByRun(next);
 		const changes: CommandsChange[] = [];
 		for (const [runId, run] of before) {
 			if (after.get(runId)?.ids !== run.ids) {
@@ -140,10 +132,6 @@ export function createPendingOnHosts(
 					}
 				}),
 			);
-		},
-
-		forget(hostId) {
-			if (byHost.has(hostId)) replace(hostId, undefined);
 		},
 
 		of(runIds) {

@@ -9,8 +9,6 @@ export const MERGE_WORDS = {
 		"Your home Host does not show your personal Space yet. Try again in a minute.",
 	isHost:
 		"Other devices use this computer as their Host. Its Personal stays as it is.",
-	olderHost:
-		"Your home Host runs an older version of Night Shift. Update it, then merge.",
 	leaving:
 		"This computer still leaves your old Host. Let the runs on this computer finish or stop them, then merge.",
 	changed: "Your projects changed while they moved. Try again in a minute.",

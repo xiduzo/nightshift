@@ -215,17 +215,12 @@ describe("the Devices of a Person in a Space kept here", () => {
 		]);
 	});
 
-	test("for a node, an offered Device counts only for a role that uses Offers", async () => {
-		const forNode = async (mayUse: boolean) =>
-			(
-				await placementWith({
-					paired: [THEIRS],
-					offering: ["theirs"],
-					mayUse,
-				}).placement.devicesFor(SPACE, OWNER, PROJECT, { profile: "coder" })
-			).map((d) => d.deviceId);
-		expect(await forNode(true)).toEqual([WALKER, "theirs"]);
-		expect(await forNode(false)).toEqual([WALKER]);
+	test("asked for the Person's own, no offered Device counts", async () => {
+		const devices = await placementWith({
+			paired: [THEIRS],
+			offering: ["theirs"],
+		}).placement.devicesFor(SPACE, OWNER, PROJECT, true);
+		expect(devices.map((d) => d.deviceId)).toEqual([WALKER]);
 	});
 
 	test("a run can be placed on the ones online, and not on a development install", async () => {

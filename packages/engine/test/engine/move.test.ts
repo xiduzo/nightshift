@@ -129,12 +129,12 @@ async function computer(
 					if (!target.online) throw new Error("The planner refuses it.");
 					return { id: target.deviceId, name: target.name };
 				},
-				devicesFor: async (spaceId, personId, projectId, forNode) => [
+				devicesFor: async (spaceId, personId, projectId, ownOnly) => [
 					...(await alone.placement.devicesFor(
 						spaceId,
 						personId,
 						projectId,
-						forNode,
+						ownOnly,
 					)),
 					...others(),
 				],

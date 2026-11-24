@@ -4,6 +4,5 @@ export {
 	capabilitiesFor,
 	olderNightShift,
 	refusalOf,
-	UNADVERTISED_FLOW_VERSION,
 	unfit,
 } from "./fit";

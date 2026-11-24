@@ -750,16 +750,14 @@ describe("the merge of Personal", () => {
 	test("an older Host without the merge refuses it politely", async () => {
 		const { link } = online({ push: false });
 		await ready(link);
-		// The Link says so for a Host that does not know the procedure, with
-		// the words the caller gives for it.
+		// The Link says so for a Host that does not know the procedure.
 		const older: Link = {
 			...link,
-			call: (_use, options) =>
-				Promise.reject(new OlderHostError(options?.olderHost)),
+			call: () => Promise.reject(new OlderHostError()),
 		};
 
-		await expect(merger(older).preview()).rejects.toThrow(
-			MERGE_WORDS.olderHost,
+		await expect(merger(older).preview()).rejects.toBeInstanceOf(
+			OlderHostError,
 		);
 		expect(await b.db.select().from(spaceMerge)).toEqual([]);
 	});

@@ -207,23 +207,21 @@ export function mergeSteps(deps: MergeDeps & { record: MembershipRecord }) {
 	): Promise<HostAnswer> {
 		const projects = await engine.projects.ofSpace(from);
 		try {
-			return await link.call(
-				(client) =>
-					client.sync.mergePersonal({
-						personId: deps.ownerId,
-						projects: projects.map((p) => ({
-							id: p.id,
-							name: p.name,
-							remote: p.remote,
-							createdAt: p.createdAt,
-							removedAt: p.removedAt,
-							clone: p.clone,
-							folder: p.folder,
-						})),
-						join: [...joined],
-						dryRun,
-					}),
-				{ olderHost: MERGE_WORDS.olderHost },
+			return await link.call((client) =>
+				client.sync.mergePersonal({
+					personId: deps.ownerId,
+					projects: projects.map((p) => ({
+						id: p.id,
+						name: p.name,
+						remote: p.remote,
+						createdAt: p.createdAt,
+						removedAt: p.removedAt,
+						clone: p.clone,
+						folder: p.folder,
+					})),
+					join: [...joined],
+					dryRun,
+				}),
 			);
 		} catch (error) {
 			if (deps.engineKernel.isHostUnreachable(error)) {

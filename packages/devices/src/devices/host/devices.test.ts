@@ -93,6 +93,8 @@ test("a join ends what an earlier leave left before its link starts", async () =
 				personId: "person",
 				host: { id: "host", name: "Studio", addresses: [] },
 				deviceId: "me",
+				walkerSeq: 0,
+				hostAdmin: true,
 			})),
 		},
 	});

@@ -29,7 +29,7 @@ type Ollama = Awaited<ReturnType<typeof createOllama>>;
 export function wireLocalDevice(
 	deps: Pick<
 		LocalDeviceDeps,
-		"id" | "name" | "toolLaunchers" | "clonePath" | "knowledge" | "flows"
+		"id" | "name" | "toolLaunchers" | "clonePath" | "knowledge"
 	> & {
 		config: ConfigStores;
 		/** Who may ask of this computer: its owner. */
@@ -95,9 +95,6 @@ export function wireLocalDevice(
 		// A run of a project without a folder works in a folder of its own
 		// here, next to the run history (ADR 22).
 		runFolders: createRunFolders(dataDir),
-		// The flows another Device's older Walker asks this one for: the
-		// engine's (made later, before anyone can ask).
-		flows: deps.flows,
 		// The files agents keep for the person, next to the run history.
 		artifacts: createArtifactStore(dataDir),
 		// The projects' knowledge, outside every repository, in step with the Space.

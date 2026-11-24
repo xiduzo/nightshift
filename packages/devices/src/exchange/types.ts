@@ -39,16 +39,14 @@ import type {
  * written for people.
  */
 export type HostExchange = {
-	/** Rows of the Spaces the Caller's Person is a Member of, after the cursors, but the Device's own. */
-	pull(caller: Caller, input: { cursors: SyncCursors }): Promise<SyncBatch>;
 	/**
-	 * The same, then every new batch as rows land, until the signal
-	 * aborts. `commands: false` leaves the Commands out: the Device takes
-	 * them from `commands`.
+	 * Rows of the Spaces the Caller's Person is a Member of, after the
+	 * cursors, but the Device's own. Then every new batch as rows land,
+	 * until the signal aborts.
 	 */
 	stream(
 		caller: Caller,
-		input: { cursors: SyncCursors; commands?: boolean },
+		input: { cursors: SyncCursors },
 		signal?: AbortSignal,
 	): AsyncIterable<SyncBatch>;
 	/**
@@ -136,9 +134,9 @@ export type HostExchange = {
 			spaceId: string;
 			projectIds: string[];
 			deviceName: string;
-			/** A development install (ADR 17). An older Device leaves it out. */
-			dev?: boolean | undefined;
-			/** The fingerprint of its computer (ADR 20). An older Device leaves it out. */
+			/** A development install (ADR 17). */
+			dev: boolean;
+			/** The fingerprint of its computer (ADR 20). Only to a home Host. */
 			machine?: string | undefined;
 		},
 	): Promise<{ added: string[]; removed: string[] }>;
@@ -153,8 +151,8 @@ export type HostExchange = {
 			spaceId: string;
 			/** The profile's id. */
 			profile: string;
-			/** The profile's name. A Device from before ids sends none: its id is its name. */
-			profileName?: string;
+			/** The profile's name. */
+			profileName: string;
 			deviceName: string;
 		},
 	): Promise<void>;
@@ -163,7 +161,7 @@ export type HostExchange = {
 		caller: Caller,
 		input: { spaceId: string; profile: string },
 	): Promise<void>;
-	/** Keeps a file of a run the Device walks, with its stamp for a step's file (none from an older Walker). */
+	/** Keeps a file of a run the Device walks, with its stamp for a step's file. */
 	archivePut(
 		caller: Caller,
 		input: { ref: ArchiveRef; content: string; stamp?: CopyStamp },
@@ -212,11 +210,7 @@ export type HostExchange = {
 	 */
 	work(
 		caller: Caller,
-		input: {
-			running: string[];
-			/** The Device ends a cancelled call after its cleanup: a stop keeps the call open. */
-			stopWaits?: boolean;
-		},
+		input: { running: string[] },
 		signal?: AbortSignal,
 	): AsyncIterable<WorkDelivery>;
 	/** The Caller's Device answers a call it took. */
@@ -264,8 +258,7 @@ export type HostExchange = {
 	): AsyncIterable<WorkReply>;
 	/**
 	 * Stops a call the Caller's Device made with this `stopId`: the Device
-	 * cancels it, and its stream ends after the Device's cleanup there when
-	 * that Device says `stopWaits`, else at once. False: no such call is
+	 * cancels it, and its stream ends after the Device's cleanup there. False: no such call is
 	 * open now.
 	 */
 	stop(caller: Caller, input: { id: string }): Promise<{ known: boolean }>;

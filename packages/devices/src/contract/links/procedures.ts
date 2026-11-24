@@ -43,8 +43,7 @@ export const linkProcedures = {
 		.output(described(z.void())),
 	/**
 	 * The Device leaves this Host (`nightshift leave`): its access here
-	 * ends, as when its owner removes it. An older Host has none: the
-	 * Device leaves on its own, and the Host still lists it.
+	 * ends, as when its owner removes it.
 	 */
 	leave: sync
 		.route({
@@ -68,8 +67,8 @@ export const pairingProcedures = {
 				platform: z.string().trim().min(1).max(32),
 				/** The fingerprint of its computer (ADR 20). Only to a home Host. */
 				machine: machineFingerprintSchema.optional(),
-				/** The Device asks this Host to be its home Host. An older Device leaves it out. */
-				home: z.boolean().optional(),
+				/** The Device asks this Host to be its home Host. */
+				home: z.boolean(),
 			}),
 		)
 		.output(described(pairingStartSchema)),

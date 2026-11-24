@@ -24,7 +24,6 @@ import {
 import type { Flow } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
 import { asDate, now as timeNow } from "@nightshift/time";
-import { ORPCError } from "@orpc/client";
 import { and, eq } from "drizzle-orm";
 import type { HostClient } from "../contract";
 import {
@@ -848,6 +847,8 @@ describe("the Device's exchange with its Host", () => {
 			label: "the Command done on A",
 		});
 		await waitFor(() => reported.length === 2, { label: "both reports" });
+		// The Host sends it no more: nothing holds it here.
+		await waitFor(() => applied.size === 0, { label: "nothing held" });
 		expect(applies).toBe(1);
 		expect(reported).toEqual([null, null]);
 		expect(await commandOnA(command?.id as string)).toEqual({
@@ -1149,48 +1150,6 @@ describe("the Device's exchange with its Host", () => {
 		expect(applied).toEqual([early.id]);
 	});
 
-	test("a Host of an older version has no Commands stream: its Commands come with the rows", async () => {
-		const run = await walkOnB(gateFlow);
-		const client = paired.memory.client(paired.key);
-		let asked = 0;
-		online(
-			withSync(client, {
-				// It knows neither the procedure nor the option.
-				commands: (async () => {
-					asked++;
-					throw new ORPCError("NOT_FOUND", { status: 404 });
-				}) as HostClient["sync"]["commands"],
-				stream: ((input, options) =>
-					client.sync.stream(
-						{ cursors: input.cursors },
-						options,
-					)) as HostClient["sync"]["stream"],
-			}),
-		);
-		await untilStatus(paired.host, run.id, "waiting");
-		const gate = (
-			await paired.host.space(a.spaceId, NIGHT_SHIFT).listGates()
-		)[0];
-		await paired.host
-			.space(a.spaceId, { personId: paired.personId, door: "session" })
-			.act(run.id, {
-				kind: "answer",
-				stepId: gate?.stepId as string,
-				choice: "approve",
-			});
-		const [command] = await paired.host.exchange.commands.pendingOf([run.id]);
-		await untilStatus(paired.device, run.id, "finished");
-		await waitFor(async () => (await commandOnA(command?.id as string)).done, {
-			label: "the Command done on A",
-		});
-		expect(await commandOnA(command?.id as string)).toEqual({
-			done: true,
-			error: null,
-		});
-		// It asked once, and waits: no stream that starts again and again.
-		expect(asked).toBe(1);
-	});
-
 	test("an answer C sends shows on C as on its way at once, and stays so until B applies it", async () => {
 		// A's sets after the first wait until `late`: only C itself can know.
 		const late = Promise.withResolvers<void>();
@@ -1287,32 +1246,6 @@ describe("the Device's exchange with its Host", () => {
 		});
 		await untilStatus(desktop.engine, run.id, "finished");
 		expect(await onC.listGates()).toEqual([]);
-	});
-
-	test("a Host of an older version has no pending stream: C knows only its own Commands, and asks once", async () => {
-		let asked = 0;
-		const { run, desktop, onC } = await desktopBesideB((client) =>
-			withSync(client, {
-				pending: (async () => {
-					asked++;
-					throw new ORPCError("NOT_FOUND", { status: 404 });
-				}) as HostClient["sync"]["pending"],
-			}),
-		);
-		const [gate] = await onC.listGates();
-		await onC.act(run.id, {
-			kind: "answer",
-			stepId: gate?.stepId as string,
-			choice: "approve",
-		});
-		// As before: nothing says the answer waits on the Host.
-		expect((await onC.listGates())[0]?.answerPending).toBe(false);
-		expect(desktop.engine.exchange.pendingOnHosts.of([run.id]).size).toBe(0);
-		await Bun.sleep(500);
-		expect(asked).toBe(1);
-		expect(
-			await paired.host.exchange.commands.pendingOf([run.id]),
-		).toHaveLength(1);
 	});
 
 	test("B keeps walking while A is away, and A catches up from the cursor when the link is back", async () => {

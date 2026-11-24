@@ -38,6 +38,7 @@ const hello = (addresses: string[]): HostHello => ({
 	deviceId: "device-b",
 	personId: "person-a",
 	spaces: [],
+	hostAdmin: true,
 });
 
 const unreachable = () => Promise.reject(new TypeError("Unable to connect."));
@@ -155,35 +156,6 @@ describe("httpsLink", () => {
 			up = true;
 			await until(() => link.state().status === "online");
 			expect(states).toEqual(["online", "offline", "online"]);
-		} finally {
-			await link.close();
-		}
-	});
-
-	test("keeps the Host's last answer while online, and none while offline: what its version can do", async () => {
-		let up = true;
-		let answer: HostHello = hello([]);
-		const host = fakeHost({
-			"https://studio.example.com": () =>
-				up ? Promise.resolve(answer) : unreachable(),
-		});
-		const link = httpsLink({
-			link: LINK,
-			key: "nsd_key",
-			clientFor: host.clientFor,
-			heartbeatMs: 5,
-			firstBackoffMs: 5,
-		});
-		try {
-			expect(link.hello()).toBeNull();
-			await until(() => link.state().status === "online");
-			expect(link.hello()).toEqual(hello([]));
-			// The Host was updated: its next answer says more.
-			answer = { ...hello([]), stopWaits: true };
-			await until(() => link.hello()?.stopWaits === true);
-			up = false;
-			await until(() => link.state().status === "offline");
-			expect(link.hello()).toBeNull();
 		} finally {
 			await link.close();
 		}
@@ -367,19 +339,17 @@ describe("httpsLink", () => {
 		const add = (client: HostClient) =>
 			client.sync.addProject({ spaceId: "s", name: "app", remote: "r" });
 
-		test("a call, a stream and the client itself: an older Host says the caller's words, a refusal keeps the Host's", async () => {
+		test("a call, a stream and the client itself: an older Host says the one sentence, a refusal keeps the Host's", async () => {
 			let answer: () => Promise<never> = () =>
 				Promise.reject(new ORPCError("NOT_FOUND"));
 			const link = hostWith(() => answer());
 			try {
 				const client = await link.ready();
-				const older = await link
-					.call(add, { olderHost: "Update the studio." })
-					.catch((error: unknown) => error);
+				const older = await link.call(add).catch((error: unknown) => error);
 				expect(older).toBeInstanceOf(OlderHostError);
 				expect(older).toMatchObject({
 					kind: "unavailable",
-					message: "Update the studio.",
+					message: new OlderHostError().message,
 				});
 				await expect(add(client)).rejects.toBeInstanceOf(OlderHostError);
 				let seen: unknown;

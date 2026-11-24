@@ -27,15 +27,15 @@ describe("the Devices a person may place a step on", () => {
 		expect(
 			await list(ada, { spaceId: "space-own", projectId: "project-1" }),
 		).toEqual([laptop]);
-		const forNode = { type: "agent" } as never;
-		await list(ada, { spaceId: "space-own", projectId: "project-1", forNode });
+		const ownOnly = true;
+		await list(ada, { spaceId: "space-own", projectId: "project-1", ownOnly });
 		expect(ports.planner.listed).toEqual([
 			{ spaceId: "space-own", personId: "person-ada", projectId: "project-1" },
 			{
 				spaceId: "space-own",
 				personId: "person-ada",
 				projectId: "project-1",
-				forNode,
+				ownOnly,
 			},
 		]);
 	});

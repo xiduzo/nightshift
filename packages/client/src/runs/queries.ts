@@ -159,11 +159,11 @@ export function createRunQueries(orpc: ApiQueryUtils) {
 		}),
 		/**
 		 * The person's Devices for the project, online or not. With
-		 * `forNode`, the Devices that node may name, as the Host decides.
+		 * `ownOnly`, without other persons' Devices.
 		 */
-		devices: (projectId: string, forNode?: { profile?: string }) =>
+		devices: (projectId: string, ownOnly?: boolean) =>
 			orpc.runs.devices.queryOptions({
-				input: { projectId, ...(forNode ? { forNode } : {}) },
+				input: { projectId, ...(ownOnly ? { ownOnly } : {}) },
 			}),
 		/** Records whether you found this run useful. */
 		useful: () => orpc.runs.useful.mutationOptions(),

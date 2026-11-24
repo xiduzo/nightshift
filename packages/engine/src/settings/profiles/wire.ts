@@ -19,13 +19,11 @@ export type ProfileStore = {
 	load(): Promise<void>;
 	list(): ProfileView[];
 	get(id: string): ProfileView | null;
-	/** The profile with that name, as a flow names it. */
+	/** The profile with that name. */
 	byName(name: string): ProfileView | null;
 	/**
 	 * What a run resolves a node with, or null when there is no such
-	 * profile. A flow names a profile by its id. A Walker of an older Night
-	 * Shift asks by the name: an old profile's id is its name, and a newer
-	 * profile of that name is found by it. Only this Device's own profiles:
+	 * profile. A flow names a profile by its id. Only this Device's own profiles:
 	 * never another Device's of the same name (ADR 3).
 	 */
 	settingsFor(id: string): ProfileSettings | null;

@@ -5,16 +5,15 @@ type OfferedSession = {
 	runId: string;
 	deviceId: string;
 	spaceId: string;
-	/** The profile as the node names it: its id, or its name for a run from before ids. */
+	/** The profile's id, as the node names it. */
 	profile: string;
 };
 
-/** An Offer whose sessions withdrawing it stops: its profile's id and name. */
+/** An Offer whose sessions withdrawing it stops: its profile's id. */
 export type OfferRef = {
 	spaceId: string;
 	deviceId: string;
 	profile: string;
-	profileName: string;
 };
 
 /**
@@ -72,8 +71,7 @@ export function createOfferedSessions() {
 							(e) =>
 								e.spaceId === offer.spaceId &&
 								e.deviceId === offer.deviceId &&
-								(e.profile === offer.profile ||
-									e.profile === offer.profileName),
+								e.profile === offer.profile,
 						)
 						.map((e) => e.runId),
 				),

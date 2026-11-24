@@ -1,4 +1,3 @@
-import { UNADVERTISED_FLOW_VERSION } from "../../../../graph";
 import { placedRun } from "../../../../log";
 import type { PlacementPort } from "../../..";
 import type { MoveDevices } from "../../application/ports";
@@ -14,7 +13,7 @@ export type PlacementMoveDevicesDeps = Pick<
  * daemon (its registry, its Links and its Offers), the fake of a computer
  * alone in the engine's tests. The planner decides which Devices are the
  * Person's own and refuses one that is offline. A Device that does not say
- * which flow format it reads reads format 8 (`UNADVERTISED_FLOW_VERSION`).
+ * which flow format it reads does not walk the run.
  */
 export function placementMoveDevices(
 	placement: PlacementMoveDevicesDeps,
@@ -27,7 +26,7 @@ export function placementMoveDevices(
 				.deviceById(target.id, placedRun(run), target.name)
 				.capabilities();
 			return {
-				flowVersion: has.flowVersion ?? UNADVERTISED_FLOW_VERSION,
+				flowVersion: has.flowVersion,
 				testRuns: has.testRuns === true,
 			};
 		},

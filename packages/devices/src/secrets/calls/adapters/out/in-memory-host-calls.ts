@@ -9,7 +9,7 @@ import type { HostCalls } from "../../application/ports";
 export function inMemoryHostCalls() {
 	let homeHost: { hostId: string; personId: string } | null = null;
 	const hosts = new Map<string, unknown>();
-	const asked: { hostId: string; deadlineMs: number; olderHost: string }[] = [];
+	const asked: { hostId: string; deadlineMs: number }[] = [];
 	const twin = {
 		hosts,
 		asked,
@@ -26,7 +26,7 @@ export function inMemoryHostCalls() {
 		async ask<T>(
 			hostId: string,
 			onHost: (client: HostClient) => Promise<T>,
-			options: { deadlineMs: number; olderHost: string },
+			options: { deadlineMs: number },
 		): Promise<T> {
 			asked.push({ hostId, ...options });
 			const client = hosts.get(hostId);

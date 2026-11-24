@@ -187,6 +187,9 @@ const joinedAnswer: Joined = {
 	key: "device-key",
 	personId: "person-bob",
 	host: { id: "host-a", name: "Studio", addresses: [] },
+	deviceId: "device-b",
+	walkerSeq: 0,
+	hostAdmin: true,
 };
 
 describe("joining a Host as its home Host", () => {
@@ -207,12 +210,12 @@ describe("joining a Host as its home Host", () => {
 		}
 	});
 
-	test("with a Host of an older version, which does not say who its Host admin is", async () => {
+	test("as a guest: it does not ask to be its home Device", async () => {
 		const host = pairingHost(joinedAnswer);
 		try {
 			const steps = await joinSteps(host.url, "guest");
 			expect(host.asked).toEqual([{ home: false }]);
-			expect(steps.at(-1)).toMatchObject({ role: "guest", hostAdmin: null });
+			expect(steps.at(-1)).toMatchObject({ role: "guest", hostAdmin: true });
 		} finally {
 			host.server.stop(true);
 		}

@@ -210,10 +210,6 @@ export function wireOffers(ground: { now?: () => number } = {}) {
 				const found = profiles.get(id);
 				return found ? { id: found.id, name: found.name } : null;
 			},
-			byName: (name) => {
-				const found = profiles.byName(name);
-				return found ? { id: found.id, name: found.name } : null;
-			},
 			agent: (id) => {
 				const found = profiles.get(id);
 				if (!found || !isAgentProfile(found)) return null;

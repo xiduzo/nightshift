@@ -2,7 +2,6 @@ import type { HostCalls } from "../../calls";
 import type { ProjectSecretStore } from "../../kept";
 import {
 	atKeeper,
-	OLDER_HOST_PROJECT_SECRETS,
 	type ProjectAt,
 	projectAccess,
 } from "../domain/project-secrets";
@@ -64,7 +63,6 @@ export const removeProjectSecret =
 						client.projectSecrets.remove({ ...at, name: request.name }),
 					{
 						deadlineMs: ports.deadlineMs,
-						olderHost: OLDER_HOST_PROJECT_SECRETS,
 					},
 				),
 		);

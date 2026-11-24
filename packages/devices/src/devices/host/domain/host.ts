@@ -11,7 +11,7 @@ export type PairingReviewView = {
 	userCode: string;
 	/** The Person who reviews it is the Host admin. */
 	hostAdmin: boolean;
-	/** The Device asks this Host to be its home Host. Null: an older Device did not say. */
+	/** The Device asks this Host to be its home Host. Null: this Host started again since. */
 	home: boolean | null;
 	status: "pending" | "approved" | "denied";
 	device: { id: string; name: string | null; platform: string | null };

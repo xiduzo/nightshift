@@ -2,7 +2,6 @@ import type * as Engine from "@nightshift/engine";
 import type {
 	Device,
 	DeviceProfile,
-	NodeToPlace,
 	OfferedPlacement,
 	OwnDevice,
 	PeerProfiles,
@@ -28,7 +27,6 @@ import {
 	hostOffersNothing,
 	offerRefusal,
 	offersNothing,
-	offerTakes,
 	spaceOffers,
 } from "../../offers";
 import type { DeviceRegistry } from "../../registry";
@@ -183,8 +181,6 @@ export function createPlacement(deps: PlacementDeps) {
 						return {
 							...d,
 							thisDevice: false,
-							// A Host of a version before ADR 22 says no for a project without a folder.
-							hasClone: hasProject(project, d.hasClone),
 							...(profiles ? { profiles } : {}),
 						};
 					}),
@@ -269,7 +265,7 @@ export function createPlacement(deps: PlacementDeps) {
 		spaceId: string,
 		personId: string,
 		projectId: string,
-		forNode?: NodeToPlace,
+		ownOnly?: boolean,
 	): Promise<OwnDevice[]> {
 		const own = await ownDevices(spaceId, personId, projectId);
 		const [here, ...rest] = own as [OwnDevice, ...OwnDevice[]];
@@ -293,11 +289,7 @@ export function createPlacement(deps: PlacementDeps) {
 			...rest,
 			...(await offeredDevices(spaceId, personId, projectId, own)),
 		];
-		if (!forNode) return all;
-		const mayUse = (await deps.mayUseOffers?.(spaceId, asking)) ?? false;
-		return all.filter(
-			(d) => d.offers === undefined || offerTakes(forNode, d.offers, mayUse),
-		);
+		return ownOnly ? all.filter((d) => d.offers === undefined) : all;
 	}
 
 	/** The Devices a run of the project can run on: online, with a Clone. */

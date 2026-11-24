@@ -22,13 +22,7 @@ export function hostSync(
 	shared: HostShared,
 ): Pick<
 	HostExchange,
-	| "pull"
-	| "stream"
-	| "commands"
-	| "pending"
-	| "push"
-	| "command"
-	| "commandDone"
+	"stream" | "commands" | "pending" | "push" | "command" | "commandDone"
 > {
 	const { deps, door } = shared;
 	const { engine, registry } = deps;
@@ -40,15 +34,14 @@ export function hostSync(
 		return (await registry.get(walkerId))?.ownerId ?? null;
 	}
 
-	/** The rows of `spaces` after `cursors` (default: the Person's Spaces), every Walker's but the Device's own. */
+	/** The rows of `spaces` after `cursors`, every Walker's but the Device's own. */
 	async function batch(
 		caller: Caller,
 		cursors: SyncCursors,
-		withCommands = true,
-		spaces?: readonly string[],
+		spaces: readonly string[],
 	): Promise<SyncBatch> {
 		const { rows, cursors: moved } = await exchange.rowsAfter({
-			spaces: spaces ?? (await caller.spaces()),
+			spaces,
 			cursors,
 			except: caller.deviceId,
 		});
@@ -62,41 +55,34 @@ export function hostSync(
 				(walkerId) => owners.get(walkerId) === caller.personId,
 			),
 			cursors: moved,
-			commands: withCommands
-				? await exchange.commands.pendingFor(caller.deviceId)
-				: [],
 			follows: exchange.feeds.wanted(caller.deviceId),
 		};
 	}
 
 	/**
-	 * Resolves when rows land that the Device lacks (of `on.rows`' Spaces,
-	 * another Walker's), the Commands change (with `commands`), the steps
-	 * someone follows of the Device's runs change, the time is up, or the
-	 * signal aborts.
+	 * Resolves when what `on` names changes, the time is up, or the signal
+	 * aborts. The rows: those the Device lacks (of these Spaces, another
+	 * Walker's), and the steps someone follows of the Device's runs.
 	 */
 	function change(
 		signal: AbortSignal,
 		deviceId: string,
-		on: { rows: readonly string[] | null; commands: boolean },
+		on: { rows: readonly string[] } | "commands",
 	): Promise<void> {
 		return new Promise((resolve) => {
 			const done = () => {
 				off();
-				offFollows();
 				clearTimeout(timer);
 				signal.removeEventListener("abort", done);
 				resolve();
 			};
-			const off = on.commands
-				? exchange.commands.onChanged(done)
-				: () => undefined;
-			const offFollows = on.rows
-				? exchange.feeds.onWanted(deviceId, done)
-				: () => false;
+			const off =
+				on === "commands"
+					? exchange.commands.onChanged(done)
+					: exchange.feeds.onWanted(deviceId, done);
 			const timer = setTimeout(done, STREAM_IDLE_MS);
 			// Not the rows this Device pushed: it has them.
-			if (on.rows) {
+			if (on !== "commands") {
 				void exchange
 					.landed(signal, STREAM_IDLE_MS, {
 						spaces: on.rows,
@@ -117,12 +103,8 @@ export function hostSync(
 			.join();
 
 	return {
-		pull: (caller, { cursors }) => batch(caller, cursors),
-
 		async *stream(caller, input, signal) {
 			let at = input.cursors;
-			const withCommands = input.commands !== false;
-			let sentCommands = "";
 			let sentFollows = "";
 			while (!signal?.aborted) {
 				// Read again each cycle: a long stream follows a change of Membership.
@@ -132,19 +114,12 @@ export function hostSync(
 				// Listen before reading, so nothing lands unseen between the two.
 				const changed = change(AbortSignal.any(signals), caller.deviceId, {
 					rows: spaces,
-					commands: withCommands,
 				});
 				try {
-					const next = await batch(caller, at, withCommands, spaces);
-					const commands = next.commands.map((c) => c.id).join();
+					const next = await batch(caller, at, spaces);
 					const follows = followsOf(next);
-					if (
-						!isEmpty(next.rows) ||
-						commands !== sentCommands ||
-						follows !== sentFollows
-					) {
+					if (!isEmpty(next.rows) || follows !== sentFollows) {
 						at = mergeCursors(at, next.cursors);
-						sentCommands = commands;
 						sentFollows = follows;
 						yield next;
 						continue;
@@ -162,10 +137,11 @@ export function hostSync(
 				const cycle = new AbortController();
 				const signals = signal ? [signal, cycle.signal] : [cycle.signal];
 				// Listen before reading, so no Command is kept unseen between the two.
-				const changed = change(AbortSignal.any(signals), caller.deviceId, {
-					rows: null,
-					commands: true,
-				});
+				const changed = change(
+					AbortSignal.any(signals),
+					caller.deviceId,
+					"commands",
+				);
 				try {
 					const commands = await exchange.commands.pendingFor(caller.deviceId);
 					const ids = commands.map((c) => c.id).join();
@@ -187,10 +163,11 @@ export function hostSync(
 				const cycle = new AbortController();
 				const signals = signal ? [signal, cycle.signal] : [cycle.signal];
 				// Listen before reading, so no Command is kept unseen between the two.
-				const changed = change(AbortSignal.any(signals), caller.deviceId, {
-					rows: null,
-					commands: true,
-				});
+				const changed = change(
+					AbortSignal.any(signals),
+					caller.deviceId,
+					"commands",
+				);
 				try {
 					// Read again each cycle: a long stream follows a change of Membership.
 					const kept = await exchange.commands.pendingIn(

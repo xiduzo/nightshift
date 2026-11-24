@@ -51,9 +51,7 @@ export type ListOffersPorts = {
 export const listOffers =
 	(ports: ListOffersPorts) => async (): Promise<OfferView[]> => {
 		const nameOrId = (profile: string) =>
-			ports.profiles.get(profile)?.name ??
-			ports.profiles.byName(profile)?.name ??
-			profile;
+			ports.profiles.get(profile)?.name ?? profile;
 		const views: OfferView[] = [];
 		const offerable = await listOfferSpaces(ports)();
 		const spaceNameOf = async (spaceId: string) =>

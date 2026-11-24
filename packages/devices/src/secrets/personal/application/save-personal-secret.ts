@@ -1,6 +1,5 @@
 import type { HostCalls } from "../../calls";
 import type { PersonalSecretStore } from "../../kept";
-import { OLDER_HOST_SECRETS } from "../domain/personal-secrets";
 
 export type SavePersonalSecretPorts = {
 	store: Pick<PersonalSecretStore, "set">;
@@ -32,6 +31,6 @@ export const savePersonalSecret =
 		return ports.calls.ask(
 			home.hostId,
 			(client) => client.secrets.set({ name, value }),
-			{ deadlineMs: ports.deadlineMs, olderHost: OLDER_HOST_SECRETS },
+			{ deadlineMs: ports.deadlineMs },
 		);
 	};

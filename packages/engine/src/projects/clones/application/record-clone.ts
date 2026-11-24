@@ -16,7 +16,7 @@ export type RecordClone = { spaceId: string; clone: CloneRecord };
 /**
  * Records another Device's Clone of a project in the Space's document, on
  * the Host that keeps the Space. Not found when this Replica does not keep
- * the Space, or its document has no entry of the project. An older Device
+ * the Space, or its document has no entry of the project. A Device
  * may give a folder to a project without one: refused.
  */
 export const recordClone =

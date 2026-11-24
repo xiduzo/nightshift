@@ -21,7 +21,7 @@ export const archiveProcedures = {
 			z.object({
 				ref: archiveRefSchema,
 				content: z.string(),
-				// Which end of its step the copy holds. A Walker of an older version sends none.
+				// Which end of its step the copy holds. Checkpoints have none.
 				stamp: copyStampSchema.optional(),
 			}),
 		)

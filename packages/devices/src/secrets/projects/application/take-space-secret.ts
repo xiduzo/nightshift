@@ -1,10 +1,6 @@
 import type { HostCalls } from "../../calls";
 import type { SpaceSecretStore } from "../../kept";
-import {
-	atKeeper,
-	OLDER_HOST_PROJECT_SECRETS,
-	spaceAccess,
-} from "../domain/project-secrets";
+import { atKeeper, spaceAccess } from "../domain/project-secrets";
 import type { KeeperSpaces, Members, RoleRules } from "./ports";
 
 export type TakeSpaceSecretPorts = {
@@ -61,7 +57,6 @@ export const takeSpaceSecret =
 					(client) => client.spaceSecrets.take({ spaceId, name: request.name }),
 					{
 						deadlineMs: ports.deadlineMs,
-						olderHost: OLDER_HOST_PROJECT_SECRETS,
 					},
 				),
 		);

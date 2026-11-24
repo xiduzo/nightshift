@@ -33,17 +33,6 @@ describe("the peer protocol", () => {
 				served++;
 			}
 		}
-		// 24 before `sync.commands`, 25 before `sync.mergePersonal`, 26
-		// before `link.leave` and 27 before `archive.knowledgePut` and
-		// `archive.knowledgeGet`, 29 before the `leases` group (ADR 7), and
-		// 32 before `sync.addProject`, 33 before the `secrets` group, 37
-		// before the `projectSecrets` group and 42 before
-		// `secrets.moveOnDevice` (ADR 13), 43 before `sync.setClones`, 44
-		// before the `spaceSecrets` group (ADR 18), 48 before
-		// `sync.addWithoutFolder` (ADR 22), 49 before `sync.startTest`
-		// (ADR 27), 50 before `devices.stop` (a stop that waits for the
-		// Device's cleanup), 51 before `sync.answerCosts` and 52 before
-		// `sync.pending`, which an older Host lacks.
-		expect(served).toBe(53);
+		expect(served).toBe(52);
 	});
 });

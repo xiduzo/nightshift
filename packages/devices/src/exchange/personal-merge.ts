@@ -157,7 +157,7 @@ export async function mergePersonalHere(
 			id: p.id,
 			name: p.name,
 			remote: there ? null : p.remote,
-			folder: p.folder ?? true,
+			folder: p.folder,
 			createdAt: p.createdAt,
 			removedAt: p.removedAt,
 		});

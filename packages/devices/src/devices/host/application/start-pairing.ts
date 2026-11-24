@@ -18,7 +18,7 @@ export type StartPairing = {
 	deviceId: string;
 	name: string;
 	platform: string;
-	home?: boolean;
+	home: boolean;
 	machine?: string;
 };
 

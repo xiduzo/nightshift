@@ -115,8 +115,7 @@ export const startRunInputSchema = z.union([
 /**
  * A test run's start (ADR 27): a saved flow by name, with its pins and
  * skips. A Device hands it to the Host that keeps the Space on its own
- * procedure (`sync.startTest`), so a Host of an older version refuses it
- * instead of running every node for real. The pins travel as refs: the
+ * procedure (`sync.startTest`). The pins travel as refs: the
  * Host reads their outputs from its own log.
  */
 export const startTestInputSchema = z.object({

@@ -36,17 +36,11 @@ export type Placement = {
 };
 
 /**
- * A node, as far as the choice of its Device goes: the profile of an
- * Agent node, or none (a node that runs nothing offered).
- */
-export type NodeToPlace = { profile?: string };
-
-/**
  * A profile of a Device, as a Person picks it for a node: its id, its
  * name, and its kind (an Agent Profile for Agent nodes, a Model Profile
  * for Decisions and Values decided by a model). An Agent Profile also
  * tells its permission mode, so the editor can warn about a mode that
- * refuses commands. An offered profile and an older Host leave it out.
+ * refuses commands. An offered profile leaves it out.
  */
 export type DeviceProfile = {
 	id: string;

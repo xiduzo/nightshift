@@ -102,7 +102,7 @@ export function DeviceField({
 }: {
 	id: string;
 	value: string | undefined;
-	/** The devices this node may name (`runs.devices` with `forNode`); undefined while they load. */
+	/** The devices this node may name (`runs.devices` with `ownOnly`); undefined while they load. */
 	devices: readonly DeviceChoice[] | undefined;
 	copy?: DeviceFieldCopy;
 	onChange: (device: string | undefined) => void;

@@ -15,7 +15,7 @@ import { run } from "@nightshift/db/schema";
 import type { EndNode } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { eq } from "drizzle-orm";
-import type { Capabilities, Device } from "../../../device";
+import type { Device } from "../../../device";
 import { foldRun } from "../../../log";
 
 import { readTranscriptFile } from "../../../log/transcript/transcripts";
@@ -40,7 +40,6 @@ import {
 	TEST_DEVICE_ID,
 	testDevice,
 } from "../../../testing/test-support";
-import { refusalOf } from "../../fit";
 import { endingOf } from "../../runner/thread";
 
 /**
@@ -536,21 +535,6 @@ describe("a report from a file the run wrote", () => {
 		});
 	});
 
-	test("a Device that reads no files: a warning that says to update it", async () => {
-		const h = await startRun(sandbox, fileFlow("report.md"));
-		const { readFile: _, ...older } = testDevice(h.local);
-		h.ctx.placement = placementOn(() => ({ ...older, name: "laptop" }));
-		const driven = await drive(h, { inputs: {} });
-		expect(driven.state.ended).toMatchObject({ result: "done" });
-		expect(await warnings(h)).toEqual([
-			{
-				kind: "report",
-				message:
-					"Night Shift could not read the report file. laptop runs an older version of Night Shift. Update Night Shift on laptop. The run ends without a report.",
-			},
-		]);
-	});
-
 	test("a Device that goes away during the read: the step waits as the network does", async () => {
 		const h = await startRun(sandbox, fileFlow("report.md"));
 		const device: Device = {
@@ -806,26 +790,6 @@ describe("a report from a file the run wrote", () => {
 			});
 			expect(await warnings(h)).toEqual([]);
 		});
-	});
-
-	test("run start refuses a Device that reads no files, and names the nodes", () => {
-		const has: Capabilities = {
-			elsewhere: "laptop",
-			harnesses: [],
-			connections: [],
-			clis: [],
-			programs: {},
-			profiles: {},
-			decider: null,
-			requests: true,
-			flowVersion: Number.MAX_SAFE_INTEGER,
-		};
-		const nodes = [fromFile("report.md"), end("none", "nothing-to-do")];
-		expect(refusalOf(nodes, has)).toBe(
-			"The flow ends with a report from a file (done), but laptop runs an older version of Night Shift. Update Night Shift on laptop.",
-		);
-		expect(refusalOf(nodes, { ...has, readFiles: true })).toBeNull();
-		expect(refusalOf([end("none", "done")], has)).toBeNull();
 	});
 });
 

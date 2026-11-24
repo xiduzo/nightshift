@@ -29,22 +29,14 @@ export const hostHelloSchema = z.object({
 	 * role there. A Guest Host lists no personal Space.
 	 */
 	spaces: z.array(listedSpaceSchema),
-	/** The Device's owner is the Host admin. A Host of an older version leaves it out. */
-	hostAdmin: z.boolean().optional(),
+	/** The Device's owner is the Host admin. */
+	hostAdmin: z.boolean(),
 	/**
 	 * Over a link to the home Host: the owner's other Devices whose Device
 	 * documents the Host keeps, the Host itself when the owner owns it. The
-	 * Device syncs a read-only copy of each. A guest Host, and a Host of an
-	 * older version, leaves it out.
+	 * Device syncs a read-only copy of each. A guest Host leaves it out.
 	 */
 	devices: z.array(z.object({ id: z.string(), name: z.string() })).optional(),
-	/**
-	 * A stop of a step this Host relays waits for the Device's cleanup:
-	 * `devices.call` takes a `stopId`, and `devices.stop` stops that call
-	 * and keeps its stream open until the Device ended it. A Host of an
-	 * older version leaves it out: a Walker closes the stream at a stop.
-	 */
-	stopWaits: z.boolean().optional(),
 });
 export type HostHello = z.infer<typeof hostHelloSchema>;
 
@@ -72,21 +64,19 @@ export const pairingRedeemedSchema = z.union([
 		host: hostSchema,
 		/**
 		 * The Device the Host joined it as: another id than it asked for when
-		 * this computer already has a Device there (ADR 20). A Host of an
-		 * older version leaves it out.
+		 * this computer already has a Device there (ADR 20).
 		 */
-		deviceId: z.string().optional(),
+		deviceId: z.string(),
 		/**
 		 * The last event count of that Device on this Host. The install goes
 		 * on after it, so no new event of it has the number of an old one.
 		 */
-		walkerSeq: z.number().int().nonnegative().optional(),
+		walkerSeq: z.number().int().nonnegative(),
 		/**
 		 * The Person who allowed it is the Host admin. When not, the Host
-		 * admin can read their personal runs there. A Host of an older
-		 * version leaves it out.
+		 * admin can read their personal runs there.
 		 */
-		hostAdmin: z.boolean().optional(),
+		hostAdmin: z.boolean(),
 	}),
 ]);
 export type PairingRedeemed = z.infer<typeof pairingRedeemedSchema>;

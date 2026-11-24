@@ -29,20 +29,18 @@ import {
  *   When it opens a new one, the older ones end, and the calls they took
  *   that the Device has not answered and does not name in `running` go to
  *   the new stream.
- * - **A taken call is confirmed.** A Device of this version answers each
- *   call it takes at once with an empty batch of replies (an ack). When a
- *   Device that acks leaves a call without one for `ackMs`, its stream is
- *   dead: that stream ends, and the call waits for the next one. A Device
- *   of an older version never acks, so nothing waits for its acks.
+ * - **A taken call is confirmed.** A Device answers each call it takes
+ *   at once with an empty batch of replies (an ack). When it leaves a call
+ *   without an answer for `ackMs`, its stream is dead: that stream ends,
+ *   and the call waits for the next one.
  *
- * A stop (the caller's `stop` signal) cancels the call on the Device. When
- * the stream that took it says `stopWaits`, the call stays open: the
- * Device's replies still come, and the call ends when the Device ends it,
- * after its cleanup. Else, and for a call no stream took, the call ends at
- * the stop, as at an abort.
+ * A stop (the caller's `stop` signal) cancels the call on the Device. The
+ * call stays open: the Device's replies still come, and the call ends when
+ * the Device ends it, after its cleanup. A call no stream took ends at the
+ * stop, as at an abort.
  */
 
-/** How long a Device that acks its calls may take to ack one before its stream counts as dead. */
+/** How long a Device may take to ack a call before its stream counts as dead. */
 export const ACK_MS = 15_000;
 
 export type WorkHub = WorkRelay & {
@@ -57,15 +55,7 @@ export type WorkHub = WorkRelay & {
 	take(
 		deviceId: string,
 		signal: AbortSignal,
-		running?: readonly string[],
-		options?: {
-			/**
-			 * The Device ends a cancelled call after its cleanup there, and its
-			 * replies until then come: a stop keeps such a call open. An older
-			 * Device does not say so.
-			 */
-			stopWaits?: boolean;
-		},
+		running: readonly string[],
 	): AsyncIterable<WorkDelivery>;
 	/**
 	 * The placed Device answers a call it took. `done`: the call ended
@@ -104,8 +94,6 @@ type Stream = {
 	end: AbortController;
 	/** It stopped counting as one of the Device's streams. */
 	left: boolean;
-	/** The Device ends a cancelled call after its cleanup: a stop keeps the call open. */
-	stopWaits: boolean;
 };
 
 /** A call waiting for its replies. */
@@ -130,8 +118,6 @@ type Inbox = {
 	wake: Set<() => void>;
 	/** Streams open now. The Device takes work while it has one. */
 	streams: Set<Stream>;
-	/** The Device acks the calls it takes (it runs this version or newer). */
-	acks: boolean;
 	/** Fails the Device's calls once it stayed away too long. */
 	lost: Timer | null;
 };
@@ -139,7 +125,7 @@ type Inbox = {
 export function createWorkHub(
 	options: {
 		lostAfterMs?: number;
-		/** How long an acking Device may take to ack a call. Default `ACK_MS`. */
+		/** How long a Device may take to ack a call. Default `ACK_MS`. */
 		ackMs?: number;
 		/** A Device took work again after it had none: it is back. */
 		onBack?: (deviceId: string) => void;
@@ -157,7 +143,6 @@ export function createWorkHub(
 				deliveries: [],
 				wake: new Set(),
 				streams: new Set(),
-				acks: false,
 				lost: null,
 			};
 			inboxes.set(deviceId, found);
@@ -295,12 +280,12 @@ export function createWorkHub(
 				notify();
 			};
 			/**
-			 * A stop: the Device's cleanup is part of the call when the stream
-			 * that took it says `stopWaits`. Else it ends now, as at an abort.
+			 * A stop: the Device's cleanup is part of the call. One no stream
+			 * took ends now, as at an abort.
 			 */
 			const halt = () => {
 				if (!calls.has(id) || open.stopping) return;
-				if (!open.takenBy?.stopWaits) {
+				if (!open.takenBy) {
 					cancel();
 					return;
 				}
@@ -331,16 +316,16 @@ export function createWorkHub(
 			}
 		},
 
-		async *take(deviceId, signal, running, said = {}) {
+		async *take(deviceId, signal, running) {
 			const box = inbox(deviceId);
-			const serving = running ? new Set(running) : null;
+			const serving = new Set(running);
 			/** The calls it still serves: this stream carries them now. */
 			const served: OpenCall[] = [];
 			// The calls out with a stream of before. The Device restarted, or
 			// that stream died: this one replaces them.
 			for (const [id, call] of calls) {
 				if (call.deviceId !== deviceId || !call.takenBy) continue;
-				if (serving?.has(id)) {
+				if (serving.has(id)) {
 					served.push(call);
 					// Its cancel may have left with the stream of before.
 					if (call.stopping) box.deliveries.push({ kind: "cancel", id });
@@ -352,7 +337,6 @@ export function createWorkHub(
 					redeliver(call);
 					continue;
 				}
-				if (!serving) continue;
 				calls.delete(id);
 				stopAckTimer(call);
 				call.push(
@@ -369,7 +353,7 @@ export function createWorkHub(
 			// A call it still serves that this hub does not know (the Host
 			// restarted): nobody waits for it, so it stops there. The
 			// Walker's recovery continues the step by its harness session.
-			for (const id of serving ?? []) {
+			for (const id of serving) {
 				if (!calls.has(id)) box.deliveries.push({ kind: "cancel", id });
 			}
 			// The newest stream wins: the older ones end.
@@ -380,7 +364,6 @@ export function createWorkHub(
 			const stream: Stream = {
 				end: new AbortController(),
 				left: false,
-				stopWaits: said.stopWaits === true,
 			};
 			for (const call of served) call.takenBy = stream;
 			const back = box.streams.size === 0 && !box.lost;
@@ -407,7 +390,7 @@ export function createWorkHub(
 							delivery.kind === "call" ? calls.get(delivery.id) : undefined;
 						if (call) {
 							call.takenBy = stream;
-							if (box.acks && !call.answered) {
+							if (!call.answered) {
 								call.ackTimer = setTimeout(() => {
 									call.ackTimer = null;
 									if (call.answered || call.takenBy !== stream) return;
@@ -454,7 +437,6 @@ export function createWorkHub(
 		reply(deviceId, { id, replies, done }) {
 			const call = calls.get(id);
 			if (!call || call.deviceId !== deviceId) return false;
-			if (replies.length === 0 && !done) inbox(deviceId).acks = true;
 			call.answered = true;
 			stopAckTimer(call);
 			if (done) calls.delete(id);

@@ -1,12 +1,7 @@
 import { createHash } from "node:crypto";
-import { documentName, type Engine, OlderHostError } from "@nightshift/engine";
-import type {
-	HostClient,
-	PendingElsewhere,
-	RunCommand,
-	RunRows,
-} from "../contract";
-import { type HostSpaces, type Link, pause } from "../links";
+import { documentName, type Engine } from "@nightshift/engine";
+import type { HostClient, RunCommand, RunRows } from "../contract";
+import type { HostSpaces, Link } from "../links";
 import { isEmpty, MissingProjectError, mergeCursors } from "./rows";
 import type { RunHistoryExchange } from "./run-history";
 
@@ -35,14 +30,11 @@ import type { RunHistoryExchange } from "./run-history";
  *   walks, on their own stream, so they never wait behind rows, nor
  *   behind a run that is still on its way here. Such a run's Commands
  *   wait until it arrived, however long that takes, and go as soon as a
- *   row lands here. A Host of an older version has none: its Commands
- *   come with the rows, and this stream waits until the link drops.
+ *   row lands here.
  * - Pending: `sync.pending`, the Commands that wait on the Host for other
  *   Devices, in the Spaces of this computer's Person. This computer keeps
  *   the last set in memory (`PendingOnHosts`), so its screens show an
- *   answer on its way to another Device as such. A Host of an older
- *   version has none: this computer knows only its own table, and asks
- *   again in an hour.
+ *   answer on its way to another Device as such.
  *
  * A Command is checked again here, from this Replica, and applied like a
  * local action (`RunHistoryExchange.apply`); then the Host is told. It is
@@ -108,30 +100,29 @@ export function createDeviceExchange(deps: {
 
 	/**
 	 * Applies the Commands that wait, in the Host's order, and reports each
-	 * result once per stream (`reported`). `whole`: the set is every
-	 * Command that waits, so one it lacks is done there.
+	 * result once per stream (`reported`). The set is every Command that
+	 * waits, so one it lacks is done there.
 	 *
 	 * A Command this computer cannot tell about yet (its run is still on
 	 * its way here) waits, with the later Commands of its run, so their
-	 * order holds. The others go on. Returns why the first of those waits,
-	 * or null when none does: the caller takes them again later.
+	 * order holds. The others go on. Returns whether one waits: the caller
+	 * takes them again later.
 	 */
 	async function take(
 		client: HostClient,
 		commands: readonly RunCommand[],
 		reported: Set<string>,
-		whole: boolean,
 		signal: AbortSignal,
-	): Promise<{ why: unknown } | null> {
-		/** The runs whose Commands wait, and why the first one does. */
-		const waiting = new Map<string, unknown>();
+	): Promise<boolean> {
+		/** The runs whose Commands wait. */
+		const waiting = new Set<string>();
 		for (const command of commands) {
 			if (reported.has(command.id) || waiting.has(command.runId)) continue;
 			let error: string | null;
 			try {
 				error = await applyOnce(command);
-			} catch (notYet) {
-				waiting.set(command.runId, notYet);
+			} catch {
+				waiting.add(command.runId);
 				continue;
 			}
 			await client.sync.commandDone({ id: command.id, error }, { signal });
@@ -141,13 +132,10 @@ export function createDeviceExchange(deps: {
 		for (const id of reported) {
 			if (!pending.has(id)) reported.delete(id);
 		}
-		if (whole) {
-			for (const id of applied.keys()) {
-				if (!pending.has(id)) applied.delete(id);
-			}
+		for (const id of applied.keys()) {
+			if (!pending.has(id)) applied.delete(id);
 		}
-		const [first] = waiting.values();
-		return waiting.size > 0 ? { why: first } : null;
+		return waiting.size > 0;
 	}
 
 	/**
@@ -222,14 +210,12 @@ export function createDeviceExchange(deps: {
 		}
 	}
 
-	/** One pull stream: rows and follows (and an older Host's Commands) until it ends or `signal` aborts. */
+	/** One pull stream: rows and follows until it ends or `signal` aborts. */
 	async function pull(
 		link: Pick<Link, "inStep">,
 		client: HostClient,
 		signal: AbortSignal,
 	) {
-		/** The commands whose result the Host has from this stream. */
-		const reported = new Set<string>();
 		// The live transcripts the Host wants of this computer's runs. A
 		// stream that ends stops them: the next one says again what it wants.
 		const pumps = exchange.feeds.pumps((step, entries, ended, stop) =>
@@ -240,30 +226,14 @@ export function createDeviceExchange(deps: {
 		);
 		try {
 			const stream = await client.sync.stream(
-				// The Commands come on their own stream.
-				{ cursors: await exchange.cursorsWith(hostId), commands: false },
+				{ cursors: await exchange.cursorsWith(hostId) },
 				{ signal },
 			);
 			for await (const batch of stream) {
-				// A Host of an older version sends no follows.
-				pumps.set(batch.follows ?? []);
+				pumps.set(batch.follows);
 				if (!isEmpty(batch.rows)) {
 					await ingestWhenReady(batch.rows, link, signal);
 					await exchange.advance(hostId, batch.cursors);
-				}
-				// A Host of an older version sends its Commands here, after
-				// the rows they need, and only when some wait. One whose run
-				// is still on its way starts the stream again: the Host sends
-				// it again.
-				if (batch.commands.length > 0 || reported.size > 0) {
-					const waits = await take(
-						client,
-						batch.commands,
-						reported,
-						batch.commands.length > 0,
-						signal,
-					);
-					if (waits) throw waits.why;
 				}
 			}
 		} finally {
@@ -280,16 +250,7 @@ export function createDeviceExchange(deps: {
 	 */
 	async function commands(client: HostClient, signal: AbortSignal) {
 		const reported = new Set<string>();
-		let stream: AsyncIterable<{ commands: RunCommand[] }>;
-		try {
-			stream = await client.sync.commands({}, { signal });
-		} catch (error) {
-			if (!(error instanceof OlderHostError)) throw error;
-			// Its Commands come with the rows. It may be updated meanwhile:
-			// ask again in an hour.
-			await pause(OLDER_HOST_WAIT_MS, signal);
-			return;
-		}
+		const stream = await client.sync.commands({}, { signal });
 		const batches = stream[Symbol.asyncIterator]();
 		let latest: RunCommand[] = [];
 		/** The Host's next set, asked for once the last one was taken. */
@@ -323,7 +284,7 @@ export function createDeviceExchange(deps: {
 					cycle.abort();
 				}
 				if (signal.aborted) return;
-				waits = (await take(client, latest, reported, true, signal)) !== null;
+				waits = await take(client, latest, reported, signal);
 			}
 		} finally {
 			void Promise.resolve(batches.return?.()).catch(() => {});
@@ -332,20 +293,10 @@ export function createDeviceExchange(deps: {
 
 	/**
 	 * The Commands that wait on the Host for other Devices: each set the
-	 * Host sends replaces what this computer knew of it. A Host of an
-	 * older version has none: what it kept goes, and the stream waits.
+	 * Host sends replaces what this computer knew of it.
 	 */
 	async function pending(client: HostClient, signal: AbortSignal) {
-		let stream: AsyncIterable<{ commands: PendingElsewhere[] }>;
-		try {
-			stream = await client.sync.pending({}, { signal });
-		} catch (error) {
-			if (!(error instanceof OlderHostError)) throw error;
-			exchange.pendingOnHosts.forget(hostId);
-			// It may be updated meanwhile: ask again in an hour.
-			await pause(OLDER_HOST_WAIT_MS, signal);
-			return;
-		}
+		const stream = await client.sync.pending({}, { signal });
 		for await (const batch of stream) {
 			exchange.pendingOnHosts.set(hostId, batch.commands);
 		}
@@ -395,6 +346,3 @@ export function createDeviceExchange(deps: {
 		},
 	};
 }
-
-/** How long the Commands stream waits before it asks a Host of an older version again. */
-const OLDER_HOST_WAIT_MS = 60 * 60_000;

@@ -1,11 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { Refusal } from "@nightshift/refusal";
-import { UNREADABLE_REQUEST } from "../../../contract";
 import {
 	moveHere,
 	noAnswerWords,
 	offlineWords,
-	olderDeviceWords,
 	refusalOf,
 } from "./secret-moves";
 
@@ -19,9 +17,6 @@ describe("the words of a move", () => {
 		);
 		expect(offlineWords("Laptop", removed)).toBe(
 			"Laptop is offline. Remove it when Laptop is online.",
-		);
-		expect(olderDeviceWords("Laptop")).toBe(
-			"Update Night Shift on Laptop to move its secrets from here.",
 		);
 		expect(noAnswerWords("Laptop")).toBe(
 			"Laptop did not answer. Check that Laptop is online, then try again.",
@@ -48,13 +43,6 @@ describe("a reply of the Device with the value", () => {
 		expect(offline).toEqual(
 			new Refusal("unavailable", offlineWords("Laptop", personal)),
 		);
-		expect(
-			refusalOf(
-				{ kind: "error", message: UNREADABLE_REQUEST },
-				"Laptop",
-				personal,
-			)?.message,
-		).toBe(olderDeviceWords("Laptop"));
 		const other = refusalOf(
 			{ kind: "error", message: "Your role does not allow this." },
 			"Laptop",

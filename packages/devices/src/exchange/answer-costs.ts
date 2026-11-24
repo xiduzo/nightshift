@@ -1,4 +1,4 @@
-import { OlderHostError, type SharedAnswerCosts } from "@nightshift/engine";
+import type { SharedAnswerCosts } from "@nightshift/engine";
 import { ANSWER_COSTS_MAX, type HostClient } from "../contract";
 import { pause } from "../links";
 
@@ -14,9 +14,7 @@ import { pause } from "../links";
  * computers, within that time. A row is one answer by its key, so a turn
  * that fails halfway goes again, whole.
  *
- * The Host offline: the rows wait here, and go when the link is back. A
- * Host of an older version has no such call (`OlderHostError`): the rows
- * wait, and this computer asks again in an hour.
+ * The Host offline: the rows wait here, and go when the link is back.
  */
 export function shareAnswerCosts(deps: {
 	/** The Spaces this Host keeps for this computer (`HostSpaces.ofHost`). */
@@ -34,17 +32,10 @@ export function shareAnswerCosts(deps: {
 			let more = spaces.length > 0;
 			while (more && !signal.aborted) {
 				const rows = await costs.unsent(spaces, ANSWER_COSTS_MAX);
-				let answer: Awaited<ReturnType<HostClient["sync"]["answerCosts"]>>;
-				try {
-					answer = await client.sync.answerCosts(
-						{ rows, cursors: await costs.cursors(spaces) },
-						{ signal },
-					);
-				} catch (error) {
-					if (!(error instanceof OlderHostError)) throw error;
-					await pause(OLDER_HOST_WAIT_MS, signal);
-					return;
-				}
+				const answer = await client.sync.answerCosts(
+					{ rows, cursors: await costs.cursors(spaces) },
+					{ signal },
+				);
 				const now = deps.now();
 				await costs.ingest(answer.rows, now);
 				await costs.sent(answer.taken, now);
@@ -58,6 +49,3 @@ export function shareAnswerCosts(deps: {
 		}
 	};
 }
-
-/** How long it waits before it asks a Host of an older version again. */
-const OLDER_HOST_WAIT_MS = 60 * 60_000;

@@ -154,7 +154,7 @@ describe("the work hub knows which Device runs a step of which run now", () => {
 	test("a session out to a Device is placed until it ends", async () => {
 		const hub = createWorkHub();
 		const stop = new AbortController();
-		const taken = hub.take("laptop", stop.signal)[Symbol.asyncIterator]();
+		const taken = hub.take("laptop", stop.signal, [])[Symbol.asyncIterator]();
 		// The Device takes work: its stream is open before the call.
 		const next = taken.next();
 		const request: WorkRequest = {

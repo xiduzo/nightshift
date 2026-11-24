@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { HostUnreachableError } from "@nightshift/engine";
+import { HostUnreachableError, OlderHostError } from "@nightshift/engine";
 import { ORPCError } from "@orpc/server";
 import type { HostClient } from "../../../../contract";
 import { linksTo } from "../../../../testing/host-in-memory";
@@ -66,18 +66,18 @@ describe("the calls over links", () => {
 	test("a Host that is too slow cannot be reached", async () => {
 		const slow = { secrets: { list: () => new Promise(() => {}) } };
 		await expect(
-			via(slow).ask("host", list, { deadlineMs: 20, olderHost: "Update." }),
+			via(slow).ask("host", list, { deadlineMs: 20 }),
 		).rejects.toBeInstanceOf(HostUnreachableError);
 	});
 
-	test("a Host without the procedure is older, in the words asked for", async () => {
+	test("a Host without the procedure is older", async () => {
 		const older = {
 			secrets: {
 				list: () => Promise.reject(new ORPCError("NOT_FOUND", { status: 404 })),
 			},
 		};
 		await expect(
-			via(older).ask("host", list, { deadlineMs: 1_000, olderHost: "Update." }),
-		).rejects.toThrow("Update.");
+			via(older).ask("host", list, { deadlineMs: 1_000 }),
+		).rejects.toBeInstanceOf(OlderHostError);
 	});
 });

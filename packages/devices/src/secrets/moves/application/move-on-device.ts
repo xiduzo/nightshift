@@ -1,10 +1,7 @@
 import { Refusal } from "@nightshift/refusal";
 import type { SecretMove } from "../../../contract";
 import type { HostCalls } from "../../calls";
-import {
-	NOT_YOUR_OTHER_DEVICE,
-	OLDER_HOST_MOVES,
-} from "../domain/secret-moves";
+import { NOT_YOUR_OTHER_DEVICE } from "../domain/secret-moves";
 import type { OtherDevices } from "./ports";
 import type { RelaySecretMove } from "./relay-secret-move";
 
@@ -49,6 +46,6 @@ export const moveOnDevice =
 			home.hostId,
 			(client) => client.secrets.moveOnDevice(input),
 			// The Host waits for the Device first.
-			{ deadlineMs: ports.deadlineMs + 10_000, olderHost: OLDER_HOST_MOVES },
+			{ deadlineMs: ports.deadlineMs + 10_000 },
 		);
 	};

@@ -47,19 +47,8 @@ export function runFoldersOf<R>(device: Named & { runFolder?: R }): {
 	return { runFolder };
 }
 
-/**
- * The file call of a Device. `deviceFor` has it only when this computer
- * has it, and its admitted path always does.
- */
-export function filesOf<R>(device: Named & { readFile?: R }): { readFile: R } {
-	const { readFile } = device;
-	if (!readFile) throw new Error(`${device.name} reads no files.`);
-	return { readFile };
-}
-
 /** The calls that work in the project's Clone, or its run folder; a model or a tool needs none. */
 export const NEEDS_CLONE: ReadonlySet<WorkCall["kind"]> = new Set([
-	"flows",
 	"worktree",
 	"restoreWorktree",
 	"runFolder",
@@ -105,7 +94,7 @@ export function cwdOf(call: WorkCall): string | null {
 /**
  * The check of one call of another Person's run, given this computer's
  * Offers in force into the run's Space: an offered session of one of
- * them, or the run's own folder work (its flows, its worktree, its item
+ * them, or the run's own folder work (its worktree, its item
  * branches, the Hand-off of its work to and from it, the snapshots that
  * tell what a step changed in it, the report file the run wrote there).
  * Anything
@@ -121,7 +110,6 @@ export function offeredCallRefusal(
 	if (offers.length === 0) return offersNothingOr(deviceName, offers);
 	const refused = `${deviceName} runs only the profiles its owner offers to this Space. ${offersNothingOr(deviceName, offers)}`;
 	switch (call.kind) {
-		case "flows":
 		case "worktree":
 		case "restoreWorktree":
 		case "runFolder":

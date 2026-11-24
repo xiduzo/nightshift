@@ -27,7 +27,6 @@ export type {
 export {
 	createOfferUse,
 	deviceOffers,
-	offeredProfile,
 	wireOffers,
 } from "./offers";
 export { wirePlacement } from "./placement";

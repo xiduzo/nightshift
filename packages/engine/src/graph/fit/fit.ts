@@ -25,22 +25,13 @@ import { kindOf, kindOfType, missingNames, NODE_KINDS } from "../nodes";
  */
 
 /**
- * The flow format a Device reads when it does not say: the last one before
- * Devices advertised theirs (`Capabilities.flowVersion`).
- */
-export const UNADVERTISED_FLOW_VERSION = 8;
-
-/**
- * The Device reads this build's flow format: one of an older Night Shift
- * may not know a field or a node of the flow, so no step goes there and no
- * run moves there. A Device that does not say reads format 8. One rule for
- * every flow, not only for one that uses what format 9 added: it is the
- * simpler safe rule, and an update fixes it.
+ * The Device reads this build's flow format: one that does not may not
+ * know a field or a node of the flow, so no step goes there and no run
+ * moves there. A Device that does not say its format does not read it. An
+ * update fixes it.
  */
 export const readsTheFlow: Requirement = (_nodes, has) => {
-	if ((has.flowVersion ?? UNADVERTISED_FLOW_VERSION) >= FLOW_VERSION) {
-		return null;
-	}
+	if (has.flowVersion >= FLOW_VERSION) return null;
 	return olderNightShift(has.elsewhere ?? "this computer");
 };
 

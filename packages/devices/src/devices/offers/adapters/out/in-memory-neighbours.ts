@@ -125,10 +125,6 @@ export function inMemoryOfferNeighbours() {
 			const found = profiles.get(id);
 			return found ? { id: found.id, name: found.name } : null;
 		},
-		byName(name) {
-			const found = [...profiles.values()].find((p) => p.name === name);
-			return found ? { id: found.id, name: found.name } : null;
-		},
 		agent(id) {
 			const found = profiles.get(id);
 			if (!found?.agent) return null;

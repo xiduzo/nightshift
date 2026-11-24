@@ -10,6 +10,7 @@ describe("denyPairing", () => {
 			deviceId: "laptop",
 			name: "LE2316",
 			platform: "darwin",
+			home: true,
 		});
 		await denyPairing(p)({
 			headers: new Headers(),

@@ -11,25 +11,16 @@ export const workProcedures = {
 				"Streams the calls a Host sends to a placed Device, and their cancels.",
 		})
 		.input(
-			z
-				.object({
-					/** The calls the Device still serves: any other it took has ended there. */
-					running: z.array(z.string().min(1).max(64)).max(1_000),
-					/**
-					 * The Device ends a cancelled call after its cleanup, and
-					 * its replies until then come. Sent only to a Host whose
-					 * hello says `stopWaits`. Absent: the Host ends a stopped
-					 * call at once.
-					 */
-					stopWaits: z.boolean().optional(),
-				})
-				.default({ running: [] }),
+			z.object({
+				/** The calls the Device still serves: any other it took has ended there. */
+				running: z.array(z.string().min(1).max(64)).max(1_000),
+			}),
 		)
 		.output(describedStream(workDeliverySchema)),
 	/**
 	 * The Walker → Host → Device leg: the stream carries the replies,
-	 * and closing it cancels the call. With a `stopId` (only to a Host
-	 * whose hello says `stopWaits`), `devices.stop` cancels it too.
+	 * and closing it cancels the call. With a `stopId`, `devices.stop`
+	 * cancels it too.
 	 */
 	call: relay
 		.route({
@@ -49,8 +40,7 @@ export const workProcedures = {
 	 * A stop of a call a Walker made with a `stopId`: the Device cancels
 	 * it, and its stream goes on until the Device ended it there, after
 	 * its cleanup. `known` false: no such call is open here now, and the
-	 * Walker closes the stream. An older Host has none, and says no
-	 * `stopWaits` in its hello.
+	 * Walker closes the stream.
 	 */
 	stop: relay
 		.route({

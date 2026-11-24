@@ -1,6 +1,5 @@
 import type { HostCalls } from "../../calls";
 import type { PersonalSecretStore } from "../../kept";
-import { OLDER_HOST_SECRETS } from "../domain/personal-secrets";
 
 export type RemovePersonalSecretPorts = {
 	store: Pick<PersonalSecretStore, "remove">;
@@ -28,6 +27,6 @@ export const removePersonalSecret =
 		return ports.calls.ask(
 			home.hostId,
 			(client) => client.secrets.remove({ name }),
-			{ deadlineMs: ports.deadlineMs, olderHost: OLDER_HOST_SECRETS },
+			{ deadlineMs: ports.deadlineMs },
 		);
 	};
