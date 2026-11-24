@@ -1,12 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import type { EnginePayloads, WaitReason } from "../../../log";
-import {
-	eventsOf,
-	inMemoryRecoveryPorts,
-} from "../adapters/out/in-memory-neighbours";
+import { eventsOf } from "../adapters/out/in-memory-neighbours";
+import { recoveryPorts } from "../test-support";
 import { wakeSleepingRuns } from "./wake-sleeping-runs";
 
-/** The wakes of sleeping runs, on in-memory adapters. */
+/** The wakes of sleeping runs, over a database in memory. */
 
 const started = {
 	projectId: "project-1",
@@ -36,16 +34,18 @@ function sleepingFor(runId: string, reason: WaitReason | null) {
 			{ stepId: "s1" },
 		);
 	}
-	return { projectId: "project-1", events: log.events };
+	return log.events;
 }
 
-function setup() {
-	const ports = inMemoryRecoveryPorts();
-	ports.waits.add("run-lease", sleepingFor("run-lease", "lease"));
-	ports.waits.add("run-offline", sleepingFor("run-offline", "device-offline"));
-	ports.waits.add("run-busy", sleepingFor("run-busy", null));
-	ports.waits.add("run-far", {
-		...sleepingFor("run-far", "lease"),
+async function setup() {
+	const ports = await recoveryPorts();
+	await ports.addRun("run-lease", sleepingFor("run-lease", "lease"));
+	await ports.addRun(
+		"run-offline",
+		sleepingFor("run-offline", "device-offline"),
+	);
+	await ports.addRun("run-busy", sleepingFor("run-busy", null));
+	await ports.addRun("run-far", sleepingFor("run-far", "lease"), {
 		walkerId: "device-far",
 	});
 	return { ports, wake: wakeSleepingRuns(ports) };
@@ -53,7 +53,7 @@ function setup() {
 
 describe("wakeSleepingRuns", () => {
 	test("a freed lease wakes the runs here that wait for a lease, by the daemon", async () => {
-		const { ports, wake } = setup();
+		const { ports, wake } = await setup();
 		await wake("lease");
 		expect(ports.turns.taken).toEqual([
 			{
@@ -64,13 +64,13 @@ describe("wakeSleepingRuns", () => {
 	});
 
 	test("a Device that is back wakes the runs here that sleep because it was offline", async () => {
-		const { ports, wake } = setup();
+		const { ports, wake } = await setup();
 		await wake("device-offline");
 		expect(ports.turns.taken.map((t) => t.runId)).toEqual(["run-offline"]);
 	});
 
 	test("a wake that fails changes nothing, and the call does not fail", async () => {
-		const { ports, wake } = setup();
+		const { ports, wake } = await setup();
 		ports.turns.release();
 		await wake("lease");
 		expect(ports.turns.taken).toEqual([]);

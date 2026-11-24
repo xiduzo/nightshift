@@ -2,18 +2,16 @@ import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { runRecord } from "../../../access/adapters/out/in-memory-run-records";
 import type { TakeOptions } from "../../../graph";
 import type { EnginePayloads } from "../../../log";
-import {
-	eventsOf,
-	inMemoryRecoveryPorts,
-} from "../adapters/out/in-memory-neighbours";
+import { eventsOf } from "../adapters/out/in-memory-neighbours";
+import { recoveryPorts } from "../test-support";
 import {
 	type ResumeInterruptedRunPorts,
 	resumeInterruptedRun,
 } from "./resume-interrupted-run";
 
 /**
- * The daemon's own resume of a run that startup recovery interrupted, on
- * in-memory adapters. The resume itself (the re-entry, `RunResumed`, the
+ * The daemon's own resume of a run that startup recovery interrupted, over
+ * a database in memory. The resume itself (the re-entry, `RunResumed`, the
  * drive) is the runner's: the whole engine's tests prove it.
  */
 
@@ -52,11 +50,11 @@ afterEach(() => {
 });
 
 /** Ports with the interrupted run in `space-1`, and what each part saw. */
-function setup(
+async function setup(
 	overrides: Partial<ResumeInterruptedRunPorts> = {},
 	log = interrupted(),
 ) {
-	const ports = inMemoryRecoveryPorts();
+	const ports = await recoveryPorts();
 	ports.runs.add(runRecord({ id: RUN_ID, spaceId: "space-1" }));
 	ports.facts.seed(RUN_ID, log);
 	const options: (TakeOptions | undefined)[] = [];
@@ -90,7 +88,7 @@ function setup(
 
 describe("resumeInterruptedRun", () => {
 	test("an interrupted run continues in a Turn of the daemon, inside the start hold of its Space", async () => {
-		const { ports, resume, options } = setup();
+		const { ports, resume, options } = await setup();
 		await resume(RUN_ID);
 		expect(ports.holds.started).toEqual([{ spaceId: "space-1", when: "wait" }]);
 		expect(ports.turns.taken).toEqual([
@@ -100,7 +98,7 @@ describe("resumeInterruptedRun", () => {
 	});
 
 	test("a full run cap queues it, and a freed slot asks again from the top", async () => {
-		const { ports, resume, options } = setup();
+		const { ports, resume, options } = await setup();
 		await resume(RUN_ID);
 		options[0]?.retry?.();
 		await new Promise((resolve) => setTimeout(resolve, 0));
@@ -122,13 +120,13 @@ describe("resumeInterruptedRun", () => {
 				prompt: null,
 				by: "person",
 			});
-		const { ports, resume } = setup({}, resumed.events);
+		const { ports, resume } = await setup({}, resumed.events);
 		await resume(RUN_ID);
 		expect(ports.turns.taken).toEqual([]);
 	});
 
 	test("a run a drive holds is left alone", async () => {
-		const { ports, resume } = setup();
+		const { ports, resume } = await setup();
 		ports.turns.set(RUN_ID, {
 			row: runRecord({ id: RUN_ID, spaceId: "space-1" }),
 			runState: eventsOf(RUN_ID).push("RunStarted", started).state(),
@@ -139,7 +137,7 @@ describe("resumeInterruptedRun", () => {
 	});
 
 	test("a run that may not continue now says why and lets go of what it holds", async () => {
-		const { ports, resume, because } = setup();
+		const { ports, resume, because } = await setup();
 		because("its stop time has passed.");
 		await resume(RUN_ID);
 		expect(ports.turns.taken).toEqual([]);
@@ -150,7 +148,7 @@ describe("resumeInterruptedRun", () => {
 	});
 
 	test("a stopped engine resumes nothing", async () => {
-		const { ports, resume } = setup({ stopped: () => true });
+		const { ports, resume } = await setup({ stopped: () => true });
 		await resume(RUN_ID);
 		expect(ports.holds.started).toEqual([]);
 		expect(ports.turns.taken).toEqual([]);
@@ -158,7 +156,7 @@ describe("resumeInterruptedRun", () => {
 
 	test("an engine that stops while the start hold waits resumes nothing", async () => {
 		let stopped = false;
-		const { ports, resume } = setup({
+		const { ports, resume } = await setup({
 			stopped: () => stopped,
 			holds: {
 				start<T>(_spaceId: string, work: () => Promise<T>) {
@@ -176,7 +174,7 @@ describe("resumeInterruptedRun", () => {
 		const recovering = new Promise<void>((resolve) => {
 			done = resolve;
 		});
-		const { ports, resume } = setup({ recovered: () => recovering });
+		const { ports, resume } = await setup({ recovered: () => recovering });
 		const resumed = resume(RUN_ID);
 		await new Promise((resolve) => setTimeout(resolve, 0));
 		expect(ports.holds.started).toEqual([]);
@@ -186,14 +184,14 @@ describe("resumeInterruptedRun", () => {
 	});
 
 	test("a run this Replica does not have is skipped, with no error", async () => {
-		const { ports, resume } = setup();
+		const { ports, resume } = await setup();
 		await resume("run-gone");
 		expect(ports.holds.started).toEqual([]);
 		expect(failed).toEqual([]);
 	});
 
 	test("a failure is logged, never thrown", async () => {
-		const { resume } = setup({
+		const { resume } = await setup({
 			openRun: async () => {
 				throw new Error("the database is locked");
 			},

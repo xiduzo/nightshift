@@ -1,13 +1,11 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import type { EnginePayloads } from "../../../log";
-import {
-	eventsOf,
-	inMemoryRecoveryPorts,
-} from "../adapters/out/in-memory-neighbours";
+import { eventsOf } from "../adapters/out/in-memory-neighbours";
+import { recoveryPorts } from "../test-support";
 import { recoverRuns } from "./recover-runs";
 
 /**
- * Startup recovery on in-memory adapters: what a new daemon does with
+ * Startup recovery over a database in memory: what a new daemon does with
  * each run the last one left open. What a cut writes in the log is the
  * contract of `OpenWork`, and the whole engine's `recovery.test.ts`.
  */
@@ -57,11 +55,11 @@ afterEach(() => {
 });
 
 /** Ports, and the reasons `checkResume` gives by run (none: the run continues). */
-function setup(
+async function setup(
 	why: Record<string, string> = {},
 	older: Record<string, string> = {},
 ) {
-	const ports = inMemoryRecoveryPorts();
+	const ports = await recoveryPorts();
 	const asked: string[] = [];
 	const recover = recoverRuns({
 		openWork: ports.openWork,
@@ -79,8 +77,8 @@ function setup(
 
 describe("recoverRuns", () => {
 	test("a run that ran ends interrupted, keeps only what a resume reads, and continues", async () => {
-		const { ports, recover } = setup();
-		ports.openWork.add("run-1", ran("run-1"));
+		const { ports, recover } = await setup();
+		await ports.addRun("run-1", ran("run-1"));
 		expect(await recover()).toEqual(["run-1"]);
 		expect(ports.openWork.pruned).toBe(1);
 		expect(ports.turns.taken).toEqual([
@@ -95,8 +93,10 @@ describe("recoverRuns", () => {
 	});
 
 	test("a run that does not continue says why in its end, and lets go of what it holds", async () => {
-		const { ports, recover } = setup({ "run-1": "schedules are paused." });
-		ports.openWork.add("run-1", ran("run-1"));
+		const { ports, recover } = await setup({
+			"run-1": "schedules are paused.",
+		});
+		await ports.addRun("run-1", ran("run-1"));
 		expect(await recover()).toEqual([]);
 		expect(ports.openWork.closed).toEqual([
 			{
@@ -109,8 +109,8 @@ describe("recoverRuns", () => {
 	});
 
 	test("a step past its limits ends as its timer would: the run fails and recovery leaves it", async () => {
-		const { ports, recover, asked } = setup();
-		ports.openWork.add("run-1", ran("run-1"));
+		const { ports, recover, asked } = await setup();
+		await ports.addRun("run-1", ran("run-1"));
 		ports.turns.answer({ kind: "halted" });
 		expect(await recover()).toEqual([]);
 		expect(ports.turns.taken.map((t) => t.intent.kind)).toEqual(["overdue"]);
@@ -119,9 +119,9 @@ describe("recoverRuns", () => {
 	});
 
 	test("a sleeping run gets its timer back, and nothing of it ends", async () => {
-		const { ports, recover, asked } = setup();
+		const { ports, recover, asked } = await setup();
 		const events = slept("run-1");
-		ports.openWork.add("run-1", events);
+		await ports.addRun("run-1", events);
 		expect(await recover()).toEqual([]);
 		expect(ports.turns.restored.map((r) => r.runId)).toEqual(["run-1"]);
 		expect(ports.turns.restored[0]?.state.sleep).toMatchObject({
@@ -135,19 +135,19 @@ describe("recoverRuns", () => {
 
 	test("a run of an older flow ends with its waits, and the next run goes on", async () => {
 		const reason = "This run is from an older version of Night Shift.";
-		const { ports, recover, asked } = setup(
+		const { ports, recover, asked } = await setup(
 			{},
 			{ ran: reason, slept: reason, ended: reason },
 		);
-		ports.openWork.add("ran", ran("ran"));
-		ports.openWork.add("slept", slept("slept"));
-		ports.openWork.add(
+		await ports.addRun("ran", ran("ran"));
+		await ports.addRun("slept", slept("slept"));
+		await ports.addRun(
 			"ended",
 			eventsOf("ended")
 				.push("RunStarted", started)
 				.push("RunEnded", { status: "finished", reason: null }).events,
 		);
-		ports.openWork.add("new", ran("new"));
+		await ports.addRun("new", ran("new"));
 		expect(await recover()).toEqual(["new"]);
 		expect(ports.openWork.closed).toEqual([
 			{ runId: "ran", reason },
@@ -162,8 +162,8 @@ describe("recoverRuns", () => {
 	});
 
 	test("a run that ended has nothing open: recovery only restores it", async () => {
-		const { ports, recover } = setup();
-		ports.openWork.add(
+		const { ports, recover } = await setup();
+		await ports.addRun(
 			"run-1",
 			eventsOf("run-1")
 				.push("RunStarted", started)
@@ -175,11 +175,13 @@ describe("recoverRuns", () => {
 	});
 
 	test("each run of this computer, in the order of the log", async () => {
-		const { ports, recover } = setup({ "run-2": "its stop time has passed." });
-		ports.openWork.add("run-1", ran("run-1"));
-		ports.openWork.add("run-2", ran("run-2"));
-		ports.openWork.add("run-3", slept("run-3"));
-		ports.openWork.add("run-far", ran("run-far"), { walkerId: "device-far" });
+		const { ports, recover } = await setup({
+			"run-2": "its stop time has passed.",
+		});
+		await ports.addRun("run-1", ran("run-1"));
+		await ports.addRun("run-2", ran("run-2"));
+		await ports.addRun("run-3", slept("run-3"));
+		await ports.addRun("run-far", ran("run-far"), { walkerId: "device-far" });
 		expect(await recover()).toEqual(["run-1"]);
 		expect(ports.openWork.closed.map((c) => c.runId)).toEqual([
 			"run-1",
@@ -190,21 +192,27 @@ describe("recoverRuns", () => {
 	});
 
 	test("checkpoints that cannot be pruned do not stop recovery", async () => {
-		const { ports, recover } = setup();
-		ports.openWork.add("run-1", ran("run-1"));
-		ports.openWork.failNextPrune();
+		const { ports, recover } = await setup();
+		await ports.addRun("run-1", ran("run-1"));
+		ports.openWork.pruneCheckpoints = async () => {
+			throw new Error("The disk is full.");
+		};
 		expect(await recover()).toEqual(["run-1"]);
 		expect(warned[0]?.[0]).toBe("[engine] could not prune the checkpoints");
 	});
 
 	test("a run that cannot let go is logged, and recovery goes on", async () => {
-		const { ports, recover } = setup({
+		const { ports, recover } = await setup({
 			"run-1": "schedules are paused.",
 			"run-2": "schedules are paused.",
 		});
-		ports.openWork.add("run-1", ran("run-1"));
-		ports.openWork.add("run-2", ran("run-2"));
-		ports.openWork.failNextLetGo();
+		await ports.addRun("run-1", ran("run-1"));
+		await ports.addRun("run-2", ran("run-2"));
+		const { letGo } = ports.openWork;
+		ports.openWork.letGo = async (runId) => {
+			if (runId === "run-1") throw new Error("The Host cannot be reached.");
+			return letGo(runId);
+		};
 		expect(await recover()).toEqual([]);
 		expect(ports.openWork.letGone).toEqual(["run-2"]);
 		expect(warned[0]?.[0]).toBe(

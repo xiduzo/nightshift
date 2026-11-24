@@ -2,13 +2,11 @@ import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { runRecord } from "../../../access/adapters/out/in-memory-run-records";
 import type { TakeOptions } from "../../../graph";
 import type { EnginePayloads, LoggedEvent } from "../../../log";
-import {
-	eventsOf,
-	inMemoryRecoveryPorts,
-} from "../adapters/out/in-memory-neighbours";
+import { eventsOf } from "../adapters/out/in-memory-neighbours";
+import { recoveryPorts } from "../test-support";
 import { signalProjectRuns } from "./signal-project-runs";
 
-/** A webhook's signal to the runs of a project, on in-memory adapters. */
+/** A webhook's signal to the runs of a project, over a database in memory. */
 
 const started = {
 	projectId: "project-1",
@@ -66,10 +64,10 @@ afterEach(() => {
 });
 
 /** Ports with each run in the waits, the run facts and the Turns, as its log says. */
-function setup(runs: Record<string, LoggedEvent[]>, failFor?: string) {
-	const ports = inMemoryRecoveryPorts();
+async function setup(runs: Record<string, LoggedEvent[]>, failFor?: string) {
+	const ports = await recoveryPorts();
 	for (const [runId, events] of Object.entries(runs)) {
-		ports.waits.add(runId, { projectId: "project-1", events });
+		await ports.addRun(runId, events);
 		ports.facts.seed(runId, events);
 		ports.turns.set(runId, {
 			row: runRecord({ id: runId, spaceId: "space-1" }),
@@ -96,7 +94,7 @@ const deployed = { name: "deployed", key: null, data: { env: "prod" } };
 
 describe("signalProjectRuns", () => {
 	test("wakes each run that waits for the signal with its data, queued on a full cap, and counts them", async () => {
-		const { ports, send, options } = setup({
+		const { ports, send, options } = await setup({
 			"run-1": waiting("run-1", "deployed"),
 			"run-2": waiting("run-2", "deployed"),
 			"run-other": waiting("run-other", "merged"),
@@ -126,7 +124,7 @@ describe("signalProjectRuns", () => {
 	});
 
 	test("a run that waited once and moved on is not woken", async () => {
-		const { ports, send } = setup({
+		const { ports, send } = await setup({
 			"run-1": waiting("run-1", "deployed", { woke: true }),
 		});
 		expect(await send("project-1", deployed)).toBe(0);
@@ -134,7 +132,7 @@ describe("signalProjectRuns", () => {
 	});
 
 	test("a run whose rules do not hold for the event is not woken", async () => {
-		const { ports, send } = setup({
+		const { ports, send } = await setup({
 			"run-1": waiting("run-1", "deployed", {
 				rules: [{ outcome: "test", when: 'event.env = "test"' }],
 			}),
@@ -144,7 +142,9 @@ describe("signalProjectRuns", () => {
 	});
 
 	test("a run that moved on before its Turn is refused quietly, and not counted", async () => {
-		const { ports, send } = setup({ "run-1": waiting("run-1", "deployed") });
+		const { ports, send } = await setup({
+			"run-1": waiting("run-1", "deployed"),
+		});
 		// In its Turn, the run no longer waits: a person sent the signal first.
 		ports.turns.set("run-1", {
 			row: runRecord({ id: "run-1", spaceId: "space-1" }),
@@ -157,7 +157,7 @@ describe("signalProjectRuns", () => {
 	});
 
 	test("a wake that fails for another reason is logged, and the next run still wakes", async () => {
-		const { ports, send } = setup(
+		const { ports, send } = await setup(
 			{
 				"run-1": waiting("run-1", "deployed"),
 				"run-2": waiting("run-2", "deployed"),

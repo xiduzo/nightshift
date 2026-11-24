@@ -3,8 +3,7 @@ import type { LoggedEvent, SleepFact } from "../../../log";
 /**
  * The driven ports of recovery: the work the last daemon left open, the
  * folders runs work in, and the sleeps of the runs this computer walks.
- * Each is recovery's own, with a real adapter, an in-memory adapter and a
- * contract suite in `adapters/out/`.
+ * Each is recovery's own: the adapters sit in `adapters/out/`.
  */
 
 /** The work the last daemon left open on this computer. */

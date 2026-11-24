@@ -11,16 +11,14 @@ import {
 import { awaitsWorktree, runWorktree } from "../../../../read";
 import { inMemoryRunFacts } from "../../../walk/adapters/out/in-memory-run-facts";
 import { inMemoryTurns } from "../../../walk/adapters/out/in-memory-turns";
-import { inMemoryOpenWork } from "./in-memory-open-work";
-import { inMemoryWaits } from "./in-memory-waits";
 import { inMemoryWorkplaces } from "./in-memory-workplaces";
 
 /**
- * Every port of recovery at once, in memory, for a use-case test: the
- * twins of recovery's own ports, the walk's run facts and Turns, the runs
- * of access with a Night Shift `openRun` over them, start holds that
- * record each Space, and the pure functions of the mechanisms. Test code:
- * production code never imports this file.
+ * The ports of recovery that are no database, for a use-case test: the
+ * folders, the walk's run facts and Turns, the runs of access with a Night
+ * Shift `openRun` over them, start holds that record each Space, and the
+ * pure functions of the mechanisms. Test code: production code never
+ * imports this file.
  */
 export function inMemoryRecoveryPorts() {
 	const runs = inMemoryRunRecords();
@@ -43,9 +41,7 @@ export function inMemoryRecoveryPorts() {
 		},
 	};
 	return {
-		openWork: inMemoryOpenWork(),
 		workplaces: inMemoryWorkplaces(),
-		waits: inMemoryWaits(),
 		facts: inMemoryRunFacts(),
 		turns: inMemoryTurns(),
 		runs,

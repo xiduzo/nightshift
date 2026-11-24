@@ -3,8 +3,8 @@ import type { RunFile } from "../domain/run-files";
 import type { RunCopyState, WorktreeRemoved } from "../domain/safety";
 
 /**
- * The driven ports of the cleanup. One is its own, with a real adapter, an
- * in-memory adapter and a contract suite in `adapters/out/`: `RemovalLog`.
+ * The driven ports of the cleanup. One is its own, with its adapter
+ * in `adapters/out/`: `RemovalLog`.
  * Another vertical fills the others (`@filledBy`): the engine's
  * composition passes them to `wireCleanup`.
  */
