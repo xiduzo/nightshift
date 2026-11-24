@@ -3,17 +3,13 @@ import type { Schedule } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { atLocal, utc } from "@nightshift/time/testing";
 import type { UsageMoment } from "../../usage";
-import {
-	type InMemorySchedulePorts,
-	inMemorySchedulePorts,
-} from "../adapters/out/in-memory-neighbours";
-import { inMemoryScheduleLog } from "../adapters/out/in-memory-schedule-log";
 import { createScheduleWatch } from "../domain/schedule-watch";
+import { schedulePorts } from "../test-support";
 import { fireDueSchedules } from "./fire-due-schedules";
 
 /**
- * One look of the scheduler, on in-memory adapters. A test sets the clock
- * and asks for a look: no timer, no database.
+ * One look of the scheduler, over a database in memory. A test sets the clock
+ * and asks for a look: no timer.
  */
 
 /** Local time on the computer's clock, October 2026 (the 16th is a Friday). */
@@ -37,9 +33,9 @@ function nightly(extra: Partial<Schedule> = {}): Schedule {
 }
 
 /** A daemon over the ports: its watch begins now, and its log reads the facts that are there. */
-function daemon(ports: InMemorySchedulePorts) {
+function daemon(ports: Awaited<ReturnType<typeof schedulePorts>>) {
 	const usage: UsageMoment[] = [];
-	const log = inMemoryScheduleLog(ports.log.facts);
+	const log = ports.openLog();
 	const fire = fireDueSchedules({
 		...ports,
 		log,
@@ -55,7 +51,7 @@ function daemon(ports: InMemorySchedulePorts) {
 
 /** A project with `schedules`, a daemon that began at `startedAt`, and one look at that moment. */
 async function watching(schedules: Schedule[], startedAt = at(16, 21, 59)) {
-	const ports = inMemorySchedulePorts(startedAt);
+	const ports = await schedulePorts(startedAt);
 	ports.projects.add({ id: P, spaceId: "space-1" });
 	ports.store.seed(P, { schedules });
 	const first = daemon(ports);
@@ -64,8 +60,8 @@ async function watching(schedules: Schedule[], startedAt = at(16, 21, 59)) {
 }
 
 /** The fired and skipped facts, as the log has them. */
-function facts(ports: InMemorySchedulePorts) {
-	return ports.log.facts.schedule;
+function facts(ports: Awaited<ReturnType<typeof schedulePorts>>) {
+	return ports.facts();
 }
 
 describe("the scheduler's look", () => {
@@ -73,7 +69,7 @@ describe("the scheduler's look", () => {
 		const { ports, look, usage } = await watching([
 			nightly({ inputs: { epic: "42" }, stopAt: "07:00" }),
 		]);
-		expect(facts(ports)).toEqual([]);
+		expect(await facts(ports)).toEqual([]);
 
 		ports.clock.set(at(16, 22, 0, 20));
 		await look();
@@ -89,7 +85,7 @@ describe("the scheduler's look", () => {
 			},
 			trigger: { kind: "schedule", scheduleId: "nightly", at: at(16, 22) },
 		});
-		expect(facts(ports)).toEqual([
+		expect(await facts(ports)).toEqual([
 			{
 				kind: "fired",
 				projectId: P,
@@ -143,15 +139,15 @@ describe("the scheduler's look", () => {
 		ports.clock.set(at(16, 22, 5));
 		await daemon(ports).look();
 		expect(ports.runs.started).toHaveLength(1);
-		expect(facts(ports)).toHaveLength(1);
+		expect(await facts(ports)).toHaveLength(1);
 	});
 
 	test("the run's own start counts as fired when the daemon died before the fired fact", async () => {
-		const ports = inMemorySchedulePorts(at(16, 22, 3));
+		const ports = await schedulePorts(at(16, 22, 3));
 		ports.projects.add({ id: P, spaceId: "space-1" });
 		ports.store.seed(P, { schedules: [nightly()] });
 		// What the scheduler leaves when it dies between the start and its record.
-		ports.log.runStarted({
+		await ports.runStarted({
 			projectId: P,
 			scheduleId: "nightly",
 			at: at(16, 22),
@@ -159,13 +155,13 @@ describe("the scheduler's look", () => {
 		});
 		await daemon(ports).look();
 		expect(ports.runs.started).toEqual([]);
-		expect(facts(ports)).toHaveLength(1);
+		expect(await facts(ports)).toHaveLength(1);
 	});
 
 	test("a time missed by less than 15 minutes fires after a restart", async () => {
 		const { ports } = await watching([nightly()], at(16, 22, 14));
 		expect(ports.runs.started).toHaveLength(1);
-		expect(facts(ports)).toMatchObject([
+		expect(await facts(ports)).toMatchObject([
 			{ kind: "fired", at: at(16, 22), error: null },
 		]);
 	});
@@ -180,8 +176,8 @@ describe("the scheduler's look", () => {
 		const second = daemon(ports);
 		await second.look();
 		await second.look();
-		expect(facts(ports)).toHaveLength(2);
-		expect(facts(ports)[1]).toEqual({
+		expect(await facts(ports)).toHaveLength(2);
+		expect((await facts(ports))[1]).toEqual({
 			kind: "skipped",
 			projectId: P,
 			scheduleId: "nightly",
@@ -205,7 +201,7 @@ describe("the scheduler's look", () => {
 		// The computer slept from 21:59 to 23:00.
 		ports.clock.set(at(16, 23));
 		await look();
-		expect(facts(ports)).toMatchObject([
+		expect(await facts(ports)).toMatchObject([
 			{
 				kind: "skipped",
 				at: at(16, 22),
@@ -218,7 +214,7 @@ describe("the scheduler's look", () => {
 	test("a schedule added after its time is not reported as missed", async () => {
 		const { ports, look } = await watching([nightly()], at(16, 23));
 		await look();
-		expect(facts(ports)).toEqual([]);
+		expect(await facts(ports)).toEqual([]);
 		expect(ports.notices.misses).toEqual([]);
 	});
 
@@ -237,7 +233,7 @@ describe("the scheduler's look", () => {
 			scheduleId: "nightly",
 			at: at(17, 22),
 		});
-		expect(facts(ports)[1]).toMatchObject({
+		expect((await facts(ports))[1]).toMatchObject({
 			kind: "fired",
 			at: at(17, 22),
 			error: null,
@@ -247,7 +243,7 @@ describe("the scheduler's look", () => {
 		ports.clock.set(at(17, 23, 45));
 		await daemon(ports).look();
 		expect(ports.runs.started).toHaveLength(2);
-		expect(facts(ports)).toHaveLength(2);
+		expect(await facts(ports)).toHaveLength(2);
 	});
 
 	test("a missed time past its lateMinutes is skipped, and the Space hears of it", async () => {
@@ -257,7 +253,7 @@ describe("the scheduler's look", () => {
 
 		ports.clock.set(at(17, 23, 30));
 		await daemon(ports).look();
-		expect(facts(ports)[1]).toMatchObject({
+		expect((await facts(ports))[1]).toMatchObject({
 			kind: "skipped",
 			at: at(17, 22),
 			reason:
@@ -286,7 +282,9 @@ describe("the scheduler's look", () => {
 		} finally {
 			logged.mockRestore();
 		}
-		expect(facts(ports).map((fact) => [fact.kind, fact.scheduleId])).toEqual([
+		expect(
+			(await facts(ports)).map((fact) => [fact.kind, fact.scheduleId]),
+		).toEqual([
 			["skipped", "first"],
 			["skipped", "second"],
 		]);
@@ -298,7 +296,7 @@ describe("the scheduler's look", () => {
 		]);
 		ports.clock.set(at(16, 22, 1));
 		await look();
-		expect(facts(ports)).toEqual([
+		expect(await facts(ports)).toEqual([
 			{
 				kind: "skipped",
 				projectId: P,
@@ -324,7 +322,7 @@ describe("the scheduler's look", () => {
 			at(16, 23),
 		);
 		await look();
-		expect(facts(ports)).toEqual([]);
+		expect(await facts(ports)).toEqual([]);
 		expect(ports.runs.started).toEqual([]);
 	});
 
@@ -336,7 +334,7 @@ describe("the scheduler's look", () => {
 
 		ports.clock.set(at(16, 23, 0, 30));
 		await look();
-		expect(facts(ports)[1]).toEqual({
+		expect((await facts(ports))[1]).toEqual({
 			kind: "skipped",
 			projectId: P,
 			scheduleId: "nightly",
@@ -351,7 +349,7 @@ describe("the scheduler's look", () => {
 		ports.runs.setStatus("run-1", "stopped");
 		ports.clock.set(at(17, 0, 0, 30));
 		await look();
-		expect(facts(ports)[2]).toMatchObject({
+		expect((await facts(ports))[2]).toMatchObject({
 			kind: "fired",
 			at: at(17, 0),
 			error: null,
@@ -367,26 +365,26 @@ describe("the scheduler's look", () => {
 		]);
 		ports.clock.set(at(16, 22, 1));
 		await look();
-		expect(facts(ports)).toEqual([]);
+		expect(await facts(ports)).toEqual([]);
 		expect(ports.runs.started).toEqual([]);
 	});
 
 	test("a schedule of a Space that another Device keeps does not fire here", async () => {
-		const ports = inMemorySchedulePorts(at(16, 21, 59));
+		const ports = await schedulePorts(at(16, 21, 59));
 		ports.projects.add({ id: P, spaceId: "space-1", firesHere: false });
 		ports.store.seed(P, { schedules: [nightly()] });
 		const { look } = daemon(ports);
 		await look();
 		ports.clock.set(at(16, 22, 1));
 		await look();
-		expect(facts(ports)).toEqual([]);
+		expect(await facts(ports)).toEqual([]);
 		expect(ports.runs.started).toEqual([]);
 
 		// It is not watched there: when this Device takes the Space over, the old time is not missed.
 		ports.projects.add({ id: P, spaceId: "space-1" });
 		ports.clock.set(at(16, 23));
 		await look();
-		expect(facts(ports)).toEqual([]);
+		expect(await facts(ports)).toEqual([]);
 	});
 
 	test("picks up an edit of the schedules on the next look, without a restart", async () => {
@@ -394,7 +392,7 @@ describe("the scheduler's look", () => {
 		await ports.store.save(P, [nightly()]);
 		ports.clock.set(at(16, 22, 0, 10));
 		await look();
-		expect(facts(ports)).toMatchObject([
+		expect(await facts(ports)).toMatchObject([
 			{ kind: "fired", at: at(16, 22), error: null },
 		]);
 	});
@@ -414,7 +412,7 @@ describe("the scheduler's look", () => {
 		} finally {
 			logged.mockRestore();
 		}
-		expect(facts(ports)).toEqual([
+		expect(await facts(ports)).toEqual([
 			{
 				kind: "fired",
 				projectId: P,
@@ -442,7 +440,7 @@ describe("the scheduler's look", () => {
 		} finally {
 			logged.mockRestore();
 		}
-		expect(facts(ports)).toMatchObject([
+		expect(await facts(ports)).toMatchObject([
 			{
 				kind: "fired",
 				runId: null,
@@ -457,7 +455,7 @@ describe("the scheduler's look", () => {
 		ports.projects.remove(P);
 		ports.clock.set(at(16, 22, 1));
 		await look();
-		expect(facts(ports)).toEqual([]);
+		expect(await facts(ports)).toEqual([]);
 	});
 
 	test("a project whose schedules do not load is passed over", async () => {
@@ -468,7 +466,7 @@ describe("the scheduler's look", () => {
 		ports.projects.add({ id: P, spaceId: "space-1" });
 		ports.clock.set(at(16, 22, 1));
 		await look();
-		expect(facts(ports)).toMatchObject([{ kind: "fired", projectId: P }]);
+		expect(await facts(ports)).toMatchObject([{ kind: "fired", projectId: P }]);
 	});
 
 	test("the first of two schedules with one id counts", async () => {
@@ -486,7 +484,7 @@ describe("the scheduler's look", () => {
 
 describe("the settings' scheduler switch", () => {
 	test("off skips every look: nothing fires", async () => {
-		const ports = inMemorySchedulePorts(at(16, 21, 59));
+		const ports = await schedulePorts(at(16, 21, 59));
 		ports.projects.add({ id: P, spaceId: "space-1" });
 		ports.store.seed(P, { schedules: [nightly()] });
 		ports.switch.turn(false);
@@ -494,7 +492,7 @@ describe("the settings' scheduler switch", () => {
 		await look();
 		ports.clock.set(at(16, 22, 0, 20));
 		await look();
-		expect(facts(ports)).toEqual([]);
+		expect(await facts(ports)).toEqual([]);
 		expect(ports.runs.started).toEqual([]);
 	});
 
@@ -507,24 +505,24 @@ describe("the settings' scheduler switch", () => {
 		await look();
 		ports.switch.turn(true);
 		await look();
-		expect(facts(ports)).toEqual([]);
+		expect(await facts(ports)).toEqual([]);
 		expect(ports.runs.started).toEqual([]);
 
 		// Later that evening it is not missed either.
 		ports.clock.set(at(16, 23, 30));
 		await look();
-		expect(facts(ports)).toEqual([]);
+		expect(await facts(ports)).toEqual([]);
 
 		// The next time fires as usual.
 		ports.clock.set(at(17, 22, 0, 10));
 		await look();
-		expect(facts(ports)).toMatchObject([
+		expect(await facts(ports)).toMatchObject([
 			{ kind: "fired", at: at(17, 22), error: null },
 		]);
 	});
 
 	test("turned on within the grace of a time that came due while off, it does not fire it", async () => {
-		const ports = inMemorySchedulePorts(at(16, 21, 59));
+		const ports = await schedulePorts(at(16, 21, 59));
 		ports.projects.add({ id: P, spaceId: "space-1" });
 		ports.store.seed(P, { schedules: [nightly()] });
 		ports.switch.turn(false);
@@ -534,12 +532,12 @@ describe("the settings' scheduler switch", () => {
 		await look();
 		ports.switch.turn(true);
 		await look();
-		expect(facts(ports)).toEqual([]);
+		expect(await facts(ports)).toEqual([]);
 		expect(ports.runs.started).toEqual([]);
 
 		ports.clock.set(at(17, 22, 0, 10));
 		await look();
-		expect(facts(ports)).toMatchObject([
+		expect(await facts(ports)).toMatchObject([
 			{ kind: "fired", at: at(17, 22), error: null },
 		]);
 	});
@@ -563,7 +561,7 @@ describe("Pause tonight, at the cron time", () => {
 		const second = daemon(ports);
 		ports.clock.set(at(16, 22, 0, 20));
 		await second.look();
-		expect(facts(ports)).toEqual([
+		expect(await facts(ports)).toEqual([
 			{
 				kind: "skipped",
 				projectId: P,
@@ -577,7 +575,7 @@ describe("Pause tonight, at the cron time", () => {
 
 		ports.clock.set(at(17, 22, 0, 20));
 		await second.look();
-		expect(facts(ports)[1]).toMatchObject({
+		expect((await facts(ports))[1]).toMatchObject({
 			kind: "fired",
 			at: at(17, 22),
 			error: null,
@@ -591,10 +589,15 @@ describe("Pause tonight, at the cron time", () => {
 		);
 		ports.clock.set(at(17, 5, 0, 20));
 		await look();
-		expect(facts(ports)).toMatchObject([{ kind: "skipped", at: at(17, 5) }]);
+		expect(await facts(ports)).toMatchObject([
+			{ kind: "skipped", at: at(17, 5) },
+		]);
 		ports.clock.set(at(17, 6, 0, 20));
 		await look();
-		expect(facts(ports)[1]).toMatchObject({ kind: "fired", at: at(17, 6) });
+		expect((await facts(ports))[1]).toMatchObject({
+			kind: "fired",
+			at: at(17, 6),
+		});
 	});
 });
 
@@ -619,7 +622,7 @@ describe("a hold and a stop", () => {
 		// After the release the time fires, within its grace.
 		ports.clock.set(at(16, 22, 2));
 		await fire({ held: () => false, stopped: () => false });
-		expect(facts(ports)).toMatchObject([
+		expect(await facts(ports)).toMatchObject([
 			{ kind: "fired", at: at(16, 22), error: null },
 		]);
 	});
@@ -657,7 +660,7 @@ describe("a hold and a stop", () => {
 			),
 		).toEqual(["first"]);
 		// The run that started is in the log before the hold counts.
-		expect(facts(ports)).toMatchObject([
+		expect(await facts(ports)).toMatchObject([
 			{ kind: "fired", scheduleId: "first" },
 		]);
 	});

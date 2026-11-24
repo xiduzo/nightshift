@@ -22,10 +22,6 @@ import type {
 } from "../../application/ports";
 import type { MissedScheduleTime } from "../../domain/schedule-watch";
 import {
-	type InMemoryScheduleLog,
-	inMemoryScheduleLog,
-} from "./in-memory-schedule-log";
-import {
 	type InMemoryScheduleStore,
 	inMemoryScheduleStore,
 } from "./in-memory-schedule-store";
@@ -347,12 +343,11 @@ export function inMemoryScheduleNotices(): InMemoryScheduleNotices {
 	return notices;
 }
 
-/** Every port of the slice, in memory. */
+/** The ports of the slice that are no database, in memory. */
 export type InMemorySchedulePorts = {
 	clock: InMemoryClock;
 	access: InMemoryAccess;
 	store: InMemoryScheduleStore;
-	log: InMemoryScheduleLog;
 	runs: InMemoryScheduledRuns;
 	projects: InMemoryScheduledProjects;
 	offers: InMemoryScheduleOffers;
@@ -362,13 +357,12 @@ export type InMemorySchedulePorts = {
 	notices: InMemoryScheduleNotices;
 };
 
-/** Every port of the slice, in memory, with the clock at `at`: what a use-case test starts from. */
+/** The ports of the slice that are no database, in memory, with the clock at `at`. */
 export function inMemorySchedulePorts(at: number): InMemorySchedulePorts {
 	return {
 		clock: inMemoryClock(at),
 		access: inMemoryAccess(),
 		store: inMemoryScheduleStore(),
-		log: inMemoryScheduleLog(),
 		runs: inMemoryScheduledRuns(),
 		projects: inMemoryScheduledProjects(),
 		offers: inMemoryScheduleOffers(),

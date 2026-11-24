@@ -48,9 +48,9 @@ export function inMemoryAccess(walkerId?: string) {
 			effects: () => unknown = () => null,
 		) {
 			const ask = async (actor: Actor): Promise<AccessAnswer> => {
-				const before = JSON.stringify(effects());
-				const refused = (answer: AccessAnswer): AccessAnswer =>
-					JSON.stringify(effects()) === before ? answer : "too-late";
+				const before = JSON.stringify(await effects());
+				const refused = async (answer: AccessAnswer): Promise<AccessAnswer> =>
+					JSON.stringify(await effects()) === before ? answer : "too-late";
 				try {
 					await act(actor);
 				} catch (error) {

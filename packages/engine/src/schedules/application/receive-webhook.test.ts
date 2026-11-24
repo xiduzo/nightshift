@@ -2,11 +2,11 @@ import { describe, expect, spyOn, test } from "bun:test";
 import { createHmac } from "node:crypto";
 import { FLOW_VERSION, type Flow, type Schedule } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
-import { inMemorySchedulePorts } from "../adapters/out/in-memory-neighbours";
 import { createWebhookRefusals } from "../domain/webhook-delivery";
+import { schedulePorts } from "../test-support";
 import { receiveWebhook } from "./receive-webhook";
 
-/** A webhook for a schedule, on in-memory adapters: no HTTP server, no database. */
+/** A webhook for a schedule, over a database in memory: no HTTP server, no database. */
 
 const P = "project-1";
 const SECRET = "s3cret";
@@ -79,8 +79,8 @@ function signed(
 }
 
 /** A project with `schedules` and the flow `echo`, and the secret `HOOK_SECRET`. */
-function project(schedules: Schedule[]) {
-	const ports = inMemorySchedulePorts(NOW);
+async function project(schedules: Schedule[]) {
+	const ports = await schedulePorts(NOW);
 	ports.projects.add({ id: P, spaceId: "space-1" });
 	ports.store.seed(P, { flows: { echo: { json: echoFlow } }, schedules });
 	ports.secrets.set("HOOK_SECRET", SECRET);
@@ -113,7 +113,7 @@ function project(schedules: Schedule[]) {
 
 describe("a webhook for a schedule", () => {
 	test("starts its flow with inputs read from the event, and logs that it took it", async () => {
-		const { ports, send } = project([hook()]);
+		const { ports, send } = await project([hook()]);
 		const payload = body({ action: "opened", pull_request: { number: 7 } });
 		expect(await send(payload, signed(payload))).toEqual({ kind: "accepted" });
 
@@ -130,7 +130,7 @@ describe("a webhook for a schedule", () => {
 			},
 			trigger: { kind: "webhook", scheduleId: "review", at: NOW },
 		});
-		expect(ports.log.facts.webhooks).toEqual([
+		expect(await ports.webhooks()).toEqual([
 			{
 				projectId: P,
 				scheduleId: "review",
@@ -144,7 +144,7 @@ describe("a webhook for a schedule", () => {
 	});
 
 	test("refuses an unknown schedule and a wrong secret with one answer, and logs neither", async () => {
-		const { ports, send, refused } = project([
+		const { ports, send, refused } = await project([
 			hook(),
 			{
 				id: "cron",
@@ -172,7 +172,7 @@ describe("a webhook for a schedule", () => {
 		).toEqual(notFound);
 
 		expect(ports.runs.started).toEqual([]);
-		expect(ports.log.facts.webhooks).toEqual([]);
+		expect(await ports.webhooks()).toEqual([]);
 		// The person sees why the schedule's own webhooks did nothing.
 		expect(refused()).toEqual([
 			"The request had no secret.",
@@ -184,7 +184,7 @@ describe("a webhook for a schedule", () => {
 	});
 
 	test("the key that stands in for the secret of an unknown schedule opens nothing", async () => {
-		const { send } = project([hook()]);
+		const { send } = await project([hook()]);
 		const payload = body({});
 		expect(
 			await send(payload, signed(payload, {}, NO_SECRET), {
@@ -197,7 +197,7 @@ describe("a webhook for a schedule", () => {
 	});
 
 	test("reads the secret for the schedule's project, by the name the schedule gives", async () => {
-		const { ports, send } = project([hook()]);
+		const { ports, send } = await project([hook()]);
 		const payload = body({});
 		await send(payload, signed(payload));
 		expect(ports.secrets.asked).toEqual([
@@ -206,7 +206,7 @@ describe("a webhook for a schedule", () => {
 	});
 
 	test("a secret with no value refuses every webhook, and says so", async () => {
-		const { send, refused } = project([
+		const { send, refused } = await project([
 			// biome-ignore lint/suspicious/noTemplateCurlyInString: a secret reference, as a person writes it.
 			hook({ webhook: { secret: "${OTHER}" } }),
 			hook({ id: "plain", webhook: { secret: "not a reference" } }),
@@ -227,7 +227,7 @@ describe("a webhook for a schedule", () => {
 	});
 
 	test("takes a bearer secret, and filters by the schedule's rule", async () => {
-		const { ports, send } = project([
+		const { ports, send } = await project([
 			hook({
 				webhook: {
 					secret: HOOK_SECRET,
@@ -245,7 +245,7 @@ describe("a webhook for a schedule", () => {
 
 		expect(await send(payload, bearer("push"))).toEqual({ kind: "filtered" });
 		expect(ports.runs.started).toEqual([]);
-		expect(ports.log.facts.webhooks).toEqual([
+		expect(await ports.webhooks()).toEqual([
 			{
 				projectId: P,
 				scheduleId: "review",
@@ -264,12 +264,12 @@ describe("a webhook for a schedule", () => {
 	});
 
 	test("a rule that fails filters the webhook, with the reason", async () => {
-		const { ports, send } = project([
+		const { ports, send } = await project([
 			hook({ webhook: { secret: HOOK_SECRET, when: "event.body.(" } }),
 		]);
 		const payload = body({});
 		expect(await send(payload, signed(payload))).toEqual({ kind: "filtered" });
-		expect(ports.log.facts.webhooks[0]).toMatchObject({
+		expect((await ports.webhooks())[0]).toMatchObject({
 			result: "filtered",
 			error: expect.stringMatching(/^The rule failed: /),
 		});
@@ -279,14 +279,14 @@ describe("a webhook for a schedule", () => {
 		const payload = body({});
 		const refusedWith = async (
 			schedule: Schedule,
-			change: (ports: ReturnType<typeof project>["ports"]) => void,
+			change: (ports: Awaited<ReturnType<typeof project>>["ports"]) => void,
 		) => {
-			const { ports, send, refused } = project([schedule]);
+			const { ports, send, refused } = await project([schedule]);
 			change(ports);
 			const answer = await send(payload, signed(payload));
 			expect(ports.runs.started).toEqual([]);
 			// A refusal is told and remembered, and never logged.
-			expect(ports.log.facts.webhooks).toEqual([]);
+			expect(await ports.webhooks()).toEqual([]);
 			expect(refused()).toEqual([
 				answer.kind === "refused" ? answer.reason : answer.kind,
 			]);
@@ -322,7 +322,7 @@ describe("a webhook for a schedule", () => {
 	});
 
 	test("its signal wakes the runs that wait for its key, with the event as data, and starts no run", async () => {
-		const { ports, send } = project([ciHook()]);
+		const { ports, send } = await project([ciHook()]);
 		ports.runs.wakes(1);
 		const payload = body({ number: 7, conclusion: "success" });
 		expect(await send(payload, signed(payload), { scheduleId: "ci" })).toEqual({
@@ -346,7 +346,7 @@ describe("a webhook for a schedule", () => {
 			},
 		]);
 		expect(ports.runs.started).toEqual([]);
-		expect(ports.log.facts.webhooks[0]).toMatchObject({
+		expect((await ports.webhooks())[0]).toMatchObject({
 			result: "accepted",
 			runId: null,
 			woke: 1,
@@ -362,7 +362,7 @@ describe("a webhook for a schedule", () => {
 			webhook: { secret: HOOK_SECRET },
 			scorePullRequests: true,
 		};
-		const { ports, send } = project([
+		const { ports, send } = await project([
 			scores,
 			{ ...scores, id: "plain", scorePullRequests: false },
 		]);
@@ -377,7 +377,7 @@ describe("a webhook for a schedule", () => {
 	});
 
 	test("what goes wrong after the answer is logged in words, and the rest still happens", async () => {
-		const { ports, send } = project([
+		const { ports, send } = await project([
 			hook({ signal: { name: "ci-done" }, scorePullRequests: true }),
 		]);
 		ports.runs.failSignals(new Refusal("conflict", "No run waits here."));
@@ -399,7 +399,7 @@ describe("a webhook for a schedule", () => {
 		} finally {
 			logged.mockRestore();
 		}
-		expect(ports.log.facts.webhooks).toEqual([
+		expect(await ports.webhooks()).toEqual([
 			{
 				projectId: P,
 				scheduleId: "review",
@@ -414,21 +414,21 @@ describe("a webhook for a schedule", () => {
 	});
 
 	test("a signal key that fails sends no signal, and the run still starts", async () => {
-		const { ports, send } = project([
+		const { ports, send } = await project([
 			hook({ signal: { name: "ci-done", key: "event.body.(" } }),
 		]);
 		const payload = body({ pull_request: { number: 7 } });
 		await send(payload, signed(payload));
 		expect(ports.runs.signals).toEqual([]);
 		expect(ports.runs.started).toHaveLength(1);
-		expect(ports.log.facts.webhooks[0]).toMatchObject({
+		expect((await ports.webhooks())[0]).toMatchObject({
 			runId: "run-1",
 			error: expect.stringMatching(/^The signal's key failed: /),
 		});
 	});
 
 	test("answers before the work is done: the run starts after the sender has its answer", async () => {
-		const { ports, receive } = project([hook()]);
+		const { ports, receive } = await project([hook()]);
 		let release: () => void = () => {};
 		let reached: () => void = () => {};
 		const atTheStart = new Promise<void>((resolve) => {
@@ -450,7 +450,7 @@ describe("a webhook for a schedule", () => {
 			body: payload,
 		});
 		expect(answer).toEqual({ kind: "accepted" });
-		expect(ports.log.facts.webhooks).toEqual([]);
+		expect(await ports.webhooks()).toEqual([]);
 
 		// `done` ends after the log has the webhook.
 		let ended = false;
@@ -459,14 +459,14 @@ describe("a webhook for a schedule", () => {
 		});
 		await atTheStart;
 		expect(ended).toBe(false);
-		expect(ports.log.facts.webhooks).toEqual([]);
+		expect(await ports.webhooks()).toEqual([]);
 		release();
 		await finished;
-		expect(ports.log.facts.webhooks).toHaveLength(1);
+		expect(await ports.webhooks()).toHaveLength(1);
 	});
 
 	test("the first of two schedules with one id counts", async () => {
-		const { ports, send } = project([hook(), hook({ flow: "second" })]);
+		const { ports, send } = await project([hook(), hook({ flow: "second" })]);
 		const payload = body({ pull_request: { number: 7 } });
 		await send(payload, signed(payload));
 		expect(ports.runs.started.map((start) => start.input)).toMatchObject([
@@ -475,7 +475,7 @@ describe("a webhook for a schedule", () => {
 	});
 
 	test("a flow whose inputs do not load still starts, with the values as text", async () => {
-		const { ports, send } = project([hook({ flow: "gone" })]);
+		const { ports, send } = await project([hook({ flow: "gone" })]);
 		const payload = body({ pull_request: { number: 7 } });
 		expect(await send(payload, signed(payload))).toEqual({ kind: "accepted" });
 		expect(ports.runs.started[0]?.input).toMatchObject({ flowName: "gone" });

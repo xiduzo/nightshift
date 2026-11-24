@@ -4,10 +4,10 @@ import { Refusal } from "@nightshift/refusal";
 import { allowing } from "../../access/adapters/out/in-memory-access";
 import { NOT_ON_THIS_COMPUTER } from "../../projects";
 import type { UsageMoment } from "../../usage";
-import { inMemorySchedulePorts } from "../adapters/out/in-memory-neighbours";
+import { schedulePorts } from "../test-support";
 import { saveSchedules } from "./save-schedules";
 
-/** The save of a project's schedules, on in-memory adapters. */
+/** The save of a project's schedules, over a database in memory. */
 
 const P = "project-1";
 const SPACE = "space-1";
@@ -44,8 +44,10 @@ function nightly(extra: Partial<Schedule> = {}): Schedule {
 }
 
 /** A project in a Space, with a Clone here unless the test says otherwise. */
-function project(clone: { hasFolder?: boolean; clonedHere?: boolean } = {}) {
-	const ports = inMemorySchedulePorts(0);
+async function project(
+	clone: { hasFolder?: boolean; clonedHere?: boolean } = {},
+) {
+	const ports = await schedulePorts(0);
 	for (const spaceId of [SPACE, "space-2"]) {
 		ports.access.members.join(spaceId, ANN.personId, "member");
 	}
@@ -81,7 +83,7 @@ const refusalOf = (work: Promise<unknown>) =>
 
 describe("the save of a project's schedules", () => {
 	test("saves schedules with problems too, and returns the issues", async () => {
-		const { save, saved } = project();
+		const { save, saved } = await project();
 		expect(await save([nightly({ flow: "gone" })])).toEqual([
 			{
 				severity: "error",
@@ -93,20 +95,20 @@ describe("the save of a project's schedules", () => {
 	});
 
 	test("a schedule without a problem has no issue", async () => {
-		const { ports, save } = project();
+		const { ports, save } = await project();
 		ports.store.seed(P, { flows: { night: { json: night } } });
 		expect(await save([nightly()])).toEqual([]);
 	});
 
 	test("replaces every schedule of the project", async () => {
-		const { save, saved } = project();
+		const { save, saved } = await project();
 		await save([nightly({ id: "a" }), nightly({ id: "b" })]);
 		await save([nightly({ id: "b", enabled: false })]);
 		expect(await saved()).toEqual([nightly({ id: "b", enabled: false })]);
 	});
 
 	test("gives the saver's clock to each schedule with a time and no time zone of its own", async () => {
-		const { save, saved } = project();
+		const { save, saved } = await project();
 		await save(
 			[
 				nightly({ id: "mine" }),
@@ -125,7 +127,7 @@ describe("the save of a project's schedules", () => {
 	});
 
 	test("asks the Offer rule for the Space and the person who saves, with the project's flows", async () => {
-		const { ports, save } = project();
+		const { ports, save } = await project();
 		const flows = { night: { json: { name: "night" } } };
 		ports.store.seed(P, { flows });
 		await save([nightly()], "Europe/Amsterdam");
@@ -141,14 +143,14 @@ describe("the save of a project's schedules", () => {
 	});
 
 	test("saves what the Offer rule writes: a schedule on another Person's Device runs for the saver", async () => {
-		const { ports, save, saved } = project();
+		const { ports, save, saved } = await project();
 		ports.offers.writeFor("person-ann");
 		await save([nightly()]);
 		expect(await saved()).toEqual([nightly({ person: "person-ann" })]);
 	});
 
 	test("what the Offer rule refuses passes through, and nothing is saved", async () => {
-		const { ports, save, saved, usage } = project();
+		const { ports, save, saved, usage } = await project();
 		const refusal = new Refusal("forbidden", "No Offer covers this flow.");
 		ports.offers.refuse(refusal);
 		expect(await refusalOf(save([nightly()]))).toBe(refusal);
@@ -157,7 +159,7 @@ describe("the save of a project's schedules", () => {
 	});
 
 	test("refuses a project with a folder and no Clone on this computer, before the Offers are asked", async () => {
-		const { ports, save, saved } = project({ clonedHere: false });
+		const { ports, save, saved } = await project({ clonedHere: false });
 		const refused = await refusalOf(save([nightly()]));
 		expect(refused).toBeInstanceOf(Refusal);
 		expect(refused).toMatchObject({
@@ -169,13 +171,16 @@ describe("the save of a project's schedules", () => {
 	});
 
 	test("a project without a folder needs no Clone", async () => {
-		const { save, saved } = project({ hasFolder: false, clonedHere: false });
+		const { save, saved } = await project({
+			hasFolder: false,
+			clonedHere: false,
+		});
 		await save([nightly()]);
 		expect(await saved()).toEqual([nightly()]);
 	});
 
 	test("a project of another Space is not found", async () => {
-		const { ports, save } = project();
+		const { ports, save } = await project();
 		expect(
 			await refusalOf(save([nightly()], undefined, "space-2")),
 		).toMatchObject({ kind: "not-found" });
@@ -183,7 +188,7 @@ describe("the save of a project's schedules", () => {
 	});
 
 	test("notes each saved schedule for the usage numbers", async () => {
-		const { save, usage } = project();
+		const { save, usage } = await project();
 		await save([
 			nightly(),
 			{
@@ -212,7 +217,7 @@ describe("the save of a project's schedules", () => {
 	});
 
 	test("asks schedule:save: owners, admins and members may, and nobody else", async () => {
-		const { ports, saveAs } = project();
+		const { ports, saveAs } = await project();
 		expect(
 			await ports.access.whoMay(
 				SPACE,

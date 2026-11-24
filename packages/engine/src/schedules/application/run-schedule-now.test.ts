@@ -4,12 +4,12 @@ import { Refusal } from "@nightshift/refusal";
 import { atLocal } from "@nightshift/time/testing";
 import { allowing } from "../../access/adapters/out/in-memory-access";
 import { NIGHT_SHIFT } from "../../contract";
-import { inMemorySchedulePorts } from "../adapters/out/in-memory-neighbours";
 import { createScheduleWatch } from "../domain/schedule-watch";
+import { schedulePorts } from "../test-support";
 import { fireDueSchedules } from "./fire-due-schedules";
 import { runScheduleNow } from "./run-schedule-now";
 
-/** Run now, on in-memory adapters. */
+/** Run now, over a database in memory. */
 
 /** Local time on the computer's clock, October 2026 (the 16th is a Friday). */
 function at(day: number, hours: number, minutes = 0, seconds = 0): number {
@@ -32,8 +32,8 @@ function nightly(extra: Partial<Schedule> = {}): Schedule {
 }
 
 /** A project in a Space with `schedules`, at `now`. */
-function project(schedules: Schedule[], now = at(16, 12)) {
-	const ports = inMemorySchedulePorts(now);
+async function project(schedules: Schedule[], now = at(16, 12)) {
+	const ports = await schedulePorts(now);
 	for (const spaceId of [SPACE, "space-2"]) {
 		ports.access.members.join(spaceId, ANN.personId, "member");
 	}
@@ -62,7 +62,7 @@ const refusalOf = (work: Promise<unknown>) =>
 
 describe("Run now", () => {
 	test("starts the schedule's run at once, with its inputs and the schedule as the trigger", async () => {
-		const { ports, runNow } = project([
+		const { ports, runNow } = await project([
 			nightly({ inputs: { epic: "42" }, stopAt: "07:00", baseRef: "main" }),
 		]);
 		const run = await runNow("nightly");
@@ -80,7 +80,7 @@ describe("Run now", () => {
 			trigger: { kind: "schedule", scheduleId: "nightly", at: at(16, 12) },
 		});
 		expect(run).toBe(ports.runs.started[0]?.run as typeof run);
-		expect(ports.log.facts.schedule).toEqual([
+		expect(await ports.facts()).toEqual([
 			{
 				kind: "fired",
 				projectId: P,
@@ -93,7 +93,7 @@ describe("Run now", () => {
 	});
 
 	test("the run is the schedule's Person's, else the person's who asks", async () => {
-		const { ports, runNow, runNowAsNightShift } = project([
+		const { ports, runNow, runNowAsNightShift } = await project([
 			nightly({ id: "mine" }),
 			nightly({ id: "carols", person: "person-carol" }),
 			nightly({ id: "nobodys" }),
@@ -110,7 +110,7 @@ describe("Run now", () => {
 
 	test("tonight's start still fires after it, and a pause tonight stays", async () => {
 		const paused = nightly({ id: "paused", pausedUntil: at(17, 6) });
-		const { ports, runNow } = project([nightly(), paused]);
+		const { ports, runNow } = await project([nightly(), paused]);
 		const look = fireDueSchedules({
 			...ports,
 			watch: createScheduleWatch(ports.clock()),
@@ -128,7 +128,7 @@ describe("Run now", () => {
 		ports.clock.set(at(16, 22, 0, 20));
 		await look(idle);
 		expect(
-			ports.log.facts.schedule.map((fact) => [
+			(await ports.facts()).map((fact) => [
 				fact.kind,
 				fact.scheduleId,
 				fact.at,
@@ -142,7 +142,7 @@ describe("Run now", () => {
 	});
 
 	test("refuses while an earlier run of the schedule is open, and starts nothing", async () => {
-		const { ports, runNow } = project([nightly()]);
+		const { ports, runNow } = await project([nightly()]);
 		await runNow("nightly");
 		ports.runs.setStatus("run-1", "waiting");
 		const refused = await refusalOf(runNow("nightly"));
@@ -161,7 +161,7 @@ describe("Run now", () => {
 	});
 
 	test("refuses a schedule that does not exist, and one that starts no flow", async () => {
-		const { ports, runNow } = project([
+		const { ports, runNow } = await project([
 			{ id: "signal-only", inputs: {}, enabled: true },
 		]);
 		expect(await refusalOf(runNow("gone"))).toMatchObject({
@@ -173,11 +173,11 @@ describe("Run now", () => {
 			message: "This schedule starts no flow.",
 		});
 		expect(ports.runs.started).toEqual([]);
-		expect(ports.log.facts.schedule).toEqual([]);
+		expect(await ports.facts()).toEqual([]);
 	});
 
 	test("a project of another Space is not found, before anyone is asked anything", async () => {
-		const { ports, runNowIn } = project([nightly()]);
+		const { ports, runNowIn } = await project([nightly()]);
 		expect(await refusalOf(runNowIn("space-2"))).toMatchObject({
 			kind: "not-found",
 		});
@@ -186,7 +186,7 @@ describe("Run now", () => {
 	});
 
 	test("asks who may see the run before it starts it, and shows the run as that says", async () => {
-		const { ports, runNow } = project([nightly()]);
+		const { ports, runNow } = await project([nightly()]);
 		ports.runs.hidePaths();
 		// The start sees that the question came first.
 		const start = ports.runs.start;
@@ -203,15 +203,15 @@ describe("Run now", () => {
 	});
 
 	test("what the start refuses passes through, and nothing is logged", async () => {
-		const { ports, runNow } = project([nightly()]);
+		const { ports, runNow } = await project([nightly()]);
 		const cap = new Refusal("conflict", "The run cap is reached.");
 		ports.runs.failNextStart(cap);
 		expect(await refusalOf(runNow("nightly"))).toBe(cap);
-		expect(ports.log.facts.schedule).toEqual([]);
+		expect(await ports.facts()).toEqual([]);
 	});
 
 	test("works while the scheduler is switched off", async () => {
-		const { ports, runNow } = project([nightly()]);
+		const { ports, runNow } = await project([nightly()]);
 		ports.switch.turn(false);
 		ports.switch.start(false);
 		await runNow("nightly");
@@ -219,7 +219,7 @@ describe("Run now", () => {
 	});
 
 	test("owners, admins and members may, and nobody else", async () => {
-		const { ports, runNowAs } = project([nightly()]);
+		const { ports, runNowAs } = await project([nightly()]);
 		// `space-2` does not have the project: the role is asked before it.
 		for (const spaceId of [SPACE, "space-2"]) {
 			expect(
@@ -227,10 +227,10 @@ describe("Run now", () => {
 					spaceId,
 					(actor) =>
 						runNowAs(actor, { spaceId, projectId: P, scheduleId: "nightly" }),
-					() => [
+					async () => [
 						ports.runs.shown,
 						ports.runs.started,
-						ports.log.facts.schedule,
+						await ports.facts(),
 					],
 				),
 			).toEqual(allowing("owner", "admin", "member"));

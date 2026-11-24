@@ -2,11 +2,11 @@ import { describe, expect, test } from "bun:test";
 import type { Schedule } from "@nightshift/flows";
 import { atLocal } from "@nightshift/time/testing";
 import { allowing } from "../../access/adapters/out/in-memory-access";
-import { inMemorySchedulePorts } from "../adapters/out/in-memory-neighbours";
 import { createScheduleWatch } from "../domain/schedule-watch";
+import { schedulePorts } from "../test-support";
 import { pauseScheduleTonight } from "./pause-schedule-tonight";
 
-/** Pause tonight, on in-memory adapters. */
+/** Pause tonight, over a database in memory. */
 
 /** Local time on the computer's clock, October 2026 (the 16th is a Friday). */
 function at(day: number, hours: number, minutes = 0, seconds = 0): number {
@@ -31,8 +31,8 @@ function nightly(extra: Partial<Schedule> = {}): Schedule {
 }
 
 /** A project in a Space with `schedules`, at `now`. */
-function project(schedules: Schedule[], now = at(16, 12)) {
-	const ports = inMemorySchedulePorts(now);
+async function project(schedules: Schedule[], now = at(16, 12)) {
+	const ports = await schedulePorts(now);
 	for (const spaceId of [SPACE, "space-2"]) {
 		ports.access.members.join(spaceId, ANN.personId, "member");
 	}
@@ -62,7 +62,7 @@ const refusalOf = (work: Promise<unknown>) =>
 describe("Pause tonight", () => {
 	test("pauses until the first 06:00 after the next start, and says when the schedule starts again", async () => {
 		const morning = nightly({ id: "morning", cron: "0 7 * * *" });
-		const { pause, saved } = project([morning, nightly()]);
+		const { pause, saved } = await project([morning, nightly()]);
 		expect(await pause("nightly")).toEqual({
 			pausedUntil: at(17, 6),
 			nextAt: at(17, 22),
@@ -75,7 +75,10 @@ describe("Pause tonight", () => {
 	});
 
 	test("an hourly schedule skips the night and starts again at 06:00", async () => {
-		const { pause } = project([nightly({ cron: "0 * * * *" })], at(16, 23, 30));
+		const { pause } = await project(
+			[nightly({ cron: "0 * * * *" })],
+			at(16, 23, 30),
+		);
 		expect(await pause("nightly")).toEqual({
 			pausedUntil: at(17, 6),
 			nextAt: at(17, 6),
@@ -83,7 +86,9 @@ describe("Pause tonight", () => {
 	});
 
 	test("a second pause counts from the next start without the first", async () => {
-		const { pause, saved } = project([nightly({ pausedUntil: at(17, 6) })]);
+		const { pause, saved } = await project([
+			nightly({ pausedUntil: at(17, 6) }),
+		]);
 		expect(await pause("nightly")).toEqual({
 			pausedUntil: at(17, 6),
 			nextAt: at(17, 22),
@@ -92,7 +97,7 @@ describe("Pause tonight", () => {
 	});
 
 	test("a time the log has handled is not the next start: the pause is for the evening after", async () => {
-		const { ports, pause } = project([nightly()], at(16, 22, 5));
+		const { ports, pause } = await project([nightly()], at(16, 22, 5));
 		await ports.log.fired({
 			projectId: P,
 			scheduleId: "nightly",
@@ -115,7 +120,7 @@ describe("Pause tonight", () => {
 				webhook: { secret: HOOK_SECRET },
 			}),
 		];
-		const { pause, saved } = project(schedules);
+		const { pause, saved } = await project(schedules);
 		expect(await refusalOf(pause("off"))).toMatchObject({
 			kind: "invalid",
 			message: "This schedule is off. It starts nothing tonight.",
@@ -132,7 +137,7 @@ describe("Pause tonight", () => {
 	});
 
 	test("tells the open screens of the Space after the save, and waits for it", async () => {
-		const { ports, pause } = project([nightly()]);
+		const { ports, pause } = await project([nightly()]);
 		// The screens hear of it when the pause is saved.
 		let savedWhenTold: number | undefined;
 		const changed = ports.notices.changed;
@@ -147,7 +152,7 @@ describe("Pause tonight", () => {
 	});
 
 	test("a refused pause tells nobody", async () => {
-		const { ports, pause } = project([nightly({ enabled: false })]);
+		const { ports, pause } = await project([nightly({ enabled: false })]);
 		await refusalOf(pause("nightly"));
 		await refusalOf(pause("gone"));
 		await refusalOf(pause("nightly", "space-2"));
@@ -155,7 +160,7 @@ describe("Pause tonight", () => {
 	});
 
 	test("when the screens cannot be told, the request fails, and the pause stays saved", async () => {
-		const { ports, pause, saved } = project([nightly()]);
+		const { ports, pause, saved } = await project([nightly()]);
 		const failure = new Error("the stream is gone");
 		ports.notices.failChanged(failure);
 		expect(await refusalOf(pause("nightly"))).toBe(failure);
@@ -163,7 +168,7 @@ describe("Pause tonight", () => {
 	});
 
 	test("a project of another Space is not found", async () => {
-		const { pause, saved } = project([nightly()]);
+		const { pause, saved } = await project([nightly()]);
 		expect(await refusalOf(pause("nightly", "space-2"))).toMatchObject({
 			kind: "not-found",
 		});
@@ -171,7 +176,7 @@ describe("Pause tonight", () => {
 	});
 
 	test("owners, admins and members may, and nobody else", async () => {
-		const { ports, pauseAs } = project([nightly()]);
+		const { ports, pauseAs } = await project([nightly()]);
 		// `space-2` does not have the project: the role is asked before it.
 		for (const spaceId of [SPACE, "space-2"]) {
 			expect(

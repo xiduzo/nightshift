@@ -3,12 +3,12 @@ import { FLOW_VERSION, type Flow, type Schedule } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { atLocal, utc } from "@nightshift/time/testing";
 import { allowing } from "../../access/adapters/out/in-memory-access";
-import { inMemorySchedulePorts } from "../adapters/out/in-memory-neighbours";
 import { createScheduleWatch } from "../domain/schedule-watch";
 import { createWebhookRefusals } from "../domain/webhook-delivery";
+import { schedulePorts } from "../test-support";
 import { listSchedules } from "./list-schedules";
 
-/** The schedules of a project as a person reads them, on in-memory adapters. */
+/** The schedules of a project as a person reads them, over a database in memory. */
 
 /** Local time on the computer's clock, October 2026 (the 16th is a Friday). */
 function at(day: number, hours: number, minutes = 0, seconds = 0): number {
@@ -49,8 +49,8 @@ function nightly(extra: Partial<Schedule> = {}): Schedule {
 }
 
 /** A project in a Space with `schedules`, at `now`, and the list of it. */
-function project(schedules: Schedule[], now = at(16, 21, 59)) {
-	const ports = inMemorySchedulePorts(now);
+async function project(schedules: Schedule[], now = at(16, 21, 59)) {
+	const ports = await schedulePorts(now);
 	for (const spaceId of [SPACE, "space-2"]) {
 		ports.access.members.join(spaceId, ANN.personId, "member");
 	}
@@ -73,7 +73,7 @@ function project(schedules: Schedule[], now = at(16, 21, 59)) {
 describe("the schedules of a project", () => {
 	test("each has its next start, its last result with the run's status now, and its issues", async () => {
 		const stops = nightly({ stopAt: "07:00" });
-		const { ports, list } = project([stops]);
+		const { ports, list } = await project([stops]);
 		expect((await list()).schedules[0]?.nextAt).toBe(at(16, 22));
 
 		await ports.log.fired({
@@ -106,8 +106,8 @@ describe("the schedules of a project", () => {
 	});
 
 	test("the run's own start counts as the last result when the daemon died before the fired fact", async () => {
-		const { ports, list } = project([nightly()], at(16, 22, 3));
-		ports.log.runStarted({
+		const { ports, list } = await project([nightly()], at(16, 22, 3));
+		await ports.runStarted({
 			projectId: P,
 			scheduleId: "nightly",
 			at: at(16, 22),
@@ -123,7 +123,7 @@ describe("the schedules of a project", () => {
 	});
 
 	test("a run that is gone has no status", async () => {
-		const { ports, list } = project([nightly()]);
+		const { ports, list } = await project([nightly()]);
 		await ports.log.fired({
 			projectId: P,
 			scheduleId: "nightly",
@@ -139,7 +139,7 @@ describe("the schedules of a project", () => {
 	});
 
 	test("a skipped time is the last result, and the next start is the next evening", async () => {
-		const { ports, list } = project([nightly()], at(17, 22, 30));
+		const { ports, list } = await project([nightly()], at(17, 22, 30));
 		await ports.log.skipped({
 			projectId: P,
 			scheduleId: "nightly",
@@ -158,7 +158,7 @@ describe("the schedules of a project", () => {
 	});
 
 	test("a start that failed is the last result, with its words", async () => {
-		const { ports, list } = project([nightly({ flow: "gone" })]);
+		const { ports, list } = await project([nightly({ flow: "gone" })]);
 		await ports.log.fired({
 			projectId: P,
 			scheduleId: "nightly",
@@ -183,20 +183,20 @@ describe("the schedules of a project", () => {
 	});
 
 	test("a schedule added after its time has no last result, and starts the next evening", async () => {
-		const { list } = project([nightly()], at(16, 23));
+		const { list } = await project([nightly()], at(16, 23));
 		const [listed] = (await list()).schedules;
 		expect(listed?.last).toBeNull();
 		expect(listed?.nextAt).toBe(at(17, 22));
 	});
 
 	test("a time that is due and still starts is the next start", async () => {
-		const { ports, list } = project([nightly()]);
+		const { ports, list } = await project([nightly()]);
 		ports.clock.set(at(16, 22, 1));
 		expect((await list()).schedules[0]?.nextAt).toBe(at(16, 22));
 	});
 
 	test("a schedule without a fact lists as it is saved, with its next start and no last result", async () => {
-		const { list } = project([nightly()], at(16, 12));
+		const { list } = await project([nightly()], at(16, 12));
 		expect((await list()).schedules).toEqual([
 			{
 				...nightly(),
@@ -210,7 +210,7 @@ describe("the schedules of a project", () => {
 
 	test("the next start is on the schedule's clock, not this computer's", async () => {
 		// 22:00 in Tokyo on the 16th is 13:00 UTC.
-		const { list } = project(
+		const { list } = await project(
 			[nightly({ timeZone: "Asia/Tokyo" })],
 			utc(2026, 9, 16, 12, 59),
 		);
@@ -218,14 +218,17 @@ describe("the schedules of a project", () => {
 	});
 
 	test("lateMinutes do not make a time from before the schedule existed the next start", async () => {
-		const { list } = project([nightly({ lateMinutes: 1440 })], at(16, 23));
+		const { list } = await project(
+			[nightly({ lateMinutes: 1440 })],
+			at(16, 23),
+		);
 		const [listed] = (await list()).schedules;
 		expect(listed?.last).toBeNull();
 		expect(listed?.nextAt).toBe(at(17, 22));
 	});
 
 	test("a time skipped for an earlier run names that run", async () => {
-		const { ports, list } = project(
+		const { ports, list } = await project(
 			[nightly({ cron: "0 * * * *" })],
 			at(16, 23, 0, 30),
 		);
@@ -245,12 +248,12 @@ describe("the schedules of a project", () => {
 	});
 
 	test("a schedule that is off has no next start", async () => {
-		const { list } = project([nightly({ enabled: false })]);
+		const { list } = await project([nightly({ enabled: false })]);
 		expect((await list()).schedules[0]?.nextAt).toBeNull();
 	});
 
 	test("after Run now the last result is that run, and tonight's start is still next", async () => {
-		const { ports, list } = project([nightly()], at(16, 12));
+		const { ports, list } = await project([nightly()], at(16, 12));
 		await ports.log.fired({
 			projectId: P,
 			scheduleId: "nightly",
@@ -264,7 +267,7 @@ describe("the schedules of a project", () => {
 	});
 
 	test("a pause tonight shows with the start after it, and a pause that has ended is dropped", async () => {
-		const { ports, list } = project(
+		const { ports, list } = await project(
 			[nightly({ pausedUntil: at(17, 6) })],
 			at(16, 12),
 		);
@@ -288,7 +291,7 @@ describe("the schedules of a project", () => {
 			webhook: { secret: HOOK_SECRET },
 			enabled: true,
 		};
-		const { ports, refusals, list } = project([hook, nightly()]);
+		const { ports, refusals, list } = await project([hook, nightly()]);
 		await ports.log.received({
 			projectId: P,
 			scheduleId: "review",
@@ -328,7 +331,7 @@ describe("the schedules of a project", () => {
 	});
 
 	test("an issue of the whole list is told apart from the issues of a schedule", async () => {
-		const { ports, list } = project([nightly()]);
+		const { ports, list } = await project([nightly()]);
 		const read = ports.store.list;
 		ports.store.list = async (projectId, options) => {
 			const loaded = await read(projectId, options);
@@ -348,7 +351,7 @@ describe("the schedules of a project", () => {
 	});
 
 	test("a project of another Space, or none, is not found", async () => {
-		const { ports, listIn } = project([nightly()]);
+		const { ports, listIn } = await project([nightly()]);
 		for (const asked of [listIn("space-2"), listIn(SPACE, "no-such-project")]) {
 			const refused = await asked.then(
 				() => null,
@@ -358,11 +361,11 @@ describe("the schedules of a project", () => {
 			expect(refused).toMatchObject({ kind: "not-found" });
 		}
 		// It is refused before anything is read.
-		expect(ports.log.facts.schedule).toEqual([]);
+		expect(await ports.facts()).toEqual([]);
 	});
 
 	test("every Member may, and nobody else", async () => {
-		const { ports, listAs } = project([nightly()]);
+		const { ports, listAs } = await project([nightly()]);
 		expect(
 			await ports.access.whoMay(SPACE, (actor) =>
 				listAs(actor, { spaceId: SPACE, projectId: P }),
