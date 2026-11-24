@@ -81,9 +81,7 @@ export async function wireDaemonNotifications(
 			});
 	};
 	// A reload binds the kept documents to this daemon's notifications.
-	if (typeof documents.watchStored === "function") {
-		documents.watchStored((document) => tellDocument(document.name));
-	}
+	documents.watchStored((document) => tellDocument(document.name));
 	return {
 		notifications,
 		projectsChanged,
