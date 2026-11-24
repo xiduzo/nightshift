@@ -189,8 +189,8 @@ describe("dashboard.summary", () => {
 			[platform]: {
 				projects: [{ id: "web", name: "website" }],
 				runs: [
-					aRun({ id: "a", projectId: "web", costUsd: 2 }),
-					aRun({ id: "b", projectId: "gone", status: "failed" }),
+					aRun({ id: "a", projectId: "web" }),
+					aRun({ id: "b", projectId: "gone", createdAt: now() - 2 * HOUR }),
 				],
 				flows: [],
 			},
@@ -206,17 +206,18 @@ describe("dashboard.summary", () => {
 			{ context: await contextFor(headers, engine) },
 		);
 		expect(once(asked)).toEqual([platform]);
-		expect(summary.cards.lastDay).toMatchObject({
-			runs: 2,
-			finished: 1,
-			failed: 1,
-		});
-		const week = summary.nights.find((range) => range.nights === 7);
-		expect(week?.spend.groups.map((group) => group.label)).toEqual([
-			"website",
-			"Removed",
+		expect(summary.lastNight?.latest.map((run) => [run.id, run.group])).toEqual(
+			[
+				["a", "website"],
+				["b", "Removed"],
+			],
+		);
+		expect(summary.watch.watched).toBe(2);
+		expect(summary.nights.map((range) => range.flows)).toEqual([
+			null,
+			null,
+			null,
 		]);
-		expect(summary.recent.map((run) => run.id).sort()).toEqual(["a", "b"]);
 		expect(summary.flowHealth).toBeNull();
 	});
 
@@ -230,7 +231,9 @@ describe("dashboard.summary", () => {
 			},
 			[personal]: {
 				projects: [{ id: "mine", name: "notes" }],
-				runs: [aRun({ id: "c", projectId: "mine", costUsd: 3 })],
+				runs: [
+					aRun({ id: "c", projectId: "mine", createdAt: now() - 2 * HOUR }),
+				],
 				flows: [],
 			},
 		});
@@ -240,13 +243,13 @@ describe("dashboard.summary", () => {
 			{ context: await contextFor(headers, engine) },
 		);
 		expect(once(asked.slice(1)).sort()).toEqual([personal, platform].sort());
-		expect(summary.cards.lastDay.runs).toBe(2);
-		expect(summary.cards.allTime.costUsd).toBe(4);
-		const week = summary.nights.find((range) => range.nights === 7);
-		expect(week?.spend.groups.map((group) => group.label)).toEqual([
-			"notes",
-			"website",
-		]);
+		expect(summary.lastNight?.latest.map((run) => [run.id, run.group])).toEqual(
+			[
+				["a", "website"],
+				["c", "notes"],
+			],
+		);
+		expect(summary.watch.watched).toBe(2);
 	});
 
 	test("covers one project, its runs grouped by flow, with Flow health", async () => {
@@ -267,15 +270,45 @@ describe("dashboard.summary", () => {
 			{ projectId: "web", timeZone: "UTC" },
 			{ context: await contextFor(headers, engine) },
 		);
-		expect(summary.cards.lastDay.runs).toBe(2);
-		const week = summary.nights.find((range) => range.nights === 7);
-		expect(week?.runs.groups.rows.map((group) => group.label).sort()).toEqual(
-			["Quick runs", "night"].sort(),
+		expect(summary.lastNight?.latest.map((run) => [run.id, run.group])).toEqual(
+			[
+				["a", "night"],
+				["b", "Quick runs"],
+			],
 		);
-		expect(summary.flowHealth?.rows.map((row) => row.name)).toEqual([
-			"night",
-			"deploy",
-		]);
+		expect(summary.flowHealth?.rows.map((row) => [row.name, row.runs])).toEqual(
+			[
+				["night", 1],
+				["deploy", 0],
+			],
+		);
+	});
+
+	test("counts a day on the clock of the time zone it is asked for", async () => {
+		const { headers, platform } = await ada();
+		// 22:30 UTC the evening before: today in Amsterdam, yesterday in UTC.
+		const eve = now() - 16.5 * HOUR;
+		const { engine } = engineOf({
+			[platform]: {
+				projects: [{ id: "web", name: "website" }],
+				runs: [
+					aRun({ id: "a", projectId: "web" }),
+					aRun({ id: "eve", projectId: "web", createdAt: eve, endedAt: eve }),
+				],
+				flows: ["night"],
+			},
+		});
+		const latestIn = async (timeZone?: string) => {
+			const summary = await call(
+				appRouter.dashboard.summary,
+				{ projectId: "web", timeZone },
+				{ context: await contextFor(headers, engine) },
+			);
+			return summary.lastNight?.latest.map((run) => run.id);
+		};
+		expect(await latestIn("Europe/Amsterdam")).toEqual(["a", "eve"]);
+		expect(await latestIn("UTC")).toEqual(["a"]);
+		expect(await latestIn()).toEqual(["a"]);
 	});
 
 	test("refuses a time zone it does not know", async () => {

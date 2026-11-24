@@ -36,7 +36,10 @@ describe("the dashboard of one project", () => {
 		aSpace(
 			ports,
 			"s1",
-			[aRun({ projectId: "p1" }), aRun({ projectId: "p2" })],
+			[
+				aRun({ id: "mine", projectId: "p1" }),
+				aRun({ id: "other", projectId: "p2" }),
+			],
 			{
 				p1: "website",
 				p2: "shop",
@@ -47,22 +50,17 @@ describe("the dashboard of one project", () => {
 			projectId: "p1",
 			...read,
 		});
-		expect(summary.cards.lastDay.runs).toBe(1);
-		expect(summary.flowHealth?.rows.map((row) => row.name)).toContain("fix");
-	});
-
-	test("says the days Flow health covers: one of its ranges of days", async () => {
-		const ports = inMemoryDashboardPorts();
-		aSpace(ports, "s1", [aRun({ projectId: "p1" })], { p1: "website" });
-		const summary = await readProjectDashboard(ports)(NIGHT_SHIFT, {
-			spaceId: "s1",
-			projectId: "p1",
-			...read,
-		});
-		expect(summary.healthNights).toBe(30);
-		expect(summary.nights.map((range) => range.nights)).toContain(
-			summary.healthNights,
+		expect(summary.lastNight?.latest.map((run) => run.id)).toEqual(["mine"]);
+		expect(summary.flowHealth?.rows.map((row) => [row.name, row.runs])).toEqual(
+			[
+				["night", 1],
+				["fix", 0],
+			],
 		);
+		expect(summary.nights.map((range) => range.flows?.rows[0]?.runs)).toEqual([
+			1, 1, 1,
+		]);
+		expect(summary.watch.watched).toBe(1);
 	});
 
 	test("asks the project's runs and flows for the actor, and stops on a refusal", async () => {

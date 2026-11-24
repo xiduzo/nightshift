@@ -33,34 +33,29 @@ function aSpace(
 describe("the dashboard of Spaces", () => {
 	test("every Space's runs count, grouped by the project's name", async () => {
 		const ports = inMemoryDashboardPorts();
-		aSpace(ports, "s1", [aRun({ projectId: "p1", costUsd: 2 })], {
-			p1: "website",
-		});
-		aSpace(ports, "s2", [aRun({ projectId: "p2", costUsd: 1 })], {
+		aSpace(
+			ports,
+			"s1",
+			[aRun({ id: "a", projectId: "p1", createdAt: NOW - HOUR / 2 })],
+			{
+				p1: "website",
+			},
+		);
+		aSpace(ports, "s2", [aRun({ id: "b", projectId: "p2" })], {
 			p2: "shop",
 		});
+		aSpace(ports, "s3", [aRun({ id: "c", projectId: "p3" })], { p3: "notes" });
 		const summary = await readSpacesDashboard(ports)(NIGHT_SHIFT, {
 			spaceIds: ["s1", "s2"],
 			...read,
 		});
-		expect(summary.cards.lastDay.runs).toBe(2);
-		const days = summary.nights.find((range) => range.nights === 30);
-		expect(days?.spend.groups.map((group) => group.label)).toEqual([
-			"website",
-			"shop",
-		]);
-	});
-
-	test("says the days Flow health covers: one of its ranges of days", async () => {
-		const ports = inMemoryDashboardPorts();
-		aSpace(ports, "s1", [aRun({ projectId: "p1" })], { p1: "website" });
-		const summary = await readSpacesDashboard(ports)(NIGHT_SHIFT, {
-			spaceIds: ["s1"],
-			...read,
-		});
-		expect(summary.healthNights).toBe(30);
-		expect(summary.nights.map((range) => range.nights)).toContain(
-			summary.healthNights,
+		expect(summary.lastNight?.latest.map((run) => [run.id, run.group])).toEqual(
+			[
+				["a", "website"],
+				["b", "shop"],
+			],
 		);
+		expect(summary.watch.watched).toBe(2);
+		expect(summary.flowHealth).toBeNull();
 	});
 });

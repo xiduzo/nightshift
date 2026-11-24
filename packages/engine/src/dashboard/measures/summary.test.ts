@@ -455,6 +455,217 @@ describe("a flow's row", () => {
 	});
 });
 
+describe("what a Flow health row counts", () => {
+	test("a flow's row has its cost, its length, and what the runs that did not finish spent", () => {
+		const row = summarize(
+			[
+				aRun({
+					status: "finished",
+					costUsd: 1,
+					createdAt: NOW - 3 * HOUR,
+					endedAt: NOW - 2 * HOUR,
+				}),
+				aRun({
+					status: "finished",
+					costUsd: 3,
+					createdAt: NOW - 2 * HOUR,
+					endedAt: NOW - HOUR,
+				}),
+				// Asked no agent, or with a cost that is not known: not in the cost.
+				aRun({ status: "finished", costCalls: 0, endedAt: NOW }),
+				aRun({ status: "finished", costUsd: 70, costMissing: 2, endedAt: NOW }),
+				aRun({ status: "failed", costUsd: 5 }),
+				aRun({ status: "interrupted", costUsd: 0 }),
+				aRun({ status: "stopped", costUsd: 0.5 }),
+				// Not ended: in the runs only.
+				aRun({ status: "running", costUsd: 8 }),
+				aRun({ status: "sleeping", costUsd: 8 }),
+				aRun({ flowName: "other", costUsd: 100 }),
+			],
+			project(["night"]),
+		).flowHealth?.rows[0];
+		expect(row).toMatchObject({
+			runs: 9,
+			rate: 57,
+			unknownCost: 1,
+			freeRuns: 1,
+			unfinished: { count: 3, costUsd: 5.5, tokens: 0 },
+		});
+		expect(row?.cost).toMatchObject({ min: 1, median: 2, max: 3, count: 2 });
+		expect(row?.watch.length?.median).toBe(HOUR);
+	});
+
+	test("a flow's row has the tokens its runs reported, beside the same runs' cost", () => {
+		const tokens = (input: number, output: number) => ({
+			metrics: {
+				...NO_METRICS,
+				tokens: { input, output, cacheRead: 9, cacheWrite: 9 },
+			},
+		});
+		const row = summarize(
+			[
+				aRun({ costUsd: 1, ...tokens(12_000, 345) }),
+				aRun({ costUsd: 1, ...tokens(100, 1) }),
+				aRun({ status: "failed", ...tokens(50, 5) }),
+				aRun({ status: "stopped", ...tokens(40, 4) }),
+			],
+			project(["night"]),
+		).flowHealth?.rows[0];
+		expect(row?.tokenUse).toMatchObject({ min: 101, max: 12_345, count: 2 });
+		expect(row?.unfinished.tokens).toBe(99);
+		// A run as a subflow reports no tokens of its own: the spreads would differ.
+		const called = summarize(
+			[
+				aRun({
+					flowName: "deploy",
+					...tokens(1, 1),
+					subflows: [
+						{
+							flowName: "night",
+							status: "finished",
+							costUsd: 4,
+							costEstimated: false,
+							costMissing: 0,
+							costCalls: 1,
+							startedAt: NOW - HOUR,
+							endedAt: NOW,
+						},
+					],
+				}),
+			],
+			project(["night"]),
+		).flowHealth?.rows[0];
+		expect(called).toMatchObject({ cost: { count: 1 }, tokenUse: null });
+	});
+
+	test("a range counts its first day whole, on the reader's clock, a subflow run too", () => {
+		const subflow = (startedAt: number) => ({
+			flowName: "night",
+			status: "finished" as const,
+			costUsd: 0,
+			costEstimated: false,
+			costMissing: 0,
+			costCalls: 0,
+			startedAt,
+			endedAt: startedAt,
+		});
+		const start = TODAY - 6 * DAY;
+		const runs = [
+			aRun({ createdAt: start }),
+			aRun({ createdAt: start - HOUR }),
+			// Its own start counts, not that of the run that called it.
+			aRun({
+				flowName: "deploy",
+				createdAt: start - HOUR / 2,
+				subflows: [subflow(start - HOUR / 2), subflow(start)],
+			}),
+		];
+		const countIn = (timeZone: string) =>
+			daysOf(
+				summarizeDashboard(runs, {
+					now: NOW,
+					timeZone,
+					scope: project(["night"]),
+				}),
+				7,
+			).flows?.rows[0]?.runs;
+		expect(countIn("UTC")).toBe(2);
+		expect(countIn("Europe/Amsterdam")).toBe(4);
+	});
+
+	test("the ranges are 7, 30 and 90 days, and Flow health covers 30", () => {
+		const summary = summarize(
+			[6, 29, 30, 89, 90].map((days) =>
+				aRun({ createdAt: TODAY - days * DAY }),
+			),
+			project(["night"]),
+		);
+		expect(
+			summary.nights.map((range) => [range.nights, range.flows?.rows[0]?.runs]),
+		).toEqual([
+			[7, 1],
+			[30, 2],
+			[90, 4],
+		]);
+		expect(summary.flowHealth?.rows[0]?.runs).toBe(2);
+	});
+
+	test("flows with as many runs stand by their last run, and five show", () => {
+		const names = ["a", "b", "c", "d", "e", "f"];
+		const { flowHealth } = summarize(
+			names.map((flowName, index) =>
+				aRun({ flowName, createdAt: NOW - (6 - index) * HOUR }),
+			),
+			project(names),
+		);
+		expect(flowHealth?.rows.map((row) => row.name)).toEqual([
+			"f",
+			"e",
+			"d",
+			"c",
+			"b",
+		]);
+		expect(flowHealth?.count).toBe(6);
+	});
+});
+
+describe("the latest day", () => {
+	test("is a day from midnight to midnight on the reader's clock", () => {
+		// 23:30 and 00:30 UTC, the night into 21 October.
+		const runs = [
+			aRun({ id: "late", createdAt: TODAY - HOUR / 2 }),
+			aRun({ id: "early", createdAt: TODAY + HOUR / 2 }),
+		];
+		expect(summarize(runs).lastNight?.latest.map((run) => run.id)).toEqual([
+			"early",
+		]);
+		// In Amsterdam (UTC+2) both are on 21 October, which began at 22:00 UTC.
+		const inAmsterdam = summarizeDashboard(runs, {
+			now: NOW,
+			timeZone: "Europe/Amsterdam",
+			scope: project(),
+		});
+		expect(inAmsterdam.lastNight?.latest.map((run) => run.id)).toEqual([
+			"early",
+			"late",
+		]);
+	});
+
+	test("shows five whole runs, each with its group", () => {
+		const { lastNight } = summarize([
+			...Array.from({ length: 6 }, (_, index) =>
+				aRun({ id: `r${index}`, createdAt: TODAY + index * HOUR }),
+			),
+			aRun({ id: "quick", flowName: null, createdAt: TODAY + 7 * HOUR }),
+		]);
+		expect(lastNight?.latest.map((run) => [run.id, run.group])).toEqual([
+			["quick", "Quick runs"],
+			["r5", "night"],
+			["r4", "night"],
+			["r3", "night"],
+			["r2", "night"],
+		]);
+		expect(lastNight?.latest[1]).toMatchObject({
+			branch: expect.any(String),
+			projectId: "p1",
+			status: "finished",
+		});
+	});
+
+	test("over all projects it covers the Space, each run under its project", () => {
+		const { lastNight } = summarize(
+			[
+				aRun({ id: "site", createdAt: TODAY + HOUR }),
+				aRun({ id: "lost", projectId: "gone", createdAt: TODAY }),
+			],
+			all({ p1: "website" }),
+		);
+		expect(lastNight?.latest.map((run) => [run.id, run.group])).toEqual([
+			["site", "website"],
+			["lost", "Removed"],
+		]);
+	});
+});
 describe("runs over a range of days", () => {
 	test("count outcomes per day and per flow, and list the failures newest first", () => {
 		const range = daysOf(
@@ -1204,6 +1415,129 @@ describe("the latest reports", () => {
 		});
 	});
 
+	test("the first day of a range counts whole, on the reader's clock", () => {
+		const onDay = (id: string, createdAt: number) =>
+			reported(id, { flowName: id, createdAt, endedAt: TODAY + HOUR });
+		// 22:30 UTC, half past midnight in Amsterdam: the first of 7 days there.
+		const runs = [
+			onDay("eve", TODAY - 6 * DAY - HOUR - HOUR / 2),
+			onDay("first", TODAY - 6 * DAY),
+		];
+		expect(
+			daysOf(summarize(runs), 7).reports.rows.map((row) => row.runId),
+		).toEqual(["first"]);
+		const inAmsterdam = summarizeDashboard(runs, {
+			now: NOW,
+			timeZone: "Europe/Amsterdam",
+			scope: project(),
+		});
+		expect(
+			daysOf(inAmsterdam, 7)
+				.reports.rows.map((row) => row.runId)
+				.sort(),
+		).toEqual(["eve", "first"]);
+	});
+
+	test("the days of a range reach over a clock change, a day of 25 hours", () => {
+		// Amsterdam leaves summer time on 25 October 2026. Seven days before
+		// the end of the 27th begin at midnight of the 21st, in summer time.
+		const now = parseInstant("2026-10-27T10:00:00Z");
+		const started = (id: string, at: string) =>
+			reported(id, {
+				flowName: id,
+				createdAt: parseInstant(at),
+				endedAt: now,
+			});
+		const summary = summarizeDashboard(
+			[
+				started("before", "2026-10-20T21:30:00Z"),
+				started("first", "2026-10-20T22:30:00Z"),
+			],
+			{ now, timeZone: "Europe/Amsterdam", scope: project() },
+		);
+		expect(daysOf(summary, 7).reports.rows.map((row) => row.runId)).toEqual([
+			"first",
+		]);
+	});
+
+	test("a quick run has a row under its prompt, and a flow one per project", () => {
+		const times = { createdAt: TODAY, endedAt: TODAY + HOUR };
+		const { rows } = daysOf(
+			summarize([
+				reported("quick", {
+					...times,
+					endedAt: TODAY + 3 * HOUR,
+					flowName: null,
+					title: "Read the news",
+				}),
+				reported("here", { ...times, endedAt: TODAY + 2 * HOUR }),
+				reported("there", { ...times, projectId: "p2" }),
+			]),
+			7,
+		).reports;
+		expect(rows.map((row) => [row.key, row.group, row.title])).toEqual([
+			["p1/Read the news", "Quick runs", "Read the news"],
+			["p1/night", "night", "night"],
+			["p2/night", "night", "night"],
+		]);
+	});
+
+	test("shows five rows and how many flows have one", () => {
+		const reports = daysOf(
+			summarize(
+				Array.from({ length: 7 }, (_, index) =>
+					reported(`r${index}`, {
+						flowName: `flow-${index}`,
+						createdAt: TODAY,
+						endedAt: TODAY + index * HOUR,
+					}),
+				),
+			),
+			7,
+		).reports;
+		expect(reports.rows.map((row) => row.runId)).toEqual([
+			"r6",
+			"r5",
+			"r4",
+			"r3",
+			"r2",
+		]);
+		expect(reports.count).toBe(7);
+	});
+
+	test("a run that has not ended, or wrote no report, has no row", () => {
+		const report = { stepId: "end", excerpt: "So far", more: false };
+		const { reports } = daysOf(
+			summarize([
+				aRun({ status: "running", report, result: "done", endedAt: null }),
+				aRun({ flowName: "fix", report, result: null, endedAt: NOW }),
+				aRun({ flowName: "plain", result: "done", endedAt: NOW }),
+			]),
+			7,
+		);
+		expect(reports).toEqual({ rows: [], count: 0 });
+	});
+
+	test("a run of a removed project has its row under Removed", () => {
+		const summary = summarize(
+			[
+				reported("site", { createdAt: TODAY, endedAt: TODAY + 2 * HOUR }),
+				reported("lost", {
+					projectId: "gone",
+					createdAt: TODAY,
+					endedAt: TODAY + HOUR,
+				}),
+			],
+			all({ p1: "website" }),
+		);
+		expect(
+			daysOf(summary, 7).reports.rows.map((row) => [row.runId, row.group]),
+		).toEqual([
+			["site", "website"],
+			["lost", "Removed"],
+		]);
+		expect(summary.flowHealth).toBeNull();
+	});
 	test("a Flow health row has its own newest report of any day, not one as a subflow", () => {
 		const summary = summarize(
 			[
@@ -1377,6 +1711,44 @@ describe("test runs", () => {
 		});
 	});
 
+	test("write no report that counts, also next to a report of a real run", () => {
+		const report = (id: string) => ({
+			id,
+			result: "done" as const,
+			report: { stepId: `${id}-end`, excerpt: id, more: false },
+		});
+		const summary = summarize([
+			aRun({
+				...report("real"),
+				createdAt: TODAY + HOUR,
+				endedAt: TODAY + 2 * HOUR,
+			}),
+			tried({
+				...report("try"),
+				createdAt: TODAY + 3 * HOUR,
+				endedAt: TODAY + 4 * HOUR,
+			}),
+			tried({
+				...report("other"),
+				flowName: "fetch",
+				createdAt: TODAY + 3 * HOUR,
+				endedAt: TODAY + 4 * HOUR,
+			}),
+		]);
+		for (const days of [7, 30, 90] as const) {
+			const { reports } = daysOf(summary, days);
+			expect(reports.rows.map((row) => row.runId)).toEqual(["real"]);
+			expect(reports.count).toBe(1);
+		}
+	});
+
+	test("show in the list of the latest day, with the real runs of that day", () => {
+		const day = summarize(runs()).lastNight;
+		expect(day?.latest.map((run) => [run.id, run.test])).toEqual([
+			["try", { pinned: ["fetch"], skipped: [] }],
+			["real", undefined],
+		]);
+	});
 	test("count in the latest day's spend, which says how many there were", () => {
 		const day = summarize(runs()).lastNight;
 		expect(day).toMatchObject({ runs: 2, tests: 1, cost: { costUsd: 3 } });
