@@ -13,6 +13,7 @@ import { foldRun } from "../log";
 import { parseEventRow } from "../log/run-log/append";
 import { readRunTranscript } from "../log/transcript/transcripts";
 import { openRunBundle } from "../testing/run-bundle";
+import { createTestEngine } from "../testing/test-engine";
 import {
 	createSandbox,
 	otherSpace,
@@ -20,7 +21,6 @@ import {
 	waitFor,
 	withDevice,
 } from "../testing/test-support";
-import { createEngine } from "../wire";
 import { exportRun } from "./run-bundle";
 import { deriveNodeOutputs, deriveSteps, sumCost } from "./run-views";
 
@@ -63,7 +63,7 @@ const flow: Flow = {
 /** A finished run of agent → command. The agent read a file that held a secret. */
 async function finishedRun(): Promise<string> {
 	const script = reportingScript("pass", "Fixed.");
-	const engine = createEngine(
+	const engine = createTestEngine(
 		withDevice({
 			db: sandbox.db,
 			harnesses: {

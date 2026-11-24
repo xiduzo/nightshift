@@ -13,6 +13,7 @@ import { NIGHT_SHIFT } from "../../src/contract";
 import type { RunDetail } from "../../src/read/views";
 import type { SpaceEngine } from "../../src/space-engine";
 import { createProfileStore } from "../../src/testing";
+import { createTestEngine } from "../../src/testing/test-engine";
 import {
 	cliToolsOf,
 	createSandbox,
@@ -21,7 +22,6 @@ import {
 	waitFor,
 	withDevice,
 } from "../../src/testing/test-support";
-import { createEngine } from "../../src/wire";
 
 /** Profiles of this computer, by id: resolved into the run's copy when a run starts. */
 
@@ -49,7 +49,7 @@ function makeEngine(
 		"profileFor" | "cliTools" | "which" | "decider"
 	> = {},
 ): SpaceEngine {
-	return createEngine(
+	return createTestEngine(
 		withDevice({
 			db: sandbox.db,
 			harnesses,

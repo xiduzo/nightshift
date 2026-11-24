@@ -8,6 +8,7 @@ import { NIGHT_SHIFT } from "../../src/contract";
 import type { RunStatus } from "../../src/run-status";
 import { expandMcpServers } from "../../src/settings/connections/domain/mcp-expansion";
 import type { SpaceEngine } from "../../src/space-engine";
+import { createTestEngine } from "../../src/testing/test-engine";
 import {
 	createSandbox,
 	type Sandbox,
@@ -15,7 +16,6 @@ import {
 	waitFor,
 	withDevice,
 } from "../../src/testing/test-support";
-import { createEngine } from "../../src/wire";
 
 let sandbox: Sandbox;
 beforeEach(async () => {
@@ -34,7 +34,7 @@ function named(name: HarnessName): FakeHarness {
 }
 
 function makeEngine(harnesses: TestEngineOptions["harnesses"]): SpaceEngine {
-	return createEngine(
+	return createTestEngine(
 		withDevice({
 			db: sandbox.db,
 			harnesses,
@@ -194,7 +194,7 @@ describe("custom agents", () => {
 			name: "acp:goose",
 			label: "Goose",
 		};
-		const engine = createEngine(
+		const engine = createTestEngine(
 			withDevice({
 				db: sandbox.db,
 				harnesses: { "claude-code": named("claude-code"), "acp:goose": goose },

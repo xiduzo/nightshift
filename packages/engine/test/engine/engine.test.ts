@@ -41,6 +41,7 @@ import {
 	type RunSettings,
 } from "../../src/settings/settings";
 import type { SpaceEngine } from "../../src/space-engine";
+import { createTestEngine } from "../../src/testing/test-engine";
 import {
 	cliToolsOf,
 	createSandbox,
@@ -54,7 +55,6 @@ import {
 	waitFor,
 	withDevice,
 } from "../../src/testing/test-support";
-import { createEngine } from "../../src/wire";
 
 let sandbox: Sandbox;
 /** The run log of each engine the test made, oldest first: checked against the database after it. */
@@ -102,7 +102,7 @@ function makeDaemon(
 		dataDir: sandbox.dataDir,
 	});
 	runLogs.push(runLog);
-	return createEngine(
+	return createTestEngine(
 		withDevice({
 			db: sandbox.db,
 			harnesses: { "claude-code": harness },

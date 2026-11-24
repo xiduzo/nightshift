@@ -23,13 +23,13 @@ import {
 import type { PeerContext, PeersFactory } from "../../src/peers";
 import { alonePeers } from "../../src/testing/alone-peers";
 import { joinSpace } from "../../src/testing/join-space";
+import { createTestEngine } from "../../src/testing/test-engine";
 import {
 	createSandbox,
 	type Sandbox,
 	waitFor,
 	withDevice,
 } from "../../src/testing/test-support";
-import { createEngine } from "../../src/wire";
 
 /**
  * "Move to …" between two computers in one process, each with its own
@@ -151,7 +151,7 @@ async function computer(
 			},
 		};
 	};
-	const engine = createEngine(
+	const engine = createTestEngine(
 		withDevice({
 			db: sandbox.db,
 			harnesses: { "claude-code": fakeHarness(() => ({})) },

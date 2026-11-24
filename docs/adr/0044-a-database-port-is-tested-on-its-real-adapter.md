@@ -53,5 +53,8 @@ The three rings and the use-case tests stay, and only the in-memory twin of a da
 - A use-case test keeps its file and its place. Its set-up is async, and foreign keys ask for the
   parent rows.
 - Each slice with a database port has a `test-support.ts` of 30 to 70 lines.
+- On the day of the decision, five ports of `devices` and one of `schedules` still have their twin.
+  The check refuses a twin of a database port once the last of them is gone. Until then it only
+  does not ask for one.
 - The name of the adapter says which rule holds. An adapter of another name that only reads SQLite
   keeps a twin, and a review must catch it.

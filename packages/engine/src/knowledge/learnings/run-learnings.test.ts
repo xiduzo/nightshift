@@ -15,6 +15,7 @@ import type { Engine } from "../../engine";
 import { createRunLog, type RunLog } from "../../log/run-log/run-log";
 import { transcriptLines } from "../../read/transcript-lines";
 import { testKnowledge } from "../../testing/knowledge";
+import { createTestEngine } from "../../testing/test-engine";
 import {
 	createSandbox,
 	expectRunLogsInSync,
@@ -22,7 +23,6 @@ import {
 	waitFor,
 	withDevice,
 } from "../../testing/test-support";
-import { createEngine } from "../../wire";
 import type { AskLearner } from "./application/ports";
 
 /**
@@ -89,7 +89,7 @@ function setup(answer: string[]) {
 		dataDir: sandbox.dataDir,
 	});
 	runLogs.push(runLog);
-	const engine: Engine = createEngine(
+	const engine: Engine = createTestEngine(
 		withDevice({
 			db: sandbox.db,
 			harnesses: { "claude-code": fakeHarness() },

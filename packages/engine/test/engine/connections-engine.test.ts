@@ -19,6 +19,7 @@ import {
 	type RunSettings,
 } from "../../src/settings/settings";
 import type { SpaceEngine } from "../../src/space-engine";
+import { createTestEngine } from "../../src/testing/test-engine";
 import {
 	cliToolsOf,
 	connectionsOf,
@@ -30,7 +31,6 @@ import {
 	waitFor,
 	withDevice,
 } from "../../src/testing/test-support";
-import { createEngine } from "../../src/wire";
 
 /** The engine's hooks for the daemon's settings and connections. */
 
@@ -50,7 +50,7 @@ function makeEngine(
 	> = {},
 	internals: EngineInternals = {},
 ): SpaceEngine {
-	return createEngine(
+	return createTestEngine(
 		withDevice({
 			db: sandbox.db,
 			harnesses: { "claude-code": harness },

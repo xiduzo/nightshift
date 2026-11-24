@@ -229,6 +229,19 @@ export function cliToolsOf(
 	};
 }
 
+const lifetimes = new WeakMap<Database, AbortController>();
+
+/**
+ * The lifetime of the engines a test makes over this database
+ * (`createTestEngine`): the sandbox's cleanup ends it. An engine left alive
+ * sweeps its gone folder a minute later, in the middle of another file.
+ */
+export function lifetimeOf(db: Database): AbortController {
+	const lifetime = lifetimes.get(db) ?? new AbortController();
+	lifetimes.set(db, lifetime);
+	return lifetime;
+}
+
 export type Sandbox = {
 	root: string;
 	repoPath: string;
@@ -301,7 +314,10 @@ export async function createSandbox(): Promise<Sandbox> {
 		deviceId,
 		spaceId: await localSpaceId(db),
 		openDocument: () => openDeviceDocument({ db, deviceId }),
-		cleanup: () => rm(root, { recursive: true, force: true }),
+		cleanup: async () => {
+			lifetimeOf(db).abort();
+			await rm(root, { recursive: true, force: true });
+		},
 	};
 }
 

@@ -11,13 +11,13 @@ import { NIGHT_SHIFT } from "../../src/contract";
 import { createRunLog } from "../../src/log/run-log/run-log";
 import { createRunFolders } from "../../src/run-folders/run-folders";
 import type { SpaceEngine } from "../../src/space-engine";
+import { createTestEngine } from "../../src/testing/test-engine";
 import {
 	createSandbox,
 	type Sandbox,
 	waitFor,
 	withDevice,
 } from "../../src/testing/test-support";
-import { createEngine } from "../../src/wire";
 
 /**
  * A run of a project without a folder (ADR 22), through the engine's
@@ -47,7 +47,7 @@ function makeEngine(): SpaceEngine {
 			return reporting.run(input);
 		},
 	};
-	return createEngine(
+	return createTestEngine(
 		withDevice({
 			db: sandbox.db,
 			harnesses: { "claude-code": harness },
