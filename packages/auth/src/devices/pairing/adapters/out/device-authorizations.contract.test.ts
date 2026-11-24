@@ -1,4 +1,4 @@
-import { createAuthSandbox } from "../../../testing/sandbox";
+import { createAuthSandbox } from "../../../../testing/sandbox";
 import { betterAuthDeviceAuthorizations } from "./better-auth-device-authorizations";
 import { deviceAuthorizationsContract } from "./device-authorizations.contract";
 import { inMemoryDeviceAuthorizations } from "./in-memory-device-authorizations";

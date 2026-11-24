@@ -13,7 +13,7 @@ import { serveTools, terminalResources } from "../../../bound-assistant";
 import type {
 	TerminalGate,
 	TerminalRunSummary,
-} from "../terminal/domain/terminal-runs";
+} from "../../terminal/domain/terminal-runs";
 import { type TerminalPort, terminalTools } from "./tanstack-terminal-tools";
 
 const flow: Flow = flowSchema.parse({

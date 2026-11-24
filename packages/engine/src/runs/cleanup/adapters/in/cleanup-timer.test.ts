@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { waitFor } from "../../../testing/test-support";
+import { waitFor } from "../../../../testing/test-support";
 import { startCleanupJob } from "./cleanup-timer";
 
 test("sweeps after the delay and then on its interval, survives a failed sweep, and stops with the signal", async () => {

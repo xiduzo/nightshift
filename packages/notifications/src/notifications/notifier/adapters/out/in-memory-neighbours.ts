@@ -5,7 +5,7 @@ import type {
 	PushKind,
 	PushTarget,
 	SendResult,
-} from "../../../channels";
+} from "../../../../channels";
 import type {
 	NotificationSettings,
 	NotificationSettingsPatch,

@@ -1,6 +1,6 @@
 import { now } from "@nightshift/time";
-import { createAuthSandbox } from "../../../testing";
-import { testLocalPerson } from "../../../testing/wires";
+import { createAuthSandbox } from "../../../../testing";
+import { testLocalPerson } from "../../../../testing/wires";
 import { betterAuthSessions } from "./better-auth-sessions";
 import { inMemorySessions } from "./in-memory-sessions";
 import { sessionsContract } from "./sessions.contract";

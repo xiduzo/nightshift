@@ -57,11 +57,11 @@ import type { DeviceOffer } from "../offers";
 const NO_STARTER =
 	"Night Shift does not know who started this run. Start it again to run its steps.";
 
+import { withPeers } from "../../testing";
+import { deviceDirectory } from "../../wire-peers-directory";
+import { createPeerEngine, type PeerEngine } from "../../wire-peers-engine";
+import { serveWork } from "../../work/serve-work";
 import { selfOwnerId } from "../registry/test-support";
-import { withPeers } from "../testing";
-import { deviceDirectory } from "../wire-peers-directory";
-import { createPeerEngine, type PeerEngine } from "../wire-peers-engine";
-import { serveWork } from "../work/serve-work";
 import { createPlacement } from "./test-support";
 
 /** No profile of this computer, and no Device document kept here. */

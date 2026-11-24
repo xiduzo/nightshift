@@ -1,7 +1,7 @@
 import { Refusal } from "@nightshift/refusal";
 import { asDate } from "@nightshift/time";
-import type { Actor } from "../../../contract";
-import type { RunStatus } from "../../../run-status";
+import type { Actor } from "../../../../contract";
+import type { RunStatus } from "../../../../run-status";
 import type {
 	CleanupAccess,
 	CleanupGround,

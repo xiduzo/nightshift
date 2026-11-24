@@ -1,5 +1,5 @@
 import { user } from "@nightshift/db/schema";
-import { createAuthSandbox } from "../../../testing/sandbox";
+import { createAuthSandbox } from "../../../../testing/sandbox";
 import { betterAuthCredentials } from "./better-auth-credentials";
 import { credentialsContract } from "./credentials.contract";
 import { inMemoryCredentials } from "./in-memory-credentials";

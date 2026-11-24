@@ -5,17 +5,17 @@
 import type { AssistantUsage } from "@nightshift/flows";
 import type { AgentUsage, BridgedTool, ValueResult } from "../../../port";
 import { settleCost } from "../../../pricing";
-import { activityOf } from "./activity-lines";
 import type { AssistantSessions } from "../../application/ports";
 import {
-	AT_LIMIT,
 	type AssistantReport,
 	type AssistantSessionEvent,
 	type AssistantSessionInput,
 	type AssistantVia,
+	AT_LIMIT,
 	sessionErrorMessage,
 	settleUsage,
 } from "../../domain/session";
+import { activityOf } from "./activity-lines";
 
 function usageOf(usage: AgentUsage, model: string | null): AssistantUsage {
 	const { costUsd } = settleCost(usage, model);

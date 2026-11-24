@@ -1,6 +1,6 @@
 import { describe, test } from "bun:test";
-import { mcpToolServerContract } from "./mcp-tool-server.contract";
 import { inMemoryMcpToolServer } from "./in-memory-mcp-tool-server";
+import { mcpToolServerContract } from "./mcp-tool-server.contract";
 import { mcpToolServer } from "./node-mcp-tool-server";
 
 describe("McpToolServer", () => {

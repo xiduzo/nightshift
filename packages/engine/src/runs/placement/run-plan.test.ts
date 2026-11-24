@@ -6,7 +6,7 @@ import {
 	type ProfileRef,
 } from "@nightshift/flows";
 import { addressKey, type Device } from "../../device";
-import { planNodes } from "../wire-start";
+import { planNodes } from "../../wire-start";
 import type { PlacedDevice, PlanDevices } from "./application/plan-nodes";
 import { UNREACHABLE_DEVICE } from "./domain/device-order";
 

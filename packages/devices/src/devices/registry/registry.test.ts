@@ -11,7 +11,7 @@ import {
 } from "@nightshift/engine/testing";
 import { asc, eq } from "drizzle-orm";
 import { createHostLinks, deviceKeyStore } from "../../links";
-import { SECOND_HOME } from "../links/host-links";
+import { SECOND_HOME } from "../../links/host-links";
 import type { DeviceRegistry } from ".";
 import { createDeviceRegistry } from "./test-support";
 

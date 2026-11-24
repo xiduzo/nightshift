@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { createDb } from "@nightshift/db";
 import { migrateDb } from "@nightshift/db/migrate";
 import { Expo } from "expo-server-sdk";
-import type { PushKind } from "../../../channels";
+import type { PushKind } from "../../../../channels";
 import { isExpoPushToken, type TARGET_KINDS } from "../../domain/push-targets";
 import { drizzleTargetStore } from "./drizzle-target-store";
 import { inMemoryTargetStore } from "./in-memory-target-store";

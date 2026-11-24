@@ -2,9 +2,9 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { apikey } from "@nightshift/db/schema";
 import { asDate, instantOrNull, now } from "@nightshift/time";
 import { eq } from "drizzle-orm";
+import { type AuthSandbox, createAuthSandbox } from "../../testing";
+import { testDeviceKeys, testPairing } from "../../testing/wires";
 import type { DeviceKeys } from "../device-keys";
-import { type AuthSandbox, createAuthSandbox } from "../testing";
-import { testDeviceKeys, testPairing } from "../testing/wires";
 
 /**
  * Pairing by device authorization, and the Device keys it ends in: through

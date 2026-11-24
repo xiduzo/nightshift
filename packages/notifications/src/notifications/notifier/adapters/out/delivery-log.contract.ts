@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import type { Claim, Delivery } from "../../../deliveries";
+import type { Claim, Delivery } from "../../../../deliveries";
 import type { DeliveryLog } from "../../application/ports";
 
 /** One adapter of `DeliveryLog` to test. */

@@ -37,8 +37,8 @@ import type { HostClient } from "../../contract";
 import { createDeviceExchange } from "../../exchange";
 import type { JoinProgress } from "../../links";
 import { createHostLinks, type Link } from "../../links";
-import { httpsLink } from "../links/link";
-import { type PairedReplicas, pairedReplicas } from "../testing";
+import { httpsLink } from "../../links/link";
+import { type PairedReplicas, pairedReplicas } from "../../testing";
 import { MERGE_WORDS } from "./domain/words";
 import {
 	createHomeMembershipForTest as createHomeMembership,

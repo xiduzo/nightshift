@@ -4,7 +4,7 @@ import { HostUnreachableError } from "@nightshift/engine";
 import { FAILURE_MESSAGE, Refusal } from "@nightshift/refusal";
 import { createRouterClient, ORPCError } from "@orpc/server";
 
-import { admitEvery } from "../testing";
+import { admitEvery } from "../../testing";
 import { type HostPeerContext, hostRouter } from "./adapters/in/host-router";
 
 /**

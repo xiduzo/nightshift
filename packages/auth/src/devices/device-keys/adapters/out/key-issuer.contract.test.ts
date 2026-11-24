@@ -1,6 +1,6 @@
 import { defaultKeyHasher } from "@better-auth/api-key";
 import { now } from "@nightshift/time";
-import { createAuthSandbox } from "../../../testing/sandbox";
+import { createAuthSandbox } from "../../../../testing/sandbox";
 import { betterAuthKeyIssuer } from "./better-auth-key-issuer";
 import { drizzleKeyStore } from "./drizzle-key-store";
 import { inMemoryKeyIssuer } from "./in-memory-key-issuer";

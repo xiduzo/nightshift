@@ -31,8 +31,8 @@ import { eq } from "drizzle-orm";
 import type { HostClient } from "../../contract";
 import { createDeviceExchange } from "../../exchange";
 import { createHostLinks, type Link } from "../../links";
-import { httpsLink } from "../links/link";
-import { type PairedReplicas, pairedReplicas } from "../testing";
+import { httpsLink } from "../../links/link";
+import { type PairedReplicas, pairedReplicas } from "../../testing";
 import { SPLIT_WORDS } from "./domain/words";
 import {
 	createHomeMembershipForTest as createHomeMembership,
