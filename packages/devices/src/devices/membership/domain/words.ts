@@ -11,6 +11,8 @@ export const MERGE_WORDS = {
 		"Other devices use this computer as their Host. Its Personal stays as it is.",
 	olderHost:
 		"Your home Host runs an older version of Night Shift. Update it, then merge.",
+	leaving:
+		"This computer still leaves your old Host. Let the runs on this computer finish or stop them, then merge.",
 	changed: "Your projects changed while they moved. Try again in a minute.",
 	busy: "Night Shift moves your Personal now. Wait until it is done.",
 } as const;
@@ -45,6 +47,7 @@ export type MergeHeld = {
 		| "noHome"
 		| "isHost"
 		| "merged"
+		| "leaving"
 		| "offline"
 		| "notListed"
 		| "changed"

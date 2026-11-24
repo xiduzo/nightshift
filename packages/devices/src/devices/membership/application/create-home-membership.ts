@@ -15,7 +15,7 @@ import type {
 	JoinProgress,
 	Link,
 } from "../../../links";
-import { LEAVE_WORDS, MERGE_WORDS } from "../domain/words";
+import { LEAVE_WORDS, MERGE_WORDS, mergeHeld } from "../domain/words";
 import { type MergeDeps, mergeSteps } from "./merge-steps";
 import type { Batches, DeviceCopiesPort, MembershipRecord } from "./ports";
 import { type SplitDeps, splitSteps } from "./split-steps";
@@ -134,12 +134,17 @@ export function createHomeMembership(deps: HomeMembershipDeps) {
 
 	/**
 	 * Merges Personal into the home Host's, or goes on with a merge that
-	 * stopped.
+	 * stopped. A leave of another Host ends first.
 	 */
 	function merge(
 		input: { join?: readonly string[] } = {},
 	): Promise<MergeResult> {
 		return exclusive(async () => {
+			await settle().catch((error) => {
+				if (!(error instanceof Refusal)) throw error;
+				// The words of a leave: this is a merge.
+				throw mergeHeld("leaving").refusal;
+			});
 			const started = await record.unfinished();
 			if (started?.step === "merge") return merges.resume(started.row);
 			return merges.start(input);
@@ -162,6 +167,9 @@ export function createHomeMembership(deps: HomeMembershipDeps) {
 			hostId: string,
 			signal?: AbortSignal,
 		): AsyncGenerator<JoinProgress> {
+			await attempted("the leave of a Host goes on", () =>
+				exclusive(settle, "wait"),
+			);
 			const end = timeNow() + (deps.listedWaitMs ?? LISTED_WAIT_MS);
 			while (timeNow() < end && !signal?.aborted) {
 				const link = deps.links.get(hostId);

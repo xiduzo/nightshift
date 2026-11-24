@@ -383,6 +383,48 @@ describe("a split that waits", () => {
 			schedule("on", { person: "ada-there" }),
 		]);
 	});
+
+	test("ends first when this computer joined another Host, and then Personal merges there", async () => {
+		const { world, steps } = await waiting();
+		const [first] = world.hosts;
+		if (!first) throw new Error("No Host.");
+		world.hosts = [
+			{ ...first, hostId: "second", name: "Second", revokedAt: null },
+		];
+		world.linked.add("second");
+		world.online.add("second");
+		world.listed = [{ id: "there", name: "Personal", personal: true }];
+		world.listedBy = "second";
+		world.answer = (input) => ({
+			spaceId: "there",
+			projectMap: Object.fromEntries(input.projects.map((p) => [p.id, p.id])),
+			personMap: { ada: "ada-there" },
+			elsewhere: [],
+		});
+
+		const seen = await steps(undefined, "second");
+
+		expect(seen).toMatchObject([{ kind: "merge-preview" }, { kind: "merged" }]);
+		expect(world.record.splitsRows.map((s) => s.state)).toEqual(["done"]);
+		expect(world.projects.map((p) => p.spaceId)).toEqual(["there"]);
+		// Its Projects left the first Host's Space for its own, then for the second's.
+		expect(world.record.mergesRows.map((m) => m.fromSpace)).toEqual(["fresh"]);
+	});
+
+	test("that cannot go on now holds a merge, and the page says why", async () => {
+		const { world, membership } = await waiting();
+		const [first] = world.hosts;
+		if (!first) throw new Error("No Host.");
+		world.hosts = [{ ...first, hostId: "second", revokedAt: null }];
+		world.run("late", { spaceId: "theirs", status: "running" });
+
+		await expect(membership.merge()).rejects.toThrow(MERGE_WORDS.leaving);
+		expect(await membership.pending()).toMatchObject({
+			pending: true,
+			blocked: MERGE_WORDS.leaving,
+		});
+		expect(world.record.mergesRows).toEqual([]);
+	});
 });
 
 describe("going on with what stopped", () => {
@@ -438,7 +480,15 @@ describe("going on with what stopped", () => {
 		await merging;
 		await tick();
 
-		// The merge's own read: no attempt waited behind it.
-		expect(reads.count).toBe(1);
+		// The merge's own reads: no attempt waited behind it.
+		const alone = setUp();
+		let own = 0;
+		const unfinishedAlone = alone.world.record.unfinished;
+		alone.world.record.unfinished = async () => {
+			own++;
+			return unfinishedAlone();
+		};
+		await alone.membership.merge();
+		expect(reads.count).toBe(own);
 	});
 });

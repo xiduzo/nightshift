@@ -562,6 +562,25 @@ describe("leaving and joining the same Host again", () => {
 		expect((await ownSchedules(projectId))[0]?.enabled).toBe(false);
 	});
 
+	test("a planned split off one Host ends before Personal goes to another one", async () => {
+		await plannedSplit();
+		const links = createHostLinks(b.db);
+		const {
+			createdAt: _at,
+			revokedAt: _gone,
+			...link
+		} = (await links.get(paired.hostId)) as NonNullable<
+			Awaited<ReturnType<typeof links.get>>
+		>;
+		await links.save({ ...link, hostId: "second", name: "Second" });
+		await expect(membershipOf(undefined).merge()).rejects.toThrow();
+		const [row] = await b.db.select().from(spaceSplit);
+		expect(row?.state).toBe("done");
+		expect(await personalSpaceId(b.db, localPerson)).toBe(
+			row?.toSpace as string,
+		);
+	});
+
 	test("the record of another Host, or of another Person there, turns none on", async () => {
 		const { projectId } = await merged();
 		for (const other of [{ hostId: "other" }, { hostPersonId: "other" }]) {

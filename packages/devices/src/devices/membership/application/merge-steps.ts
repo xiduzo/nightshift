@@ -156,6 +156,10 @@ export function mergeSteps(deps: MergeDeps & { record: MembershipRecord }) {
 	 * from the Host's answer on.
 	 */
 	async function checks(started?: MergeRow): Promise<MergeReady | MergeHeld> {
+		// A split ends first: until then Personal is the Host's it leaves.
+		if ((await deps.record.unfinished())?.step === "split") {
+			return held("leaving");
+		}
 		const home = await deps.hostLinks.home();
 		let host: { id: string; name: string };
 		let from: string;
