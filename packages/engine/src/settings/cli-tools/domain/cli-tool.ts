@@ -63,16 +63,21 @@ export type CliToolEntry = Omit<CliTool, "name">;
 export const programOf = (tool: Pick<CliTool, "name" | "program">): string =>
 	tool.program ?? tool.name;
 
+/** A field that an entry must have. A value this version cannot read is null. */
+const readableOrNull = <T>(schema: z.ZodType<T>) =>
+	z
+		.custom<unknown>((value) => value !== undefined)
+		.pipe(schema.nullable().catch(null));
+
 /**
- * A CLI tool as the Device document holds it. An older document has no
- * program, login or git; a login or git this version cannot read reads as
- * none, so the tool still runs, the way it did before it had them.
+ * A CLI tool as the Device document holds it, with every field. A login or
+ * git this version cannot read reads as none, so the tool still runs.
  */
 const entrySchema = z.object({
 	description: z.string().nullable(),
-	program: cliNameSchema.nullable().catch(null).default(null),
-	login: loginSchema.nullable().catch(null).default(null),
-	git: cliToolGitSchema.nullable().catch(null).default(null),
+	program: readableOrNull(cliNameSchema),
+	login: readableOrNull(loginSchema),
+	git: readableOrNull(cliToolGitSchema),
 	updatedAt: z.number(),
 });
 

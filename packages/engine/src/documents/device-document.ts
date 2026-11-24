@@ -3,7 +3,6 @@ import { clone } from "@nightshift/db/schema";
 import { now } from "@nightshift/time";
 import { eq } from "drizzle-orm";
 import type * as Y from "yjs";
-import { writeExplicitEntries } from "./explicit-entries";
 import {
 	createSyncedDocuments,
 	documentName,
@@ -102,30 +101,7 @@ export async function openDeviceDocument(options: {
 			meta.set("deviceId", deviceId);
 		});
 	}
-	await writeExplicitTools(document);
 	return document;
-}
-
-/** What a CLI tool without these fields has: none of them. */
-const NO_TOOL_SETUP = { program: null, login: null, git: null };
-
-/**
- * CONVERSION, with an end (`writeExplicitEntries`): each CLI tool of this
- * Device gets the fields it misses. A failure never stops the start.
- */
-async function writeExplicitTools(document: DeviceDocument): Promise<void> {
-	try {
-		const { written, entries } = await writeExplicitEntries(
-			document,
-			document.cliTools,
-			NO_TOOL_SETUP,
-		);
-		if (written > 0) {
-			console.log(`Explicit CLI tools: ${written} of ${entries} written.`);
-		}
-	} catch (error) {
-		console.error("The CLI tools were not made explicit:", error);
-	}
 }
 
 /** Sets the facts that changed. Facts are the Owner's: only it calls this. */

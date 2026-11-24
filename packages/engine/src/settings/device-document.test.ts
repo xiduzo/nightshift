@@ -101,6 +101,15 @@ async function seedReplacedRows() {
 	await sandbox.db.insert(secret).values({ name: "TRACKER_TOKEN" });
 }
 
+/** A CLI tool as the document holds it. */
+const tool = (description: string | null) => ({
+	description,
+	program: null,
+	login: null,
+	git: null,
+	updatedAt: 1,
+});
+
 describe("the Device document", () => {
 	test("is named after its Device and saved in the Replica", async () => {
 		const document = await sandbox.openDocument();
@@ -129,7 +138,7 @@ describe("the Device document", () => {
 		await document.change(() => {
 			document.doc.getMap("meta").set("importedAt", 1);
 			document.settings.set("maxConcurrentRuns", 4);
-			document.cliTools.set("gh", { description: "GitHub", updatedAt: 1 });
+			document.cliTools.set("gh", tool("GitHub"));
 		});
 		const before = document.doc.toJSON();
 		// The rows the import read are dead: they change nothing.
@@ -194,10 +203,7 @@ describe("the Device document", () => {
 		const { client, flush } = connectClient(document);
 
 		client.transact(() => {
-			client.getMap("cliTools").set("gh", {
-				description: "From the laptop",
-				updatedAt: 1,
-			});
+			client.getMap("cliTools").set("gh", tool("From the laptop"));
 			client.getMap("settings").set("maxConcurrentRuns", 3);
 		});
 		expect(s.cliTools.get("gh")?.description).toBe("From the laptop");
@@ -206,6 +212,20 @@ describe("the Device document", () => {
 		await flush();
 		const again = stores(await sandbox.openDocument());
 		expect(again.cliTools.get("gh")?.description).toBe("From the laptop");
+	});
+
+	test("a tool without every field is not read, and stays in the document", async () => {
+		const document = await sandbox.openDocument();
+		const partial = { description: "Partial", updatedAt: 1, later: true };
+		await document.change(() => {
+			document.cliTools.set("partial", partial);
+			document.cliTools.set("gh", tool("GitHub"));
+		});
+		const again = await sandbox.openDocument();
+		const s = stores(again);
+		expect([...s.cliTools.names()]).toEqual(["gh"]);
+		await s.cliTools.save({ name: "jq" });
+		expect(again.cliTools.get("partial")).toEqual(partial);
 	});
 
 	test("two clients that edit at once converge", async () => {
@@ -219,8 +239,8 @@ describe("the Device document", () => {
 		b.pause();
 		a.client.getMap("settings").set("agentModel", "opus");
 		b.client.getMap("settings").set("agentModel", "haiku");
-		a.client.getMap("cliTools").set("aws", { description: null, updatedAt: 1 });
-		b.client.getMap("cliTools").set("jq", { description: null, updatedAt: 2 });
+		a.client.getMap("cliTools").set("aws", tool(null));
+		b.client.getMap("cliTools").set("jq", tool(null));
 		a.resume();
 		b.resume();
 
