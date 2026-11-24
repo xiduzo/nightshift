@@ -2,6 +2,7 @@ import { findProgram } from "@nightshift/agents/types";
 import { wireSpaces } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import { HARNESS_BIN } from "@nightshift/engine/settings";
+import { now } from "@nightshift/time";
 
 /** Counts for the daily usage event. No names, paths or free text leave here. */
 export async function usageFacts(input: {
@@ -47,7 +48,7 @@ export async function usageFacts(input: {
 	const spaces = await bound.listSpaceIds();
 	const people = new Set<string>();
 	for (const spaceId of spaces) {
-		const listed = await bound.members.listMembers({ spaceId });
+		const listed = await bound.members.listMembers({ spaceId, now: now() });
 		for (const member of listed.members) people.add(member.personId);
 	}
 	return {

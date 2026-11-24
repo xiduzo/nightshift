@@ -2,6 +2,7 @@ import {
 	createKnowledgeFolderLocks,
 	createOllama,
 	createSpaceArchive,
+	type createSpaceDocuments,
 	type Knowledge,
 	measuredMeaning,
 	memberRole,
@@ -22,6 +23,7 @@ import {
 } from "./runtime";
 
 type KnowledgeDeps = Parameters<typeof wireKnowledge>[0];
+type SpaceDocuments = ReturnType<typeof createSpaceDocuments>;
 type FollowRunsDeps = Parameters<Knowledge["followRuns"]>[0];
 
 /**
@@ -35,6 +37,8 @@ export async function wireDaemonKnowledge(deps: {
 	db: KnowledgeDeps["db"];
 	dataDir: string;
 	documents: KnowledgeDeps["documents"];
+	/** The Space documents: the Members a Command's Person is read from. */
+	spaces: Pick<SpaceDocuments, "open">;
 	device: KnowledgeDeps["device"];
 	usage: KnowledgeDeps["usage"];
 	settings: ConfigStores["settings"];
@@ -97,12 +101,12 @@ export async function wireDaemonKnowledge(deps: {
 					row: async () => {
 						throw new Error("unused");
 					},
-					walkedHere: () => false,
+					walkedHere: async () => false,
 				},
 				members: {
 					db: deps.db,
 					documentRole: async (spaceId, personId) =>
-						memberRole(await deps.documents.open(spaceId), personId),
+						memberRole(await deps.spaces.open(spaceId), personId),
 				},
 			});
 			return wireKnowledge({

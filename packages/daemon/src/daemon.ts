@@ -326,6 +326,7 @@ async function makeDaemon(
 		db,
 		dataDir,
 		documents,
+		spaces,
 		device,
 		usage: telemetry,
 		settings,

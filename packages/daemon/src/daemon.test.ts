@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { daemonLease, project as projectTable } from "@nightshift/db/schema";
 import { hostInMemory } from "@nightshift/devices/testing";
 import type { Knowledge } from "@nightshift/engine";
-import { NIGHT_SHIFT } from "@nightshift/engine";
+import { NIGHT_SHIFT, SpaceNotFound } from "@nightshift/engine";
 import {
 	createSandbox,
 	type Sandbox,
@@ -147,6 +147,35 @@ describe("the daemon, wired in one process", () => {
 		expect(body.json.spaces.map((space) => space.id)).toContain(
 			body.json.active,
 		);
+	});
+
+	test("answers a request that needs no session: the API reference", async () => {
+		dir = await mkdtemp(join(tmpdir(), "nightshift-daemon-"));
+		const daemon = await start(envIn(dir));
+		const reference = await call(daemon, "/api-reference");
+		expect(reference?.status).toBe(200);
+	});
+
+	test("a Command's Person changes knowledge by their role in the Space document, and nobody else", async () => {
+		dir = await mkdtemp(join(tmpdir(), "nightshift-daemon-"));
+		const daemon = await start(envIn(dir));
+		const { you, space } = await rpc<{ you: string; space: { id: string } }>(
+			daemon,
+			"members/list",
+		);
+		const knowledge = hot.nightshiftKnowledge as Knowledge;
+		const turnOff = (personId: string) =>
+			knowledge.setMeaning(
+				{ personId, door: "command" },
+				space.id,
+				"p1",
+				false,
+			);
+		await processDatabase(daemon.info.databaseUrl)
+			.insert(projectTable)
+			.values({ id: "p1", spaceId: space.id, name: "P1" });
+		await expect(turnOff("stranger")).rejects.toThrow(SpaceNotFound);
+		await turnOff(you);
 	});
 
 	test("its stop stops every slot and frees the lease: the next daemon starts fresh", async () => {

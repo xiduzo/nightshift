@@ -101,6 +101,7 @@ export function requestContexts(services: HttpServices): RequestContexts {
 					? await accessWire.openRequest({
 							headers: new Headers(),
 							local: null,
+							policy: hostPolicy,
 						})
 					: await access(context),
 				deviceKey,

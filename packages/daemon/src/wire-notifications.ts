@@ -38,6 +38,7 @@ export async function wireDaemonNotifications(
 	const { engine, documents, owner } = deps;
 	const { notifications, settings } = await wireNotifications({
 		db: deps.db,
+		auth: deps.auth,
 		env: deps.env,
 		engine,
 		settings: deps.settings,
