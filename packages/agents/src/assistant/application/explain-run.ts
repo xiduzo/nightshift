@@ -1,10 +1,33 @@
-import type { ExplanationEvent } from "@nightshift/flows";
+import type { AgentProfileSettings, ExplanationEvent } from "@nightshift/flows";
+import type { AgentHarness, ValueResult } from "../../port";
 import { explanationPrompt } from "../catalog";
-import type { AuthoringRun } from "../domain/authoring";
-import type { AssistantVia } from "../domain/session";
-import type { ReportSessions } from "./ports";
+import { type AuthoringRun, runReport } from "../domain/authoring";
+import type { SessionLimits } from "../domain/session";
+import type { AssistantSessions } from "./ports";
 
 const ANSWER_LIMIT = 1_200;
+
+/** An agent of this computer answers: a read-only session in a folder. */
+export type AgentVia = {
+	kind: "agent";
+	harness: AgentHarness;
+	profile: Pick<AgentProfileSettings, "model" | "effort">;
+	cwd: string;
+	limits?: SessionLimits;
+};
+
+/** A model answers: one call that returns the report. */
+export type ModelVia = {
+	kind: "model";
+	ask: (input: {
+		prompt: string;
+		output: Record<string, unknown>;
+		signal: AbortSignal;
+	}) => Promise<ValueResult>;
+};
+
+/** What answers for a built-in agent that gives one report. */
+export type AssistantVia = AgentVia | ModelVia;
 
 export type ExplainRunInput = {
 	run: AuthoringRun;
@@ -13,11 +36,13 @@ export type ExplainRunInput = {
 };
 
 export const explainRun = (ports: {
-	sessions: Pick<ReportSessions, "runReport">;
+	sessions: Pick<AssistantSessions, "runReport">;
 }) =>
 	async function* (input: ExplainRunInput): AsyncGenerator<ExplanationEvent> {
 		for await (const event of ports.sessions.runReport(input.via, {
-			prompt: explanationPrompt(input.run),
+			prompt: explanationPrompt(
+				runReport(input.run, input.run.flow, "The flow"),
+			),
 			report: {},
 			signal: input.signal,
 		})) {

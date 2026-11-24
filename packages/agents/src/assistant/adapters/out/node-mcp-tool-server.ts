@@ -7,8 +7,13 @@
  *
  * The MCP SDK loads on first use: the package root must not load it.
  */
-import type { CallToolResult, Server } from "@modelcontextprotocol/server";
+import type {
+	CallToolResult,
+	Server,
+	Transport,
+} from "@modelcontextprotocol/server";
 import type { BridgedTool } from "../../../port";
+import type { McpToolServer } from "../../application/ports";
 import { toolAnnotations } from "../../catalog";
 
 export type ToolServerInfo = {
@@ -130,7 +135,7 @@ function errorResult(text: string): CallToolResult {
  * stdout) until the other end closes it.
  */
 /** The real adapter of `McpToolServer`. */
-export function mcpToolServer(): import("../../application/ports").McpToolServer {
+export function mcpToolServer(): McpToolServer<Transport, Server> {
 	return {
 		async serve(tools, info, transport) {
 			const server = await toolServer(tools, info);

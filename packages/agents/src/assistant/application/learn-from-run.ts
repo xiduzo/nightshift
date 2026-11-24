@@ -5,11 +5,11 @@ import {
 	type RunLearnings,
 	reportedLearnings,
 } from "../catalog";
-import type { AssistantVia } from "../domain/session";
-import type { ReportSessions } from "./ports";
+import type { AssistantVia } from "./explain-run";
+import type { AssistantSessions } from "./ports";
 
 export const learnFromRun =
-	(ports: { sessions: Pick<ReportSessions, "runReport"> }) =>
+	(ports: { sessions: Pick<AssistantSessions, "runReport"> }) =>
 	async (input: {
 		evidence: string;
 		via: AssistantVia;

@@ -165,8 +165,6 @@ export type TerminalRunPort = {
 	runLink(runId: string, stepId?: string): string;
 };
 
-const _RUNS_DEFAULT = 10;
-const _RUNS_MAX = 50;
 /** At most this many characters of a run's report go into `get_run`. */
 const REPORT_LIMIT = 8_000;
 

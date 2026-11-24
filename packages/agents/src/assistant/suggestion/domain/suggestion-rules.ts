@@ -18,7 +18,7 @@ import {
 	takesSuggestion,
 } from "@nightshift/flows";
 import { z } from "zod";
-import type { AssistantReport, AssistantVia } from "./session";
+import type { AssistantReport } from "./session";
 
 /** How many times the agent may answer: once, and once more with the problems. */
 export const SUGGESTION_ATTEMPTS = 2;
@@ -220,10 +220,3 @@ export function checkSuggestion(
 	}
 	return problems.length > 0 ? { problems } : { suggestion };
 }
-
-export type SuggestFieldInput = {
-	request: SuggestionRequest;
-	via: AssistantVia;
-	place: FlowPlace;
-	signal: AbortSignal;
-};

@@ -13,9 +13,8 @@ import {
 describe("the catalogue matches decider-providers", () => {
 	test("DECIDER_SETUP matches the registry", () => {
 		expect(DECIDER_SETUP.typesafeKey).toBe("TYPESAFE_API_KEY");
-		expect(DECIDER_SETUP.localModel.name).toBe(
-			DECIDER_ADAPTERS.ollama.defaultModel,
-		);
+		const ollama: string = DECIDER_ADAPTERS.ollama.defaultModel;
+		expect<string>(DECIDER_SETUP.localModel.name).toBe(ollama);
 	});
 
 	test("defaultDeciderModel matches each adapter decision default", () => {

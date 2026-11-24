@@ -1,4 +1,5 @@
-import type { AssistantVia, SuggestSessionEvent } from "../domain/session";
+import type { SuggestSessionEvent } from "../domain/session";
+import type { AssistantVia } from "./suggest-field";
 
 /**
  * Sessions the suggestion use case needs.

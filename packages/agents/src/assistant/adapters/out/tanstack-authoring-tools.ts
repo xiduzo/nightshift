@@ -9,7 +9,7 @@
  * writes a file: `propose_flow` hands the flow to the port, which shows it
  * to the person.
  */
-import { flowSchema } from "@nightshift/flows";
+import { flowSchema, proposalIssues } from "@nightshift/flows";
 import { toolDefinition } from "@tanstack/ai";
 import type { BridgedTool } from "../../../port";
 import { flowJson } from "../../catalog";
@@ -23,10 +23,6 @@ import {
 	PROPOSAL_REFUSALS,
 	runReport,
 } from "../../domain/authoring";
-
-const _TRANSCRIPT_LIMIT = 6_000;
-const _STEP_LIMIT = 40;
-const _NOTE_LIMIT = 400;
 
 const noInput: Record<string, unknown> = {
 	type: "object",
@@ -44,6 +40,12 @@ const flowInput: Record<string, unknown> = {
 	properties: { flow: flowProperty },
 	required: ["flow"],
 };
+
+/** The issues of `flow` as a change of the draft, in the draft's place. */
+async function check(port: AuthoringPort, flow: unknown) {
+	const [draft, place] = await Promise.all([port.draft(), port.place()]);
+	return { draft, issues: proposalIssues(draft.flow, flow, place) };
+}
 
 export function authoringTools(port: AuthoringPort): BridgedTool[] {
 	let refused = 0;

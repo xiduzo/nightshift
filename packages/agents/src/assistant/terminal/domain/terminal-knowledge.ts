@@ -1,7 +1,11 @@
 export type ToolServerResource = {
 	uri: string;
 	name: string;
+	title?: string;
+	description?: string;
 	mimeType?: string;
+	/** Bytes. */
+	size?: number;
 };
 
 const PREFIX = "nightshift://knowledge/";

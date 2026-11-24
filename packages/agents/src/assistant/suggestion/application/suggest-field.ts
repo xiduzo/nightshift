@@ -1,12 +1,19 @@
-import type { AssistantUsage, SuggestionEvent } from "@nightshift/flows";
+import type {
+	AgentProfileSettings,
+	AssistantUsage,
+	FlowPlace,
+	SuggestionEvent,
+	SuggestionRequest,
+} from "@nightshift/flows";
+import type { AgentHarness, ValueResult } from "../../../port";
 import type { ProjectFacts } from "../domain/project-facts";
 import { retryPrompt } from "../domain/prompts";
+import type { AssistantReport } from "../domain/session";
 import { suggestionPrompt } from "../domain/suggestion-prompt";
 import {
 	cannotSuggest,
 	checkSuggestion,
 	SUGGESTION_ATTEMPTS,
-	type SuggestFieldInput,
 	suggestionDataSchema,
 } from "../domain/suggestion-rules";
 import type { SuggestSessions } from "./ports";
@@ -21,6 +28,36 @@ const sum = (a: AssistantUsage, b: AssistantUsage) => {
 		outputTokens: a.outputTokens + b.outputTokens,
 		...(costUsd !== undefined ? { costUsd } : {}),
 	};
+};
+
+/** What answers a suggestion, as the assistant's sessions take it. */
+type SessionLimits = { turns?: number; usd?: number };
+
+type AgentVia = {
+	kind: "agent";
+	harness: AgentHarness;
+	profile: Pick<AgentProfileSettings, "model" | "effort">;
+	cwd: string;
+	limits?: SessionLimits;
+};
+
+type ModelVia = {
+	kind: "model";
+	ask: (input: {
+		prompt: string;
+		/** A JSON Schema the answer is held to. */
+		output: Record<string, unknown>;
+		signal: AbortSignal;
+	}) => Promise<ValueResult>;
+};
+
+export type AssistantVia = AgentVia | ModelVia;
+
+export type SuggestFieldInput = {
+	request: SuggestionRequest;
+	via: AssistantVia;
+	place: FlowPlace;
+	signal: AbortSignal;
 };
 
 export type ProjectFactsReader = (folder: string) => Promise<ProjectFacts>;

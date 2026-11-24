@@ -1,9 +1,7 @@
 import type { BridgedTool } from "../../port";
-import type {
-	AssistantSessionEvent,
-	AssistantSessionInput,
-	AssistantVia,
-} from "../domain/session";
+import type { AssistantSessionEvent } from "../domain/session";
+import type { AssistantSessionInput } from "./chat-turn";
+import type { AssistantVia } from "./explain-run";
 import type { ToolServerResources } from "./serve-tools";
 
 /**
@@ -23,7 +21,7 @@ export type AssistantSessions = {
 };
 
 /** MCP tool server: lists resources and serves tool calls on a transport. */
-export type McpToolServer = {
+export type McpToolServer<Transport = unknown, Server = unknown> = {
 	serve(
 		tools: readonly BridgedTool[],
 		info: {
@@ -32,6 +30,6 @@ export type McpToolServer = {
 			instructions?: string;
 			resources?: ToolServerResources;
 		},
-		transport?: unknown,
-	): Promise<unknown>;
+		transport?: Transport,
+	): Promise<Server>;
 };

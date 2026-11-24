@@ -2,25 +2,11 @@
  * Types and rules of a design-time assistant session: what it streams, how
  * usage is settled, and how failures read to the person.
  */
-import type { AgentProfileSettings, AssistantUsage } from "@nightshift/flows";
+import type { AssistantUsage } from "@nightshift/flows";
 import { formatDateTime } from "@nightshift/time";
-/** Kinds of agent failure the person may see. */
-export type AgentErrorKind =
-	| "aborted"
-	| "usage-limit"
-	| "network"
-	| "harness"
-	| "auth"
-	| "other";
 
-/** The harness handle a session needs (opaque to domain rules). */
-export type SessionHarness = {
-	name: string;
-	label?: string;
-};
-
-/** A tool the session may hand the harness. */
-export type SessionTool = { name: string };
+/** Kinds of agent failure the person may see: the harness port's kinds. */
+type AgentErrorKind = "aborted" | "usage-limit" | "network" | "harness";
 
 /** The most turns and the most money of one answer. */
 export type SessionLimits = { turns?: number; usd?: number };
@@ -31,20 +17,6 @@ export const AT_LIMIT =
 
 /** The step report of an assistant session. `data` is not checked yet. */
 export type AssistantReport = { summary: string; data?: unknown };
-
-export type AssistantSessionInput = {
-	/** The harness that answers, as this computer runs it. */
-	harness: SessionHarness;
-	profile: Pick<AgentProfileSettings, "model" | "effort">;
-	cwd: string;
-	prompt: string;
-	resumeSessionId?: string;
-	tools?: readonly SessionTool[];
-	describeTool?: (name: string, input: unknown) => string | undefined;
-	report?: { output?: Record<string, unknown> };
-	limits?: SessionLimits;
-	signal: AbortSignal;
-};
 
 export type AssistantSessionEvent =
 	| { type: "session"; sessionId: string }
@@ -100,24 +72,3 @@ export function settleUsage(
 		...(costs.length > 0 ? { costUsd: Math.max(...costs) } : {}),
 	};
 }
-
-/** An agent of this computer answers: a read-only session in a folder. */
-export type AgentVia = {
-	kind: "agent";
-	harness: SessionHarness;
-	profile: Pick<AgentProfileSettings, "model" | "effort">;
-	cwd: string;
-	limits?: SessionLimits;
-};
-
-/** A model answers: one call that returns the report. */
-export type ModelVia = {
-	kind: "model";
-	ask: (input: {
-		prompt: string;
-		output: Record<string, unknown>;
-		signal: AbortSignal;
-	}) => Promise<unknown>;
-};
-
-export type AssistantVia = AgentVia | ModelVia;

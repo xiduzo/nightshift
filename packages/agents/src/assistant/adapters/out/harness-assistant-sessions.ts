@@ -3,14 +3,15 @@
  * what the assistant streams.
  */
 import type { AssistantUsage } from "@nightshift/flows";
-import type { AgentUsage, BridgedTool, ValueResult } from "../../../port";
+import type { AgentUsage, ValueResult } from "../../../port";
 import { settleCost } from "../../../pricing";
+import type { AssistantSessionInput } from "../../application/chat-turn";
+import type { AssistantVia } from "../../application/explain-run";
 import type { AssistantSessions } from "../../application/ports";
+
 import {
 	type AssistantReport,
 	type AssistantSessionEvent,
-	type AssistantSessionInput,
-	type AssistantVia,
 	AT_LIMIT,
 	sessionErrorMessage,
 	settleUsage,

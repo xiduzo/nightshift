@@ -21,15 +21,8 @@ import {
 	field,
 	runReport,
 } from "../../domain/authoring";
+import type { HistoryPort, HistoryRunDetail } from "../../domain/history-port";
 import { costText, RUN_STATUSES, sinceOf, statusesOf } from "../../terminal";
-
-export type {
-	HistoryPort,
-	HistoryRevision,
-	HistoryRun,
-	HistoryRunDetail,
-	HistoryStepCost,
-} from "../../domain/history-port";
 
 /** The tool names. `get_run` takes the place of the authoring tool of that name. */
 export const HISTORY_TOOLS = {

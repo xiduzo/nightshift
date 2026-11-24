@@ -15,10 +15,10 @@ export type ToolServerInfo = {
 };
 
 export const serveTools =
-	(ports: { mcp: McpToolServer }) =>
+	<Transport, Server>(ports: { mcp: McpToolServer<Transport, Server> }) =>
 	async (
 		tools: readonly BridgedTool[],
 		info: ToolServerInfo,
-		transport?: unknown,
+		transport?: Transport,
 	) =>
 		ports.mcp.serve(tools, info, transport);

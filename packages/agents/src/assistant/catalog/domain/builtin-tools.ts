@@ -13,8 +13,6 @@
  */
 import type { BuiltinAgentId } from "@nightshift/flows";
 
-type NamedTool = { name: string };
-
 export type ToolTier = "read" | "propose" | "act";
 
 /** The tier of every tool Night Shift hands to an agent, by its name. */
@@ -91,10 +89,10 @@ export function withinTier(tier: ToolTier, top: ToolTier): boolean {
 }
 
 /** The tools of `tools` that the agent `id` lists, in the order of `tools`. */
-export function toolsOf(
+export function toolsOf<T extends { name: string }>(
 	id: BuiltinAgentId,
-	tools: readonly NamedTool[],
-): NamedTool[] {
+	tools: readonly T[],
+): T[] {
 	const listed = BUILTIN_TOOLS[id];
 	return tools.filter((tool) => listed.includes(tool.name));
 }

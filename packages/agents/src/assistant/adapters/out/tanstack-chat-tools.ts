@@ -1,12 +1,13 @@
 import { builtinAgent } from "@nightshift/flows";
 import type { BridgedTool } from "../../../port";
+import type { ChatTools } from "../../application/chat-turn";
 import { toolsOf } from "../../catalog";
 import type { AuthoringPort } from "../../domain/authoring";
+import type { HistoryPort } from "../../domain/history-port";
 import {
 	authoringTools,
 	describeAuthoringTool,
 } from "./tanstack-authoring-tools";
-import type { HistoryPort } from "./tanstack-history-tools";
 import { describeHistoryTool, historyTools } from "./tanstack-history-tools";
 
 export function chatToolsForTurn(input: {

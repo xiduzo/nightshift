@@ -25,6 +25,21 @@ export type ChatTools = {
 	limits(agent: "builder" | "improver"): SessionLimits;
 };
 
+/** What a session is asked. `cwd` is the project's Clone on this computer. */
+export type AssistantSessionInput = {
+	/** The harness that answers, as this computer runs it. */
+	harness: AgentHarness;
+	profile: Pick<AgentProfileSettings, "model" | "effort">;
+	cwd: string;
+	prompt: string;
+	resumeSessionId?: string;
+	tools?: readonly BridgedTool[];
+	describeTool?: (name: string, input: unknown) => string | undefined;
+	report?: { output?: Record<string, unknown> };
+	limits?: SessionLimits;
+	signal: AbortSignal;
+};
+
 export type ChatTurnPorts = {
 	sessions: Pick<AssistantSessions, "run">;
 	chatTools: ChatTools;
@@ -53,6 +68,9 @@ export const chatTurn = (ports: ChatTurnPorts) =>
 		const { request, harness, signal } = input;
 		const message = chatMessage(request) ?? "";
 		const proposals: FlowProposal[] = [];
+		// The history tools are the Improver's: their `get_run` reads any run
+		// of the project. The prompt names them only when it has them.
+		const past = input.agent === "improver" ? input.past : undefined;
 		const aboutRun = input.agent === "improver" ? request.runId : undefined;
 		const prompt = input.resumeSessionId
 			? chatFollowUpPrompt({
@@ -64,7 +82,7 @@ export const chatTurn = (ports: ChatTurnPorts) =>
 					flow: request.flow,
 					message,
 					...(aboutRun ? { runId: aboutRun } : {}),
-					...(input.past ? { past: true } : {}),
+					...(past ? { past: true } : {}),
 					...(input.history && input.history.length > 0
 						? { history: input.history }
 						: {}),
@@ -77,7 +95,7 @@ export const chatTurn = (ports: ChatTurnPorts) =>
 		const tools = ports.chatTools.forTurn({
 			agent: input.agent,
 			port: input.port,
-			...(input.past ? { past: input.past } : {}),
+			...(past ? { past } : {}),
 			proposals,
 		});
 		for await (const event of ports.sessions.run({
