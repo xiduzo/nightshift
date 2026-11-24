@@ -1065,10 +1065,9 @@ describe("leaving the home Host keeps a copy", () => {
 		expect(byId.get("on-c")?.person).toBeUndefined();
 		expect((await b.db.select().from(spaceSplit))[0]?.unpinned).toBe(2);
 
-		const paused = await flows.schedules(projectId, { validate: false });
-		await flows.saveSchedules(
+		await paired.device.space(own, NIGHT_SHIFT).saveSchedules(
 			projectId,
-			paused.schedules.map((schedule) =>
+			schedules.map((schedule) =>
 				schedule.id === "on-c" ? { ...schedule, enabled: true } : schedule,
 			),
 		);
