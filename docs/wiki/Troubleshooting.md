@@ -92,6 +92,14 @@ A step on a Host never reads a Personal secret, also on your own Host. Move the 
 
 The flow names a computer that left the Space. Open the node, and choose another profile or computer.
 
+### A flow or a run says "older version of Night Shift"
+
+An older Night Shift made it, and this one does not read it. Nothing is lost:
+
+- **A flow.** You cannot change or run it. Delete it, or make a new flow with another name.
+- **A run.** You can read its steps and costs. Start the flow again to run it.
+- **A flow file.** You cannot import it. Make the flow again.
+
 ### The Host refuses to pair a computer
 
 Another install of the same computer is online. One computer is one Device, and only one Night Shift at a time can be that Device. Quit the other install, then pair again.

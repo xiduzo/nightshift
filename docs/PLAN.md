@@ -165,12 +165,12 @@ Proves: parity with the script.
 The first nights showed two things: the dev server reloads under a running night, and the flows were built around one method. Slice 5 makes nights safe and flows generic. All of it is built in a separate git worktree while a night runs.
 
 - `bun run night`: the built server and web app, no hot reload.
-- Flow format version 2: `inputs` and `outputs` on every flow, templates with JSON paths, inputs and node ids in one namespace. `params` and `input: "item"` migrate on load. Run snapshots of version 1 migrate when read.
+- Flow format version 2: `inputs` and `outputs` on every flow, templates with JSON paths, inputs and node ids in one namespace.
 - The Subflow node.
-- For Each over any list: `json` (a template that renders a JSON array, for example `{{planner.data.tasks}}`), `command`, `files` (a glob). A fourth source, `github` (sub-issues), went on 2026-10-16. It is now a `command` recipe on `gh`, and old files migrate on load. Elements are free-form JSON with optional `id`, `title`, `dependsOn`, `done`. `as` names the input. `branch` is `per-item` or `shared`. Engine facts per element move to `run`: `{{run.branch}}`, `{{run.base_branch}}`, `{{run.index}}`.
+- For Each over any list: `json` (a template that renders a JSON array, for example `{{planner.data.tasks}}`), `command`, `files` (a glob). A fourth source, `github` (sub-issues), went on 2026-10-16. It is now a `command` recipe on `gh` (old flows are no longer read: [ADR 43](adr/0043-only-the-current-format-is-read.md)). Elements are free-form JSON with optional `id`, `title`, `dependsOn`, `done`. `as` names the input. `branch` is `per-item` or `shared`. Engine facts per element move to `run`: `{{run.branch}}`, `{{run.base_branch}}`, `{{run.index}}`.
 - Start from a branch: the start dialog takes a base ref, so a night can continue on an open stack.
 - The rpgdotexe flows move to version 2.
-- 2026-10-17, flow format version 4: the Subflow and For Each nodes became one node, `call` (shown as Subflow), with `each` optional (`docs/research/foundational-nodes.md` §3.1). A Command node takes `output: "json"` (§3.5). Version 3 files migrate on load.
+- 2026-10-17, flow format version 4: the Subflow and For Each nodes became one node, `call` (shown as Subflow), with `each` optional (`docs/research/foundational-nodes.md` §3.1). A Command node takes `output: "json"` (§3.5).
 
 Proves: any flow can call any flow, and a list can come from anywhere.
 

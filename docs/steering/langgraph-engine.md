@@ -1151,8 +1151,8 @@ and Biome's `noImportCycles` also holds it there.
    checks and its output fields. Add it to the `flowNodeSchema` union
    (`packages/flows/src/flow/schema/flow.ts`) and to `NODE_DEFINITIONS`
    (`packages/flows/src/flow/node/node.ts`). Add its check to
-   `packages/flows/src/validate/nodes.ts`. When old flows must migrate,
-   bump the flow version.
+   `packages/flows/src/validate/nodes.ts`. When the format
+   changes for old flows, read ADR 43 first.
 2. In `packages/engine/src/graph/nodes/<family>/<kind>.ts`, write the factory and
    the descriptor. The factory is `runStep` with a body, or the lower seam
    `beginStep` for a loop-shaped node. The descriptor is
