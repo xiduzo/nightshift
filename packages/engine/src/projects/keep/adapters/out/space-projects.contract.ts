@@ -124,6 +124,11 @@ export function spaceProjectsContract(
 		test("take writes only new entries, brings removed ones back and records Clones", async () => {
 			const { spaceProjects: space } = under;
 			await space.define(row("app"), { removed: true });
+			await space.create("mine", "notes", {
+				name: "notes",
+				remote: null,
+				folder: false,
+			});
 			await space.take("mine", {
 				define: [
 					{
@@ -144,12 +149,13 @@ export function spaceProjectsContract(
 					},
 				],
 				restore: ["app"],
-				clones: [studio("lib")],
+				clones: [studio("lib"), studio("notes")],
 			});
 			expect(await under.read("mine")).toEqual({
 				projects: {
 					app: { name: "app", removed: false },
 					lib: { name: "lib", removed: false },
+					notes: { name: "notes", removed: false },
 				},
 				clones: ["lib/studio"],
 			});

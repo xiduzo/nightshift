@@ -75,4 +75,15 @@ describe("addProjectFromRemote", () => {
 			}),
 		).rejects.toThrow(HOSTED_ELSEWHERE);
 	});
+
+	test("a remote that is a project of another Space is refused", async () => {
+		const ports = await seeded();
+		await expect(
+			addProjectFromRemote(ports)({
+				spaceId: "s2",
+				name: "app",
+				remote: "github.com/acme/app",
+			}),
+		).rejects.toThrow("another Space");
+	});
 });

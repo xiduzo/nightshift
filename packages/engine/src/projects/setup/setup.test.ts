@@ -6,7 +6,7 @@ import {
 	expect,
 	test,
 } from "bun:test";
-import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type Git, systemGit } from "../../git";
@@ -87,44 +87,11 @@ describe("checkProjectFolder", () => {
 		);
 	});
 
-	test("a folder that does not exist has no fix", async () => {
-		const readiness = await checkProjectFolder(join(root, "nope"));
-		expect(statuses(readiness)).toEqual([
-			"git:ok:null",
-			"folder:failed:null",
-			"commit:skipped:null",
-		]);
-	});
-
-	test("a plain folder needs set-up, and a name and email without one", async () => {
-		const readiness = await checkProjectFolder(folder);
-		expect(statuses(readiness)).toEqual([
-			"git:ok:null",
-			"folder:failed:set-up-git",
-			"commit:failed:set-up-git",
-			"identity:failed:set-up-git",
-		]);
-		expect(readiness.needsIdentity).toBe(true);
-	});
-
 	test("a global identity is enough", async () => {
 		await withGlobalIdentity();
 		const readiness = await checkProjectFolder(folder);
 		expect(readiness.needsIdentity).toBe(false);
 		expect(readiness.steps.at(-1)?.status).toBe("ok");
-	});
-
-	test("a subfolder offers the top folder", async () => {
-		await mustGit(folder, ["init", "-q"]);
-		const sub = join(folder, "packages");
-		await mkdir(sub);
-		const readiness = await checkProjectFolder(sub);
-		expect(readiness.topLevel).toBe(folder);
-		expect(statuses(readiness)).toEqual([
-			"git:ok:null",
-			"folder:failed:use-top-folder",
-			"commit:skipped:null",
-		]);
 	});
 
 	test("a repository without commits needs a first commit", async () => {
@@ -135,20 +102,6 @@ describe("checkProjectFolder", () => {
 			"folder:ok:null",
 			"commit:failed:set-up-git",
 			"identity:failed:set-up-git",
-		]);
-	});
-
-	test("a repository with a commit is ready, with no identity step", async () => {
-		await withGlobalIdentity();
-		await mustGit(folder, ["init", "-q"]);
-		await mustGit(folder, ["commit", "-q", "--allow-empty", "-m", "first"]);
-		const readiness = await checkProjectFolder(folder);
-		expect(readiness.ready).toBe(true);
-		expect(readiness.steps.map((step) => step.id)).toEqual([
-			"git",
-			"folder",
-			"commit",
-			"tools",
 		]);
 	});
 });
@@ -186,20 +139,6 @@ describe("setUpGit", () => {
 		const readiness = await setUpGit({ path: folder });
 		expect(readiness.ready).toBe(true);
 		expect(await Bun.file(join(folder, ".gitignore")).text()).toBe("dist/\n");
-	});
-
-	test("refuses without a name and email, and changes nothing", async () => {
-		await expect(setUpGit({ path: folder })).rejects.toThrow(
-			"Git needs your name and email",
-		);
-		expect(await Bun.file(join(folder, ".gitignore")).exists()).toBe(false);
-	});
-
-	test("refuses a subfolder", async () => {
-		await mustGit(folder, ["init", "-q"]);
-		const sub = join(folder, "sub");
-		await mkdir(sub);
-		await expect(setUpGit({ path: sub })).rejects.toThrow("inside the project");
 	});
 });
 

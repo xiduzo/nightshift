@@ -118,11 +118,16 @@ export function projectStoreContract(
 			).toEqual(["app", "lib"]);
 			expect(await store.matching({})).toEqual([]);
 			expect(
-				(await store.ofSpace("s1")).map((p) => [p.id, p.clone, p.walked]),
+				(await store.ofSpace("s1")).map((p) => [
+					p.id,
+					p.clone,
+					p.walked,
+					p.folder,
+				]),
 			).toEqual([
-				["app", true, false],
-				["lib", false, false],
-				["gone", true, false],
+				["app", true, false, true],
+				["lib", false, false, true],
+				["gone", true, false, true],
 			]);
 		});
 

@@ -120,4 +120,34 @@ describe("addProject", () => {
 			),
 		).toEqual(allowing("owner", "admin", "member"));
 	});
+
+	test("a project whose folder moved follows it to the new folder", async () => {
+		const ports = inMemoryCatalogPorts();
+		ports.repos.add("/old", "git@github.com:acme/app.git");
+		const added = await addProject(ports)(ADA, {
+			spaceId: "s1",
+			repoPath: "/old",
+		});
+		ports.repos.remove("/old");
+		ports.repos.add("/moved", "git@github.com:acme/app.git");
+		const again = await addProject(ports)(ADA, {
+			spaceId: "s1",
+			repoPath: "/moved",
+		});
+		expect(again).toMatchObject({ id: added.id, repoPath: "/moved" });
+		expect(ports.store.records.clones.map((c) => c.path)).toEqual(["/moved"]);
+	});
+
+	test("folders without a remote stay projects of their own, and the same folder is the same project", async () => {
+		const ports = inMemoryCatalogPorts();
+		ports.repos.add("/a");
+		ports.repos.add("/b");
+		const add = (repoPath: string) =>
+			addProject(ports)(ADA, { spaceId: "s1", repoPath });
+		const a = await add("/a");
+		const b = await add("/b");
+		expect([a.remote, b.remote]).toEqual([null, null]);
+		expect(a.id).not.toBe(b.id);
+		expect((await add("/a")).id).toBe(a.id);
+	});
 });

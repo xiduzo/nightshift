@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { Actor } from "../../../contract";
-import { NO_FOLDER } from "../../keep";
+import { NO_FOLDER, PROJECT_NOT_FOUND } from "../../keep";
 import { inMemoryCatalogPorts } from "../adapters/out/in-memory-neighbours";
 import { otherRepository, stillRunning } from "../domain/words";
 import { useProjectFolder } from "./use-project-folder";
@@ -82,5 +82,46 @@ describe("useProjectFolder", () => {
 				repoPath: "/work/feeds",
 			}),
 		).rejects.toThrow(NO_FOLDER);
+	});
+
+	test("another folder takes the place of the one a project has", async () => {
+		const ports = seeded();
+		await ports.store.addClone({
+			spaceId: "s1",
+			projectId: "p1",
+			deviceId: "this-computer",
+			path: "/work/one",
+		});
+		ports.repos.add("/work/two", "https://github.com/acme/app");
+		await useProjectFolder(ports)(ADA, {
+			spaceId: "s1",
+			projectId: "p1",
+			repoPath: "/work/two",
+		});
+		expect(ports.store.records.clones.map((c) => c.path)).toEqual([
+			"/work/two",
+		]);
+	});
+
+	test("a folder that is another project's is refused, and so is a project of another Space", async () => {
+		const ports = seeded();
+		ports.store.addProject({ id: "lib", spaceId: "s1", name: "lib" });
+		await ports.store.addClone({
+			spaceId: "s1",
+			projectId: "lib",
+			deviceId: "this-computer",
+			path: "/work/lib",
+		});
+		ports.repos.add("/work/lib");
+		const use = (spaceId: string) =>
+			useProjectFolder(ports)(ADA, {
+				spaceId,
+				projectId: "p1",
+				repoPath: "/work/lib",
+			});
+		await expect(use("s1")).rejects.toThrow(
+			"This folder is the project lib already.",
+		);
+		await expect(use("s2")).rejects.toThrow(PROJECT_NOT_FOUND);
 	});
 });
