@@ -283,38 +283,6 @@ attributes:
     type: double
     brief: What every try of a climb cost, in US dollars, a Subflow's called flow included.
     stability: development
-  - key: nightshift.pull_request.outcome
-    type:
-      members:
-        - { id: merged, value: merged, brief: The pull request was merged., stability: development }
-        - { id: closed, value: closed, brief: The pull request was closed., stability: development }
-        - { id: reverted, value: reverted, brief: The pull request was reverted., stability: development }
-        - { id: other, value: _OTHER, brief: An outcome outside this list., stability: development }
-    brief: What became of a pull request.
-    stability: development
-    deprecated:
-      reason: obsoleted
-      note: >
-        Retired. A newer build sends nightshift.run.scored. The registry keeps
-        the key while older builds send it (ADR 24).
-  - key: nightshift.pull_request.hours
-    type: double
-    brief: Hours from open to the pull request outcome.
-    stability: development
-    deprecated:
-      reason: obsoleted
-      note: >
-        Retired. A newer build sends nightshift.run.scored. The registry keeps
-        the key while older builds send it (ADR 24).
-  - key: nightshift.pull_request.useful
-    type: boolean
-    brief: Whether you found the pull request useful.
-    stability: development
-    deprecated:
-      reason: obsoleted
-      note: >
-        Retired. A newer build sends nightshift.run.scored. The registry keeps
-        the key while older builds send it (ADR 24).
   - key: nightshift.install.entry
     type:
       members:
@@ -408,7 +376,6 @@ attributes:
         - { id: implement_and_check, value: implement-and-check, brief: The implement-and-check starter., stability: development }
         - { id: build_task, value: build-task, brief: The build-task starter., stability: development }
         - { id: plan_and_build, value: plan-and-build, brief: The plan-and-build starter., stability: development }
-        - { id: review_pr, value: review-pr, brief: The review-pr starter. Retired. Older builds still send it., stability: development }
         - { id: edit_file, value: edit-file, brief: The edit-file starter., stability: development }
         - { id: review_learnings, value: review-learnings, brief: The review-learnings starter., stability: development }
         - { id: per_file, value: per-file, brief: The per-file starter., stability: development }

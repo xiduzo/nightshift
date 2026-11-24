@@ -30,16 +30,6 @@ A test run (a run with pinned or skipped nodes, [ADR 27](adr/0027-a-test-run-car
 
 A climb is the tries of one node up its ladder, up to the step it landed on. The rung says where it landed: a rule, the first tier, a later tier, a person, the deadline of a person's Gate, or none. The name of a tier stays on your computer, because you choose it.
 
-## Retired events
-
-An older build still sends these events. The ingest accepts them while such a build sends them ([ADR 24](adr/0024-a-retired-usage-name-stays-accepted-while-old-builds-send-it.md)). A newer build sends `nightshift.run.scored` instead.
-
-| Event | Fields | A newer build sends |
-| --- | --- | --- |
-| `nightshift.pull_request.opened` | `nightshift.run.id` (a hash). | Nothing. |
-| `nightshift.pull_request.outcome` | `nightshift.pull_request.outcome` (`merged`, `closed`, `reverted`, `_OTHER`). `nightshift.pull_request.hours`. | `pr_merged`, `pr_closed` or `reverted_within_7d`. |
-| `nightshift.pull_request.useful` | `nightshift.run.id` (a hash). `nightshift.pull_request.useful` (boolean). | `useful`, with 1 or 0. |
-
 ## End reasons
 
 `nightshift.run.end_reason` is one of `finished`, `guard.budget`, `guard.turns`, `guard.looping`, `guard.idle`, `guard.max_steps`, `stop_time`, `agent.usage_limit`, `agent.network`, `agent.signed_out`, `stopped_by_person` or `_OTHER`.

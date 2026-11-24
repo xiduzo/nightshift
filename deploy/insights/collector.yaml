@@ -73,9 +73,6 @@ processors:
       - nightshift.project.id
       - nightshift.project.source
       - nightshift.project.starters
-      - nightshift.pull_request.hours
-      - nightshift.pull_request.outcome
-      - nightshift.pull_request.useful
       - nightshift.run.cost_usd
       - nightshift.run.duration
       - nightshift.run.end_reason

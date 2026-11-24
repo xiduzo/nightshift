@@ -6,11 +6,7 @@ import type { Database } from "@nightshift/db";
 import { migratedDb } from "@nightshift/db/testing";
 import { type LandedFact, RUNGS, type RunTrace } from "@nightshift/engine";
 import { NODE_TYPE_LABEL, starterList } from "@nightshift/flows";
-import {
-	RETIRED_USAGE_EVENT,
-	USAGE_EVENT,
-	usageEventSchema,
-} from "@nightshift/semconv";
+import { USAGE_EVENT, usageEventSchema } from "@nightshift/semconv";
 import { parseInstant } from "@nightshift/time";
 
 import { hashId } from "./anonymize";
@@ -685,11 +681,7 @@ test("every starter and every node type is a member of its closed list", () => {
 	expect(kinds).toEqual([]);
 });
 
-test("every usage event in the registry is sent or retired, never both", () => {
+test("USAGE_EVENT names every usage event in the registry", () => {
 	const sent: string[] = Object.values(USAGE_EVENT);
-	const retired: string[] = Object.values(RETIRED_USAGE_EVENT);
-	expect(sent.filter((name) => retired.includes(name))).toEqual([]);
-	expect([...sent, ...retired].sort()).toEqual(
-		Object.keys(usageEventSchema).sort(),
-	);
+	expect(sent.sort()).toEqual(Object.keys(usageEventSchema).sort());
 });

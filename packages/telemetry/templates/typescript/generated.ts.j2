@@ -260,17 +260,6 @@ export const USAGE_EVENT = {
 	processCrashed: "nightshift.process.crashed",
 } as const;
 
-/**
- * Usage events no build of this version sends. The registry keeps them,
- * deprecated, while older builds still send them, so the ingest accepts
- * them and Insights reads their history (ADR 24).
- */
-export const RETIRED_USAGE_EVENT = {
-	pullRequestOpened: "nightshift.pull_request.opened",
-	pullRequestOutcome: "nightshift.pull_request.outcome",
-	pullRequestUseful: "nightshift.pull_request.useful",
-} as const;
-
 /** A closed schema for each usage event. */
 export const usageEventSchema = {
 {% for e in ctx.registry.events %}

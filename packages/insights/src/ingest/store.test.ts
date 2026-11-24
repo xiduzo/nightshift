@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { PGlite } from "@electric-sql/pglite";
-import { ATTR, RETIRED_USAGE_EVENT, USAGE_EVENT } from "@nightshift/semconv";
-import { now } from "@nightshift/time";
+import { ATTR, USAGE_EVENT } from "@nightshift/semconv";
+import { asDate, now } from "@nightshift/time";
 import { drizzle } from "drizzle-orm/pglite";
 import { migrate } from "drizzle-orm/pglite/migrator";
 
@@ -158,12 +158,11 @@ function events(
 	};
 }
 
-test("useful runs read old and new events as one answer per run, and the code scorer counts both", async () => {
+test("reports over stored rows with a name the registry lacks count the registry's names only", async () => {
 	const db = await database();
 	const RUN = USAGE_EVENT.runEnded;
 	const SCORED = USAGE_EVENT.runScored;
-	const OLD_USEFUL = RETIRED_USAGE_EVENT.pullRequestUseful;
-	const OLD_OUTCOME = RETIRED_USAGE_EVENT.pullRequestOutcome;
+	const OLD = ["night", "shift.pull_request"].join("");
 	const ended = (cost: number, neededYou?: boolean) => ({
 		name: RUN,
 		fields: {
@@ -188,6 +187,24 @@ test("useful runs read old and new events as one answer per run, and the code sc
 		},
 	});
 	const start = now() - 60 * 60_000;
+	// Rows the ingest stored before these names left the registry.
+	await db.insert(usageEvent).values([
+		{
+			eventName: `${OLD}.useful`,
+			installId: "install-1",
+			eventTime: asDate(start + 30_000),
+			attributes: {
+				[attribute(SCORED, "run.id")]: "run-c",
+				[`${OLD}.useful`]: true,
+			},
+		},
+		{
+			eventName: `${OLD}.outcome`,
+			installId: "install-1",
+			eventTime: asDate(start + 30_000),
+			attributes: { [`${OLD}.outcome`]: "merged", [`${OLD}.hours`]: 5 },
+		},
+	]);
 	const result = await ingestLogs(
 		db,
 		events("install-1", start, [
@@ -195,24 +212,10 @@ test("useful runs read old and new events as one answer per run, and the code sc
 				name: USAGE_EVENT.installStarted,
 				fields: { [ENTRY]: "desktop", [HOST]: false },
 			},
-			// An older build: no needed_you, and the retired events.
 			ended(1),
-			{
-				name: OLD_USEFUL,
-				fields: {
-					[attribute(OLD_USEFUL, "run.id")]: "run-a",
-					[attribute(OLD_USEFUL, "useful")]: true,
-				},
-			},
-			{
-				name: OLD_OUTCOME,
-				fields: {
-					[attribute(OLD_OUTCOME, "pull_request.outcome")]: "merged",
-					[attribute(OLD_OUTCOME, "pull_request.hours")]: 5,
-				},
-			},
-			// The same install after the update: run-a's answer changes to no.
 			ended(2, true),
+			// The answer of run-a changes to no: the latest one counts.
+			scored("run-a", "useful", 1),
 			scored("run-a", "useful", 0),
 			scored("run-b", "useful", 1),
 			scored("run-b", "pr_merged", 1),
@@ -221,6 +224,7 @@ test("useful runs read old and new events as one answer per run, and the code sc
 		{ country: null },
 	);
 	expect(result.refused).toBe(0);
+	expect(await db.select().from(usageEvent)).toHaveLength(10);
 
 	expect(await overview(db)).toMatchObject({
 		finishedRuns: 2,
@@ -232,15 +236,15 @@ test("useful runs read old and new events as one answer per run, and the code sc
 	const said = await feedback(db);
 	expect(said).toMatchObject({ answered: 2, useful: 1 });
 	expect(said.pullRequests).toMatchObject({
-		merged: 2,
+		merged: 1,
 		closed: 0,
 		revertedWithin7Days: 1,
-		revertedRate: 0.5,
+		revertedRate: 1,
 	});
 	expect(said.pullRequests.byInstallWeek.length).toBeGreaterThan(0);
-	// The first yes, two minutes after the install, is the first useful run.
+	// The first yes, three minutes after the install, is the first useful run.
 	const steps = await funnel(db);
-	expect(steps.medianSecondsToFirstUsefulRun).toBe(120);
+	expect(steps.medianSecondsToFirstUsefulRun).toBe(180);
 	expect(steps.medianSecondsToFirstFinishedRun).toBe(60);
 }, 30_000);
 

@@ -1,0 +1,42 @@
+{
+	"type": "diff",
+	"version": "9",
+	"dialect": "postgres",
+	"id": "3d2596d1-fdb5-4832-9e84-7dfad15f99ee",
+	"prevIds": ["f864d68f-885f-4f8a-b573-b990c81144e3"],
+	"footprints": [
+		{
+			"statementType": "drop_view",
+			"statementTarget": ["view", "public", "usage_fact"],
+			"writes": [
+				"s|view|public.usage_fact",
+				"n|view|public.usage_fact",
+				"e|view|public.usage_fact",
+				"n|rel|public.usage_fact",
+				"n|type|public.usage_fact"
+			],
+			"reads": ["n|sch|public"]
+		},
+		{
+			"statementType": "create_view",
+			"statementTarget": ["view", "public", "usage_fact"],
+			"writes": [
+				"s|view|public.usage_fact",
+				"n|view|public.usage_fact",
+				"e|view|public.usage_fact",
+				"n|rel|public.usage_fact",
+				"n|type|public.usage_fact"
+			],
+			"reads": ["n|sch|public"]
+		}
+	],
+	"deltas": [
+		{
+			"op": "alter",
+			"key": "views\u0000[\"public\",\"usage_fact\"]",
+			"set": {
+				"definition": "\n\tSELECT\n\t\tid,\n\t\tinstall_id,\n\t\tevent_name,\n\t\tevent_time,\n\t\tservice_version,\n\t\tos_type,\n\t\thost_arch,\n\t\tcountry,\n\t\tattributes->>'nightshift.run.end_reason' AS end_reason,\n\t\tattributes->>'nightshift.run.status' AS run_status,\n\t\t(attributes->>'nightshift.run.cost_usd')::double precision AS cost_usd,\n\t\t(attributes->>'nightshift.run.needed_you')::boolean AS needed_you,\n\t\tattributes->>'nightshift.run.id' AS run_id,\n\t\tattributes->>'nightshift.score.name' AS score_name,\n\t\t(attributes->>'nightshift.score.value')::double precision AS score_value,\n\t\t(attributes->>'nightshift.score.hours')::double precision AS score_hours,\n\t\tattributes->>'nightshift.gate.by' AS gate_by,\n\t\tattributes->>'nightshift.gate.via' AS gate_via,\n\t\t(attributes->>'nightshift.gate.wait')::double precision AS gate_wait,\n\t\t(attributes->>'nightshift.install.agents')::double precision AS agents,\n\t\tattributes->>'nightshift.install.entry' AS install_entry,\n\t\t(attributes->>'nightshift.install.host')::boolean AS install_host,\n\t\tattributes->>'nightshift.flow.from' AS flow_from,\n\t\tattributes->>'nightshift.flow.starter' AS flow_starter\n\tFROM \"usage_event\"\n"
+			}
+		}
+	]
+}

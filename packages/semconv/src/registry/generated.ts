@@ -124,7 +124,6 @@ export const REGISTRY = {
 				"implement-and-check",
 				"build-task",
 				"plan-and-build",
-				"review-pr",
 				"edit-file",
 				"review-learnings",
 				"per-file",
@@ -286,16 +285,6 @@ export const REGISTRY = {
 		},
 		"nightshift.project.starters": {
 			type: "int",
-		},
-		"nightshift.pull_request.hours": {
-			type: "double",
-		},
-		"nightshift.pull_request.outcome": {
-			type: "string",
-			members: ["merged", "closed", "reverted", "_OTHER"],
-		},
-		"nightshift.pull_request.useful": {
-			type: "boolean",
 		},
 		"nightshift.run.cost_usd": {
 			type: "double",
@@ -991,17 +980,6 @@ export const USAGE_EVENT = {
 	processCrashed: "nightshift.process.crashed",
 } as const;
 
-/**
- * Usage events no build of this version sends. The registry keeps them,
- * deprecated, while older builds still send them, so the ingest accepts
- * them and Insights reads their history (ADR 24).
- */
-export const RETIRED_USAGE_EVENT = {
-	pullRequestOpened: "nightshift.pull_request.opened",
-	pullRequestOutcome: "nightshift.pull_request.outcome",
-	pullRequestUseful: "nightshift.pull_request.useful",
-} as const;
-
 /** A closed schema for each usage event. */
 export const usageEventSchema = {
 	"nightshift.agent.checked": z
@@ -1059,7 +1037,6 @@ export const usageEventSchema = {
 					"implement-and-check",
 					"build-task",
 					"plan-and-build",
-					"review-pr",
 					"edit-file",
 					"review-learnings",
 					"per-file",
@@ -1157,31 +1134,6 @@ export const usageEventSchema = {
 			"nightshift.project.check.git": z.enum(["ok", "failed", "skipped"]),
 			"nightshift.project.check.identity": z.enum(["ok", "failed", "skipped"]),
 			"nightshift.project.check.tools": z.enum(["ok", "failed", "skipped"]),
-		})
-		.strict(),
-	"nightshift.pull_request.opened": z
-		.object({
-			name: z.literal("nightshift.pull_request.opened"),
-			"nightshift.run.id": z.string(),
-		})
-		.strict(),
-	"nightshift.pull_request.outcome": z
-		.object({
-			name: z.literal("nightshift.pull_request.outcome"),
-			"nightshift.pull_request.hours": z.number(),
-			"nightshift.pull_request.outcome": z.enum([
-				"merged",
-				"closed",
-				"reverted",
-				"_OTHER",
-			]),
-		})
-		.strict(),
-	"nightshift.pull_request.useful": z
-		.object({
-			name: z.literal("nightshift.pull_request.useful"),
-			"nightshift.pull_request.useful": z.boolean(),
-			"nightshift.run.id": z.string(),
 		})
 		.strict(),
 	"nightshift.run.ended": z

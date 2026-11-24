@@ -1,4 +1,4 @@
-import { type SQL, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import {
 	bigint,
 	boolean,
@@ -10,57 +10,18 @@ import {
 
 import {
 	ACTIVE,
-	eventIs,
 	FLOW,
 	GATE,
 	jsonBool,
 	jsonNumber,
 	jsonText,
 	lit,
-	OTHER_SCORE,
-	RETIRED_OUTCOME,
-	RETIRED_SCORE,
-	RETIRED_USEFUL,
 	RUN,
 	SCORED,
 	STARTED,
 	USEFUL,
 } from "./keys";
 import { usageEvent } from "./table";
-
-/**
- * The score an event tells. A retired pull request event of an older build
- * reads as the score a newer build sends for it (ADR 24).
- */
-function scoreName(): SQL {
-	const outcomes = RETIRED_SCORE.map(
-		(item) => sql`WHEN ${lit(item.outcome)} THEN ${lit(item.score)}`,
-	);
-	return sql`CASE
-			WHEN ${eventIs(SCORED)} THEN ${jsonText(SCORED, "score.name")}
-			WHEN ${eventIs(RETIRED_USEFUL)} THEN ${lit(USEFUL)}
-			WHEN ${eventIs(RETIRED_OUTCOME)} THEN CASE ${jsonText(RETIRED_OUTCOME, "pull_request.outcome")}
-				${sql.join(outcomes, sql` `)}
-				ELSE ${lit(OTHER_SCORE)}
-			END
-		END`;
-}
-
-/** A useful answer is 1 or 0. A pull request outcome is 1. */
-function scoreValue(): SQL {
-	return sql`CASE
-			WHEN ${eventIs(SCORED)} THEN ${jsonNumber(SCORED, "score.value")}
-			WHEN ${eventIs(RETIRED_USEFUL)} THEN CASE WHEN ${jsonBool(RETIRED_USEFUL, "pull_request.useful")} THEN 1 ELSE 0 END
-			WHEN ${eventIs(RETIRED_OUTCOME)} THEN 1
-		END::double precision`;
-}
-
-function scoreHours(): SQL {
-	return sql`CASE
-			WHEN ${eventIs(SCORED)} THEN ${jsonNumber(SCORED, "score.hours")}
-			WHEN ${eventIs(RETIRED_OUTCOME)} THEN ${jsonNumber(RETIRED_OUTCOME, "pull_request.hours")}
-		END`;
-}
 
 /** Flat columns for the views. Attribute keys stay in this select. */
 export const usageFact = pgView("usage_fact", {
@@ -106,9 +67,9 @@ export const usageFact = pgView("usage_fact", {
 		${jsonNumber(RUN, "cost_usd")} AS cost_usd,
 		${jsonBool(RUN, "needed_you")} AS needed_you,
 		${jsonText(SCORED, "run.id")} AS run_id,
-		${scoreName()} AS score_name,
-		${scoreValue()} AS score_value,
-		${scoreHours()} AS score_hours,
+		${jsonText(SCORED, "score.name")} AS score_name,
+		${jsonNumber(SCORED, "score.value")} AS score_value,
+		${jsonNumber(SCORED, "score.hours")} AS score_hours,
 		${jsonText(GATE, "gate.by")} AS gate_by,
 		${jsonText(GATE, "gate.via")} AS gate_via,
 		${jsonNumber(GATE, "gate.wait")} AS gate_wait,
@@ -121,8 +82,7 @@ export const usageFact = pgView("usage_fact", {
 `);
 
 /**
- * The latest useful answer of each run. A person can change an answer, and
- * an older build sends the retired event: both read as one answer per run.
+ * The latest useful answer of each run. A person can change an answer.
  */
 export const usageUsefulRun = pgView("usage_useful_run", {
 	installId: text("install_id").notNull(),

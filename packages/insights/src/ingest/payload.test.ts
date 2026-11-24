@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { ATTR, RETIRED_USAGE_EVENT, USAGE_EVENT } from "@nightshift/semconv";
+import { ATTR, USAGE_EVENT } from "@nightshift/semconv";
 
 import { attribute } from "../schema/keys";
 import { readLogs } from "./payload";
@@ -101,19 +101,18 @@ test("a body that is not JSON or not logs fails without the body", () => {
 	);
 });
 
-test("a retired event of an older build is accepted next to the event that replaced it", () => {
+test("an event the registry lacks is refused and the rest of its batch stays", () => {
 	const RUN_ID = attribute(USAGE_EVENT.runScored, "run.id");
 	const SCORE = attribute(USAGE_EVENT.runScored, "score.name");
 	const VALUE = attribute(USAGE_EVENT.runScored, "score.value");
-	const USEFUL = attribute(RETIRED_USAGE_EVENT.pullRequestUseful, "useful");
-	const UNKNOWN = ["night", "shift.pull_request.merged"].join("");
+	const RETIRED = ["night", "shift.pull_request.useful"].join("");
 	const read = readLogs(
 		logs([
 			{
-				name: RETIRED_USAGE_EVENT.pullRequestUseful,
+				name: RETIRED,
 				attributes: [
 					{ key: RUN_ID, value: { stringValue: "0123456789abcdef" } },
-					{ key: USEFUL, value: { boolValue: true } },
+					{ key: RETIRED, value: { boolValue: true } },
 				],
 			},
 			{
@@ -132,22 +131,20 @@ test("a retired event of an older build is accepted next to the event that repla
 					{ key: VALUE, value: { doubleValue: 1 } },
 				],
 			},
-			{ name: UNKNOWN },
 		]),
 		{ country: null },
 	);
 	expect(read.rows.map((row) => row.eventName)).toEqual([
-		RETIRED_USAGE_EVENT.pullRequestUseful,
 		USAGE_EVENT.runScored,
 	]);
-	expect(read.rows[1]?.attributes).toEqual({
+	expect(read.rows[0]?.attributes).toEqual({
 		[RUN_ID]: "0123456789abcdef",
 		[SCORE]: "useful",
 		[VALUE]: 0,
 	});
 	expect(read.refusals).toEqual([
+		{ eventName: RETIRED, rule: INGEST_RULE.unknownEvent },
 		{ eventName: USAGE_EVENT.runScored, rule: INGEST_RULE.wrongType },
-		{ eventName: UNKNOWN, rule: INGEST_RULE.unknownEvent },
 	]);
 });
 

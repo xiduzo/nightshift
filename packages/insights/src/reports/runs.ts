@@ -18,7 +18,7 @@ export type RunNumbers = {
 	costPerUsefulResult: number | null;
 	/**
 	 * Run ends where a person stepped in, divided by the run ends that say.
-	 * An older build does not say. Null when no run end says.
+	 * An end can be silent about it. Null when no run end says.
 	 */
 	neededYouRate: number | null;
 };
