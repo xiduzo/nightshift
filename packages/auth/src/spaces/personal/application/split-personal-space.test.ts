@@ -1,11 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { inMemoryPersonalPorts } from "../adapters/out/in-memory-neighbours";
-import { applyRows } from "../adapters/out/in-memory-personal-space-store";
+import { personalPorts } from "../test-support";
 import { splitPersonalSpace } from "./split-personal-space";
 
 async function withHostSpace(slug: string) {
-	const ports = inMemoryPersonalPorts();
-	ports.records.persons.push({
+	const ports = await personalPorts();
+	await ports.person({
 		id: "ada",
 		name: "Ada",
 		email: "a@x.org",
@@ -36,8 +35,8 @@ describe("splitPersonalSpace", () => {
 			to: "new",
 			hostName: "Studio",
 		});
-		applyRows(ports.records, rows);
-		expect(ports.records.spaces).toEqual([
+		await ports.run(rows);
+		expect(await ports.spaces()).toEqual([
 			{
 				id: "host",
 				name: "Personal on Studio",
@@ -46,7 +45,7 @@ describe("splitPersonalSpace", () => {
 			},
 			{ id: "new", name: "Personal", slug: "personal-ada", personal: true },
 		]);
-		expect(ports.records.members).toEqual([
+		expect(await ports.members()).toEqual([
 			{ id: "id-1", spaceId: "new", personId: "ada", role: "owner" },
 		]);
 	});
@@ -59,8 +58,8 @@ describe("splitPersonalSpace", () => {
 			to: "new",
 			hostName: "Studio",
 		});
-		applyRows(ports.records, rows);
-		expect(ports.records.spaces.find((s) => s.id === "new")?.slug).toBe(
+		await ports.run(rows);
+		expect((await ports.spaces()).find((s) => s.id === "new")?.slug).toBe(
 			"personal-ada-new",
 		);
 	});

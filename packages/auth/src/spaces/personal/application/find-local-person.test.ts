@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { inMemoryPersonalPorts } from "../adapters/out/in-memory-neighbours";
+import { personalPorts } from "../test-support";
 import { findLocalPerson } from "./find-local-person";
 
 function owned(ownerId: string | null) {
@@ -15,8 +15,8 @@ function owned(ownerId: string | null) {
 	};
 }
 
-function localPorts() {
-	const ports = inMemoryPersonalPorts();
+async function localPorts() {
+	const ports = await personalPorts();
 	return {
 		...ports,
 		ensurePersonalSpace: async (request: { personId: string }) =>
@@ -26,13 +26,13 @@ function localPorts() {
 
 describe("findLocalPerson", () => {
 	test("a database without one gets a new Person, named after the account, who may be the Host admin", async () => {
-		const ports = localPorts();
+		const ports = await localPorts();
 		const device = owned(null);
 		expect(await findLocalPerson(ports)({ self: device.self })).toEqual({
 			userId: "id-1",
 			spaceId: "personal-of-id-1",
 		});
-		expect(ports.records.persons).toEqual([
+		expect(await ports.persons()).toEqual([
 			{
 				id: "id-1",
 				name: "ada",
@@ -45,8 +45,8 @@ describe("findLocalPerson", () => {
 	});
 
 	test("is the owner the Device names, and a blank name becomes the account's", async () => {
-		const ports = localPorts();
-		ports.records.persons.push({
+		const ports = await localPorts();
+		await ports.person({
 			id: "bo",
 			name: " ",
 			email: "b@x.org",
@@ -56,14 +56,14 @@ describe("findLocalPerson", () => {
 		expect((await findLocalPerson(ports)({ self: device.self })).userId).toBe(
 			"bo",
 		);
-		expect(ports.records.persons[0]?.name).toBe("ada");
+		expect((await ports.persons())[0]?.name).toBe("ada");
 		expect(device.named).toEqual([]);
 		expect(ports.claimed).toEqual([]);
 	});
 
 	test("a Device whose owner is gone takes the Person with the local email", async () => {
-		const ports = localPorts();
-		ports.records.persons.push({
+		const ports = await localPorts();
+		await ports.person({
 			id: "local",
 			name: "Cy",
 			email: "local@nightshift.invalid",
@@ -74,6 +74,6 @@ describe("findLocalPerson", () => {
 			"local",
 		);
 		expect(device.named).toEqual(["local"]);
-		expect(ports.records.persons[0]?.name).toBe("Cy");
+		expect((await ports.persons())[0]?.name).toBe("Cy");
 	});
 });

@@ -1,0 +1,10 @@
+import { describe, expect, test } from "bun:test";
+import { {{{real}}} } from "./{{{realFile}}}";
+
+/** `{{{port}}}` over drizzle. Give the adapter a `migratedDb()` of `@nightshift/db/testing`. */
+
+describe("{{{port}}} over drizzle", () => {
+	test("an unknown id is null", async () => {
+		expect(await {{{real}}}().find("nobody-has-it")).toBeNull();
+	});
+});

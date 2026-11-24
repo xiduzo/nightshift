@@ -568,7 +568,7 @@ describe("a port has an in-memory adapter and a contract suite (H7)", () => {
 		const problems = await check({
 			...repository,
 			[`${OUT}/in-memory-schedule-store.ts`]: null,
-			[`${OUT}/drizzle-schedule-store.ts`]: null,
+			[`${OUT}/node-schedule-store.ts`]: null,
 			[`${OUT}/schedule-store.contract.ts`]: null,
 			[`${OUT}/schedule-store.contract.test.ts`]: null,
 			[`${SLICE}/wire.ts`]: "export const wireSchedules = () => ({});\n",
@@ -579,7 +579,7 @@ describe("a port has an in-memory adapter and a contract suite (H7)", () => {
 		});
 		expect(problems).toEqual([
 			`${PORTS}: the port ScheduleStore is read by a use case and has no in-memory adapter. Add adapters/out/in-memory-schedule-store.ts. If another slice or package implements the port, write @filledBy <who> in its comment.`,
-			`${PORTS}: the port ScheduleStore has no real adapter. Add adapters/out/<tech>-schedule-store.ts (drizzle-schedule-store.ts).`,
+			`${PORTS}: the port ScheduleStore has no real adapter. Add adapters/out/<tech>-schedule-store.ts (node-schedule-store.ts).`,
 			`${PORTS}: the port ScheduleStore has no contract suite. Add adapters/out/schedule-store.contract.ts, which exports the function "scheduleStoreContract".`,
 			`${PORTS}: the port ScheduleStore has no test that runs its contract suite. Add adapters/out/schedule-store.contract.test.ts, which runs "scheduleStoreContract" on the in-memory adapter and on the real one.`,
 		]);
@@ -627,7 +627,7 @@ describe("a port has an in-memory adapter and a contract suite (H7)", () => {
 				],
 			}),
 		).toEqual([
-			`${TEST}: runs the contract suite on both adapters, but it does not import the real adapter (./drizzle-schedule-store).`,
+			`${TEST}: runs the contract suite on both adapters, but it does not import the real adapter (./node-schedule-store).`,
 		]);
 		expect(
 			await check({
@@ -638,7 +638,7 @@ describe("a port has an in-memory adapter and a contract suite (H7)", () => {
 				],
 			}),
 		).toEqual([
-			`${TEST}: runs the contract suite on both adapters, but it does not import ./in-memory-schedule-store and the real adapter (./drizzle-schedule-store).`,
+			`${TEST}: runs the contract suite on both adapters, but it does not import ./in-memory-schedule-store and the real adapter (./node-schedule-store).`,
 		]);
 	});
 
@@ -737,6 +737,101 @@ describe("a port has an in-memory adapter and a contract suite (H7)", () => {
 		expect(problems).toEqual([
 			`${PORTS}: the port ScheduledRuns has @filledBy, but its real adapter is here (adapters/out/drizzle-scheduled-runs.ts). Remove the tag, and give the port its contract suite.`,
 		]);
+	});
+});
+
+describe("a port of the database (H7, ADR 44)", () => {
+	const OUT = `${SLICE}/adapters/out`;
+	const PORTS = `${SLICE}/application/ports.ts`;
+	const ADAPTER = `${OUT}/drizzle-fired-times.ts`;
+	const TEST = `${OUT}/drizzle-fired-times.test.ts`;
+	const files: Files = {
+		...repository,
+		[PORTS]: [
+			'import type { Schedule } from "../domain/schedule";',
+			"export type ScheduleStore = { save(schedule: Schedule): Promise<void> };",
+			"export type FiredTimes = { last(id: string): number };",
+		],
+		[ADAPTER]: [
+			'import type { FiredTimes } from "../../application/ports";',
+			"export const drizzleFiredTimes = (): FiredTimes => ({ last: () => 1 });",
+		],
+		[TEST]: [
+			'import { drizzleFiredTimes } from "./drizzle-fired-times";',
+			'test("x", () => expect(drizzleFiredTimes().last("a")).toBe(1));',
+		],
+		[`${SLICE}/application/list-schedules.ts`]: [
+			'import type { FiredTimes } from "./ports";',
+			"export const listSchedules = (ports: { times: FiredTimes }) => (id: string) => ports.times.last(id) + 1;",
+		],
+		[`${SLICE}/application/list-schedules.test.ts`]: [
+			'import { schedulePorts } from "../test-support";',
+			'import { listSchedules } from "./list-schedules";',
+			'expect(listSchedules(schedulePorts())("a")).toBe(2);',
+		],
+		[`${SLICE}/test-support.ts`]: [
+			'import { drizzleFiredTimes } from "./adapters/out/drizzle-fired-times";',
+			"export const schedulePorts = () => ({ times: drizzleFiredTimes() });",
+		],
+	};
+
+	test("one that a use case reads passes with its adapter's test: it needs no twin and no suite", async () => {
+		expect(await check(files)).toEqual([]);
+	});
+
+	test("its adapter without a test, and a test that imports another thing or expects nothing, fail", async () => {
+		expect(await check({ ...files, [TEST]: null })).toEqual([
+			`${ADAPTER}: the adapter of FiredTimes has no test. Add drizzle-fired-times.test.ts beside it, over migratedDb() of @nightshift/db/testing.`,
+		]);
+		expect(await check({ ...files, [TEST]: "expect(1).toBe(1);\n" })).toEqual([
+			`${TEST}: does not import the adapter it tests (./drizzle-fired-times).`,
+		]);
+		expect(
+			await check({
+				...files,
+				[TEST]: [
+					'import { drizzleFiredTimes } from "./drizzle-fired-times";',
+					"drizzleFiredTimes();",
+				],
+			}),
+		).toEqual([`${TEST}: expects no outcome of the adapter.`]);
+	});
+
+	test("a use-case test takes no test-support.ts of another slice", async () => {
+		const problems = await check({
+			...files,
+			"packages/engine/src/gates/index.ts":
+				'export { mayAnswer } from "./domain/answer";\n',
+			"packages/engine/src/gates/domain/answer.ts":
+				"export const mayAnswer = (status: string) => status.length > 0;\n",
+			"packages/engine/src/gates/test-support.ts": "export const gates = 1;\n",
+			[`${SLICE}/application/list-schedules.test.ts`]: [
+				'import { gates } from "../../gates/test-support";',
+				'import { listSchedules } from "./list-schedules";',
+				"expect([gates, listSchedules]).toBeDefined();",
+			],
+		});
+		expect(problems).toHaveLength(1);
+		expect(problems[0]).toContain('imports "../../gates/test-support"');
+	});
+
+	test("a use-case test reaches the database only through a port: it names no handle", async () => {
+		for (const name of ["db", "database"]) {
+			const TEST = `${SLICE}/application/list-schedules.test.ts`;
+			expect(
+				await check({
+					...files,
+					[TEST]: [
+						'import { schedulePorts } from "../test-support";',
+						'import { listSchedules } from "./list-schedules";',
+						`const { ${name}, ...ports } = schedulePorts() as never;`,
+						'expect(listSchedules(ports)("a")).toBe(2);',
+					],
+				}),
+			).toEqual([
+				`${TEST}: names the database. A use-case test reaches it only through a port: give the rows a function of test-support.ts.`,
+			]);
+		}
 	});
 });
 

@@ -303,9 +303,9 @@ describe("a twin has a reader (H7)", () => {
 			"export type ScheduleStore = { save(schedule: Schedule): Promise<void> };",
 			"export type FiredTimes = { last(id: string): number };",
 		],
-		[`${OUT}/drizzle-fired-times.ts`]: [
+		[`${OUT}/node-fired-times.ts`]: [
 			'import type { FiredTimes } from "../../application/ports";',
-			"export const drizzleFiredTimes = (): FiredTimes => ({ last: () => 1 });",
+			"export const nodeFiredTimes = (): FiredTimes => ({ last: () => 1 });",
 		],
 		[`${OUT}/in-memory-fired-times.ts`]: twin
 			? [
@@ -320,12 +320,12 @@ describe("a twin has a reader (H7)", () => {
 			"}",
 		],
 		[`${OUT}/fired-times.contract.test.ts`]: [
-			'import { drizzleFiredTimes } from "./drizzle-fired-times";',
+			'import { nodeFiredTimes } from "./node-fired-times";',
 			...(twin
 				? ['import { inMemoryFiredTimes } from "./in-memory-fired-times";']
 				: []),
 			'import { firedTimesContract } from "./fired-times.contract";',
-			"firedTimesContract(drizzleFiredTimes);",
+			"firedTimesContract(nodeFiredTimes);",
 			...(twin ? ["firedTimesContract(inMemoryFiredTimes);"] : []),
 		],
 	});

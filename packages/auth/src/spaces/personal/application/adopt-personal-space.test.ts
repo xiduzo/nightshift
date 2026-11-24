@@ -1,11 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { inMemoryPersonalPorts } from "../adapters/out/in-memory-neighbours";
-import { applyRows } from "../adapters/out/in-memory-personal-space-store";
+import { personalPorts } from "../test-support";
 import { adoptPersonalSpace } from "./adopt-personal-space";
 
 async function withSpaces() {
-	const ports = inMemoryPersonalPorts();
-	ports.records.persons.push({
+	const ports = await personalPorts();
+	await ports.person({
 		id: "ada",
 		name: "Ada",
 		email: "a@x.org",
@@ -18,7 +17,7 @@ async function withSpaces() {
 		personId: "ada",
 		membershipId: "m-mine",
 	});
-	ports.records.spaces.push({
+	await ports.space({
 		id: "host",
 		name: "Ada's",
 		slug: "host-host",
@@ -41,11 +40,11 @@ describe("adoptPersonalSpace", () => {
 			from: "mine",
 			to: "host",
 		});
-		applyRows(ports.records, rows);
-		expect(ports.records.spaces).toEqual([
+		await ports.run(rows);
+		expect(await ports.spaces()).toEqual([
 			{ id: "host", name: "Personal", slug: "host-host", personal: true },
 		]);
-		expect(ports.records.members).toEqual([
+		expect(await ports.members()).toEqual([
 			{ id: "id-1", spaceId: "host", personId: "ada", role: "owner" },
 		]);
 	});

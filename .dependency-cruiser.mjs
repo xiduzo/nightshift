@@ -129,6 +129,9 @@ const PACKAGE_VALUE =
 /** An in-memory adapter of any slice of the package. */
 const IN_MEMORY_OF_PACKAGE = `^packages/$1/src/.+${IN_MEMORY}`;
 
+/** The `test-support.ts` of the slice: its ports over a database in memory. */
+const OWN_TEST_SUPPORT = "^packages/$1/src/$2/test-support\\.ts$";
+
 /** H3: what touches a database, a folder, a process or the network. */
 const OUTSIDE_WORLD = [
 	"^packages/db/",
@@ -212,7 +215,7 @@ export default {
 			name: "h2-application-test",
 			severity: "error",
 			comment:
-				"A use-case test imports only what application/ may import, in-memory adapters, bun:test and the ./testing entry of a kernel package. It starts no database, folder or process (H2, H8).",
+				"A use-case test imports only what application/ may import, in-memory adapters, the test-support.ts of its slice, bun:test and the ./testing entry of a kernel package. It starts no folder or process, and reaches a database only through a port (H2, H8).",
 			from: { path: testInRing("application") },
 			to: {
 				pathNot: [
@@ -221,6 +224,7 @@ export default {
 					OTHER_BARREL,
 					OTHER_PACKAGE,
 					IN_MEMORY_OF_PACKAGE,
+					OWN_TEST_SUPPORT,
 					...KERNEL,
 					...KERNEL_FOR_TESTS,
 				],

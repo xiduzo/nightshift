@@ -143,21 +143,19 @@ function generate(root: string, pkg: string): void {
 			about: "Lists the limits.",
 		}),
 	);
-	run(
-		root,
-		adapterSteps(root, {
-			...at,
-			port: "SpendStore",
-			tech: "drizzle",
-			about: "The spend.",
-		}),
-	);
+	for (const [port, tech] of [
+		["SpendStore", "drizzle"],
+		["LimitStore", "drizzle"],
+		["PriceList", "node"],
+	] as const) {
+		run(root, adapterSteps(root, { ...at, port, tech, about: "The spend." }));
+	}
 }
 
 test("a template holds no Handlebars but {{{name}}}", () => {
 	const files = readdirSync(TEMPLATES, { recursive: true, encoding: "utf8" });
 	const templates = files.filter((file) => file.endsWith(".hbs"));
-	expect(templates.length).toBe(16);
+	expect(templates.length).toBe(18);
 	for (const file of templates) {
 		const rest = readFileSync(join(TEMPLATES, file), "utf8").replace(
 			PLACEHOLDER,
@@ -223,21 +221,35 @@ test("the generators name files as the ring check does", () => {
 
 describe("what the generators make keeps the ring check", () => {
 	for (const pkg of ["engine", "devices"]) {
-		test(`a slice of ${pkg} with two use cases and an adapter`, async () => {
+		test(`a slice of ${pkg} with two use cases, two ports of the database and one of a folder`, async () => {
 			const root = repositoryWithMap();
 			expect(await checkRings(root, DEFAULTS)).toEqual([]);
 			generate(root, pkg);
 			const out = `packages/${pkg}/src/spend/adapters/out`;
 			for (const file of [
 				`${out}/drizzle-spend-store.ts`,
-				`${out}/spend-store.contract.test.ts`,
+				`${out}/in-memory-price-list.ts`,
+				`${out}/price-list.contract.test.ts`,
 				`packages/${pkg}/src/spend/application/list-limits.test.ts`,
 			]) {
 				expect(readFileSync(join(root, file), "utf8")).toContain("import");
 			}
 			expect(
-				readFileSync(join(root, `${out}/spend-store.contract.test.ts`), "utf8"),
-			).toContain("`migratedDb()` of\n * `@nightshift/db/testing`");
+				readdirSync(join(root, out))
+					.filter((file) => /(?:spend|limit)-store/.test(file))
+					.sort(),
+			).toEqual([
+				"drizzle-limit-store.test.ts",
+				"drizzle-limit-store.ts",
+				"drizzle-spend-store.test.ts",
+				"drizzle-spend-store.ts",
+			]);
+			const support = readFileSync(
+				join(root, `packages/${pkg}/src/spend/test-support.ts`),
+				"utf8",
+			);
+			expect(support).toContain("\t\tspendStore: drizzleSpendStore(),\n");
+			expect(support).toContain("\t\tlimitStore: drizzleLimitStore(),\n");
 			expect(await checkRings(root, DEFAULTS)).toEqual([]);
 			const wire = readFileSync(
 				join(root, `packages/${pkg}/src/spend/wire.ts`),

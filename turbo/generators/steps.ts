@@ -453,8 +453,10 @@ export function useCaseSteps(root: string, answers: UseCaseAnswers): Step[] {
 
 /**
  * The steps of `turbo gen adapter`: a new port of a slice, with its real
- * adapter, its in-memory twin, its contract suite and the test that runs
- * the suite on both.
+ * adapter. A port of the database (`drizzle`) gets the test of its adapter,
+ * and its line in `test-support.ts`, where its use-case tests start. Any
+ * other port gets its in-memory twin, its contract suite and the test that
+ * runs the suite on both.
  */
 export function adapterSteps(root: string, answers: AdapterAnswers): Step[] {
 	const { package: pkg, slice, port, tech } = answers;
@@ -492,17 +494,32 @@ export function adapterSteps(root: string, answers: AdapterAnswers): Step[] {
 		real,
 		realFile: `${tech}-${name}`,
 	};
+	const database = tech === "drizzle";
+	const support = `${paths.dir}/test-support.ts`;
+	const supported = existsSync(join(root, support));
 	const files = [
-		{
-			path: `${out}/in-memory-${name}.ts`,
-			template: "adapter/in-memory.ts.hbs",
-		},
 		{ path: `${out}/${tech}-${name}.ts`, template: "adapter/real.ts.hbs" },
-		{ path: `${out}/${name}.contract.ts`, template: "adapter/contract.ts.hbs" },
-		{
-			path: `${out}/${name}.contract.test.ts`,
-			template: "adapter/contract.test.ts.hbs",
-		},
+		...(database
+			? [
+					{
+						path: `${out}/${tech}-${name}.test.ts`,
+						template: "adapter/drizzle.test.ts.hbs",
+					},
+				]
+			: [
+					{
+						path: `${out}/in-memory-${name}.ts`,
+						template: "adapter/in-memory.ts.hbs",
+					},
+					{
+						path: `${out}/${name}.contract.ts`,
+						template: "adapter/contract.ts.hbs",
+					},
+					{
+						path: `${out}/${name}.contract.test.ts`,
+						template: "adapter/contract.test.ts.hbs",
+					},
+				]),
 	];
 	for (const file of files) {
 		if (existsSync(join(root, file.path)))
@@ -529,8 +546,38 @@ export function adapterSteps(root: string, answers: AdapterAnswers): Step[] {
 			[`${all.portCamel}: inMemory${port}(),`],
 			`the return of inMemory${pascal(paths.name)}Ports in ${paths.neighbours}`,
 		);
+	const ports = `${camel(paths.name)}Ports`;
+	const editSupport = (text: string) =>
+		withMember(
+			withImport(
+				text,
+				`import { ${real} } from "./adapters/out/${tech}-${name}";`,
+			),
+			{
+				opener: at.returned,
+				after: new RegExp(`^export async function ${ports}\\(`),
+			},
+			[`${all.portCamel}: ${real}(),`],
+			`the return of ${ports} in ${support}`,
+		);
 	checkEdit(root, paths.wire, editWire);
 	checkEdit(root, paths.neighbours, editTwins);
+	if (database && supported) checkEdit(root, support, editSupport);
+	const bag: Step[] = database
+		? [
+				...(supported
+					? []
+					: [
+							{
+								kind: "add" as const,
+								path: support,
+								template: "adapter/test-support.ts.hbs",
+								data: { ...all, ports },
+							},
+						]),
+				{ kind: "edit", path: support, edit: editSupport },
+			]
+		: [{ kind: "edit", path: paths.neighbours, edit: editTwins }];
 	return [
 		...(existsSync(portsFile)
 			? []
@@ -550,14 +597,14 @@ export function adapterSteps(root: string, answers: AdapterAnswers): Step[] {
 		},
 		...files.map((file): Step => ({ kind: "add", ...file, data: all })),
 		{ kind: "edit", path: paths.wire, edit: editWire },
-		{ kind: "edit", path: paths.neighbours, edit: editTwins },
+		...bag,
 		{
 			kind: "format",
 			paths: [
 				paths.ports,
 				...files.map((file) => file.path),
 				paths.wire,
-				paths.neighbours,
+				database ? support : paths.neighbours,
 			],
 		},
 	];

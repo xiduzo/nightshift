@@ -57,8 +57,10 @@
  * (H8) A test in `domain/` or `application/` keeps H1, H2 and H3. It may
  *      also import `bun:test` and the `./testing` entry of a kernel
  *      package. A use-case test may also import an in-memory adapter of
- *      its package. It imports no `testing/` folder: that is where a
- *      database starts.
+ *      its package, and the `test-support.ts` of its slice, which gives
+ *      the ports over a database in memory. It imports no `testing/`
+ *      folder, and reaches the database only through a port: it names no
+ *      `db` and no `database`.
  * (in) A file in `adapters/in/` imports nothing of its slice. The wire
  *      hands it the bound use case.
  * In `domain/`, `application/` and `adapters/in/`, a type is never written
@@ -91,14 +93,19 @@
  *        its ports names. A function written in the ports themselves (a
  *        clock, another use case) passes.
  * (H7) Every type that `application/ports.ts` exports is a port. A port
- *      `ScheduleStore` has, in `adapters/out/` of its slice:
+ *      `ScheduleStore` of the database (its real adapter is
+ *      `drizzle-schedule-store.ts`) has, in `adapters/out/` of its slice, that
+ *      adapter and `drizzle-schedule-store.test.ts`, which imports it and
+ *      expects. It has no in-memory adapter and no contract suite: the
+ *      use-case tests run on the real adapter, over a database in memory
+ *      (ADR 44). Any other port `ScheduleStore` has:
  *      - `in-memory-schedule-store.ts`: the in-memory adapter, when a use
  *        case that is no forward reads the port. It imports `ScheduleStore`
  *        from `../../application/ports`, and no value of a real adapter.
  *        One that only its contract test imports fails when no use case
  *        reads the port.
  *      - `<tech>-schedule-store.ts`: the real adapter
- *        (`drizzle-schedule-store.ts`).
+ *        (`node-schedule-store.ts`).
  *      - `schedule-store.contract.ts`: the contract suite. It exports one
  *        function, `scheduleStoreContract`, imports the port, and expects.
  *      - `schedule-store.contract.test.ts`: it imports the suite, a real

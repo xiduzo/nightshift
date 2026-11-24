@@ -2,16 +2,23 @@ import type { Database } from "@nightshift/db";
 import { member, organization, user } from "@nightshift/db/schema";
 import { migratedDb } from "@nightshift/db/testing";
 import { asDate } from "@nightshift/time";
+import { drizzleLocalPersonStore } from "./adapters/out/drizzle-local-person-store";
+import { drizzlePersonalSpaceStore } from "./adapters/out/drizzle-personal-space-store";
 import type { RowBatch } from "./domain/personal-space";
 
 /**
- * The real side of the contract suites of personal: a database in memory,
- * the rows a test puts on it, and how a row batch runs on it.
+ * The ports of personal over a database in memory, the rows a test puts on
+ * it, and how a row batch runs on it.
  */
 
 /** What a test puts on a Replica before it asks a store. */
 export type PersonalSeed = {
-	person(person: { id: string; name: string; email: string }): Promise<void>;
+	person(person: {
+		id: string;
+		name: string;
+		email: string;
+		role?: string;
+	}): Promise<void>;
 	space(space: {
 		id: string;
 		name: string;
@@ -62,4 +69,56 @@ export function drizzlePersonalSeed(db: Database): PersonalSeed {
 /** Runs a row batch of the drizzle adapter as one `db.batch`. */
 export async function runBatch(db: Database, rows: RowBatch): Promise<void> {
 	await db.batch(rows as unknown as Parameters<Database["batch"]>[0]);
+}
+
+/**
+ * Every port of the slice: the stores over one database in memory, and the
+ * two use cases of other slices it calls, which record what they were asked.
+ */
+export async function personalPorts() {
+	const db = await memoryDb();
+	const claimed: string[] = [];
+	let ids = 0;
+	return {
+		...drizzlePersonalSeed(db),
+		run: (rows: RowBatch) => runBatch(db, rows),
+		/** The rows of this Replica, as a test compares them. */
+		persons: () =>
+			db
+				.select({
+					id: user.id,
+					name: user.name,
+					email: user.email,
+					role: user.role,
+				})
+				.from(user),
+		spaces: () =>
+			db
+				.select({
+					id: organization.id,
+					name: organization.name,
+					slug: organization.slug,
+					personal: organization.personal,
+				})
+				.from(organization)
+				.orderBy(organization.id),
+		members: () =>
+			db
+				.select({
+					id: member.id,
+					spaceId: member.organizationId,
+					personId: member.userId,
+					role: member.role,
+				})
+				.from(member),
+		/** The Persons `claimHostAdmin` was asked for, in order. */
+		claimed,
+		newId: () => `id-${++ids}`,
+		accountName: () => "ada",
+		claimHostAdmin: async (request: { personId: string }) => {
+			claimed.push(request.personId);
+		},
+		personalSpaceStore: drizzlePersonalSpaceStore(db),
+		localPersonStore: drizzleLocalPersonStore(db),
+	};
 }

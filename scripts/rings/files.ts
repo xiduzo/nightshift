@@ -1,7 +1,6 @@
 /**
  * The file rules of a slice: its `wire.ts`, one use case per file with its
- * test (H6), and an in-memory adapter and one contract suite for every
- * port (H7). `scripts/check-rings.ts` writes the naming conventions out.
+ * test (H6), and the adapters of every port with their tests (H7). `scripts/check-rings.ts` writes the naming conventions out.
  */
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
@@ -11,7 +10,7 @@ import ts from "@typescript/typescript6";
 
 import { resolveFile } from "../verticals/resolve";
 import { parse } from "../verticals/source-file";
-import { readPorts } from "./decides";
+import { assertsOutcome, readPorts } from "./decides";
 import type { Slice } from "./slices";
 import { camel, exportedFunctions, treeOf } from "./syntax";
 
@@ -220,9 +219,34 @@ export function portsOf(slice: Slice): Port[] {
 		.map((name) => ({ name, filledBy: fillers.get(name) }));
 }
 
+/** What the test of each drizzle adapter of a port lacks, as messages. */
+function databasePortProblems(
+	rel: (path: string) => string,
+	out: string,
+	port: string,
+	reals: readonly string[],
+): string[] {
+	return reals.flatMap((file) => {
+		const adapter = join(out, file);
+		const test = adapter.replace(/\.ts$/, ".test.ts");
+		if (!existsSync(test))
+			return [
+				`${rel(adapter)}: the adapter of ${port} has no test. Add ${basename(test)} beside it, over migratedDb() of @nightshift/db/testing.`,
+			];
+		if (!importsFrom(test, adapter))
+			return [
+				`${rel(test)}: does not import the adapter it tests (./${file.slice(0, -3)}).`,
+			];
+		return assertsOutcome(test)
+			? []
+			: [`${rel(test)}: expects no outcome of the adapter.`];
+	});
+}
+
 /**
  * H7: what each port of one slice (not of its sub-verticals) lacks, as
- * messages. A port has its real adapter, its contract suite and the test
+ * messages. A port of the database has its drizzle adapter with a test, and
+ * no twin. Any other port has its real adapter, its contract suite and the test
  * that runs the suite. It has its in-memory adapter when something reads
  * it, and the suite runs on both then. A port with `@filledBy` has an
  * in-memory adapter only. `twinReaders` gives the files that import a twin.
@@ -278,6 +302,15 @@ export function portProblems(
 		const twin = join(out, `in-memory-${name}.ts`);
 		const test = join(out, `${name}.contract.test.ts`);
 		const twinned = existsSync(twin);
+		if (
+			reals.length &&
+			reals.every((file) => file.startsWith("drizzle-")) &&
+			!twinned &&
+			!existsSync(join(out, `${name}.contract.ts`))
+		) {
+			problems.push(...databasePortProblems(rel, out, port, reals));
+			continue;
+		}
 		const wantsTwin = read.has(port);
 		if (!twinned && wantsTwin) {
 			problems.push(
@@ -299,7 +332,7 @@ export function portProblems(
 
 		if (!reals.length) {
 			problems.push(
-				`${where} has no real adapter. Add adapters/out/<tech>-${name}.ts (drizzle-${name}.ts).`,
+				`${where} has no real adapter. Add adapters/out/<tech>-${name}.ts (node-${name}.ts).`,
 			);
 		}
 

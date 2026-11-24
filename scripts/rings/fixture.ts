@@ -135,12 +135,12 @@ export const repository: Files = {
 	],
 	[`${SLICE}/wire.ts`]: [
 		'import type { Database } from "@nightshift/db";',
-		'import { drizzleScheduleStore } from "./adapters/out/drizzle-schedule-store";',
+		'import { nodeScheduleStore } from "./adapters/out/node-schedule-store";',
 		'import { createSchedule } from "./application/create-schedule";',
 		"export type Schedules = { create: ReturnType<typeof createSchedule> };",
 		"export function wireSchedules(deps: { db: Database }): Schedules {",
 		"\treturn {",
-		"\t\tcreate: createSchedule({ schedules: drizzleScheduleStore(deps.db) }),",
+		"\t\tcreate: createSchedule({ schedules: nodeScheduleStore(deps.db) }),",
 		"\t};",
 		"}",
 	],
@@ -203,12 +203,12 @@ export const repository: Files = {
 		"\treturn { save: async () => {} };",
 		"}",
 	],
-	[`${SLICE}/adapters/out/drizzle-schedule-store.ts`]: [
+	[`${SLICE}/adapters/out/node-schedule-store.ts`]: [
 		'import type { Database } from "@nightshift/db";',
 		'import { eq } from "drizzle-orm";',
 		'import type { ScheduleStore } from "../../application/ports";',
 		'import { appendEvent } from "../../../log";',
-		"export function drizzleScheduleStore(db: Database): ScheduleStore {",
+		"export function nodeScheduleStore(db: Database): ScheduleStore {",
 		"\treturn { save: async () => appendEvent(db) ?? eq };",
 		"}",
 	],
@@ -221,11 +221,11 @@ export const repository: Files = {
 	],
 	[`${SLICE}/adapters/out/schedule-store.contract.test.ts`]: [
 		'import type { Database } from "@nightshift/db";',
-		'import { drizzleScheduleStore } from "./drizzle-schedule-store";',
+		'import { nodeScheduleStore } from "./node-schedule-store";',
 		'import { inMemoryScheduleStore } from "./in-memory-schedule-store";',
 		'import { scheduleStoreContract } from "./schedule-store.contract";',
 		"scheduleStoreContract(inMemoryScheduleStore);",
-		"scheduleStoreContract(() => drizzleScheduleStore({} as Database));",
+		"scheduleStoreContract(() => nodeScheduleStore({} as Database));",
 	],
 };
 

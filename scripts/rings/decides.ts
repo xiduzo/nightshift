@@ -1,8 +1,8 @@
 /**
  * A use case decides (ADR 41): it is no forward of one port call, it reads
  * its `Actor`, its ports come from `ports.ts`, and its test asserts an
- * outcome (H6). A contract suite asserts, and a twin takes no code of a
- * real adapter (H7). These rules read the body of a file.
+ * outcome and names no database (H6, H8). A contract suite asserts, and a
+ * twin takes no code of a real adapter (H7). These rules read the body of a file.
  */
 
 import { existsSync, readdirSync } from "node:fs";
@@ -178,7 +178,7 @@ function isTypeOf(value: ts.Expression): boolean {
 }
 
 /** A test file asserts an outcome: an `expect` of more than a `typeof` or of the function `named` itself. */
-function assertsOutcome(test: string, named?: string): boolean {
+export function assertsOutcome(test: string, named?: string): boolean {
 	return expected(test).some((argument) => {
 		if (!argument) return false;
 		const value = unwrapped(argument);
@@ -186,6 +186,16 @@ function assertsOutcome(test: string, named?: string): boolean {
 			!isTypeOf(value) && !(ts.isIdentifier(value) && value.text === named)
 		);
 	});
+}
+
+/** A test names the handle of a database: `db` or `database`. */
+function namesDatabase(test: string): boolean {
+	let found = false;
+	eachNode(treeOf(test), (node) => {
+		if (ts.isIdentifier(node) && /^(?:db|database)$/.test(node.text))
+			found = true;
+	});
+	return found;
 }
 
 /** A type holds a function or a method. */
@@ -276,6 +286,7 @@ export type Offence = {
 		| "actor"
 		| "request"
 		| "empty-test"
+		| "database"
 		| "port"
 		| "suite"
 		| "twin";
@@ -319,6 +330,12 @@ export function decisionOffences(root: string, slice: Slice): Offence[] {
 				rule: "empty-test",
 				file: rel(test),
 				message: `${rel(test)}: asserts no outcome of ${name}. Expect what it returns, refuses or changes.`,
+			});
+		if (existsSync(test) && namesDatabase(test))
+			offences.push({
+				rule: "database",
+				file: rel(test),
+				message: `${rel(test)}: names the database. A use-case test reaches it only through a port: give the rows a function of test-support.ts.`,
 			});
 	}
 	const out = join(slice.dir, "adapters", "out");

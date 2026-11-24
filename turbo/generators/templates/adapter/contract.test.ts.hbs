@@ -2,11 +2,7 @@ import { inMemory{{{port}}} } from "./in-memory-{{{portKebab}}}";
 import { {{{real}}} } from "./{{{realFile}}}";
 import { {{{portCamel}}}Contract } from "./{{{portKebab}}}.contract";
 
-/**
- * The contract of `{{{port}}}`, on both adapters. When the real adapter
- * reads the database, its side runs on libsql in memory: `migratedDb()` of
- * `@nightshift/db/testing`.
- */
+/** The contract of `{{{port}}}`, on both adapters. */
 
 {{{portCamel}}}Contract("in memory", async () => ({
 	{{{portCamel}}}: inMemory{{{port}}}(),

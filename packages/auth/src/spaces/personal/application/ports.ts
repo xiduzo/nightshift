@@ -1,8 +1,8 @@
 import type { RowBatch } from "../domain/personal-space";
 
 /**
- * The driven ports of personal. A port of its own has a real adapter, an
- * in-memory adapter and a contract suite in `adapters/out/`.
+ * The driven ports of personal. A port of its own has a real adapter and
+ * its test in `adapters/out/`.
  */
 
 /** The personal Spaces of this Replica and the rows that make one. */

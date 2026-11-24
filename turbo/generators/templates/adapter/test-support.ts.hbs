@@ -1,0 +1,13 @@
+import { inMemory{{{slicePascal}}}Ports } from "./adapters/out/in-memory-neighbours";
+
+/**
+ * Every port of {{{slice}}}: the stores over one database in memory
+ * (`migratedDb()` of `@nightshift/db/testing`), and the neighbours in
+ * memory. A use-case test starts here. It gets a function that puts a row,
+ * and never the database.
+ */
+export async function {{{ports}}}() {
+	return {
+		...inMemory{{{slicePascal}}}Ports(),
+	};
+}

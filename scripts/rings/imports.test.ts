@@ -370,20 +370,20 @@ describe("the outside world (H3)", () => {
 });
 
 describe("a real adapter (H5)", () => {
-	const REAL = `${SLICE}/adapters/out/drizzle-schedule-store.ts`;
+	const REAL = `${SLICE}/adapters/out/node-schedule-store.ts`;
 	const IMPORT =
-		'import { drizzleScheduleStore } from "../schedules/adapters/out/drizzle-schedule-store";';
+		'import { nodeScheduleStore } from "../schedules/adapters/out/node-schedule-store";';
 
 	test("a barrel that passes one on fails", async () => {
 		const problems = await check({
 			...repository,
 			[`${SLICE}/index.ts`]: [
-				'export { drizzleScheduleStore } from "./adapters/out/drizzle-schedule-store";',
+				'export { nodeScheduleStore } from "./adapters/out/node-schedule-store";',
 				'export { wireSchedules } from "./wire";',
 			],
 		});
 		expect(problems).toEqual([
-			`${SLICE}/index.ts: imports "./adapters/out/drizzle-schedule-store" (${REAL}). ${H5} A barrel never passes one on: it exports the wire function of the slice.`,
+			`${SLICE}/index.ts: imports "./adapters/out/node-schedule-store" (${REAL}). ${H5} A barrel never passes one on: it exports the wire function of the slice.`,
 		]);
 	});
 
@@ -392,7 +392,7 @@ describe("a real adapter (H5)", () => {
 			...repository,
 			"packages/engine/src/projects/project.ts": [
 				IMPORT,
-				"export const projectOf = (id: string) => id + drizzleScheduleStore.name;",
+				"export const projectOf = (id: string) => id + nodeScheduleStore.name;",
 			],
 		});
 		expect(problems).toHaveLength(1);
@@ -405,12 +405,12 @@ describe("a real adapter (H5)", () => {
 			...repository,
 			...gates,
 			"packages/engine/src/wire.ts": [
-				'import { drizzleScheduleStore } from "./schedules/adapters/out/drizzle-schedule-store";',
-				"export const wired = drizzleScheduleStore;",
+				'import { nodeScheduleStore } from "./schedules/adapters/out/node-schedule-store";',
+				"export const wired = nodeScheduleStore;",
 			],
 			"packages/engine/src/gates/wire.ts": [
 				IMPORT,
-				"export const wireGates = () => drizzleScheduleStore;",
+				"export const wireGates = () => nodeScheduleStore;",
 			],
 		});
 		expect(problems).toHaveLength(2);
@@ -430,8 +430,8 @@ describe("a real adapter (H5)", () => {
 			"packages/engine/src/gates/wire.ts":
 				"export const wireGates = () => ({});\n",
 			"packages/engine/src/gates/adapters/out/drizzle-gates.ts": [
-				'import { drizzleScheduleStore } from "../../../schedules/adapters/out/drizzle-schedule-store";',
-				"export const status = drizzleScheduleStore;",
+				'import { nodeScheduleStore } from "../../../schedules/adapters/out/node-schedule-store";',
+				"export const status = nodeScheduleStore;",
 			],
 		});
 		expect(problems).toHaveLength(1);
@@ -445,12 +445,12 @@ describe("a real adapter (H5)", () => {
 			await check({
 				...repository,
 				[`${SLICE}/adapters/out/drizzle-rows.ts`]: [
-					'import { drizzleScheduleStore } from "./drizzle-schedule-store";',
-					"export const rows = drizzleScheduleStore;",
+					'import { nodeScheduleStore } from "./node-schedule-store";',
+					"export const rows = nodeScheduleStore;",
 				],
 				"packages/engine/src/projects/project.test.ts": [
 					IMPORT,
-					"export const made = drizzleScheduleStore;",
+					"export const made = nodeScheduleStore;",
 				],
 			}),
 		).toEqual([]);
@@ -474,12 +474,12 @@ describe("a real adapter (H5)", () => {
 		const problems = await check({
 			...repository,
 			"packages/engine/src/projects/project.ts": [
-				'export type Store = import("../schedules/adapters/out/drizzle-schedule-store").Made;',
+				'export type Store = import("../schedules/adapters/out/node-schedule-store").Made;',
 				"export const projectOf = (id: string) => id;",
 			],
 		});
 		expect(problems).toEqual([
-			'packages/engine/src/projects/project.ts: writes a type as import("../schedules/adapters/out/drizzle-schedule-store"). Write an "import type" statement: the ring rules read it.',
+			'packages/engine/src/projects/project.ts: writes a type as import("../schedules/adapters/out/node-schedule-store"). Write an "import type" statement: the ring rules read it.',
 		]);
 	});
 });
@@ -512,11 +512,11 @@ describe("a driving adapter in adapters/in/", () => {
 			[TICKER]: [
 				'import type { createSchedule } from "../../application/create-schedule";',
 				'import type { Schedule } from "../../domain/schedule";',
-				'import { drizzleScheduleStore } from "../out/drizzle-schedule-store";',
+				'import { nodeScheduleStore } from "../out/node-schedule-store";',
 				"export const createScheduleTicker = (",
 				"\tfire: ReturnType<typeof createSchedule>,",
 				"\tschedule: Schedule,",
-				") => [fire, schedule, drizzleScheduleStore];",
+				") => [fire, schedule, nodeScheduleStore];",
 			],
 		});
 		const own = problems.filter((problem) =>
@@ -558,15 +558,15 @@ describe("a use-case test (H8)", () => {
 		const problems = await check({
 			...withTest([
 				'import { sandbox } from "../../testing/sandbox";',
-				'import { drizzleScheduleStore } from "../adapters/out/drizzle-schedule-store";',
-				'test("x", () => expect([sandbox, drizzleScheduleStore]));',
+				'import { nodeScheduleStore } from "../adapters/out/node-schedule-store";',
+				'test("x", () => expect([sandbox, nodeScheduleStore]));',
 			]),
 			"packages/engine/src/testing/sandbox.ts": "export const sandbox = 1;\n",
 		});
 		expect(problems).toHaveLength(2);
 		for (const problem of problems) {
 			expect(problem).toContain(
-				"It starts no database, folder or process (H2, H8).",
+				"reaches a database only through a port (H2, H8).",
 			);
 		}
 	});
@@ -699,7 +699,7 @@ describe("twins and contract suites are test code", () => {
 		])
 			expect(isTest(path)).toBe(true);
 		for (const path of [
-			"src/schedules/adapters/out/drizzle-schedule-store.ts",
+			"src/schedules/adapters/out/node-schedule-store.ts",
 			"src/schedules/adapters/out/memory/in-memory-rows.ts",
 			"src/schedules/adapters/in/in-memory-timer.ts",
 			"src/schedules/domain/in-memory-schedule.ts",
@@ -714,7 +714,7 @@ describe("twins and contract suites are test code", () => {
 		for (const path of [
 			twin,
 			suite,
-			"src/schedules/adapters/out/drizzle-schedule-store.ts",
+			"src/schedules/adapters/out/node-schedule-store.ts",
 			"src/schedules/adapters/out/memory/in-memory-rows.ts",
 			"src/schedules/domain/schedule.contract.ts",
 			"src/schedules/domain/schedule.test.ts",
@@ -752,7 +752,7 @@ describe("twins and contract suites are test code", () => {
 		const sizes = measure(root, ["packages/engine"]);
 		expect(sizes.folders.get(`${SLICE}/adapters/out`)).toBe(1);
 		expect([...sizes.files.keys()].filter((f) => f.includes("/out/"))).toEqual([
-			`${SLICE}/adapters/out/drizzle-schedule-store.ts`,
+			`${SLICE}/adapters/out/node-schedule-store.ts`,
 		]);
 	});
 });

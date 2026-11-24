@@ -386,7 +386,7 @@ The rules of 2026-11-18 (sections 4 and 9) each started with a **debt list**: a 
 
 ## 9. Rings: the inside of a capability
 
-A capability of a server package is a **slice** with three rings. Imports point inward: `adapters/` to `application/` to `domain/`. [ADR 40](../adr/0040-a-capability-has-three-rings.md) and [ADR 41](../adr/0041-a-use-case-decides.md) record why.
+A capability of a server package is a **slice** with three rings. Imports point inward: `adapters/` to `application/` to `domain/`. [ADR 40](../adr/0040-a-capability-has-three-rings.md), [ADR 41](../adr/0041-a-use-case-decides.md) and [ADR 44](../adr/0044-a-database-port-is-tested-on-its-real-adapter.md) record why.
 
 - The server packages are `engine`, `devices`, `notifications`, `agents`, `auth` and `telemetry` (`SERVER_PACKAGES` of `.dependency-cruiser.mjs`).
 - A slice is a vertical of a server package that the capability map gives a capability (section 4). Each sub-vertical of it is a slice too.
@@ -404,11 +404,13 @@ packages/engine/src/<capability>/
   application/                 flat: no folder in it
     ports.ts                   the driven ports: types only
     <verb>-<object>.ts         one use case: one exported function
-    <verb>-<object>.test.ts    its test, on in-memory adapters
+    <verb>-<object>.test.ts    its test, on a database in memory and in-memory twins
   adapters/
     out/                       the driven adapters
-      <tech>-<port>.ts           the real adapter: drizzle, node:fs, git, Yjs, fetch
-      in-memory-<port>.ts        the in-memory twin, when something reads it (test code)
+      drizzle-<port>.ts          the real adapter of a database port
+      drizzle-<port>.test.ts     its test, over migratedDb(). It has no twin and no suite
+      <tech>-<port>.ts           any other real adapter: node:fs, git, Yjs, fetch
+      in-memory-<port>.ts        its in-memory twin, when something reads it (test code)
       <port>.contract.ts         one suite for each adapter (test code)
       <port>.contract.test.ts    runs the suite on each
     in/                        a driving adapter that is not the API: a timer, a listener
@@ -471,9 +473,11 @@ export const answerGate =
 
 Only that `wire.ts`, a file of the same `adapters/out/` and a test import a real adapter. The `wire.ts` of the package calls the slice wires (in the engine, `createEngine` in `src/wire.ts` and the `wire-<what>.ts` files beside it). It never builds the adapter of a slice itself.
 
-**P7. Every driven port has one contract suite, and a twin when a use case reads it.** Every type that `application/ports.ts` exports is a port. A use-case file declares no port type of its own. A data shape goes in `domain/`. A store port is narrow and belongs to one slice (`ScheduleStore`). There is never a port for the whole database.
+**P7. A database port is tested on its real adapter. Any other driven port has one contract suite, and a twin when a use case reads it.** Every type that `application/ports.ts` exports is a port. A use-case file declares no port type of its own. A data shape goes in `domain/`. A store port is narrow and belongs to one slice (`ScheduleStore`). There is never a port for the whole database.
 
-The contract suite runs on the twin and on the real adapter. A twin takes no code of a real adapter. A twin that only its contract test imports goes: the suite then runs on the real adapter alone. A use-case test runs on the twins.
+A database port has a drizzle adapter, `drizzle-<port>.ts`, and that adapter has its test beside it. It has no twin and no contract suite. A use-case test runs on that adapter, over a database in memory. The `test-support.ts` of the slice gives the ports, and functions that put and read rows. It never gives a use-case test the database. To inject a failure, override one method of the real port: `{ ...store, commit: async () => { throw new Error("x"); } }`.
+
+For any other port, the contract suite runs on the twin and on the real adapter. A twin takes no code of a real adapter. A twin that only its contract test imports goes: the suite then runs on the real adapter alone. A use-case test runs on the twins of these ports.
 
 A port that another slice or another package implements says so in the comment of its type: `/** The runs a schedule starts. @filledBy engine/runs */`. The name is a package (`@filledBy devices`) or a vertical of one, on disk, and not the slice itself. A port that a sub-vertical fills names its vertical. When the `wire.ts` of a package builds the port from several things, the name is that composition: `@filledBy engine/wire`. The package then has a `src/wire.ts`. Such a port has an in-memory twin and no contract suite. One file `adapters/out/in-memory-*.ts` may hold the twins of several of these ports. When a slice of the same package fills the port and is in shape, import its barrel in the use case and remove the port. The check does not ask for that.
 
@@ -485,7 +489,8 @@ Twins and contract suites are test code. Production code never imports them. The
 
 - A use-case test and a contract suite assert an outcome: an `expect` of more than a `typeof`.
 - A test in `domain/` or `application/` keeps the import rules of its ring. It may also import `bun:test` and the `./testing` entry of a kernel package (`@nightshift/time/testing`, `@nightshift/flows/testing`).
-- A use-case test may also import an in-memory twin of any slice of its package. It imports no real adapter, no `testing/` folder, no `@nightshift/db` and no `node:fs`.
+- A use-case test may also import an in-memory twin of any slice of its package, and the `test-support.ts` of its own slice. It imports no real adapter, no `testing/` folder, no `@nightshift/db` and no `node:fs`.
+- A use-case test reaches the database only through a port. It names no `db` and no `database`.
 - No `Bun`, `fetch` or `process` in `domain/` and `application/`, tests included. A port type does not write `typeof fetch` either: write the function type.
 - In `domain/`, `application/` and `adapters/in/`, write `import type`. A type written as `import("x").Name` fails, because the import rules do not read that form.
 
@@ -498,6 +503,7 @@ Twins and contract suites are test code. Production code never imports them. The
 | `application/` | `<verb>-<object>.ts` | Lower case with dashes. One exported function with the camelCase name of the file: `answer-gate.ts` exports `answerGate`. Write it as `export function` or as `export const x = (...) => ...`. Types are fine too. |
 | `application/` | `<verb>-<object>.test.ts` | One per use case, beside it, with an `expect` of an outcome. No other test file. |
 | `adapters/out/` | `<tech>-schedule-store.ts` | The real adapter of the port `ScheduleStore`. `<tech>` is any prefix in lower case: `drizzle-`, `flow-document-`, `node-`. |
+| `adapters/out/` | `drizzle-schedule-store.test.ts` | For a database port, in the place of the next three files. It imports the adapter, and has an `expect` of an outcome. |
 | `adapters/out/` | `in-memory-schedule-store.ts` | The twin, when something reads it. It imports `ScheduleStore` from `../../application/ports`. |
 | `adapters/out/` | `schedule-store.contract.ts` | The contract suite. It exports one function, `scheduleStoreContract`, and imports the port. |
 | `adapters/out/` | `schedule-store.contract.test.ts` | It imports the suite, the real adapter and the twin. |
@@ -528,9 +534,9 @@ To add a use case to a slice:
 To add a port with its adapters:
 
 1. Run `bun run gen adapter --args <package> <slice> <Port> <tech> "<what the port does>"`. For example: `bun run gen adapter --args engine spend SpendStore drizzle "The spend of each run."`
-2. The generator adds the port to `application/ports.ts` with one call, `find(id)`. The first port starts that file. It writes the real adapter, the twin, the contract suite and the test that runs the suite on both. It adds the real adapter to the ports in `wire.ts`, and the twin to `inMemory<Slice>Ports`.
-3. Replace `find` with the calls of your port. Change the twin, the real adapter and the contract suite to match.
-4. If the real adapter reads the database, run its side of the contract on libsql in memory: `migratedDb()` of `@nightshift/db/testing`.
+2. The generator adds the port to `application/ports.ts` with one call, `find(id)`. The first port starts that file. It writes the real adapter and adds it to the ports in `wire.ts`. For `drizzle`, it writes the test of the adapter, and adds the adapter to `<slice>Ports` in `test-support.ts`. For any other `<tech>`, it writes the twin, the contract suite and the test that runs the suite on both, and adds the twin to `inMemory<Slice>Ports`.
+3. Replace `find` with the calls of your port. Change the tests, and the twin if there is one, to match.
+4. For `drizzle`, give the adapter the database. In its test and in `test-support.ts`, use `migratedDb()` of `@nightshift/db/testing`. Start the use-case tests that read the port from `<slice>Ports`.
 
 A generator refuses, and writes nothing, in these cases:
 
@@ -545,9 +551,9 @@ A generator refuses, and writes nothing, in these cases:
 3. Write `application/ports.ts`: one type for each thing the slice asks of the outside.
 4. If another slice or another package implements a port, write `@filledBy` in its comment.
 5. Write one use case file for each request, in `application/`. Move the check of who may act into it.
-6. Write the test of each use case beside it, on in-memory twins.
+6. Write the test of each use case beside it, on a database in memory and in-memory twins.
 7. Move each call to the database, a folder, a process or the network into a real adapter in `adapters/out/`.
-8. Write the contract suite of each port, and the twin of each port that a use case reads. Run the suite on each adapter.
+8. Write the test of each drizzle adapter. Write the contract suite of each other port, and the twin of each one that a use case reads. Run the suite on each adapter.
 9. If a timer or a listener drives the slice, move it to `adapters/in/`.
 10. Write `wire.ts`. Build the real adapters there, and return the use cases bound to their ports.
 11. Export the wire function and the types from the barrel. Remove each store from it.
