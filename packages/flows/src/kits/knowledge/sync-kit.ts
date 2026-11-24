@@ -23,7 +23,7 @@ export const KNOWLEDGE_FOLDER_INPUT = "folder";
  * the project's knowledge folder in `$NS_KNOWLEDGE`, and sets `dest` to
  * the kit's folder in it. It refuses Night Shift's own folders.
  */
-const KNOWLEDGE_DEST = String.raw`set -e
+const KNOWLEDGE_DEST = `set -e
 if [ -z "$NS_KNOWLEDGE" ]; then echo "Run this kit in a flow: the step gets the project's knowledge folder there." >&2; exit 2; fi
 folder="{{folder}}"
 case "$folder" in
@@ -165,7 +165,7 @@ function reportFiles(data: Readonly<Record<string, string>>): string {
 	const names = Object.keys(data);
 	const format = names.map((name) => `, "${name}": "%s"`).join("");
 	const values = names.map((name) => ` "${data[name]}"`).join("");
-	return String.raw`files=$(find "$dest" -type f -not -path '*/.git/*' | wc -l | tr -d ' ')
+	return `files=$(find "$dest" -type f -not -path '*/.git/*' | wc -l | tr -d ' ')
 printf '{"files": %s${format}}' "$files"${values} > "$NS_OUTPUT"`;
 }
 

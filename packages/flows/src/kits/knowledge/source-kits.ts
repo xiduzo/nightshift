@@ -214,7 +214,7 @@ mv "$part" "$dest"`,
 		],
 		folder: "files",
 		stepLabel: "Copy the files",
-		script: String.raw`# The project's own folder: the run works in a copy that has only what git tracks.
+		script: `# The project's own folder: the run works in a copy that has only what git tracks.
 common=$(git rev-parse --git-common-dir)
 case "$common" in /*) ;; *) common="$PWD/$common" ;; esac
 project=$(cd "$common/.." && pwd)
@@ -377,7 +377,7 @@ fi`,
 		],
 		folder: "wiki",
 		stepLabel: "Sync the wiki",
-		script: String.raw`repo="{{repo}}"
+		script: `repo="{{repo}}"
 case "$repo" in
 	*://*|*@*) url="$repo" ;;
 	*) url="https://github.com/$repo.wiki.git" ;;
@@ -433,7 +433,7 @@ fi`,
 		],
 		folder: "jira",
 		stepLabel: "Copy the work items",
-		script: String.raw`tool="{{tool}}"
+		script: `tool="{{tool}}"
 keys="{{keys}}"
 mkdir -p "$dest"
 # Split the list, but never read a pattern in it.
@@ -494,7 +494,7 @@ done`,
 		folder: "confluence",
 		stepLabel: "Copy the pages",
 		secrets: [CONFLUENCE_TOKEN],
-		script: String.raw`site=$(printf '%s' "{{site}}" | sed -e 's#^[A-Za-z]*://##' -e 's#/.*$##')
+		script: `site=$(printf '%s' "{{site}}" | sed -e 's#^[A-Za-z]*://##' -e 's#/.*$##')
 email="{{email}}"
 pages="{{pages}}"
 mkdir -p "$dest"

@@ -12,9 +12,8 @@ import { flowMutations, flowQueries } from "./queries";
 
 /**
  * What Night Shift did to the project's flows that the person did not
- * ask for: the import of a project folder from before flows moved into
- * Night Shift. Each notice stays on every Device until a person
- * dismisses it.
+ * ask for: the Project moved to another Space by itself. Each notice
+ * stays on every Device until a person dismisses it.
  */
 export function FlowNotices({ projectId }: { projectId: string }) {
 	const mayChange = useMayChange();

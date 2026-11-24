@@ -7,7 +7,7 @@ import {
 } from "./layout";
 
 /** The start of each command: the proposed learnings, the accepted ones, and the rule for a name. */
-const LEARNINGS = String.raw`set -e
+const LEARNINGS = `set -e
 if [ -z "$NS_KNOWLEDGE" ]; then echo "Run this kit in a flow: the step gets the project's knowledge folder there." >&2; exit 2; fi
 proposed="$NS_KNOWLEDGE/${PROPOSED_LEARNINGS_DIR}"
 accepted="$NS_KNOWLEDGE/${ACCEPTED_LEARNINGS_DIR}"
@@ -21,7 +21,7 @@ ${IS_PROPOSED_LEARNING_SHELL}`;
  * and the rule lets no space through.
  */
 function eachShown(action: string): string {
-	return String.raw`${LEARNINGS}
+	return `${LEARNINGS}
 set -f
 for name in {{list.data.files}}; do
 	is_proposed_learning "$name" || continue
@@ -50,7 +50,7 @@ export const knowledgeReviewLearningsKit: FlowInput = {
 			type: "command",
 			label: "Find the proposals",
 			position: { x: 0, y: 0 },
-			command: String.raw`${LEARNINGS}
+			command: `${LEARNINGS}
 files=""
 for file in "$proposed"/*.md; do
 	[ -f "$file" ] || continue
@@ -91,7 +91,7 @@ printf '{"files": "%s", "text": "%s"}' "$files" "$text" > "$NS_OUTPUT"`,
 			type: "command",
 			label: "Keep them",
 			position: { x: 600, y: -60 },
-			command: eachShown(String.raw`	mkdir -p "$accepted"
+			command: eachShown(`	mkdir -p "$accepted"
 	cat "$proposed/$name" >> "$accepted/$name"
 	rm -f "$proposed/$name"`),
 		},
@@ -100,7 +100,7 @@ printf '{"files": "%s", "text": "%s"}' "$files" "$text" > "$NS_OUTPUT"`,
 			type: "command",
 			label: "Delete them",
 			position: { x: 600, y: 60 },
-			command: eachShown(String.raw`	rm -f "$proposed/$name"`),
+			command: eachShown(`	rm -f "$proposed/$name"`),
 		},
 		{
 			id: "kept",
