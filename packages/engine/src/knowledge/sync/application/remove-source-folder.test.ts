@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { inMemorySyncPorts } from "../adapters/out/in-memory-neighbours";
+import { syncPorts } from "../test-support";
 import { removeSourceFolder } from "./remove-source-folder";
 
-/** The use case removeSourceFolder, on in-memory adapters. */
+/** The use case removeSourceFolder, over a database in memory. */
 
 const entry = (char: string) => ({
 	sha256: char.repeat(64),
@@ -11,8 +11,8 @@ const entry = (char: string) => ({
 	deviceId: "desktop",
 });
 
-function removePorts() {
-	const ports = inMemorySyncPorts();
+async function removePorts() {
+	const ports = await syncPorts();
 	const order: string[] = [];
 	return {
 		ports,
@@ -28,7 +28,7 @@ function removePorts() {
 
 describe("removeSourceFolder", () => {
 	test("removes the folder's entries between two reconciles, and counts them", async () => {
-		const { ports, order, remove } = removePorts();
+		const { ports, order, remove } = await removePorts();
 		const document = await ports.documents.open("p1");
 		await document.apply({
 			set: [
@@ -43,7 +43,7 @@ describe("removeSourceFolder", () => {
 	});
 
 	test("refuses a folder outside the knowledge and one of Night Shift's own", async () => {
-		const { remove } = removePorts();
+		const { remove } = await removePorts();
 		for (const folder of ["../web", ".hidden", "learnings"]) {
 			await expect(remove({ projectId: "p1", folder })).rejects.toThrow(
 				"Choose a folder inside the knowledge.",
@@ -52,7 +52,7 @@ describe("removeSourceFolder", () => {
 	});
 
 	test("refuses while a run changes the knowledge", async () => {
-		const { ports, order, remove } = removePorts();
+		const { ports, order, remove } = await removePorts();
 		ports.locks.hold("/knowledge/p1");
 		await expect(remove({ projectId: "p1", folder: "web" })).rejects.toThrow(
 			"A run is changing this knowledge now. Try again when it ends.",

@@ -1,19 +1,19 @@
 import { describe, expect, test } from "bun:test";
-import { inMemoryReviewPorts } from "../adapters/out/in-memory-neighbours";
+import { reviewPorts } from "../test-support";
 import { readKnowledgeUse } from "./read-knowledge-use";
 
-/** The use case readKnowledgeUse, on in-memory adapters. */
+/** The use case readKnowledgeUse, over a database in memory. */
 
 const DAY = 24 * 60 * 60 * 1000;
 
 describe("readKnowledgeUse", () => {
 	test("how often runs read each file in 90 days, and the listed files no run used lately", async () => {
-		const ports = inMemoryReviewPorts();
+		const ports = await reviewPorts();
 		const now = 200 * DAY;
 		ports.setNow(now);
 		await ports.sync.publish("p1", "used.md", "Used.");
 		await ports.sync.publish("p1", "idle.md", "Idle.");
-		ports.log.log("p1", {
+		await ports.logUse("p1", {
 			type: "KnowledgeRead",
 			at: now - DAY,
 			runId: "run-1",
@@ -37,7 +37,7 @@ describe("readKnowledgeUse", () => {
 			],
 			unused: ["idle.md"],
 		});
-		expect(ports.log.reads).toEqual([
+		expect(ports.reads).toEqual([
 			{ projectId: "p1", limit: 20_000, since: now - 90 * DAY },
 		]);
 	});

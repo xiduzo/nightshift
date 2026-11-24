@@ -3,8 +3,8 @@ import type { ContentRef, KnowledgeDocument } from "../domain/entry";
 import type { KnowledgeReconciled } from "../domain/merge";
 
 /**
- * The driven ports of knowledge/sync. A port of its own has a real adapter,
- * an in-memory adapter and a contract suite in `adapters/out/`. Another
+ * The driven ports of knowledge/sync. The adapters of its own ports sit
+ * in `adapters/out/`. Another
  * slice or package fills a port with `@filledBy`: the composition of the
  * package passes it to `wireSync`.
  */

@@ -1,13 +1,13 @@
 import { describe, expect, test } from "bun:test";
-import { inMemoryReviewPorts } from "../adapters/out/in-memory-neighbours";
 import { formatQuestions } from "../domain/questions";
+import { reviewPorts } from "../test-support";
 import { readQuestionSet } from "./read-question-set";
 
-/** The use case readQuestionSet, on in-memory adapters. */
+/** The use case readQuestionSet, over a database in memory. */
 
 describe("readQuestionSet", () => {
 	test("reads the set's file under a hold", async () => {
-		const ports = inMemoryReviewPorts();
+		const ports = await reviewPorts();
 		const set = [
 			{
 				query: "rollback",
@@ -26,7 +26,7 @@ describe("readQuestionSet", () => {
 	});
 
 	test("no file, or one that is not valid, is an empty set", async () => {
-		const ports = inMemoryReviewPorts();
+		const ports = await reviewPorts();
 		const read = readQuestionSet(ports);
 		expect(await read({ projectId: "p1" })).toEqual([]);
 		ports.questions.files.set("p1", "{ not json");
@@ -40,7 +40,7 @@ describe("readQuestionSet", () => {
 	});
 
 	test("ends the hold when the read fails", async () => {
-		const ports = inMemoryReviewPorts();
+		const ports = await reviewPorts();
 		const failure = new Error("disk");
 		ports.questions.read = async () => {
 			throw failure;

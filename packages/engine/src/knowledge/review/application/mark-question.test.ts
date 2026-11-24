@@ -1,15 +1,15 @@
 import { describe, expect, test } from "bun:test";
 import { allowing } from "../../../access/adapters/out/in-memory-access";
 import { NIGHT_SHIFT } from "../../../contract";
-import { inMemoryReviewPorts } from "../adapters/out/in-memory-neighbours";
 import { parseQuestions } from "../domain/questions";
+import { reviewPorts } from "../test-support";
 import { markQuestion } from "./mark-question";
 
-/** The use case markQuestion, on in-memory adapters. */
+/** The use case markQuestion, over a database in memory. */
 
 describe("markQuestion", () => {
 	test("marks the files an agent reads under a hold, newest first, and with none takes the question out", async () => {
-		const ports = inMemoryReviewPorts();
+		const ports = await reviewPorts();
 		const mark = markQuestion(ports);
 		ports.setNow(5);
 		expect(
@@ -49,7 +49,7 @@ describe("markQuestion", () => {
 	});
 
 	test("ends the hold when the write fails", async () => {
-		const ports = inMemoryReviewPorts();
+		const ports = await reviewPorts();
 		const failure = new Error("disk");
 		ports.questions.write = async () => {
 			throw failure;
@@ -66,7 +66,7 @@ describe("markQuestion", () => {
 	});
 
 	test("owners, admins and members may, and nobody else", async () => {
-		const ports = inMemoryReviewPorts();
+		const ports = await reviewPorts();
 		expect(
 			await ports.access.whoMay(
 				"space-1",

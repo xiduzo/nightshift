@@ -1,18 +1,26 @@
 import { holdFolder } from "../../application/hold-folder";
+import type { ProjectSpaces } from "../../application/ports";
 import { reconcileFolder } from "../../application/reconcile-folder";
 import { reconcileUnlessHeld } from "../../application/reconcile-unless-held";
 import { removeSourceFolder } from "../../application/remove-source-folder";
 import { contentHash } from "../../domain/entry";
 import { inMemorySyncPorts } from "./in-memory-neighbours";
 
+/** The only project of a test: `p1`, in the Space `s1`, which is not shared. */
+const ONE_PROJECT: ProjectSpaces = {
+	spaceOf: async (projectId) => (projectId === "p1" ? "s1" : null),
+	isShared: async () => false,
+	projectsIn: async (spaceId) => (spaceId === "s1" ? ["p1"] : []),
+};
+
 /**
- * The sync over in-memory adapters: the real use cases, with the documents,
- * the Spaces and the content a test puts in. The use-case test of every
+ * The sync over in-memory adapters: the real use cases, with the documents
+ * and the content a test puts in. The use-case test of every
  * slice that reads the documents or holds a folder takes this one. Test
  * code: production code never imports this file.
  */
 export function inMemorySync() {
-	const ports = inMemorySyncPorts();
+	const ports = { ...inMemorySyncPorts(), spaces: ONE_PROJECT };
 	const reconcileOne = reconcileFolder(ports);
 	const bound = {
 		...ports,

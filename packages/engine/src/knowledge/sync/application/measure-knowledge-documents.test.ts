@@ -1,12 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { inMemorySyncPorts } from "../adapters/out/in-memory-neighbours";
+import { syncPorts } from "../test-support";
 import { measureKnowledgeDocuments } from "./measure-knowledge-documents";
 
-/** The use case measureKnowledgeDocuments, on in-memory adapters. */
+/** The use case measureKnowledgeDocuments, over a database in memory. */
 
 describe("measureKnowledgeDocuments", () => {
 	test("notes the size of each knowledge document", async () => {
-		const ports = inMemorySyncPorts();
+		const ports = await syncPorts();
 		ports.documents.listRaw("p1", "a.md", { sha256: "a" });
 		ports.documents.listRaw("p2", "b.md", { sha256: "b" });
 		await measureKnowledgeDocuments(ports)();
@@ -18,7 +18,7 @@ describe("measureKnowledgeDocuments", () => {
 	});
 
 	test("without notes, nothing goes anywhere", async () => {
-		const ports = inMemorySyncPorts();
+		const ports = await syncPorts();
 		ports.documents.listRaw("p1", "a.md", { sha256: "a" });
 		await measureKnowledgeDocuments({ documents: ports.documents })();
 		expect(ports.notes.notes).toEqual([]);

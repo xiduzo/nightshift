@@ -1,15 +1,15 @@
 import { describe, expect, test } from "bun:test";
-import { inMemorySyncPorts } from "../adapters/out/in-memory-neighbours";
 import type { KnowledgeEntry } from "../domain/entry";
+import { syncPorts } from "../test-support";
 import { reconcileFolder } from "./reconcile-folder";
 
-/** The use case reconcileFolder, on in-memory adapters. */
+/** The use case reconcileFolder, over a database in memory. */
 
 const bytes = (text: string) => new TextEncoder().encode(text);
 
 /** Ports whose calls go into one log, in order. */
-function loggedPorts() {
-	const ports = inMemorySyncPorts();
+async function loggedPorts() {
+	const ports = await syncPorts();
 	const log: string[] = [];
 	const { copy, archive, documents, hosts, listener } = ports;
 	const scan = copy.scan.bind(copy);
@@ -66,7 +66,7 @@ function loggedPorts() {
 
 /** An entry of another Device, whose content its Host keeps. */
 function fromHost(
-	ports: ReturnType<typeof inMemorySyncPorts>,
+	ports: Awaited<ReturnType<typeof syncPorts>>,
 	text: string,
 	changedAt: number,
 ): KnowledgeEntry {
@@ -77,7 +77,7 @@ function fromHost(
 
 describe("reconcileFolder", () => {
 	test("the first reconcile publishes the folder's files and keeps their state", async () => {
-		const ports = inMemorySyncPorts();
+		const ports = await syncPorts();
 		ports.copy.put("p1", "a.md", "# A\n", 5);
 		await reconcileFolder(ports)({ projectId: "p1" });
 		const sha256 = ports.copy.hash("# A\n");
@@ -96,7 +96,7 @@ describe("reconcileFolder", () => {
 	});
 
 	test("keeps the order of a pass", async () => {
-		const { ports, log } = loggedPorts();
+		const { ports, log } = await loggedPorts();
 		const document = await ports.documents.open("p1");
 		await document.apply({ set: [["b.md", fromHost(ports, "# B\n", 7)]] });
 		ports.copy.put("p1", "a.md", "# A\n", 5);
@@ -144,7 +144,7 @@ describe("reconcileFolder", () => {
 	});
 
 	test("a Host that is down: the content waits, and the next reconcile copies it", async () => {
-		const ports = inMemorySyncPorts();
+		const ports = await syncPorts();
 		ports.archive.down = true;
 		ports.copy.put("p1", "a.md", "# A\n", 5);
 		await reconcileFolder(ports)({ projectId: "p1" });
@@ -158,7 +158,7 @@ describe("reconcileFolder", () => {
 	});
 
 	test("a project this Replica does not have: nothing happens", async () => {
-		const ports = inMemorySyncPorts();
+		const ports = await syncPorts();
 		ports.copy.put("gone", "a.md", "# A\n", 5);
 		await reconcileFolder(ports)({ projectId: "gone" });
 		expect(ports.copy.calls).toEqual([]);
@@ -166,7 +166,7 @@ describe("reconcileFolder", () => {
 	});
 
 	test("two reconciles of one folder take turns", async () => {
-		const ports = inMemorySyncPorts();
+		const ports = await syncPorts();
 		const order: string[] = [];
 		let release = () => {};
 		ports.hosts.inStep = async (_spaceId, _names, { timeoutMs }) => {

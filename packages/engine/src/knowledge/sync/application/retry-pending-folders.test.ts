@@ -1,12 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { inMemorySyncPorts } from "../adapters/out/in-memory-neighbours";
+import { syncPorts } from "../test-support";
 import { retryPendingFolders } from "./retry-pending-folders";
 
-/** The use case retryPendingFolders, on in-memory adapters. */
+/** The use case retryPendingFolders, over a database in memory. */
 
 describe("retryPendingFolders", () => {
 	test("reconciles only the folders whose content waits, and not one a step holds", async () => {
-		const ports = inMemorySyncPorts();
+		const ports = await syncPorts();
 		ports.pending.add("p1");
 		ports.pending.add("p2");
 		ports.locks.hold("/knowledge/p2");
@@ -22,7 +22,7 @@ describe("retryPendingFolders", () => {
 	});
 
 	test("a failure waits for the next time", async () => {
-		const ports = inMemorySyncPorts();
+		const ports = await syncPorts();
 		ports.pending.add("p1");
 		ports.pending.add("p2");
 		const reconciled: string[] = [];

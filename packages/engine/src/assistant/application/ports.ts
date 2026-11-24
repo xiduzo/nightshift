@@ -5,8 +5,8 @@ import type {
 } from "../domain/answer-costs";
 
 /**
- * The driven ports of assistant. A port of its own has a real adapter,
- * an in-memory adapter and a contract suite in `adapters/out/`.
+ * The driven ports of assistant. The adapters of its own ports sit
+ * in `adapters/out/`.
  */
 
 /** What each answer of Night Shift's own agents cost, on this Replica. */

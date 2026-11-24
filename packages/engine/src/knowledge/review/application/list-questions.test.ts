@@ -1,18 +1,18 @@
 import { describe, expect, test } from "bun:test";
-import { inMemoryReviewPorts } from "../adapters/out/in-memory-neighbours";
+import { reviewPorts } from "../test-support";
 import { listAskedQuestions } from "./list-asked-questions";
 import { listQuestions } from "./list-questions";
 
-/** The use case listQuestions, on in-memory adapters. */
+/** The use case listQuestions, over a database in memory. */
 
 describe("listQuestions", () => {
 	test("each question asked with the files a person marked, or null outside the set, and the set", async () => {
-		const ports = inMemoryReviewPorts();
+		const ports = await reviewPorts();
 		for (const [query, at] of [
 			["rollback", 1],
 			["Deploy at night", 2],
 		] as const) {
-			ports.log.log("p1", {
+			await ports.logUse("p1", {
 				type: "KnowledgeSearched",
 				at,
 				runId: null,

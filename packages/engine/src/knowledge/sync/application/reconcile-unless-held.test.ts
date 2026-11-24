@@ -1,12 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { inMemorySyncPorts } from "../adapters/out/in-memory-neighbours";
+import { syncPorts } from "../test-support";
 import { reconcileUnlessHeld } from "./reconcile-unless-held";
 
-/** The use case reconcileUnlessHeld, on in-memory adapters. */
+/** The use case reconcileUnlessHeld, over a database in memory. */
 
 describe("reconcileUnlessHeld", () => {
 	test("reconciles a folder no step holds", async () => {
-		const ports = inMemorySyncPorts();
+		const ports = await syncPorts();
 		const reconciled: string[] = [];
 		await reconcileUnlessHeld({
 			...ports,
@@ -18,7 +18,7 @@ describe("reconcileUnlessHeld", () => {
 	});
 
 	test("leaves a folder a step holds", async () => {
-		const ports = inMemorySyncPorts();
+		const ports = await syncPorts();
 		ports.locks.hold("/knowledge/p1");
 		const reconciled: string[] = [];
 		await reconcileUnlessHeld({
@@ -31,7 +31,7 @@ describe("reconcileUnlessHeld", () => {
 	});
 
 	test("never fails", async () => {
-		const ports = inMemorySyncPorts();
+		const ports = await syncPorts();
 		const answer = reconcileUnlessHeld({
 			...ports,
 			reconcile: async () => {

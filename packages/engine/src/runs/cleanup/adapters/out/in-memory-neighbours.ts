@@ -11,12 +11,11 @@ import type {
 } from "../../application/ports";
 import type { RunFile } from "../../domain/run-files";
 import type { RunCopyState } from "../../domain/safety";
-import { inMemoryRemovalLog } from "./in-memory-removal-log";
 
 /**
  * The in-memory adapters of the ports that another vertical fills
  * (`@filledBy` in `application/ports.ts`), and `inMemoryCleanupPorts`,
- * which gives a use-case test every port of the slice at once. Test code:
+ * the ports of the slice that are no database. Test code:
  * production code never imports this file.
  */
 
@@ -253,7 +252,7 @@ export function inMemoryRunFolderFiles() {
 	return twin satisfies RunFolderFiles;
 }
 
-/** Every port of cleanup in memory at once: where each use-case test starts. */
+/** The ports of cleanup that are no database, in memory. */
 export function inMemoryCleanupPorts() {
 	return {
 		access: inMemoryAccess(),
@@ -262,6 +261,5 @@ export function inMemoryCleanupPorts() {
 		ground: inMemoryCleanupGround(),
 		branches: inMemoryRunBranches(),
 		folders: inMemoryRunFolderFiles(),
-		removalLog: inMemoryRemovalLog(),
 	};
 }

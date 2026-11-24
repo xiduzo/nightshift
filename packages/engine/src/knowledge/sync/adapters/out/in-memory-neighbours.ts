@@ -8,14 +8,12 @@ import type { ContentRef } from "../../domain/entry";
 import { createKnowledgeFolderLocks } from "../../domain/folder-locks";
 import type { KnowledgeReconciled } from "../../domain/merge";
 import { inMemoryKnowledgeDocuments } from "./in-memory-knowledge-documents";
-import { inMemoryProjectSpaces } from "./in-memory-project-spaces";
 import { inMemoryWorkingCopy } from "./in-memory-working-copy";
 
 /**
  * The in-memory adapters of the ports that another slice or package
  * fills (`@filledBy` in `application/ports.ts`), and
- * `inMemorySyncPorts`, which gives a use-case test every port of
- * the slice at once. Test code: production code never imports this file.
+ * `inMemorySyncPorts`, the ports of the slice that are no database. Test code: production code never imports this file.
  */
 
 /**
@@ -118,16 +116,13 @@ export function inMemoryMeasureNotes() {
 	return twin satisfies MeasureNotes;
 }
 
-/** Every port of knowledge/sync in memory at once: where each use-case test starts. Project `p1` is in Space `s1`. */
+/** The ports of knowledge/sync that are no database, in memory. */
 export function inMemorySyncPorts() {
-	const spaces = inMemoryProjectSpaces();
-	spaces.add("p1", "s1");
 	let clock = 1_000_000;
 	return {
 		copy: inMemoryWorkingCopy(),
 		documents: inMemoryKnowledgeDocuments(),
 		archive: inMemoryContentArchive(),
-		spaces,
 		hosts: inMemorySpaceHosts(),
 		listener: inMemoryReconcileListener(),
 		notes: inMemoryMeasureNotes(),

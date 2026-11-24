@@ -1,11 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { inMemorySyncPorts } from "../adapters/out/in-memory-neighbours";
+import { syncPorts } from "../test-support";
 import { holdFolder } from "./hold-folder";
 
-/** The use case holdFolder, on in-memory adapters. */
+/** The use case holdFolder, over a database in memory. */
 
-function holdPorts() {
-	const ports = inMemorySyncPorts();
+async function holdPorts() {
+	const ports = await syncPorts();
 	const reconciled: string[] = [];
 	return {
 		ports,
@@ -22,7 +22,7 @@ function holdPorts() {
 
 describe("holdFolder", () => {
 	test("the first hold reconciles before, the last after, and the folder is held between", async () => {
-		const { ports, reconciled, hold } = holdPorts();
+		const { ports, reconciled, hold } = await holdPorts();
 		const a = await hold({ projectId: "p1" });
 		expect(reconciled).toEqual(["p1"]);
 		const b = await hold({ projectId: "p1" });
@@ -36,7 +36,7 @@ describe("holdFolder", () => {
 	});
 
 	test("done twice lets go once", async () => {
-		const { ports, reconciled, hold } = holdPorts();
+		const { ports, reconciled, hold } = await holdPorts();
 		const a = await hold({ projectId: "p1" });
 		const b = await hold({ projectId: "p1" });
 		await a.done();
@@ -47,7 +47,7 @@ describe("holdFolder", () => {
 	});
 
 	test("a reconcile that fails leaves the folder as it is: the step goes on", async () => {
-		const ports = inMemorySyncPorts();
+		const ports = await syncPorts();
 		const hold = holdFolder({
 			copy: ports.copy,
 			locks: ports.locks,
@@ -61,7 +61,7 @@ describe("holdFolder", () => {
 	});
 
 	test("a second step waits for the turns of the folder so far", async () => {
-		const { ports, hold } = holdPorts();
+		const { ports, hold } = await holdPorts();
 		const order: string[] = [];
 		let release = () => {};
 		const turn = ports.locks.inTurn("/knowledge/p1", async () => {

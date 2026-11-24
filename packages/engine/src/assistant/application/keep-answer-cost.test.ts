@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { inMemoryAssistantPorts } from "../adapters/out/in-memory-neighbours";
 import type { AnswerCost } from "../domain/answer-costs";
+import { assistantPorts } from "../test-support";
 import { keepAnswerCost } from "./keep-answer-cost";
 
-/** The use case keepAnswerCost, on in-memory adapters. */
+/** The use case keepAnswerCost, over a database in memory. */
 
 const cost: AnswerCost = {
 	at: 1_000,
@@ -19,7 +19,7 @@ const cost: AnswerCost = {
 
 describe("keepAnswerCost", () => {
 	test("keeps each answer under a new key", async () => {
-		const ports = inMemoryAssistantPorts();
+		const ports = await assistantPorts();
 		await keepAnswerCost(ports)(cost);
 		await keepAnswerCost(ports)(cost);
 		expect(await ports.answerCostStore.list("space-a")).toEqual([

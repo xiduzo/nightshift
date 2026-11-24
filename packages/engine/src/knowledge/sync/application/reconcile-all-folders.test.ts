@@ -1,12 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { inMemorySyncPorts } from "../adapters/out/in-memory-neighbours";
+import { syncPorts } from "../test-support";
 import { reconcileAllFolders } from "./reconcile-all-folders";
 
-/** The use case reconcileAllFolders, on in-memory adapters. */
+/** The use case reconcileAllFolders, over a database in memory. */
 
 describe("reconcileAllFolders", () => {
 	test("reconciles every folder one after the other, but not one a step holds", async () => {
-		const ports = inMemorySyncPorts();
+		const ports = await syncPorts();
 		for (const projectId of ["p1", "p2", "p3"]) {
 			await ports.copy.ensure(projectId);
 		}
@@ -22,7 +22,7 @@ describe("reconcileAllFolders", () => {
 	});
 
 	test("a folder that fails does not stop the others", async () => {
-		const ports = inMemorySyncPorts();
+		const ports = await syncPorts();
 		for (const projectId of ["p1", "p2"]) await ports.copy.ensure(projectId);
 		const reconciled: string[] = [];
 		await reconcileAllFolders({

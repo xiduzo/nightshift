@@ -1,13 +1,13 @@
 import { describe, expect, test } from "bun:test";
-import { inMemorySyncPorts } from "../adapters/out/in-memory-neighbours";
+import { syncPorts } from "../test-support";
 import { moveProjectKnowledge } from "./move-project-knowledge";
 
-/** The use case moveProjectKnowledge, on in-memory adapters. */
+/** The use case moveProjectKnowledge, over a database in memory. */
 
 const bytes = (text: string) => new TextEncoder().encode(text);
 
 async function withKnowledge() {
-	const ports = inMemorySyncPorts();
+	const ports = await syncPorts();
 	const sha256 = ports.copy.hash("# A\n");
 	ports.copy.put("p1", "a.md", "# A\n", 5);
 	ports.archive.keepHere(
@@ -52,7 +52,7 @@ describe("moveProjectKnowledge", () => {
 	});
 
 	test("a project with no knowledge here: nothing happens", async () => {
-		const ports = inMemorySyncPorts();
+		const ports = await syncPorts();
 		await moveProjectKnowledge(ports)({
 			from: { spaceId: "s1", projectId: "p1" },
 			to: { spaceId: "s2", projectId: "p1" },

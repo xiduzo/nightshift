@@ -1,11 +1,11 @@
 import { describe, expect, spyOn, test } from "bun:test";
 import { FLOW_VERSION, flowSchema } from "@nightshift/flows";
-import { inMemoryReviewPorts } from "../adapters/out/in-memory-neighbours";
+import { reviewPorts } from "../test-support";
 import { listAskedQuestions } from "./list-asked-questions";
 import { listReviewTasks } from "./list-review-tasks";
 import { readKnowledgeUse } from "./read-knowledge-use";
 
-/** The use case listReviewTasks, on in-memory adapters. */
+/** The use case listReviewTasks, over a database in memory. */
 
 const DAY = 24 * 60 * 60 * 1000;
 const webFlow = flowSchema.parse({
@@ -25,7 +25,7 @@ const webFlow = flowSchema.parse({
 
 describe("listReviewTasks", () => {
 	test("sources that need a look, learnings, questions that found nothing and files no run used, in order", async () => {
-		const ports = inMemoryReviewPorts();
+		const ports = await reviewPorts();
 		ports.setNow(100 * DAY);
 		const flowsOf = spyOn(ports.space.flows, "map");
 		ports.space.flows.saved.set("wiki", webFlow);
@@ -40,7 +40,7 @@ describe("listReviewTasks", () => {
 			},
 		];
 		await ports.sync.publish("p1", "learnings/proposed/one.md", "- A note.\n");
-		ports.log.log("p1", {
+		await ports.logUse("p1", {
 			type: "KnowledgeSearched",
 			at: 100 * DAY - 1,
 			runId: "r",
@@ -64,7 +64,7 @@ describe("listReviewTasks", () => {
 	});
 
 	test("nothing waits: no tasks", async () => {
-		const ports = inMemoryReviewPorts();
+		const ports = await reviewPorts();
 		const tasks = await listReviewTasks({
 			sources: ports.sources,
 			learnings: ports.learnings,
