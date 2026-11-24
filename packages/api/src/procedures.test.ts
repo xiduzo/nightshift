@@ -254,7 +254,8 @@ function engineChecks(access: Context["access"]) {
  * The context of a request with `access`, on a computer `ownerId` owns,
  * over recording services. The Space view of each Space records its
  * calls with the Space. Its starts (`startRun`, `runScheduleNow`) and the
- * pause of a schedule (`pauseScheduleTonight`, `resumeScheduleTonight`)
+ * pause of a schedule (`pauseScheduleTonight`, `resumeScheduleTonight`), its
+ * kept values, its node memory, a project's folder and a save of schedules
  * check the Person's role first (`engineChecks`). The engine's run use cases (`Engine.runs`) check
  * who may first (`engineChecks`), then record the call as `runs.<name>`
  * with the run's Space. The engine's inbox is its own use case over the
@@ -297,6 +298,10 @@ function recording(
 					runScheduleNow: checked("runScheduleNow", START),
 					pauseScheduleTonight: checked("pauseScheduleTonight", STOP),
 					resumeScheduleTonight: checked("resumeScheduleTonight", STOP),
+					resetKeptValue: checked("resetKeptValue", SAVE),
+					forgetNodeMemory: checked("forgetNodeMemory", SAVE),
+					useProjectFolder: checked("useProjectFolder", ADD),
+					saveSchedules: checked("saveSchedules", SAVE_SCHEDULES),
 					setUsage: checked("setUsage", { space: ["settings"] }),
 					addProject: checked("addProject", { project: ["add"] }),
 					addProjectWithoutFolder: checked("addProjectWithoutFolder", {
@@ -455,6 +460,8 @@ const screen = {
 const inEditor = { ...project, flowName: "fix", flow };
 const SAVE: Permissions = { flow: ["save"] };
 const START: Permissions = { run: ["start"] };
+const ADD: Permissions = { project: ["add"] };
+const SAVE_SCHEDULES: Permissions = { schedule: ["save"] };
 
 /**
  * What a knowledge change needs the Person's role to allow. The fake
@@ -482,6 +489,7 @@ function flowsChecked(
 		save: SAVE,
 		remove: { flow: ["remove"] },
 		restore: SAVE,
+		dismissNotice: SAVE,
 		import: SAVE,
 		copy: SAVE,
 	};
@@ -600,7 +608,7 @@ const ROUTES: Route[] = [
 	route("projects.gitHubClone", { repo: "o/r" }, "owner", "projectSetup.gitHub.status", ["o/r"]),
 	route("projects.copies", undefined, "session", ["space.listProjects", "projectSetup.copies.list"]),
 	route("projects.copyHere", project, "owner", ["space.listProjects", "projectSetup.copies.copy"]),
-	route("projects.useFolder", { ...project, repoPath: "/repo" }, "owner", "space.useProjectFolder", ["p1", "/repo"]),
+	route("projects.useFolder", { ...project, repoPath: "/repo" }, { owner: true, role: ADD }, "space.useProjectFolder", ["p1", "/repo"]),
 	route("projects.remove", project, { project: ["remove"] }, "space.removeProject", ["p1"]),
 	route("projects.rename", { ...project, name: " App " }, { project: ["add"] }, "space.renameProject", ["p1", "App"]),
 	route("projects.move", { ...project, spaceId: SPACE }, { project: ["move"] }, "space.moveProject", ["p1", SPACE]),
@@ -648,11 +656,11 @@ const ROUTES: Route[] = [
 	route("flows.map", project, "session", "space.flows.map", ["p1"]),
 	route("flows.save", { ...flowRef, flow }, SAVE, "space.flows.save", ["p1", "night", flow]),
 	route("flows.kept", flowRef, "session", "space.listKeptValues", ["p1", "night"]),
-	route("flows.resetKept", { ...flowRef, variable: "count" }, "owner", "space.resetKeptValue", ["p1", "night", "count"]),
+	route("flows.resetKept", { ...flowRef, variable: "count" }, OWNER_SAVING, "space.resetKeptValue", ["p1", "night", "count"]),
 	route("flows.memory", flowRef, "session", "space.listNodeMemory", ["p1", "night"]),
-	route("flows.forgetMemory", { ...flowRef, node: "call/fresh", scope: "feed" }, "owner", "space.forgetNodeMemory", ["p1", "night", "call/fresh", "feed"]),
+	route("flows.forgetMemory", { ...flowRef, node: "call/fresh", scope: "feed" }, OWNER_SAVING, "space.forgetNodeMemory", ["p1", "night", "call/fresh", "feed"]),
 	route("flows.notices", project, "session", "space.flows.notices", ["p1"]),
-	route("flows.dismissNotice", { ...project, id: "n1" }, "owner", "space.flows.dismissNotice", ["p1", "n1"]),
+	route("flows.dismissNotice", { ...project, id: "n1" }, OWNER_SAVING, "space.flows.dismissNotice", ["p1", "n1"]),
 	route("flows.remove", flowRef, { flow: ["remove"] }, "space.flows.remove", ["p1", "night"]),
 	route("flows.revisions", flowRef, "session", "space.flows.revisions", ["p1", "night"]),
 	route("flows.revision", { ...flowRef, revisionId: "rev", against: "old" }, "session", "space.flows.revision", ["p1", "night", "rev", "old"]),
@@ -672,7 +680,7 @@ const ROUTES: Route[] = [
 	route("assistant.explain", run, RESUME, "assistant.explain", [{ runId: "r" }, any, { spaceId: SPACE, personId: PERSON }]),
 	// Schedules.
 	route("schedules.list", project, "session", "space.listSchedules", ["p1"]),
-	route("schedules.save", { ...project, schedules: [schedule] }, "owner", "space.saveSchedules", ["p1", [like(schedule)], undefined]),
+	route("schedules.save", { ...project, schedules: [schedule] }, { owner: true, role: SAVE_SCHEDULES }, "space.saveSchedules", ["p1", [like(schedule)], undefined]),
 	route("schedules.pauseTonight", one, STOP, "space.pauseScheduleTonight", ["p1", "nightly"]),
 	route("schedules.resumeTonight", one, STOP, "space.resumeScheduleTonight", ["p1", "nightly"]),
 	route("schedules.runNow", one, START, "space.runScheduleNow", ["p1", "nightly"]),

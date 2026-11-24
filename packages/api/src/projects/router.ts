@@ -9,6 +9,7 @@ import { timeZoneSchema } from "../dashboard";
 import { agentChoices, agentChoicesSchema } from "../flows";
 import { output } from "../output";
 import {
+	ownerOnly,
 	ownerProcedure,
 	protectedProcedure,
 	refusalError,
@@ -303,9 +304,10 @@ export const projects = {
 	/**
 	 * Makes a folder on this computer the project's folder here: a copy a
 	 * person already has, or a new place for the one it has. The owner's:
-	 * it is this computer's disk.
+	 * it is this computer's disk, with a role that adds projects.
 	 */
-	useFolder: ownerProcedure
+	useFolder: projectRoleProcedure
+		.use(ownerOnly)
 		.route({
 			summary:
 				"Makes a git repository on this computer the folder of a project here.",

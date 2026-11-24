@@ -4,11 +4,7 @@ import { flowNameSchema, flowSchema, nameSchema } from "@nightshift/flows";
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 import { output } from "../output";
-import {
-	ownerProcedure,
-	protectedProcedure,
-	refusalError,
-} from "../procedures";
+import { ownerOnly, protectedProcedure, refusalError } from "../procedures";
 import { agentChoices, agentChoicesSchema } from "./agent-choices";
 import {
 	flowExportSchema,
@@ -43,6 +39,9 @@ const flowRoleProcedure = protectedProcedure.use(async ({ next }) => {
 		throw error;
 	}
 });
+
+/** A flow procedure of the owner of this computer, whose role the engine checks too. */
+const ownerRoleProcedure = flowRoleProcedure.use(ownerOnly);
 
 export const flows = {
 	list: protectedProcedure
@@ -94,7 +93,7 @@ export const flows = {
 		.handler(({ context, input }) =>
 			context.space.listKeptValues(input.projectId, input.name),
 		),
-	resetKept: ownerProcedure
+	resetKept: ownerRoleProcedure
 		.route({
 			summary:
 				"Forgets the kept value of one variable of a flow: its next run starts from the initial value.",
@@ -115,7 +114,7 @@ export const flows = {
 		.handler(({ context, input }) =>
 			context.space.listNodeMemory(input.projectId, input.name),
 		),
-	forgetMemory: ownerProcedure
+	forgetMemory: ownerRoleProcedure
 		.route({
 			summary:
 				"Forgets what a Since last run node of a flow saw, in every scope or in one: its next run is a first run. A Subflow node forgets what every node inside it saw.",
@@ -146,7 +145,7 @@ export const flows = {
 		.handler(({ context, input }) =>
 			context.space.flows.notices(input.projectId),
 		),
-	dismissNotice: ownerProcedure
+	dismissNotice: ownerRoleProcedure
 		.route({ summary: "Removes a notice of a project's flows." })
 		.output(output(z.void()))
 		.input(z.object({ projectId: z.string(), id: z.string() }))

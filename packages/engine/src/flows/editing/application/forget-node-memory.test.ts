@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { allowing } from "../../../access/adapters/out/in-memory-access";
 import { inMemoryEditingPorts } from "../adapters/out/in-memory-neighbours";
 import { forgetNodeMemory } from "./forget-node-memory";
 
@@ -26,5 +27,16 @@ describe("forgetNodeMemory", () => {
 		});
 		await expect(forget).rejects.toThrow("This project does not exist.");
 		expect(ports.memory.forgets).toEqual([]);
+	});
+
+	test("asks flow:save: owners, admins and members may, and nobody else", async () => {
+		const ports = inMemoryEditingPorts();
+		expect(
+			await ports.access.whoMay(
+				"space",
+				(actor) => forgetNodeMemory(ports)(actor, { ...flow, node: "fresh" }),
+				() => ports.memory.forgets,
+			),
+		).toEqual(allowing("owner", "admin", "member"));
 	});
 });

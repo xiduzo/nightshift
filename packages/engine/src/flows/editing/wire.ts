@@ -46,7 +46,7 @@ export function wireEditing(deps: {
 	kept: KeptValues;
 	memory: NodeMemory;
 }) {
-	const { projects, flows, kept, memory } = deps;
+	const { access, projects, flows, kept, memory } = deps;
 	const names: Names = {
 		persons: deps.names?.persons ?? NO_NAMES,
 		devices: deps.names?.devices ?? NO_NAMES,
@@ -56,24 +56,24 @@ export function wireEditing(deps: {
 		readFlow: readFlow({ projects, flows }),
 		readFlowMap: readFlowMap({ projects, flows }),
 		saveFlow: saveFlow({
-			access: deps.access,
+			access,
 			projects,
 			flows,
 			...(deps.usage ? { usage: deps.usage } : {}),
 		}),
-		removeFlow: removeFlow({ access: deps.access, projects, flows }),
+		removeFlow: removeFlow({ access, projects, flows }),
 		listFlowNotices: listFlowNotices({ projects, flows }),
-		dismissFlowNotice: dismissFlowNotice({ projects, flows }),
+		dismissFlowNotice: dismissFlowNotice({ access, projects, flows }),
 		listFlowRevisions: listFlowRevisions({ projects, flows, names }),
 		readFlowRevision: readFlowRevision({ projects, flows, names }),
 		restoreFlowRevision: restoreFlowRevision({
-			access: deps.access,
+			access,
 			projects,
 			flows,
 		}),
 		listKeptValues: listKeptValues({ projects, kept }),
-		resetKeptValue: resetKeptValue({ projects, kept }),
+		resetKeptValue: resetKeptValue({ access, projects, kept }),
 		listNodeMemory: listNodeMemory({ projects, memory }),
-		forgetNodeMemory: forgetNodeMemory({ projects, memory }),
+		forgetNodeMemory: forgetNodeMemory({ access, projects, memory }),
 	};
 }

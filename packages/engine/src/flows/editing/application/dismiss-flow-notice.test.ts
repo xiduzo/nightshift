@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { allowing } from "../../../access/adapters/out/in-memory-access";
 import { inMemoryEditingPorts } from "../adapters/out/in-memory-neighbours";
 import { dismissFlowNotice } from "./dismiss-flow-notice";
 
@@ -33,5 +34,27 @@ describe("dismissFlowNotice", () => {
 		});
 		await expect(dismiss).rejects.toThrow("This project does not exist.");
 		expect(await ports.flows.notices("elsewhere")).toEqual([notice]);
+	});
+
+	test("asks flow:save: owners, admins and members may, and nobody else", async () => {
+		const ports = inMemoryEditingPorts();
+		const dismissed: string[] = [];
+		const flows = {
+			dismissNotice: async (_project: string, id: string) => {
+				dismissed.push(id);
+			},
+		};
+		expect(
+			await ports.access.whoMay(
+				"space",
+				(actor) =>
+					dismissFlowNotice({ ...ports, flows })(actor, {
+						spaceId: "space",
+						projectId: "project",
+						noticeId: "n-1",
+					}),
+				() => dismissed,
+			),
+		).toEqual(allowing("owner", "admin", "member"));
 	});
 });
