@@ -6,7 +6,7 @@ export function createSettingsQueries(orpc: ApiQueryUtils) {
 		/** The settings view: the values, where each comes from, and the daemon facts. */
 		get: () => orpc.settings.get.queryOptions(),
 		/** Saves a patch. A `null` value forgets the saved value. Answers with the new view. */
-		save: () => orpc.settings.save.mutationOptions(),
+		save: orpc.settings.save.mutationOptions,
 	};
 }
 
@@ -24,6 +24,6 @@ export function createOllamaQueries(orpc: ApiQueryUtils) {
 		/** The embedding models it has. */
 		models: () => orpc.ollama.models.queryOptions(),
 		/** Starts a download of a model, in the background. */
-		pull: () => orpc.ollama.pull.mutationOptions(),
+		pull: orpc.ollama.pull.mutationOptions,
 	};
 }

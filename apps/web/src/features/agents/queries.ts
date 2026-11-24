@@ -29,7 +29,7 @@ export const settingsQueries = createSettingsQueries(orpc);
 
 /** Saves a patch of the settings. */
 export const settingsMutations = {
-	save: settingsQueries.save(),
+	save: settingsQueries.save,
 };
 
 /** The Ollama search by meaning and Decision nodes use. */
@@ -37,7 +37,7 @@ export const ollamaQueries = createOllamaQueries(orpc);
 
 /** Starts a download of an Ollama model. */
 export const ollamaMutations = {
-	pull: ollamaQueries.pull(),
+	pull: ollamaQueries.pull,
 };
 
 export const profileQueries = {

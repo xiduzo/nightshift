@@ -22,7 +22,7 @@ export const settingsQueries = createSettingsQueries(orpc);
 
 /** Saves a patch of the settings. */
 export const settingsMutations = {
-	save: settingsQueries.save(),
+	save: settingsQueries.save,
 };
 
 export const deviceQueries = createDeviceQueries(orpc);
