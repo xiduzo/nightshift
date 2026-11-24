@@ -35,6 +35,7 @@ export function EditorHeader({
 	projectName,
 	projectId,
 	name,
+	mayChange,
 	saveFlow,
 	dirty,
 	savable,
@@ -57,6 +58,7 @@ export function EditorHeader({
 	projectName: string | undefined;
 	projectId: string;
 	name: string;
+	mayChange: boolean;
 	saveFlow: ReturnType<typeof useFlowSave>["saveFlow"];
 	dirty: boolean;
 	savable: boolean;
@@ -103,6 +105,7 @@ export function EditorHeader({
 									? "failed"
 									: "unsaved"
 				}
+				mayChange={mayChange}
 				onClick={save}
 			/>
 			<DropdownMenu>

@@ -34,9 +34,12 @@ const saveLooks: Record<
 /** The Save button shows whether the flow has changes that wait to be saved. */
 export function SaveButton({
 	state,
+	mayChange,
 	onClick,
 }: {
 	state: SaveState;
+	/** Whether the role of the person lets them save the flow. */
+	mayChange: boolean;
 	onClick: () => void;
 }) {
 	const look = saveLooks[state];
@@ -52,7 +55,9 @@ export function SaveButton({
 							variant="outline"
 							size="sm"
 							onClick={onClick}
-							disabled={state !== "unsaved" && state !== "failed"}
+							disabled={
+								!mayChange || (state !== "unsaved" && state !== "failed")
+							}
 							className={cn(
 								"relative",
 								state === "saved" && "text-muted-foreground",

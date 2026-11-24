@@ -36,6 +36,7 @@ import { MoveProjectDialog, RenameProjectDialog } from "./project-actions";
 import { ProjectClonesDialog } from "./project-clones-dialog";
 import { projectFolder } from "./projects";
 import { projectMutations } from "./queries";
+import { useMayChange } from "./use-may-change";
 
 /**
  * The ⋯ menu of a project: the computers that have it, its folder here,
@@ -54,6 +55,7 @@ export function ProjectMenu({
 }) {
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
+	const mayChange = useMayChange();
 	const folder = useChooseProjectFolder(project);
 	const withFolder = hasFolder(project);
 	const [dialog, setDialog] = useState<
@@ -106,18 +108,24 @@ export function ProjectMenu({
 							{project.repoPath === null ? "Choose folder…" : "Change folder…"}
 						</DropdownMenuItem>
 					) : null}
-					<DropdownMenuItem onClick={() => setDialog("rename")}>
+					<DropdownMenuItem
+						disabled={!mayChange}
+						onClick={() => setDialog("rename")}
+					>
 						<PencilIcon aria-hidden="true" />
 						Rename…
 					</DropdownMenuItem>
-					<DropdownMenuItem onClick={() => setDialog("move")}>
+					<DropdownMenuItem
+						disabled={!mayChange}
+						onClick={() => setDialog("move")}
+					>
 						<ArrowRightLeftIcon aria-hidden="true" />
 						Move to Space…
 					</DropdownMenuItem>
 					<DropdownMenuSeparator />
 					<DropdownMenuItem
 						variant="destructive"
-						disabled={remove.isPending}
+						disabled={!mayChange || remove.isPending}
 						onClick={() => setDialog("remove")}
 					>
 						<Trash2Icon aria-hidden="true" />

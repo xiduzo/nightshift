@@ -42,6 +42,7 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { neededMachines, useSpaceMachines } from "@/features/devices";
+import { useMayChange } from "@/features/projects";
 import { ReportPreview, RunBars, reportLink } from "@/features/runs/flows-port";
 import { formatDayTime, formatRelative, useNow } from "@/shared/format";
 import { LocalTime } from "@/shared/time";
@@ -333,6 +334,7 @@ function FlowMenu({
 	onSchedules: () => void;
 	onDelete: () => void;
 }) {
+	const mayChange = useMayChange();
 	const { flow } = overview;
 	return (
 		<DropdownMenu>
@@ -368,7 +370,11 @@ function FlowMenu({
 					Schedules
 				</DropdownMenuItem>
 				<DropdownMenuSeparator />
-				<DropdownMenuItem variant="destructive" onClick={onDelete}>
+				<DropdownMenuItem
+					variant="destructive"
+					disabled={!mayChange}
+					onClick={onDelete}
+				>
 					<Trash2Icon />
 					Delete
 				</DropdownMenuItem>

@@ -37,6 +37,7 @@ import {
 	XIcon,
 } from "lucide-react";
 import { useId, useState } from "react";
+import { useMayChange } from "@/features/projects";
 import { KitOptions } from "../kits";
 import { TemplateField } from "../template";
 
@@ -87,6 +88,7 @@ export function CalledFlowField({
 	hint: string;
 	onPick: (name: string) => void;
 }) {
+	const mayChange = useMayChange();
 	const [creating, setCreating] = useState(false);
 	const { flows } = support;
 	const names = flows
@@ -167,6 +169,7 @@ export function CalledFlowField({
 				<KitNote
 					description={kit.flow.description}
 					copy={copy}
+					mayChange={mayChange}
 					pending={support.creating}
 					onCopy={(name) => support.onCopyKit(node.id, kit.name, name)}
 				/>
@@ -185,7 +188,7 @@ export function CalledFlowField({
 					<Button
 						variant="outline"
 						size="sm"
-						disabled={!flows}
+						disabled={!mayChange || !flows}
 						onClick={() => setCreating(true)}
 					>
 						<PlusIcon data-icon="inline-start" />
@@ -204,12 +207,15 @@ export function CalledFlowField({
 function KitNote({
 	description,
 	copy,
+	mayChange,
 	pending,
 	onCopy,
 }: {
 	description: string | undefined;
 	/** The name the copy gets. Null while the project's flows load. */
 	copy: string | null;
+	/** Whether the role of the person lets them copy it. */
+	mayChange: boolean;
 	pending: boolean;
 	onCopy: (name: string) => void;
 }) {
@@ -228,7 +234,7 @@ function KitNote({
 				<Button
 					variant="outline"
 					size="sm"
-					disabled={copy === null || pending}
+					disabled={!mayChange || copy === null || pending}
 					onClick={() => {
 						if (copy) onCopy(copy);
 					}}

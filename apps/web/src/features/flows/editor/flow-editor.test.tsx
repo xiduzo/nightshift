@@ -146,6 +146,7 @@ const { QueryClient, QueryClientProvider } = await import(
 	"@tanstack/react-query"
 );
 const { SidebarProvider } = await import("@nightshift/ui/components/sidebar");
+const { spaceQueries } = await import("@/features/spaces");
 const { FlowEditor } = await import("./flow-editor");
 
 // The next test file starts with an empty page and the real fetch.
@@ -216,10 +217,17 @@ async function settled(): Promise<string> {
 	return page();
 }
 
-function mount(props: Partial<EditorProps> = {}) {
+function mount(
+	props: Partial<EditorProps> = {},
+	role: "viewer" | "member" = "member",
+) {
 	const client = new QueryClient({
 		defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
 	});
+	client.setQueryData(spaceQueries.list().queryKey, {
+		active: "s1",
+		spaces: [{ id: "s1", name: "Team", personal: false, role }],
+	} as never);
 	const base: EditorProps = {
 		projectId: "p1",
 		projectName: "Project",
@@ -433,6 +441,24 @@ describe("the flow editor: keys", () => {
 		expect(saves().length).toBe(1);
 		expect(page()).toContain("Saving");
 	});
+
+	test.each(["viewer", "member"] as const)(
+		"Save and Cmd+S, as a %s of the Space: off for a viewer only",
+		async (role) => {
+			mount({}, role);
+			// The reads of the mount leave first: a batch does not name what it holds.
+			await settled();
+			moveA(16);
+			const save = [
+				...document.body.querySelectorAll<HTMLButtonElement>("button"),
+			].find((one) => one.textContent === "Save");
+			expect(save?.disabled).toBe(role === "viewer");
+			press("s", { metaKey: true });
+			await act(() => new Promise((resolve) => setTimeout(resolve, 50)));
+			const saves = requests.filter((url) => url.includes("save"));
+			expect(saves.length).toBe(role === "viewer" ? 0 : 1);
+		},
+	);
 
 	test("Cmd+G makes a Section of the selected nodes", async () => {
 		mount();

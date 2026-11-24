@@ -113,7 +113,7 @@ export function CopyProjectHere({
 						<Button
 							size="sm"
 							variant="outline"
-							disabled={folder.busy}
+							disabled={!folder.allowed || folder.busy}
 							onClick={() => start.mutate({ projectId: project.id })}
 						>
 							{copy?.state === "failed" ? "Try again" : "Copy from GitHub"}

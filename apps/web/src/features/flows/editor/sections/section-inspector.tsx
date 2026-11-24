@@ -32,6 +32,7 @@ import {
 	ZoomInIcon,
 } from "lucide-react";
 import { useId } from "react";
+import { useMayChange } from "@/features/projects";
 import { PanelHeader } from "@/shared/panel";
 import { OUTCOME_COLOR_STYLE } from "../../canvas";
 import { Field, InspectorSection, Note } from "../inspector";
@@ -65,6 +66,7 @@ export function SectionInspector({
 	/** Opens "Make subflow from section". */
 	onMakeSubflow: () => void;
 }) {
+	const mayChange = useMayChange();
 	const id = useId();
 	// With the nodes of the Sections inside it.
 	const members = nodesWithin(flow, section);
@@ -249,6 +251,7 @@ export function SectionInspector({
 					variant="outline"
 					size="sm"
 					className="self-start"
+					disabled={!mayChange}
 					onClick={onMakeSubflow}
 				>
 					<SquareFunctionIcon data-icon="inline-start" />

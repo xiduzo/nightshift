@@ -49,6 +49,7 @@ import {
 } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
+import { useMayChange } from "@/features/projects";
 import { settingsQueries } from "@/features/settings";
 import type { FlowListItem } from "@/shared/api";
 import { PageHeading } from "@/shared/page";
@@ -74,6 +75,7 @@ import { StartRunDialog } from "./start";
  * side panel. Schedules that no flow holds show below the flows.
  */
 export function FlowList({ projectId }: { projectId: string }) {
+	const mayChange = useMayChange();
 	// Each flow with its inputs, and which flows call it.
 	const flows = useQuery(flowQueries.list(projectId));
 	// What starts each flow, and its last runs. The cards show without them while they load.
@@ -136,7 +138,7 @@ export function FlowList({ projectId }: { projectId: string }) {
 					<>
 						{overviews && overviews.length > 0 ? filter.search : null}
 						<ImportFlowButton projectId={projectId} />
-						<Button onClick={() => setCreating(true)}>
+						<Button disabled={!mayChange} onClick={() => setCreating(true)}>
 							<PlusIcon data-icon="inline-start" />
 							New flow
 						</Button>
@@ -194,7 +196,7 @@ export function FlowList({ projectId }: { projectId: string }) {
 								</EmptyDescription>
 							</EmptyHeader>
 							<EmptyContent>
-								<Button onClick={() => setCreating(true)}>
+								<Button disabled={!mayChange} onClick={() => setCreating(true)}>
 									<PlusIcon data-icon="inline-start" />
 									New flow
 								</Button>

@@ -20,6 +20,7 @@ import { UploadIcon } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { FlowAgentsStep, useFlowAgents } from "@/features/agents";
+import { useMayChange } from "@/features/projects";
 import { flowMutations } from "../queries";
 
 /** A file the person chose, before Night Shift saves it. */
@@ -42,6 +43,7 @@ function agentsOf(json: string): FlowAgent[] {
  * which of your profiles takes each one.
  */
 export function ImportFlowButton({ projectId }: { projectId: string }) {
+	const mayChange = useMayChange();
 	const input = useRef<HTMLInputElement>(null);
 	const navigate = useNavigate();
 	const [chosen, setChosen] = useState<ChosenFile | null>(null);
@@ -78,7 +80,7 @@ export function ImportFlowButton({ projectId }: { projectId: string }) {
 			<Button
 				variant="outline"
 				size="sm"
-				disabled={importFlow.isPending}
+				disabled={!mayChange || importFlow.isPending}
 				onClick={() => input.current?.click()}
 			>
 				{importFlow.isPending ? (

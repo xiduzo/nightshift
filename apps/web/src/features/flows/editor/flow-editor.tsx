@@ -146,7 +146,7 @@ function Editor({
 		(issue) => issue.severity === "error",
 	).length;
 
-	const { saveFlow, exportFlow, onSaved, save } = useFlowSave({
+	const { mayChange, saveFlow, exportFlow, onSaved, save } = useFlowSave({
 		session,
 		queryClient,
 		projectId,
@@ -336,6 +336,7 @@ function Editor({
 				projectName={projectName}
 				projectId={projectId}
 				name={name}
+				mayChange={mayChange}
 				saveFlow={saveFlow}
 				dirty={dirty}
 				savable={savable}

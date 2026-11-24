@@ -3,8 +3,13 @@
 // No request leaves the test: every fetch waits for ever.
 
 import { afterAll, afterEach, describe, expect, mock, test } from "bun:test";
-import type { SinceLastRunNode } from "@nightshift/flows";
-import type { ReactNode } from "react";
+import {
+	type Flow,
+	kitList,
+	newFlow,
+	type SinceLastRunNode,
+} from "@nightshift/flows";
+import type { ComponentProps, ReactNode } from "react";
 import type { ScheduleSummary } from "@/shared/api";
 
 const realFetch = globalThis.fetch;
@@ -16,6 +21,7 @@ const router = await import("@tanstack/react-router");
 mock.module("@tanstack/react-router", () => ({
 	...router,
 	useNavigate: () => () => Promise.resolve(),
+	Link: ({ children }: { children?: ReactNode }) => <a href="/">{children}</a>,
 }));
 
 const { act, cleanup, fireEvent, render } = await import(
@@ -28,6 +34,14 @@ const { CopyProjectHere, ProjectMenu, projectQueries } = await import(
 	"@/features/projects"
 );
 const { spaceQueries } = await import("@/features/spaces");
+const { FlowCard } = await import("./flow-card");
+const { FlowList } = await import("./flow-list");
+const { CalledFlowField } = await import(
+	"./editor/inspector/call/called-flow-fields"
+);
+const { SectionInspector } = await import(
+	"./editor/sections/section-inspector"
+);
 const { FlowNotices } = await import("./flow-notices");
 const { KeptValue } = await import("./editor/inspector/io/kept-value");
 const { MemorySection } = await import(
@@ -61,6 +75,39 @@ const project = {
 	folder: true,
 	remote: null,
 } as unknown as Parameters<typeof CopyProjectHere>[0]["project"];
+const onGitHub = {
+	...project,
+	remote: "github.com/one/one",
+} as typeof project;
+const overview = {
+	flow: { name: "night", description: null, nodes: 1, errors: 0, devices: [] },
+	starts: [],
+	lastRuns: [],
+	report: null,
+	problem: null,
+	schedules: [],
+} as unknown as ComponentProps<typeof FlowCard>["overview"];
+const kit = kitList()[0]?.name ?? "";
+const calledBy = (flow: string) => (
+	<CalledFlowField
+		id="f"
+		node={{ id: "e", type: "call", flow, inputs: {}, position: { x: 0, y: 0 } }}
+		support={{
+			flowName: "night",
+			flows: {},
+			onOpen: () => {},
+			onCreate: () => {},
+			onCopyKit: () => {},
+			creating: false,
+		}}
+		hint=""
+		onPick={() => {}}
+	/>
+);
+const sectioned = {
+	...newFlow(),
+	sections: [{ id: "s", label: "Part", nodes: [] }],
+} satisfies Flow;
 const sinceLastRun = {
 	id: "n1",
 	type: "since-last-run",
@@ -94,6 +141,7 @@ function cacheFor(role: "viewer" | "member") {
 		{ node: "n1", scope: "one", keys: 2, updatedAt: 0 },
 		{ node: "n1", scope: "two", keys: 2, updatedAt: 0 },
 	]);
+	put(flowQueries.list("p1"), []);
 	put(flowQueries.notices("p1"), [{ id: "i1", message: "Imported." }]);
 	put(projectQueries.sources(), { folderPicker: true });
 	put(projectQueries.copies(), []);
@@ -126,12 +174,17 @@ async function disabled(
 		...document.querySelectorAll<HTMLElement>("button, [role='menuitem']"),
 	];
 	return controls.map((name) => {
-		const control = found.find((one) => one.textContent?.trim() === name);
-		if (!control) throw new Error(`No control ${name}`);
-		return (
-			control.hasAttribute("disabled") ||
-			control.getAttribute("aria-disabled") === "true"
+		const named = found.filter((one) => one.textContent?.trim() === name);
+		const off = named.filter(
+			(one) =>
+				one.hasAttribute("disabled") ||
+				one.getAttribute("aria-disabled") === "true",
 		);
+		if (named.length === 0) throw new Error(`No control ${name}`);
+		if (off.length > 0 && off.length < named.length) {
+			throw new Error(`Only some of ${name} are disabled`);
+		}
+		return off.length > 0;
 	});
 }
 
@@ -166,6 +219,54 @@ describe("a Viewer sees it disabled, a Member can use it", () => {
 			() => <ProjectMenu project={project} />,
 			["Choose folder…"],
 			"Actions for One",
+		],
+		[
+			"the actions in the menu of a project",
+			() => <ProjectMenu project={project} />,
+			["Rename…", "Move to Space…", "Remove project"],
+			"Actions for One",
+		],
+		[
+			"the copy of a project from GitHub",
+			() => <CopyProjectHere project={onGitHub} />,
+			["Copy from GitHub"],
+		],
+		[
+			"a new flow in the heading and in the empty list, and an import",
+			() => <FlowList projectId="p1" />,
+			["New flow", "Import flow"],
+		],
+		[
+			"the delete of a flow",
+			() => (
+				<FlowCard
+					projectId="p1"
+					overview={overview}
+					onRun={() => {}}
+					onSchedules={() => {}}
+					onDelete={() => {}}
+				/>
+			),
+			["Delete"],
+			"More for night",
+		],
+		["a new flow for a Subflow node", () => calledBy(""), ["New flow"]],
+		["a copy of a kit", () => calledBy(kit), ["Copy into project"]],
+		[
+			"a flow made of a Section",
+			() => (
+				<SectionInspector
+					flow={sectioned}
+					section={sectioned.sections[0] as (typeof sectioned.sections)[number]}
+					issues={[]}
+					onChange={() => {}}
+					onOpen={() => {}}
+					onRemove={() => {}}
+					onSelectNode={() => {}}
+					onMakeSubflow={() => {}}
+				/>
+			),
+			["Make subflow"],
 		],
 		["a new schedule", () => <Schedules />, ["Add schedule"]],
 		[
