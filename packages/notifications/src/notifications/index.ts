@@ -5,7 +5,6 @@ export {
 	wireNotifier,
 } from "./notifier";
 export {
-	type ComputerSwitches,
 	type NotificationSettings,
 	type NotificationSettingsPatch,
 	notificationSettingsPatchSchema,

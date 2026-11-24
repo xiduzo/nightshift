@@ -11,6 +11,4 @@ export type SettingsStore = {
 	get(personId: string): Promise<NotificationSettings | null>;
 	/** Keeps the Person's settings in place of what they had. */
 	put(personId: string, settings: NotificationSettings): Promise<void>;
-	/** Keeps the Person's settings only when they have none yet. */
-	putIfAbsent(personId: string, settings: NotificationSettings): Promise<void>;
 };

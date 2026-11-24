@@ -8,19 +8,15 @@ import type { NotificationSettings } from "../../domain/notification-settings";
 export function inMemorySettingsStore() {
 	const saved = new Map<string, NotificationSettings>();
 	const twin = {
-		/** Every write, in order: `put` or `putIfAbsent`, and for whom. */
-		writes: [] as { kind: "put" | "putIfAbsent"; personId: string }[],
+		/** Every write, in order, and for whom. */
+		writes: [] as { personId: string }[],
 		async get(personId: string) {
 			const settings = saved.get(personId);
 			return settings ? structuredClone(settings) : null;
 		},
 		async put(personId: string, settings: NotificationSettings) {
-			twin.writes.push({ kind: "put", personId });
+			twin.writes.push({ personId });
 			saved.set(personId, structuredClone(settings));
-		},
-		async putIfAbsent(personId: string, settings: NotificationSettings) {
-			twin.writes.push({ kind: "putIfAbsent", personId });
-			if (!saved.has(personId)) saved.set(personId, structuredClone(settings));
 		},
 	};
 	return twin satisfies SettingsStore;

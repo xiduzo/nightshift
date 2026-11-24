@@ -36,7 +36,7 @@ export async function wireDaemonNotifications(
 	},
 ) {
 	const { engine, documents, owner } = deps;
-	const { notifications, settings } = await wireNotifications({
+	const notifications = await wireNotifications({
 		db: deps.db,
 		auth: deps.auth,
 		env: deps.env,
@@ -86,8 +86,6 @@ export async function wireDaemonNotifications(
 	}
 	return {
 		notifications,
-		/** This computer's settings as the API saves them. */
-		computerSettings: settings,
 		projectsChanged,
 		tellDocument,
 		learningsChanged: notifications.learningsChanged,

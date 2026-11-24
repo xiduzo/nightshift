@@ -6,7 +6,6 @@ import {
 	inQuietHours,
 	pushesUrgency,
 	settingsOfStored,
-	switchesChanged,
 } from "./notification-settings";
 
 const at = (hour: number, minute = 0) => utc(2026, 9, 21, hour, minute);
@@ -103,10 +102,5 @@ describe("the settings", () => {
 			settingsOfStored({ ...kept, timeZone: "Mars/Olympus" }, "Asia/Tokyo")
 				.timeZone,
 		).toBe("Asia/Tokyo");
-	});
-
-	test("a save of the computer's settings changes its switches only when it names one", () => {
-		expect(switchesChanged({})).toBe(false);
-		expect(switchesChanged({ notifyRunFinished: false })).toBe(true);
 	});
 });

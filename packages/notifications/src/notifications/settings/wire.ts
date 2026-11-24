@@ -1,11 +1,9 @@
 import type { Database } from "@nightshift/db";
 import { localZone } from "@nightshift/time";
 import { drizzleSettingsStore } from "./adapters/out/drizzle-settings-store";
-import { adoptSwitches } from "./application/adopt-switches";
 import { findSettings } from "./application/find-settings";
 import { readSettings } from "./application/read-settings";
 import { saveSettings } from "./application/save-settings";
-import { seedSettings } from "./application/seed-settings";
 
 /**
  * The wiring of settings: the one place that builds its real adapters
@@ -27,10 +25,6 @@ export type Settings = {
 	read: ReturnType<typeof readSettings>;
 	/** Saves a change of the settings of the Person who asks, and returns them all. */
 	save: ReturnType<typeof saveSettings>;
-	/** The one-time copy of the switches a computer kept, for a Person without settings. */
-	seed: ReturnType<typeof seedSettings>;
-	/** After a save of the computer's settings: the Person's events take its switches. */
-	adoptSwitches: ReturnType<typeof adoptSwitches>;
 };
 
 export function wireSettings(deps: SettingsDeps): Settings {
@@ -44,7 +38,5 @@ export function wireSettings(deps: SettingsDeps): Settings {
 		find,
 		read: readSettings({ findSettings: find }),
 		save: saveSettings(ports),
-		seed: seedSettings(ports),
-		adoptSwitches: adoptSwitches(ports),
 	};
 }

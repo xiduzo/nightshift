@@ -433,7 +433,7 @@ async function makeDaemon(
 		slots,
 		documents,
 	});
-	const { notifications, computerSettings } = screens;
+	const { notifications } = screens;
 	projectsChanged = screens.projectsChanged;
 	tellDocument = screens.tellDocument;
 	learningsChanged = screens.learningsChanged;
@@ -546,7 +546,7 @@ async function makeDaemon(
 		exchange: devices.hostExchange,
 		offers: devices.offers,
 		engine,
-		settings: computerSettings,
+		settings,
 		notifications,
 		toolLaunchers,
 		configUse: setups.configUse,

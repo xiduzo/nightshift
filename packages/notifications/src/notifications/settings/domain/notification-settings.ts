@@ -97,40 +97,6 @@ export type NotificationSettingsPatch = z.infer<
 /** How long a push waits while a screen is open, by default. */
 const DEFAULT_HOLD_MINUTES = 3;
 
-/**
- * This computer's three notification switches: its own settings from
- * before notification settings moved to the Person.
- */
-export type ComputerSwitches = {
-	notifyGateOpened: boolean;
-	notifyRunFinished: boolean;
-	notifyRunFailed: boolean;
-};
-
-const SWITCH_KEYS = [
-	"notifyGateOpened",
-	"notifyRunFinished",
-	"notifyRunFailed",
-] as const;
-
-/** The Person's events that the computer's switches stand for. The computer had no switch for a device wait. */
-export function eventsOfSwitches(
-	switches: ComputerSwitches,
-): Omit<NotificationSettings["events"], "deviceWait"> {
-	return {
-		gateOpened: switches.notifyGateOpened,
-		runFinished: switches.notifyRunFinished,
-		runFailed: switches.notifyRunFailed,
-	};
-}
-
-/** Whether a save of the computer's settings named one of its three switches. */
-export function switchesChanged(
-	patch: Partial<Record<keyof ComputerSwitches, unknown>>,
-): boolean {
-	return SWITCH_KEYS.some((key) => patch[key] !== undefined);
-}
-
 /** The settings of a Person who never saved any, in this time zone. */
 export function defaultSettings(timeZone: string): NotificationSettings {
 	return {

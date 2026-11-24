@@ -77,12 +77,6 @@ export function drizzleSettingsStore(
 				set: row,
 			});
 		},
-		async putIfAbsent(personId, settings) {
-			await db
-				.insert(notificationSettings)
-				.values(toRow(personId, settings))
-				.onConflictDoNothing();
-		},
 	};
 }
 

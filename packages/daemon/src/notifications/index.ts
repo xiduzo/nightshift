@@ -1,4 +1,4 @@
-/** The notifier of this daemon, wired: its channels, its owner's screen and the old notification switches. Who hears of a stored synced document. */
+/** The notifier of this daemon, wired: its channels and its owner's screen. Who hears of a stored synced document. */
 
 export { documentAudience } from "./document-audience";
 export {

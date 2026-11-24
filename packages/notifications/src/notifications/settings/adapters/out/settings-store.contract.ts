@@ -63,12 +63,5 @@ export function settingsStoreContract(
 			await under.settingsStore.put("ada", next);
 			expect(await under.settingsStore.get("ada")).toEqual(next);
 		});
-
-		test("putIfAbsent keeps a Person's own settings", async () => {
-			await under.settingsStore.putIfAbsent("ada", SAVED);
-			expect(await under.settingsStore.get("ada")).toEqual(SAVED);
-			await under.settingsStore.putIfAbsent("ada", defaultSettings("UTC"));
-			expect(await under.settingsStore.get("ada")).toEqual(SAVED);
-		});
 	});
 }

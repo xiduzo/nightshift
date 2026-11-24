@@ -36,7 +36,7 @@ export type NotificationsWiring = {
 	env: DaemonEnv;
 	engine: Parameters<typeof engineRunEvents>[0] &
 		Pick<Engine, "onSchedulesChanged">;
-	/** This computer's settings: whether it is a Host, and its old notification switches. */
+	/** This computer's settings: whether it is a Host. */
 	settings: SettingsStore;
 	/** This computer's Device. */
 	device: { id: string; name: string };
@@ -74,14 +74,10 @@ export function sendsPushesFor(
  * Host, else for its owner's personal Space only. The in-app channel
  * outlives a `bun --hot` reload, so the open pages keep their stream. Web
  * Push signs with the VAPID keys this daemon makes once and keeps.
- *
- * Also returns this computer's settings as the API saves them: a save of
- * the three old notification switches also changes the owner's own
- * notification settings, for a client that still sends them.
  */
 export async function wireNotifications(
 	wiring: NotificationsWiring,
-): Promise<{ notifications: Notifications; settings: SettingsStore }> {
+): Promise<Notifications> {
 	const { db, env, settings, device, owner } = wiring;
 	const inApp = await wiring.slots.keep("nightshiftInApp", createInAppChannel);
 	const desktop = desktopScreen(wiring.desktop, env);
@@ -128,9 +124,6 @@ export async function wireNotifications(
 	wiring.engine.onSchedulesChanged((spaceId, projectId) =>
 		notifications.schedulesChanged(spaceId, projectId),
 	);
-	// The switches this computer kept before notification settings moved
-	// to the Person: its owner gets them once.
-	await notifications.settings.seed(owner.userId, settings.current());
 	// This computer's desktop is its owner's screen: registered at each
 	// start, so it keeps the computer's name.
 	if (desktopChannel) {
@@ -141,34 +134,7 @@ export async function wireNotifications(
 			endpoint: device.id,
 		});
 	}
-	return {
-		notifications,
-		settings: adoptingSwitches(settings, notifications, owner.userId),
-	};
-}
-
-/**
- * This computer's settings, where a save also hands the three old
- * notification switches to the owner's notification settings. Only the
- * owner may save this computer's settings.
- */
-export function adoptingSwitches(
-	settings: SettingsStore,
-	notifications: Pick<Notifications, "settings">,
-	ownerId: string,
-): SettingsStore {
-	return {
-		...settings,
-		async save(patch) {
-			const view = await settings.save(patch);
-			await notifications.settings.adoptComputerSwitches(
-				ownerId,
-				patch,
-				view.values,
-			);
-			return view;
-		},
-	};
+	return notifications;
 }
 
 /**

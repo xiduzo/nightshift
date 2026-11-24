@@ -13,7 +13,6 @@ import {
 	type WebPushSender,
 } from "./channels";
 import {
-	type ComputerSwitches,
 	type NotificationSettings,
 	type NotificationSettingsPatch,
 	type PushTargetView,
@@ -76,17 +75,6 @@ export type Notifications = {
 			actor: PersonActor,
 			patch: NotificationSettingsPatch,
 		): Promise<NotificationSettings>;
-		/** The one-time copy of the switches a computer kept, for a Person without settings. */
-		seed(personId: string, switches: ComputerSwitches): Promise<void>;
-		/**
-		 * After a save of the computer's settings: when it changed one of
-		 * the three switches, the Person's events take their values.
-		 */
-		adoptComputerSwitches(
-			personId: string,
-			patch: Partial<Record<keyof ComputerSwitches, unknown>>,
-			switches: ComputerSwitches,
-		): Promise<void>;
 	};
 	targets: {
 		/** The screens of the Person who asks. */
@@ -223,9 +211,6 @@ export function createNotifications(
 		settings: {
 			get: (actor) => settings.read(actor),
 			save: (actor, patch) => settings.save(actor, { patch }),
-			seed: (personId, switches) => settings.seed({ personId, switches }),
-			adoptComputerSwitches: (personId, patch, switches) =>
-				settings.adoptSwitches({ personId, patch, switches }),
 		},
 		targets: {
 			list: (actor) => targets.list(actor),

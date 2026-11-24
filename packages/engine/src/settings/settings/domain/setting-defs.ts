@@ -244,18 +244,6 @@ export const DEFS = {
 		schema: deciderNameSchema,
 		default: "typesafe",
 	} satisfies Def<DeciderName>,
-	notifyGateOpened: {
-		schema: z.boolean(),
-		default: true,
-	} satisfies Def<boolean>,
-	notifyRunFinished: {
-		schema: z.boolean(),
-		default: true,
-	} satisfies Def<boolean>,
-	notifyRunFailed: {
-		schema: z.boolean(),
-		default: true,
-	} satisfies Def<boolean>,
 	/**
 	 * "Keep this computer awake": the daemon holds
 	 * the OS's sleep lock while a run on this computer runs or sleeps until
