@@ -1,13 +1,13 @@
 import { describe, expect, test } from "bun:test";
-import { inMemoryRegistryPorts } from "../adapters/out/in-memory-neighbours";
+import { registryPorts } from "../test-support";
 import { describeDevice } from "./describe-device";
 
-/** The use case describeDevice, on in-memory adapters. */
+/** The use case describeDevice, over a database in memory. */
 
 describe("describeDevice", () => {
 	test("a Device that links says its computer", async () => {
-		const ports = inMemoryRegistryPorts();
-		ports.store.add({ id: "device-b" });
+		const ports = await registryPorts();
+		await ports.add({ id: "device-b" });
 		await describeDevice(ports)({
 			id: "device-b",
 			name: "Air",
@@ -22,15 +22,15 @@ describe("describeDevice", () => {
 	});
 
 	test("a Device that says nothing keeps its computer", async () => {
-		const ports = inMemoryRegistryPorts();
-		ports.store.add({ id: "device-b", machine: "m-1" });
+		const ports = await registryPorts();
+		await ports.add({ id: "device-b", machine: "m-1" });
 		await describeDevice(ports)({ id: "device-b", name: "Air", dev: false });
 		expect((await ports.store.paired("device-b"))?.machine).toBe("m-1");
 	});
 
 	test("a development install is never the computer", async () => {
-		const ports = inMemoryRegistryPorts();
-		ports.store.add({ id: "device-b", machine: "m-1" });
+		const ports = await registryPorts();
+		await ports.add({ id: "device-b", machine: "m-1" });
 		await describeDevice(ports)({
 			id: "device-b",
 			name: "Air",

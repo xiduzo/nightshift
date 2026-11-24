@@ -1,20 +1,16 @@
 import { describe, expect, test } from "bun:test";
 import { FAILURE_MESSAGE, Refusal } from "@nightshift/refusal";
-import {
-	HostDown,
-	inMemoryHome,
-	NotKnown,
-	schedule,
-} from "../adapters/out/in-memory-home";
+import { HostDown, NotKnown, schedule } from "../adapters/out/in-memory-home";
 import { MERGE_WORDS, SPLIT_WORDS } from "../domain/words";
+import { home } from "../test-support";
 import { createHomeMembership } from "./create-home-membership";
 
-/** The membership of a home Host, on in-memory adapters. */
+/** The membership of a home Host, with the record over a database in memory. */
 
-function setUp() {
-	const { deps, world } = inMemoryHome();
+async function setUp() {
+	const { deps, world } = await home();
 	const membership = createHomeMembership(deps);
-	const merges = () => world.record.mergesRows.map((row) => row.state);
+	const merges = async () => (await world.merges()).map((row) => row.state);
 	/** A merge into the Host that stopped at `planned`. */
 	async function planned(hostId = "host") {
 		await world.record.merges.plan({
@@ -32,7 +28,7 @@ function setUp() {
 		return seen;
 	}
 	/** Lets `keepFinishing` run: a while, or until `done`. */
-	async function finishing(done?: () => boolean) {
+	async function finishing(done?: () => boolean | Promise<boolean>) {
 		const stop = new AbortController();
 		membership.keepFinishing(stop.signal, 5);
 		await pass(done);
@@ -53,17 +49,17 @@ async function quietly<T>(work: () => Promise<T>): Promise<T> {
 }
 
 /** Waits a while, or until `done`: the test fails when it never comes. */
-async function pass(done?: () => boolean) {
+async function pass(done?: () => boolean | Promise<boolean>) {
 	const end = performance.now() + (done ? 2_000 : 40);
-	while (performance.now() < end && !done?.()) await tick();
-	if (done) expect(done()).toBe(true);
+	while (performance.now() < end && !(await done?.())) await tick();
+	if (done) expect(await done()).toBe(true);
 }
 /** Lets what waits for nothing go on. */
 const tick = () => new Promise((resolve) => setTimeout(resolve, 1));
 
 describe("one step at a time", () => {
 	test("a step that failed, and one that is done, do not hold the next one", async () => {
-		const { world, membership } = setUp();
+		const { world, membership } = await setUp();
 		world.online.delete("host");
 		await expect(membership.merge()).rejects.toThrow(MERGE_WORDS.offline);
 		world.online.add("host");
@@ -75,7 +71,7 @@ describe("one step at a time", () => {
 
 	for (const how of ["leave", "revoked"] as const) {
 		test(`${how} while a merge moves rows waits for it, then splits`, async () => {
-			const { world, membership, merges } = setUp();
+			const { world, membership, merges } = await setUp();
 			world.run("r1");
 			let left: Promise<unknown> = Promise.resolve();
 			world.underHold = async () => {
@@ -86,14 +82,14 @@ describe("one step at a time", () => {
 						? membership.leave()
 						: membership.revoked({ role: "home" });
 				await tick();
-				expect(world.record.splitsRows).toEqual([]);
+				expect(await world.splits()).toEqual([]);
 			};
 
 			expect(await membership.merge()).toMatchObject({ state: "pushed" });
 			await left;
 
-			expect(merges()).toEqual(["pushed"]);
-			expect(world.record.splitsRows.map((s) => s.state)).toEqual(["done"]);
+			expect(await merges()).toEqual(["pushed"]);
+			expect((await world.splits()).map((s) => s.state)).toEqual(["done"]);
 			expect(world.runs[0]?.spaceId).toBe("fresh");
 		});
 	}
@@ -101,7 +97,7 @@ describe("one step at a time", () => {
 
 describe("the merge on join", () => {
 	test("waits until the Host lists the personal Space and answers", async () => {
-		const { world, steps } = setUp();
+		const { world, steps } = await setUp();
 		const theirs = world.listed;
 		world.listed = [{ id: "team", name: "Team", personal: false }];
 		world.online.delete("host");
@@ -120,7 +116,7 @@ describe("the merge on join", () => {
 	});
 
 	test("stops its wait when the person closes it, and merges nothing", async () => {
-		const { world, steps, merges } = setUp();
+		const { world, steps, merges } = await setUp();
 		world.listed = [];
 		const close = new AbortController();
 		world.onSleep = () => close.abort();
@@ -129,11 +125,11 @@ describe("the merge on join", () => {
 			{ kind: "merge-skipped", reason: MERGE_WORDS.notListed },
 		]);
 		expect(world.wait.sleeps).toHaveLength(1);
-		expect(merges()).toEqual([]);
+		expect(await merges()).toEqual([]);
 	});
 
 	test("says the words of a refusal, and never those of a failure", async () => {
-		const { world, steps } = setUp();
+		const { world, steps } = await setUp();
 		world.callFails = new Refusal("conflict", "The Host says no.");
 		expect(await steps()).toEqual([
 			{ kind: "merge-skipped", reason: "The Host says no." },
@@ -151,7 +147,7 @@ describe("the merge on join", () => {
 	});
 
 	test("a merge that started goes on where it stopped, and the page says how far it came", async () => {
-		const { world, membership } = setUp();
+		const { world, membership } = await setUp();
 		world.callFails = new HostDown();
 		await expect(membership.merge()).rejects.toThrow();
 		expect(await membership.pending()).toMatchObject({
@@ -163,7 +159,7 @@ describe("the merge on join", () => {
 		expect(await membership.merge({ join: ["p1"] })).toMatchObject({
 			state: "pushed",
 		});
-		expect(world.record.mergesRows).toHaveLength(1);
+		expect(await world.merges()).toHaveLength(1);
 		// What the person chose when it started stays.
 		expect(world.asked[0]?.join).toEqual([]);
 	});
@@ -171,7 +167,7 @@ describe("the merge on join", () => {
 
 describe("leaving", () => {
 	test("tells the Host first, while the key works, and only then gives it up and splits", async () => {
-		const { world, membership } = setUp();
+		const { world, membership } = await setUp();
 		world.joined();
 
 		const result = await membership.leave();
@@ -195,7 +191,7 @@ describe("leaving", () => {
 
 	test("a step of a leave that fails does not stop the next one, and the key that stays is said", async () => {
 		for (const failing of ["key", "copies", "link"] as const) {
-			const { deps, world, membership } = setUp();
+			const { deps, world, membership } = await setUp();
 			world.joined();
 			const fail = () => Promise.reject(new Error("locked"));
 			if (failing === "key") deps.keys.delete = fail;
@@ -212,7 +208,7 @@ describe("leaving", () => {
 	});
 
 	test("a key store that does not answer holds neither the leave nor the next start", async () => {
-		const { deps, world } = setUp();
+		const { deps, world } = await setUp();
 		world.joined();
 		deps.keys.delete = () => new Promise(() => {});
 		const membership = createHomeMembership({ ...deps, keyWaitMs: 5 });
@@ -222,7 +218,7 @@ describe("leaving", () => {
 	});
 
 	test("a key of a Host that gave access back meanwhile stays", async () => {
-		const { world, membership } = setUp();
+		const { world, membership } = await setUp();
 		world.joined();
 		world.underHold = async () => {
 			world.hosts = world.hosts.map((h) => ({ ...h, revokedAt: null }));
@@ -234,7 +230,7 @@ describe("leaving", () => {
 	});
 
 	test("what a leave left goes at the next start: the copies and the key, of Hosts without access only", async () => {
-		const { deps, world, membership } = setUp();
+		const { deps, world, membership } = await setUp();
 		const deleted: unknown[] = [];
 		deps.keys.delete = async (...args) => {
 			deleted.push(args);
@@ -257,17 +253,17 @@ describe("leaving", () => {
 	});
 
 	test("a Host that no longer knows this computer was told: without a link, it was not", async () => {
-		const gone = setUp();
+		const gone = await setUp();
 		gone.world.leave = () => Promise.reject(new NotKnown());
 		expect((await gone.membership.leave()).told).toBe(true);
 
-		const unlinked = setUp();
+		const unlinked = await setUp();
 		unlinked.world.linked.clear();
 		expect((await unlinked.membership.leave()).told).toBe(false);
 	});
 
 	test("a run that starts on the way makes the split wait: the leave stands, and says why", async () => {
-		const { world, membership } = setUp();
+		const { world, membership } = await setUp();
 		world.joined();
 		world.leave = async () => {
 			world.run("late", { spaceId: "theirs", status: "running" });
@@ -286,15 +282,15 @@ describe("leaving", () => {
 		const stop = new AbortController();
 		membership.keepFinishing(stop.signal, 5);
 		await pass();
-		expect(world.record.splitsRows).toEqual([]);
+		expect(await world.splits()).toEqual([]);
 		world.runs = [];
-		await pass(() => world.record.splitsRows[0]?.state === "done");
+		await pass(async () => (await world.splits())[0]?.state === "done");
 		stop.abort();
 		expect(await world.personalSpaces.personalId("ada")).toBe("fresh");
 	});
 
 	test("a failure of the split is not said as a reason to wait", async () => {
-		const { world, membership } = setUp();
+		const { world, membership } = await setUp();
 		world.joined();
 		world.batchFails = new Error("disk full");
 
@@ -304,7 +300,7 @@ describe("leaving", () => {
 
 describe("when a Host removes this computer's access", () => {
 	test("a guest Host changes nothing: not Personal, not the copies of the other Devices", async () => {
-		const { world, membership, merges, planned } = setUp();
+		const { world, membership, merges, planned } = await setUp();
 		world.joined();
 		world.revoke();
 		await planned("gone");
@@ -312,12 +308,12 @@ describe("when a Host removes this computer's access", () => {
 		expect(await membership.revoked({ role: "guest" })).toBeNull();
 
 		expect(world.copies.kept).toEqual([]);
-		expect(world.record.splitsRows).toEqual([]);
-		expect(merges()).toEqual(["planned"]);
+		expect(await world.splits()).toEqual([]);
+		expect(await merges()).toEqual(["planned"]);
 	});
 
 	test("the home Host: the copies of the other Devices go, also while a run holds the split back", async () => {
-		const { world, membership } = setUp();
+		const { world, membership } = await setUp();
 		world.joined();
 		world.revoke();
 		world.run("r1", { spaceId: "theirs", status: "waiting" });
@@ -330,7 +326,7 @@ describe("when a Host removes this computer's access", () => {
 	});
 
 	test("the split follows also when the copies of the other Devices stay", async () => {
-		const { deps, world, membership } = setUp();
+		const { deps, world, membership } = await setUp();
 		world.joined();
 		world.revoke();
 		deps.copies.keep = () => Promise.reject(new Error("disk full"));
@@ -341,20 +337,20 @@ describe("when a Host removes this computer's access", () => {
 	});
 
 	test("a merge that did not move a row ends only when its own Host is gone", async () => {
-		const { world, membership, merges, planned } = setUp();
+		const { world, membership, merges, planned } = await setUp();
 		await planned();
 		expect(await membership.revoked({ role: "home" })).toBeNull();
-		expect(merges()).toEqual(["planned"]);
+		expect(await merges()).toEqual(["planned"]);
 
 		world.revoke();
 		expect(await membership.revoked({ role: "home" })).toBeNull();
-		expect(merges()).toEqual([]);
+		expect(await merges()).toEqual([]);
 
 		// Its Host is not on record any more: another is the home Host now.
 		world.hosts = world.hosts.map((h) => ({ ...h, revokedAt: null }));
 		await planned("unknown");
 		expect(await membership.revoked({ role: "home" })).toBeNull();
-		expect(merges()).toEqual([]);
+		expect(await merges()).toEqual([]);
 		expect(world.personalSpaces.split).toEqual([]);
 	});
 });
@@ -362,7 +358,7 @@ describe("when a Host removes this computer's access", () => {
 describe("a split that waits", () => {
 	/** A leave whose batch failed: the split is planned. */
 	async function waiting() {
-		const at = setUp();
+		const at = await setUp();
 		const { world, membership } = at;
 		world.joined();
 		world.schedules.set("p1", [schedule("on", { person: "ada-there" })]);
@@ -372,7 +368,7 @@ describe("a split that waits", () => {
 		world.batchFails = null;
 		return at;
 	}
-	const joinAgain = (world: ReturnType<typeof setUp>["world"]) => {
+	const joinAgain = (world: Awaited<ReturnType<typeof setUp>>["world"]) => {
 		world.hosts = world.hosts.map((h) => ({ ...h, revokedAt: null }));
 	};
 
@@ -385,7 +381,7 @@ describe("a split that waits", () => {
 		expect(await steps()).toEqual([]);
 		await finishing();
 
-		expect(world.record.splitsRows).toEqual([]);
+		expect(await world.splits()).toEqual([]);
 		expect(await world.personalSpaces.personalId("ada")).toBe("theirs");
 		expect(world.hostSchedules.get("p1")).toEqual([
 			schedule("on", { person: "ada-there" }),
@@ -413,21 +409,21 @@ describe("a split that waits", () => {
 		const seen = await steps(undefined, "second");
 
 		expect(seen).toMatchObject([{ kind: "merge-preview" }, { kind: "merged" }]);
-		expect(world.record.splitsRows.map((s) => s.state)).toEqual(["done"]);
+		expect((await world.splits()).map((s) => s.state)).toEqual(["done"]);
 		expect(world.projects.map((p) => p.spaceId)).toEqual(["there"]);
 		// Its Projects left the first Host's Space for its own, then for the second's.
-		expect(world.record.mergesRows.map((m) => m.fromSpace)).toEqual(["fresh"]);
+		expect((await world.merges()).map((m) => m.fromSpace)).toEqual(["fresh"]);
 	});
 
 	test("that a run held back before it was planned holds a merge into another Host too", async () => {
-		const { world, membership } = setUp();
+		const { world, membership } = await setUp();
 		world.joined();
 		world.leave = async () => {
 			world.run("late", { spaceId: "theirs", status: "running" });
 			return undefined;
 		};
 		await membership.leave();
-		expect(world.record.splitsRows).toEqual([]);
+		expect(await world.splits()).toEqual([]);
 		const [first] = world.hosts;
 		if (!first) throw new Error("No Host.");
 		world.hosts = [first, { ...first, hostId: "second", revokedAt: null }];
@@ -437,7 +433,7 @@ describe("a split that waits", () => {
 		world.listedBy = "second";
 		world.run("done");
 		await expect(membership.merge()).rejects.toThrow(MERGE_WORDS.leaving);
-		expect(world.record.mergesRows).toEqual([]);
+		expect(await world.merges()).toEqual([]);
 	});
 
 	test("a join as a guest does not forget it: the split ends", async () => {
@@ -448,7 +444,7 @@ describe("a split that waits", () => {
 			revokedAt: null,
 		}));
 		await membership.beforeJoin();
-		expect(world.record.splitsRows.map((s) => s.state)).toEqual(["done"]);
+		expect((await world.splits()).map((s) => s.state)).toEqual(["done"]);
 	});
 
 	test("that cannot go on now holds a merge, and the page says why", async () => {
@@ -463,35 +459,35 @@ describe("a split that waits", () => {
 			pending: true,
 			blocked: MERGE_WORDS.leaving,
 		});
-		expect(world.record.mergesRows).toEqual([]);
+		expect(await world.merges()).toEqual([]);
 	});
 });
 
 describe("going on with what stopped", () => {
 	test("a merge that moved its rows ends by itself when the Host is back", async () => {
-		const { world, membership, merges, finishing } = setUp();
+		const { world, membership, merges, finishing } = await setUp();
 		world.pushed = false;
 		await membership.merge();
-		expect(merges()).toEqual(["moved"]);
+		expect(await merges()).toEqual(["moved"]);
 
 		world.pushed = true;
-		await finishing(() => merges()[0] === "pushed");
-		expect(merges()).toEqual(["pushed"]);
+		await finishing(async () => (await merges())[0] === "pushed");
+		expect(await merges()).toEqual(["pushed"]);
 		expect(world.plans).toHaveLength(1);
 	});
 
 	test("a merge that did not move a row waits for the person", async () => {
-		const { world, merges, planned, finishing } = setUp();
+		const { world, merges, planned, finishing } = await setUp();
 		await planned();
 
 		await finishing();
 
-		expect(merges()).toEqual(["planned"]);
+		expect(await merges()).toEqual(["planned"]);
 		expect(world.asked).toEqual([]);
 	});
 
 	test("what a done merge left goes once, at start", async () => {
-		const { world, membership, finishing } = setUp();
+		const { world, membership, finishing } = await setUp();
 		await membership.merge();
 		expect(world.forgotten).toEqual(["own"]);
 
@@ -501,7 +497,7 @@ describe("going on with what stopped", () => {
 	});
 
 	test("an attempt does not pile up behind a step under way", async () => {
-		const { world, membership, finishing } = setUp();
+		const { world, membership, finishing } = await setUp();
 		const reads = { count: 0 };
 		const unfinished = world.record.unfinished;
 		world.record.unfinished = async () => {
@@ -521,7 +517,7 @@ describe("going on with what stopped", () => {
 		await tick();
 
 		// The merge's own reads: no attempt waited behind it.
-		const alone = setUp();
+		const alone = await setUp();
 		let own = 0;
 		const unfinishedAlone = alone.world.record.unfinished;
 		alone.world.record.unfinished = async () => {

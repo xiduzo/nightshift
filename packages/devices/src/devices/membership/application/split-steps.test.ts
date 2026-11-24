@@ -1,23 +1,23 @@
 import { describe, expect, test } from "bun:test";
-import { inMemoryHome, moving, schedule } from "../adapters/out/in-memory-home";
-import { runInMemory } from "../adapters/out/in-memory-neighbours";
+import { moving, schedule } from "../adapters/out/in-memory-home";
 import { SPLIT_WORDS } from "../domain/words";
+import { home } from "../test-support";
 import { splitSteps } from "./split-steps";
 
-/** The steps of a split, on in-memory adapters: Personal is merged with the Host's. */
+/** The steps of a split, with the record over a database in memory: Personal is merged with the Host's. */
 
-function setUp(revoked = true) {
-	const { deps, world } = inMemoryHome();
+async function setUp(revoked = true) {
+	const { deps, world } = await home();
 	world.joined();
 	if (revoked) world.revoke();
 	const steps = splitSteps(deps);
-	const row = () => world.record.splitsRows[0] ?? null;
+	const row = async () => (await world.splits())[0] ?? null;
 	return { deps, world, steps, row };
 }
 
 /** A merge into `toSpace` that is done: the Person is `person` there. */
 async function merged(
-	world: ReturnType<typeof setUp>["world"],
+	world: Awaited<ReturnType<typeof setUp>>["world"],
 	toSpace: string,
 	person: string,
 ) {
@@ -34,7 +34,7 @@ async function merged(
 
 describe("who the rows are of after a split", () => {
 	test("the Person of the link on the Host becomes this computer's own", async () => {
-		const { world, steps } = setUp();
+		const { world, steps } = await setUp();
 		await merged(world, "theirs", "ada-as-merged");
 
 		await steps.splitOff(null);
@@ -43,7 +43,7 @@ describe("who the rows are of after a split", () => {
 	});
 
 	test("without the link, the Person of the merge into that Space", async () => {
-		const { world, steps } = setUp();
+		const { world, steps } = await setUp();
 		world.hosts = [];
 		await merged(world, "theirs", "ada-as-merged");
 
@@ -54,7 +54,7 @@ describe("who the rows are of after a split", () => {
 	});
 
 	test("without either, the Person keeps their own id: never the Person of another Space's merge", async () => {
-		const { world, steps } = setUp();
+		const { world, steps } = await setUp();
 		world.hosts = [];
 		await merged(world, "another", "somebody");
 
@@ -66,7 +66,7 @@ describe("who the rows are of after a split", () => {
 
 describe("what comes along", () => {
 	test("a Project with a Clone, a run walked here, or no folder: every one, and no other", async () => {
-		const { world, steps } = setUp();
+		const { world, steps } = await setUp();
 		const only = (id: string, more: object) =>
 			moving(id, { spaceId: "theirs", clone: false, ...more });
 		world.projects = [
@@ -90,7 +90,7 @@ describe("what comes along", () => {
 	});
 
 	test("no schedule changes: each is paused here, and those that are on count", async () => {
-		const { world, steps, row } = setUp();
+		const { world, steps, row } = await setUp();
 		const before = [
 			schedule("off", { enabled: false, person: "ada-there" }),
 			schedule("on", { person: "ada-there", cron: "0 7 * * *" }),
@@ -100,7 +100,7 @@ describe("what comes along", () => {
 		const result = await steps.splitOff(null);
 
 		expect(world.schedules.get("p1")).toEqual(before);
-		expect(row()?.paused).toEqual([
+		expect((await row())?.paused).toEqual([
 			{ projectId: "p1", scheduleId: "off" },
 			{ projectId: "p1", scheduleId: "on" },
 		]);
@@ -108,11 +108,14 @@ describe("what comes along", () => {
 		// The latest split of that Space says the same to a later ask.
 		expect(await steps.of("theirs")).toEqual(result);
 		expect(await steps.of("another")).toBeNull();
-		expect(row()).toMatchObject({ hostId: "host", hostPersonId: "ada-there" });
+		expect(await row()).toMatchObject({
+			hostId: "host",
+			hostPersonId: "ada-there",
+		});
 	});
 
 	test("the flows that wait for the Host merge after the batch that ends their merge, apart, again after a stop", async () => {
-		const { world, steps, row } = setUp();
+		const { world, steps, row } = await setUp();
 		const waiting = { fromSpace: "own", hostId: "host", personId: "ada" };
 		await world.record.merges.plan({ ...waiting, joined: [], backup: "/b" });
 		await world.record.merges.mapped("own", {
@@ -124,59 +127,59 @@ describe("what comes along", () => {
 			},
 			personMap: { ada: "ada-there" },
 		});
-		runInMemory(world.record.merges.moved("own"));
+		await world.runBatch(world.record.merges.moved("own"));
 		world.batchFails = new Error("disk full");
 		await expect(steps.splitOff(null)).rejects.toThrow("disk full");
 		expect(world.merged).toEqual([]);
-		expect(world.record.mergesRows).toHaveLength(1);
+		expect(await world.merges()).toHaveLength(1);
 
 		world.batchFails = null;
 		world.openFails = new Error("stop");
-		await expect(steps.splitOff(row())).rejects.toThrow("stop");
+		await expect(steps.splitOff(await row())).rejects.toThrow("stop");
 		const merged = [
 			{ from: "old", to: "new", persons: {}, apart: "fresh" },
 			{ from: "shared", to: "team-project", persons: {}, apart: "fresh" },
 		];
 		expect(world.merged).toEqual(merged);
-		expect(world.record.mergesRows).toEqual([]);
+		expect(await world.merges()).toEqual([]);
 		world.openFails = null;
-		await steps.splitOff(row());
+		await steps.splitOff(await row());
 		expect(world.merged).toEqual([...merged, ...merged]);
-		expect(row()?.state).toBe("done");
+		expect((await row())?.state).toBe("done");
 	});
 
 	test("the flows of a merge that moved no row, or that is done, stay", async () => {
 		for (const state of ["planned", "mapped", "pushed"] as const) {
-			const { world, steps } = setUp();
+			const { world, steps } = await setUp();
 			await merged(world, "theirs", "ada-there");
-			const [merge] = world.record.mergesRows;
-			if (!merge) throw new Error("No merge.");
-			merge.state = state;
-			merge.projectMap = { old: { spaceId: "theirs", projectId: "new" } };
+			expect(await world.merges()).toHaveLength(1);
+			await world.setMerges(state, {
+				old: { spaceId: "theirs", projectId: "new" },
+			});
 			await steps.splitOff(null);
 			expect(world.merged).toEqual([]);
 		}
 	});
 
 	test("one batch makes the Space, names the Host's, ends a merge on its way and marks the split", async () => {
-		const { world, steps, row } = setUp();
+		const { world, steps, row } = await setUp();
 		const merge = { fromSpace: "own", hostId: "host", personId: "ada" };
 		await world.record.merges.plan({ ...merge, joined: [], backup: "/b" });
 		world.batchFails = new Error("disk full");
 
 		await expect(steps.splitOff(null)).rejects.toThrow("disk full");
-		expect(row()?.state).toBe("planned");
-		expect(world.record.mergesRows).toHaveLength(1);
+		expect((await row())?.state).toBe("planned");
+		expect(await world.merges()).toHaveLength(1);
 		expect(world.named).toEqual([]);
 		expect(await world.personalSpaces.personalId("ada")).toBe("theirs");
 
 		world.batchFails = null;
-		expect(await steps.splitOff(row())).toMatchObject({ state: "done" });
+		expect(await steps.splitOff(await row())).toMatchObject({ state: "done" });
 		expect(world.personalSpaces.split).toEqual([
 			{ personId: "ada", from: "theirs", to: "fresh", hostName: "Studio" },
 		]);
 		expect(world.named).toEqual(["theirs: Personal on Studio"]);
-		expect(world.record.mergesRows).toEqual([]);
+		expect(await world.merges()).toEqual([]);
 		// One copy of the database: what stopped does not make a second.
 		expect(world.databaseCopy.copies).toEqual(["/tmp/before-leaving-host.db"]);
 	});
@@ -184,32 +187,32 @@ describe("what comes along", () => {
 
 describe("what holds a split", () => {
 	test("a run that starts after the first check holds the rows back, under the hold of the move", async () => {
-		const { world, steps, row } = setUp();
+		const { world, steps, row } = await setUp();
 		world.underHold = async () =>
 			world.run("late", { spaceId: "theirs", status: "running" });
 
 		await expect(steps.splitOff(null)).rejects.toThrow(SPLIT_WORDS.notDone(1));
-		expect(row()?.state).toBe("planned");
+		expect((await row())?.state).toBe("planned");
 		expect(world.personalSpaces.split).toEqual([]);
 
 		world.underHold = async () => {};
 		world.runs = [];
-		expect(await steps.splitOff(row())).toMatchObject({ state: "done" });
+		expect(await steps.splitOff(await row())).toMatchObject({ state: "done" });
 	});
 
 	test("without a copy of the database, nothing starts", async () => {
-		const { deps, world } = setUp();
+		const { deps, world } = await setUp();
 		const steps = splitSteps({
 			...deps,
 			databaseCopy: { copy: () => Promise.reject(new Error("disk full")) },
 		});
 
 		await expect(steps.splitOff(null)).rejects.toThrow("disk full");
-		expect(world.record.splitsRows).toEqual([]);
+		expect(await world.splits()).toEqual([]);
 	});
 
 	test("the check of a leave asks for runs only in a Personal that a Host keeps", async () => {
-		const { world, steps } = setUp(false);
+		const { world, steps } = await setUp(false);
 		const late = { status: "running" };
 		world.run("r1", { spaceId: "theirs", ...late });
 		await expect(steps.check()).rejects.toThrow(SPLIT_WORDS.notDone(1));

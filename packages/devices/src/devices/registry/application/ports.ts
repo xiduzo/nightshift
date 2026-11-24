@@ -2,8 +2,8 @@ import type { DeviceRows, PeerContext, RowBatch } from "@nightshift/engine";
 import type { DeviceRow, JoinRow } from "../domain/paired-device";
 
 /**
- * The driven ports of the registry. A port of its own has a real adapter,
- * an in-memory adapter and a contract suite in `adapters/out/`. Another
+ * The driven ports of the registry. The adapters of its own ports sit
+ * in `adapters/out/`. Another
  * slice or package fills a port with `@filledBy`: the composition of the
  * package passes it to `wireRegistry`.
  */

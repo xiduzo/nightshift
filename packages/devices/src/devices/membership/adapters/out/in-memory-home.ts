@@ -1,7 +1,7 @@
 import type { RowBatch } from "@nightshift/engine";
 import type { PersonalMerge, PersonalMergeInput } from "../../../../contract";
 import type { HomeMembershipDeps } from "../../application/create-home-membership";
-import { inMemoryMembershipRecord } from "./in-memory-membership-record";
+import type { Batches, MembershipRecord } from "../../application/ports";
 import {
 	inMemoryBatch,
 	inMemoryBatches,
@@ -12,7 +12,6 @@ import {
 	inMemoryPairedDevices,
 	inMemoryPersonalSpaces,
 	inMemoryWait,
-	runInMemory,
 } from "./in-memory-neighbours";
 
 /** A Host that does not answer, and one that does not know this computer. */
@@ -71,12 +70,13 @@ export function schedule(id: string, more: Partial<Schedule> = {}): Schedule {
 /**
  * This computer ("me", of "ada") and its home Host ("host", where its
  * Person is "ada-there" with the personal Space "theirs"), in memory. Its
- * own Personal is "own". `log` has what changed, in order.
+ * own Personal is "own". `log` has what changed, in order. The membership's
+ * record is the real one, and `run` runs a batch of it with the changes of
+ * the others.
  */
-export function inMemoryHome() {
+export function inMemoryHome(record: MembershipRecord, run: Batches["run"]) {
 	const log: string[] = [];
-	const record = inMemoryMembershipRecord();
-	const batches = inMemoryBatches();
+	const batches = inMemoryBatches(run);
 	const personalSpaces = inMemoryPersonalSpaces({
 		personalId: "own",
 		existing: new Set(["own"]),
@@ -285,7 +285,7 @@ export function inMemoryHome() {
 				(p) => p.spaceId === move.from && !sources.includes(p.id),
 			);
 			if (plan.empties && left) throw new Error("A project is left.");
-			runInMemory((batch ?? []) as RowBatch);
+			await run((batch ?? []) as RowBatch);
 			for (const run of moves) {
 				const to = plan.projects[run.projectId];
 				if (!to) continue;

@@ -1,19 +1,20 @@
 import { describe, expect, test } from "bun:test";
 import { Refusal } from "@nightshift/refusal";
-import { inMemoryHome, moving } from "../adapters/out/in-memory-home";
+import { moving } from "../adapters/out/in-memory-home";
 import { movedLate } from "../domain/words";
+import { home } from "../test-support";
 import { mergeSteps } from "./merge-steps";
 
-/** The Projects a done merge left, on in-memory adapters. */
+/** The Projects a done merge left, with the record over a database in memory. */
 
-function setUp() {
-	const { deps, world } = inMemoryHome();
+async function setUp() {
+	const { deps, world } = await home();
 	return { world, steps: mergeSteps(deps) };
 }
 
 describe("a Project that a done merge left", () => {
 	test("one that stayed goes later only while this computer has the Host's Personal", async () => {
-		const { world, steps } = setUp();
+		const { world, steps } = await setUp();
 		await steps.start({});
 		world.projects.push(moving("late"));
 		const stays = async () => {
@@ -48,7 +49,7 @@ describe("a Project that a done merge left", () => {
 	});
 
 	test("a Host that refuses them is asked again after an hour, and a batch that failed is not tried again in this process, and the next one tries", async () => {
-		const { deps, world } = inMemoryHome();
+		const { deps, world } = await home();
 		const clock = { now: 1 };
 		const steps = mergeSteps({ ...deps, now: () => clock.now });
 		await steps.start({});
@@ -76,7 +77,7 @@ describe("a Project that a done merge left", () => {
 		await expect(steps.moveLate()).rejects.toThrow("disk full");
 		await steps.moveLate();
 		expect(world.databaseCopy.copies).toHaveLength(2);
-		expect(world.record.mergesRows[0]?.state).toBe("pushed");
+		expect((await world.merges())[0]?.state).toBe("pushed");
 		expect(world.notes.size).toBe(0);
 
 		world.batchFails = null;
@@ -85,7 +86,7 @@ describe("a Project that a done merge left", () => {
 	});
 
 	test("a stop behind the batch goes on to the same end, and says it once", async () => {
-		const { deps, world } = inMemoryHome();
+		const { deps, world } = await home();
 		const steps = mergeSteps(deps);
 		await steps.start({});
 		world.projects.push(moving("late"));
@@ -102,7 +103,7 @@ describe("a Project that a done merge left", () => {
 		});
 		world.pushed = true;
 		if (row) await mergeSteps(deps).resume(row);
-		expect(world.record.mergesRows[0]?.state).toBe("pushed");
+		expect((await world.merges())[0]?.state).toBe("pushed");
 		expect(world.notes.get("late")).toHaveLength(1);
 	});
 });

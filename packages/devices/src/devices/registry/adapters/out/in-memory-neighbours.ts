@@ -6,29 +6,30 @@ import type {
 	PersonalSpaces,
 	ThisComputer,
 } from "../../application/ports";
-import type { DevicePresence } from "../../domain/paired-device";
-import {
-	inMemoryBatch,
-	inMemoryDeviceStore,
-	runInMemory,
-} from "./in-memory-device-store";
 
 /**
  * The in-memory adapters of the ports that another slice or package
- * fills (`@filledBy` in `application/ports.ts`), and
- * `inMemoryRegistryPorts`, which gives a use-case test every port of the
- * slice at once. Test code: production code never imports this file.
+ * fills (`@filledBy` in `application/ports.ts`). Test code: production code never
+ * imports this file.
  */
 
 type Fact = Parameters<DeviceFacts["log"]>[0];
 
-/** The facts logged, in order: each runs its batch first, as the engine's one batch does. */
-export function inMemoryDeviceFacts() {
-	const logged: { fact: Fact; withRows: boolean }[] = [];
+/** One fact a test logged, and whether rows came with it. */
+export interface LoggedFact {
+	fact: Fact;
+	withRows: boolean;
+}
+
+/** The facts logged, in order: `run` runs the batch of each first, as the engine's one batch does. */
+export function inMemoryDeviceFacts(
+	run: (batch: RowBatch) => Promise<void>,
+): DeviceFacts & { logged: LoggedFact[] } {
+	const logged: LoggedFact[] = [];
 	const twin = {
 		logged,
 		async log(fact: Fact, before?: RowBatch) {
-			if (before) runInMemory(before);
+			if (before) await run(before);
 			logged.push({ fact, withRows: before !== undefined });
 		},
 	};
@@ -52,22 +53,15 @@ export function inMemoryDeviceHistory() {
 	return twin satisfies DeviceHistory;
 }
 
-/** The engine's rows of a Device: each batch, when it runs, notes what it named. */
-export function inMemoryEngineDeviceRows() {
-	const ran: string[] = [];
+/** The engine's rows of a Device: `note` makes the statement that notes, when it runs, what it named. */
+export function inMemoryEngineDeviceRows(note: (what: string) => RowBatch) {
 	const adopts: Parameters<EngineDeviceRows["adopt"]>[0][] = [];
 	const twin = {
-		ran,
 		adopts,
-		forget: (deviceId: string) =>
-			inMemoryBatch(() => {
-				ran.push(`forget ${deviceId}`);
-			}),
+		forget: (deviceId: string) => note(`forget ${deviceId}`),
 		adopt: (move: Parameters<EngineDeviceRows["adopt"]>[0]) => {
 			adopts.push(move);
-			return inMemoryBatch(() => {
-				ran.push(`adopt ${move.from} ${move.to}`);
-			});
+			return note(`adopt ${move.from} ${move.to}`);
 		},
 	};
 	return twin satisfies EngineDeviceRows;
@@ -101,27 +95,4 @@ export function inMemoryThisComputer(
 		platform: () => facts.platform ?? "darwin",
 		env: () => facts.env ?? {},
 	} satisfies ThisComputer;
-}
-
-/** Every port of registry in memory at once: where each use-case test starts. */
-export function inMemoryRegistryPorts() {
-	let clock = 1_000_000;
-	let ids = 0;
-	const now = () => clock;
-	return {
-		store: inMemoryDeviceStore({ now }),
-		facts: inMemoryDeviceFacts(),
-		history: inMemoryDeviceHistory(),
-		engineRows: inMemoryEngineDeviceRows(),
-		spaces: inMemoryPersonalSpaces(),
-		computer: inMemoryThisComputer(),
-		online: new Map() as DevicePresence,
-		documentPrefix: "device:",
-		newId: () => `id-${++ids}`,
-		now,
-		/** Moves the clock of the test on. */
-		later(ms: number) {
-			clock += ms;
-		},
-	};
 }

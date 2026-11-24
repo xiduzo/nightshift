@@ -1,15 +1,15 @@
 import { describe, expect, test } from "bun:test";
-import { inMemoryRegistryPorts } from "../adapters/out/in-memory-neighbours";
+import { registryPorts } from "../test-support";
 import { closeStalePresence } from "./close-stale-presence";
 
-/** The use case closeStalePresence, on in-memory adapters. */
+/** The use case closeStalePresence, over a database in memory. */
 
 describe("closeStalePresence", () => {
 	test("a Host that starts again starts with every Device offline", async () => {
-		const p = inMemoryRegistryPorts();
+		const p = await registryPorts();
 		p.spaces.add("person-ada");
-		p.store.add({ id: "was-online", ownerId: "person-ada" });
-		p.store.add({ id: "was-offline", ownerId: "person-ada" });
+		await p.add({ id: "was-online", ownerId: "person-ada" });
+		await p.add({ id: "was-offline", ownerId: "person-ada" });
 		p.history.presence.set("was-online", "DeviceOnline");
 		p.history.presence.set("was-offline", "DeviceOffline");
 		await closeStalePresence(p)();
@@ -23,9 +23,9 @@ describe("closeStalePresence", () => {
 	});
 
 	test("a reload is no new start: a Device handed over as online stays online", async () => {
-		const p = inMemoryRegistryPorts();
+		const p = await registryPorts();
 		p.spaces.add("person-ada");
-		p.store.add({ id: "b", ownerId: "person-ada" });
+		await p.add({ id: "b", ownerId: "person-ada" });
 		p.history.presence.set("b", "DeviceOnline");
 		p.online.set("b", 1);
 		await closeStalePresence(p)();

@@ -17,9 +17,15 @@ export function inMemoryBatch(...changes: (() => void)[]): RowBatch {
 	return changes as unknown as RowBatch;
 }
 
-/** Runs a batch of the twins. */
-export function runInMemory(batch: RowBatch): void {
-	for (const change of batch as unknown as (() => void)[]) change();
+/** Splits a batch: the changes of the twins, and the statements of the database. */
+export function splitBatch(batch: RowBatch) {
+	const items = batch as unknown as unknown[];
+	const isChange = (item: unknown): item is () => void =>
+		typeof item === "function";
+	return {
+		changes: items.filter(isChange),
+		statements: items.filter((item) => !isChange(item)),
+	};
 }
 
 /** The Person's personal Space, and the Space rows that exist. */
@@ -89,12 +95,14 @@ export function inMemoryIds(next = "space-new"): Ids {
 	return { spaceId: () => next };
 }
 
-export function inMemoryBatches(): Batches & { ran: RowBatch[] } {
+export function inMemoryBatches(
+	run: Batches["run"],
+): Batches & { ran: RowBatch[] } {
 	const ran: RowBatch[] = [];
 	return {
 		ran,
 		async run(batch) {
-			runInMemory(batch);
+			await run(batch);
 			ran.push(batch);
 		},
 	};

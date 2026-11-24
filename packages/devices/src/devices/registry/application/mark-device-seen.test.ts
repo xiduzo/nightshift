@@ -1,19 +1,19 @@
 import { describe, expect, test } from "bun:test";
-import { inMemoryRegistryPorts } from "../adapters/out/in-memory-neighbours";
+import { registryPorts } from "../test-support";
 import { markDeviceSeen } from "./mark-device-seen";
 
-/** The use case markDeviceSeen, on in-memory adapters. */
+/** The use case markDeviceSeen, over a database in memory. */
 
-function ports() {
-	const ports = inMemoryRegistryPorts();
+async function ports() {
+	const ports = await registryPorts();
 	ports.spaces.add("person-ada");
-	ports.store.add({ id: "device-b", ownerId: "person-ada" });
+	await ports.add({ id: "device-b", ownerId: "person-ada" });
 	return ports;
 }
 
 describe("markDeviceSeen", () => {
 	test("online while the link answers: DeviceOnline once, last seen each time", async () => {
-		const p = ports();
+		const p = await ports();
 		const seen = markDeviceSeen(p);
 		await seen({ id: "device-b" });
 		p.later(1_000);
@@ -30,7 +30,7 @@ describe("markDeviceSeen", () => {
 	});
 
 	test("a Device this Host has no paired row of stays offline", async () => {
-		const p = ports();
+		const p = await ports();
 		await markDeviceSeen(p)({ id: "nobody" });
 		expect(p.online.has("nobody")).toBe(false);
 		expect(p.facts.logged).toEqual([]);

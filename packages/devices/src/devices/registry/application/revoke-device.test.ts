@@ -1,20 +1,20 @@
 import { describe, expect, test } from "bun:test";
 import { Refusal } from "@nightshift/refusal";
-import { inMemoryRegistryPorts } from "../adapters/out/in-memory-neighbours";
+import { registryPorts } from "../test-support";
 import { revokeDevice } from "./revoke-device";
 
-/** The use case revokeDevice, on in-memory adapters. */
+/** The use case revokeDevice, over a database in memory. */
 
-function ports() {
-	const ports = inMemoryRegistryPorts();
+async function ports() {
+	const ports = await registryPorts();
 	ports.spaces.add("person-ada");
-	ports.store.add({ id: "device-b", ownerId: "person-ada" });
+	await ports.add({ id: "device-b", ownerId: "person-ada" });
 	return ports;
 }
 
 describe("revokeDevice", () => {
 	test("revoking ends access: DeviceRevoked with the row, then offline", async () => {
-		const p = ports();
+		const p = await ports();
 		p.online.set("device-b", p.now());
 		await revokeDevice(p)({ id: "device-b" });
 		expect((await p.store.paired("device-b"))?.revokedAt).toBe(p.now());
@@ -40,7 +40,7 @@ describe("revokeDevice", () => {
 	});
 
 	test("a revoked Device changes nothing; an unknown one is refused", async () => {
-		const p = ports();
+		const p = await ports();
 		await revokeDevice(p)({ id: "device-b" });
 		await revokeDevice(p)({ id: "device-b" });
 		expect(p.facts.logged).toHaveLength(1);
