@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { Caller } from "../../../contract";
-import { inMemoryPersonalSecretStore } from "../../kept/adapters/out/in-memory-personal-secret-store";
+import { personalSecrets } from "../test-support";
 import { readHomeSecretValues } from "./read-home-secret-values";
 
 /** A calling Device of Ada: paired here as home, or as a guest. */
@@ -13,7 +13,7 @@ const callerOf = (homeHost: string | null) =>
 
 describe("readHomeSecretValues", () => {
 	test("another Person's Device never gets them: it reads its own Person's only", async () => {
-		const store = inMemoryPersonalSecretStore(() => 7);
+		const { store } = await personalSecrets();
 		await store.set("person-ada", "A_TOKEN", "value-a", null);
 		await store.set("person-bob", "B_TOKEN", "value-b", null);
 		expect(
@@ -24,7 +24,7 @@ describe("readHomeSecretValues", () => {
 	});
 
 	test("refuses a Device that joined as a guest: its Personal secrets stay with its home Host", async () => {
-		const store = inMemoryPersonalSecretStore(() => 7);
+		const { store } = await personalSecrets();
 		await store.set("person-ada", "A_TOKEN", "value-a", null);
 		await expect(
 			readHomeSecretValues({ store })(callerOf(null), { names: ["A_TOKEN"] }),

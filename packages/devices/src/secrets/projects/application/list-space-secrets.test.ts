@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { inMemoryProjectsPorts } from "../adapters/out/in-memory-neighbours";
+import { projectsPorts } from "../test-support";
 import { listSpaceSecrets } from "./list-space-secrets";
 
 describe("listSpaceSecrets", () => {
 	test("in a Space this computer keeps, its own store, after the same checks", async () => {
-		const p = inMemoryProjectsPorts();
+		const p = await projectsPorts();
 		await p.spaceStore.set("space-1", "A_TOKEN", "value-a", "person-ada");
 		const who = "person-ada";
 		const answer = await listSpaceSecrets(p)({
@@ -18,7 +18,7 @@ describe("listSpaceSecrets", () => {
 	});
 
 	test("here, a Person who is no Member is refused", async () => {
-		const p = inMemoryProjectsPorts();
+		const p = await projectsPorts();
 		const who = "person-eve";
 		await expect(
 			listSpaceSecrets(p)({ spaceId: "space-1", personId: who }),
@@ -28,7 +28,7 @@ describe("listSpaceSecrets", () => {
 	});
 
 	test("in a Space a Host keeps, each call goes there with this Device's key, as its owner only", async () => {
-		const p = inMemoryProjectsPorts();
+		const p = await projectsPorts();
 		p.spaces.hosts.set("space-1", "host-1");
 		const sent: unknown[] = [];
 		p.calls.addHost("host-1", {

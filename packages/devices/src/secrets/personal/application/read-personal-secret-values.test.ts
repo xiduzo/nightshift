@@ -1,22 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { inMemoryHostCalls } from "../../calls/adapters/out/in-memory-host-calls";
-import { inMemoryPersonalSecretStore } from "../../kept/adapters/out/in-memory-personal-secret-store";
+import { personalPorts } from "../test-support";
 import { readPersonalSecretValues } from "./read-personal-secret-values";
-
-/** The ports of a computer of Ada, without a Home Host until a test gives one. */
-function portsOf() {
-	return {
-		store: inMemoryPersonalSecretStore(() => 7),
-		calls: inMemoryHostCalls(),
-		ownerId: "person-ada",
-		selfId: "device-self",
-		deadlineMs: 20_000,
-	};
-}
 
 describe("readPersonalSecretValues", () => {
 	test("without a Home Host, this computer gives its owner's values itself", async () => {
-		const p = portsOf();
+		const p = await personalPorts();
 		await p.store.set("person-ada", "A_TOKEN", "value-a", null);
 		expect(await readPersonalSecretValues(p)({ names: ["A_TOKEN"] })).toEqual({
 			A_TOKEN: "value-a",
@@ -24,7 +12,7 @@ describe("readPersonalSecretValues", () => {
 	});
 
 	test("with a Home Host, the call goes there; nothing is kept here", async () => {
-		const p = portsOf();
+		const p = await personalPorts();
 		p.calls.setHome({ hostId: "host-1", personId: "person-ada" });
 		const askedFor: unknown[] = [];
 		p.calls.addHost("host-1", {
@@ -39,11 +27,11 @@ describe("readPersonalSecretValues", () => {
 			A_TOKEN: "value-a",
 		});
 		expect(askedFor).toEqual([{ names: ["A_TOKEN"] }]);
-		expect(p.store.rows.size).toBe(0);
+		expect(await p.rows()).toEqual([]);
 	});
 
 	test("no name asks nothing", async () => {
-		const p = portsOf();
+		const p = await personalPorts();
 		p.calls.setHome({ hostId: "host-1", personId: "person-ada" });
 		expect(await readPersonalSecretValues(p)({ names: [] })).toEqual({});
 		expect(p.calls.asked).toEqual([]);

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { Refusal } from "@nightshift/refusal";
 import type { Caller } from "../../../contract";
-import { inMemoryPersonalSecretStore } from "../../kept/adapters/out/in-memory-personal-secret-store";
+import { personalSecrets } from "../test-support";
 import { saveHomeSecret } from "./save-home-secret";
 
 /** A calling Device of Ada: paired here as home, or as a guest. */
@@ -14,26 +14,30 @@ const callerOf = (homeHost: string | null) =>
 
 describe("saveHomeSecret", () => {
 	test("a Device of the Person, paired here as home, sets its Person's value", async () => {
-		const store = inMemoryPersonalSecretStore(() => 7);
+		const { store, rows } = await personalSecrets();
 		await saveHomeSecret({ store })(callerOf("host.lan"), {
 			name: "A_TOKEN",
 			value: "value-a",
 		});
-		expect(store.rows.get("person-ada")?.get("A_TOKEN")).toEqual({
-			value: "value-a",
-			setAt: 7,
-			setBy: "device-a",
-		});
+		expect(await rows()).toEqual([
+			{
+				ownerId: "person-ada",
+				name: "A_TOKEN",
+				value: "value-a",
+				setAt: 7,
+				setBy: "device-a",
+			},
+		]);
 	});
 
 	test("refuses a Device that joined as a guest", async () => {
-		const store = inMemoryPersonalSecretStore(() => 7);
+		const { store, rows } = await personalSecrets();
 		await expect(
 			saveHomeSecret({ store })(callerOf(null), {
 				name: "A_TOKEN",
 				value: "value-a",
 			}),
 		).rejects.toBeInstanceOf(Refusal);
-		expect(store.rows.size).toBe(0);
+		expect(await rows()).toEqual([]);
 	});
 });

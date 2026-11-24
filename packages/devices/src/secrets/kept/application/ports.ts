@@ -2,9 +2,8 @@ import type { PersonalSecretName } from "../../../contract";
 import type { KeptProjectSecret, Sealed } from "../domain/kept-secret";
 
 /**
- * The driven ports of the kept secrets. Each is a port of its own, with a
- * real adapter, an in-memory adapter and a contract suite in
- * `adapters/out/`. The stores know no access rule: the use cases of
+ * The driven ports of the kept secrets. Each is a port of its own: the
+ * adapters sit in `adapters/out/`. The stores know no access rule: the use cases of
  * `personal`, `projects` and `moves` decide who they serve.
  */
 

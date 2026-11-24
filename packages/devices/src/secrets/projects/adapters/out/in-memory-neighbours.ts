@@ -1,8 +1,5 @@
 import type { Role } from "@nightshift/auth";
 import type { Caller } from "../../../../contract";
-import { inMemoryHostCalls } from "../../../calls/adapters/out/in-memory-host-calls";
-import { inMemoryProjectSecretStore } from "../../../kept/adapters/out/in-memory-project-secret-store";
-import { inMemorySpaceSecretStore } from "../../../kept/adapters/out/in-memory-space-secret-store";
 import type {
 	EnginePlaces,
 	KeeperSpaces,
@@ -14,8 +11,7 @@ import type {
 
 /**
  * The in-memory adapters of the ports that another vertical or package
- * fills (`@filledBy` in `application/ports.ts`), and
- * `inMemoryProjectsPorts`, which gives a use-case test every port at once.
+ * fills (`@filledBy` in `application/ports.ts`).
  * Test code: production code never imports this file.
  */
 
@@ -127,29 +123,4 @@ export function callerOf(
 		member: async (spaceId: string) =>
 			(await members.roleIn(personId, spaceId)) !== null,
 	} as unknown as Caller;
-}
-
-/**
- * Every port of the Project and Space secrets, for a computer of Ada that
- * keeps `space-1` with `project-1` in it, where Ada is an owner.
- */
-export function inMemoryProjectsPorts() {
-	const places = inMemoryEnginePlaces();
-	places.projects.set("project-1", "space-1");
-	const members = inMemoryMembers();
-	members.join("person-ada", "space-1", "owner");
-	members.personNames.set("person-ada", "Ada");
-	return {
-		places,
-		spaces: inMemoryKeeperSpaces(),
-		members,
-		rules: inMemoryRoleRules(),
-		work: inMemoryPlacedSteps(),
-		offers: inMemorySpaceOffers(),
-		store: inMemoryProjectSecretStore(() => 7),
-		spaceStore: inMemorySpaceSecretStore(() => 7),
-		calls: inMemoryHostCalls(),
-		ownerId: "person-ada",
-		deadlineMs: 20_000,
-	};
 }

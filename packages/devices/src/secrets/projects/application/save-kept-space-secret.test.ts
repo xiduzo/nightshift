@@ -1,13 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import {
-	callerOf,
-	inMemoryProjectsPorts,
-} from "../adapters/out/in-memory-neighbours";
+import { callerOf } from "../adapters/out/in-memory-neighbours";
+import { projectsPorts } from "../test-support";
 import { saveKeptSpaceSecret } from "./save-kept-space-secret";
 
 describe("saveKeptSpaceSecret", () => {
 	test("a Member who saves Flows may; a viewer is refused", async () => {
-		const p = inMemoryProjectsPorts();
+		const p = await projectsPorts();
 		p.members.join("person-bob", "space-1", "viewer");
 		await p.spaceStore.set("space-1", "A_TOKEN", "value-a", "person-bob");
 		await expect(
@@ -29,7 +27,7 @@ describe("saveKeptSpaceSecret", () => {
 	});
 
 	test("a Host that keeps no such Space refuses", async () => {
-		const p = inMemoryProjectsPorts();
+		const p = await projectsPorts();
 		p.spaces.hosts.set("space-1", "host-2");
 		await expect(
 			saveKeptSpaceSecret(p)(callerOf(p.members), {

@@ -1,14 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import { Refusal } from "@nightshift/refusal";
-import {
-	callerOf,
-	inMemoryProjectsPorts,
-} from "../adapters/out/in-memory-neighbours";
+import { callerOf } from "../adapters/out/in-memory-neighbours";
+import { projectsPorts } from "../test-support";
 import { listKeptSpaceSecrets } from "./list-kept-space-secrets";
 
 describe("listKeptSpaceSecrets", () => {
 	test("Members list the names; others are refused", async () => {
-		const p = inMemoryProjectsPorts();
+		const p = await projectsPorts();
 		await p.spaceStore.set("space-1", "A_TOKEN", "value-a", "person-gone");
 		expect(
 			await listKeptSpaceSecrets(p)(callerOf(p.members), {
@@ -29,7 +27,7 @@ describe("listKeptSpaceSecrets", () => {
 	});
 
 	test("a Host that keeps no such Space refuses", async () => {
-		const p = inMemoryProjectsPorts();
+		const p = await projectsPorts();
 		p.spaces.hosts.set("space-1", "host-2");
 		await expect(
 			listKeptSpaceSecrets(p)(callerOf(p.members), { spaceId: "space-1" }),

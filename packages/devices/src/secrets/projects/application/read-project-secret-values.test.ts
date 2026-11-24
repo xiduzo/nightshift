@@ -1,12 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { inMemoryProjectsPorts } from "../adapters/out/in-memory-neighbours";
+import { projectsPorts } from "../test-support";
 import { readProjectSecretValues } from "./read-project-secret-values";
 
 const step = { spaceId: "space-1", projectId: "project-1", runId: "run-1" };
 
 describe("readProjectSecretValues", () => {
 	test("in a Space this computer keeps, its own run of the Project, the Space's value over the Project's", async () => {
-		const p = inMemoryProjectsPorts();
+		const p = await projectsPorts();
 		p.places.runs.set("run-1", { walkerId: "self", ...step });
 		await p.store.set(step, "A_TOKEN", "from-project", "person-ada");
 		await p.store.set(step, "B_TOKEN", "value-b", "person-ada");
@@ -23,7 +23,7 @@ describe("readProjectSecretValues", () => {
 	});
 
 	test("in a Space a Host keeps, the Host checks the step", async () => {
-		const p = inMemoryProjectsPorts();
+		const p = await projectsPorts();
 		p.spaces.hosts.set("space-1", "host-1");
 		const sent: unknown[] = [];
 		p.calls.addHost("host-1", {
@@ -42,7 +42,7 @@ describe("readProjectSecretValues", () => {
 	});
 
 	test("no name asks nothing", async () => {
-		const p = inMemoryProjectsPorts();
+		const p = await projectsPorts();
 		expect(await readProjectSecretValues(p)({ step, names: [] })).toEqual({});
 		expect(p.spaces.asked).toEqual([]);
 	});
