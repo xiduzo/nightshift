@@ -1,11 +1,7 @@
 import type { Database } from "@nightshift/db";
 import { event, run } from "@nightshift/db/schema";
 import { and, asc, eq, inArray, isNotNull } from "drizzle-orm";
-import {
-	closeOpenWork,
-	pruneCheckpoints,
-	type RunHolds,
-} from "../../../../graph";
+import { closeOpenWork, type RunHolds } from "../../../../graph";
 import {
 	type EngineEventType,
 	groupByRun,
@@ -32,7 +28,6 @@ export type DrizzleOpenWorkDeps = Omit<CloseDeps, "holds"> & {
 export function drizzleOpenWork(deps: DrizzleOpenWorkDeps): OpenWork {
 	const { db, log } = deps;
 	return {
-		pruneCheckpoints: () => pruneCheckpoints(db),
 		async walkedHere() {
 			// Only the runs this Device walks, as their rows say: a run walked
 			// elsewhere is its Walker's to recover. A run moved here has the

@@ -1113,7 +1113,7 @@ describe("Agent outcomes and output schemas", () => {
 });
 
 describe("flow format 1", () => {
-	test("a run snapshot of format 1 still loads and resumes", async () => {
+	test("a run with events of an older shape still lists and opens", async () => {
 		const engine = makeEngine(fakeHarness());
 		const projectIdV1 = await projectId(engine);
 		const top = {
@@ -1282,24 +1282,14 @@ describe("flow format 1", () => {
 			expect.objectContaining({ name: "item", type: "json", required: true }),
 		]);
 		const loop = stepOf(loaded, "loop");
-		// A For Each step from before flow version 4 reads as a Call step.
 		expect(loop.nodeType).toBe("call");
 		expect((await openStep(engine, loaded, "loop")).items[0]).toMatchObject({
 			id: "12",
 			title: "first",
-			value: { number: 12, parent: { number: 7, title: "The Epic" } },
+			value: null,
 		});
-		expect(stepOf(loaded, "work").scope).toEqual({
-			parentStepId: "loop-1",
-			itemId: "12",
-		});
-
-		await engine.act(runId, { kind: "resume" });
-		const detail = await waitForEnd(engine, runId);
-		expect(detail.status).toBe("finished");
-		expect(logOf(detail, "work")).toBe("first #12 of #7 on main");
-		expect(logOf(detail, "after")).toBe("epic 7: #12 done");
-		expect(stepOf(detail, "loop").items).toHaveLength(1);
+		// Its scope names no parent step, so it shows at the top level.
+		expect(stepOf(loaded, "work").scope).toBeNull();
 	});
 
 	test("the rpgdotexe example flows start and walk to the first agent", async () => {

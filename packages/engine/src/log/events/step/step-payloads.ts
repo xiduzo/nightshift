@@ -86,9 +86,7 @@ export type GateBrief = {
  * flow that a Call step called. `parentStepId` is that step; `itemId` is
  * the element of a Call with `each` (null for a Call once). Step ids are
  * unique, so the innermost caller is enough: the caller has a scope of its
- * own, and the chain of scopes leads up to the top level. Logs written
- * before flow format 2 say `forEachStepId`; `parseEventRow` reads them as
- * `parentStepId`.
+ * own, and the chain of scopes leads up to the top level.
  */
 export type Scope = { parentStepId: string; itemId: string | null };
 
@@ -254,8 +252,7 @@ export type StepPayloads = {
 		prompt: string;
 		/** The harness session this session continues, on a resume. */
 		resumeSessionId: string | null;
-		/** Absent in logs from before Slice 8: those sessions ran on Claude Code. */
-		harness?: AgentHarnessName;
+		harness: AgentHarnessName;
 	};
 	HarnessSessionAssigned: { harnessSessionId: string; model: string | null };
 	/**

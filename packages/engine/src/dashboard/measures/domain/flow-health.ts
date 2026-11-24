@@ -150,14 +150,10 @@ function toFlowRun({
 	return { ...run, warnings: run.warnings.length };
 }
 
-/**
- * Scores with numbers of their own: left out of the score rows. A run
- * score names the useful answer `useful`. `pr_useful` is its older name.
- */
+/** Scores with numbers of their own: left out of the score rows. */
 const NOT_IN_SCORE_ROWS: ReadonlySet<string> = new Set([
 	"gate_decision",
 	"useful",
-	"pr_useful",
 ]);
 
 /**

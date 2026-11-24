@@ -63,7 +63,7 @@ export type RunMetrics = {
 	 * The feedback on the run (`Scored`), oldest first: each Gate answered,
 	 * whether a person found it `useful`, what became of its pull request,
 	 * and the flow's own scores. Only a run's metrics have them. Older Hosts
-	 * send none, or the useful answer as `pr_useful`.
+	 * send none.
 	 */
 	scores?: RunScore[];
 	/**

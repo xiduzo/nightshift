@@ -164,7 +164,7 @@ The GenAI conventions are still in development.
 | Name | Value |
 | --- | --- |
 | `gate_decision` | A Gate was answered. The label is the option, and `nightshift.score.by` says who chose it. |
-| `useful` | A person answered "Was this run useful?": 1 for yes, 0 for no. An older Night Shift writes `pr_useful`. |
+| `useful` | A person answered "Was this run useful?": 1 for yes, 0 for no. |
 | `pr_merged`, `pr_closed`, `reverted_within_7d` | What became of a run's pull request, from a schedule that [scores pull requests](triggers.md#score-runs-by-their-pull-requests). |
 
 A counter only adds. A no to "Was this run useful?" adds 0, and a changed

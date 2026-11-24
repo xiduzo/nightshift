@@ -158,7 +158,7 @@ export const metricsSchema = z.object({
 	/**
 	 * The feedback on a run: each Gate answered, whether a person found it
 	 * `useful`, what became of its pull request, and the flow's own scores.
-	 * Older Hosts send none, or the useful answer as `pr_useful`. A score's
+	 * Older Hosts send none. A score's
 	 * name is an open list: a newer peer's name passes. Older Hosts send no `by`.
 	 */
 	scores: z

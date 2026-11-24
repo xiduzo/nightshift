@@ -143,7 +143,12 @@ export function runEvents(runId = "run-1") {
 		) =>
 			push(
 				"SessionStarted",
-				{ prompt: "p", resumeSessionId: null, ...extra },
+				{
+					prompt: "p",
+					resumeSessionId: null,
+					harness: "claude-code",
+					...extra,
+				},
 				{ stepId, sessionId },
 			),
 		harness: (

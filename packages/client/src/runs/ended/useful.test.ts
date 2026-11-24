@@ -54,10 +54,6 @@ describe("Useful on the run page", () => {
 		expect(knownUseful([useful(1)], false)).toBe(false);
 	});
 
-	test("reads the answer an older Host sends as pr_useful", () => {
-		expect(knownUseful([{ score: "pr_useful", value: 1 }], null)).toBe(true);
-	});
-
 	test("remembers a tap for that run", () => {
 		rememberUseful("run-remember", false);
 		expect(rememberedUseful("run-remember")).toBe(false);

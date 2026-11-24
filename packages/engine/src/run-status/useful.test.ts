@@ -12,13 +12,6 @@ describe("usefulAnswer", () => {
 		);
 	});
 
-	test("reads the older name pr_useful as the same answer", () => {
-		expect(usefulAnswer([answer("pr_useful", 1)])).toBe(true);
-		expect(usefulAnswer([answer("pr_useful", 1), answer("useful", 0)])).toBe(
-			false,
-		);
-	});
-
 	test("is null when nobody answered", () => {
 		expect(usefulAnswer(undefined)).toBeNull();
 		expect(usefulAnswer([])).toBeNull();

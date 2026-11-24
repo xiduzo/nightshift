@@ -2,6 +2,7 @@ import {
 	DEFAULT_GATE_URGENCY,
 	type FlowNodeType,
 	type ItemState,
+	NODE_TYPE_LABEL,
 } from "@nightshift/flows";
 import {
 	answeredBy,
@@ -25,15 +26,11 @@ import { type DerivedStep, type StepOpening, visitKey } from "./run-state";
  * openings and ends, its sleeps, its Gate, its items and its clock.
  */
 
-/** The node types of runs from before flow version 4, read as today's. */
-const legacyNodeTypes: Readonly<Record<string, FlowNodeType>> = {
-	subflow: "call",
-	foreach: "call",
-};
-
-/** A logged node type as today's `FlowNodeType`: a Subflow and a For Each step are Call steps. */
+/** A logged node type. One this build does not know reads as a Call step: no reader of a step meets it. */
 function nodeTypeOf(logged: string): FlowNodeType {
-	return legacyNodeTypes[logged] ?? (logged as FlowNodeType);
+	return Object.hasOwn(NODE_TYPE_LABEL, logged)
+		? (logged as FlowNodeType)
+		: "call";
 }
 
 /** Why an item that was still running ended with its Call step. */

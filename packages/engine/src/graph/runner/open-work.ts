@@ -16,7 +16,7 @@ import {
 	parkedSteps,
 	withEnclosing,
 } from "../../read";
-import { type CutShortOutcome, type NodeKind, PLAIN_KIND } from "../context";
+import type { CutShortOutcome, NodeKind } from "../context";
 import { NODE_KINDS } from "../nodes";
 import type { Overdue } from "./deadlines";
 import { letGo, type RunHolds } from "./holds";
@@ -158,8 +158,7 @@ const CUTS = {
  * - `interrupted`: every step gets "Night Shift stopped while this ran.";
  *   the run gets `cut.reason`.
  *
- * `flows` gives each step its node (null: no step has one). A step of a
- * kind an old log has and the engine no longer knows keeps its outputs.
+ * `flows` gives each step its node (null: no step has one).
  */
 export function closingEvents(
 	runState: RunState,
@@ -292,20 +291,14 @@ async function runFlowsOf(
 	}
 }
 
-/**
- * The outputs a cut-short step ends with (`NodeKind.cutShortOutputs`). A
- * step of a kind that no longer exists (a log from before the kinds of
- * today, such as a `gate` step) keeps its outputs, as a plain kind does.
- */
+/** The outputs a cut-short step ends with (`NodeKind.cutShortOutputs`). */
 function cutShortOutputsOf(
 	step: DerivedStep,
 	node: FlowNode | undefined,
 	outcome: CutShortOutcome,
 ): StepOutputs {
-	const kind: NodeKind | undefined = NODE_KINDS[step.nodeType] as
-		| NodeKind
-		| undefined;
-	return (kind ?? PLAIN_KIND).cutShortOutputs(step, node, outcome);
+	const kind = NODE_KINDS[step.nodeType] as NodeKind;
+	return kind.cutShortOutputs(step, node, outcome);
 }
 
 /**

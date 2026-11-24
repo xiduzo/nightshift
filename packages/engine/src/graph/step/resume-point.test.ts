@@ -235,6 +235,31 @@ describe("resumePoint", () => {
 			);
 		});
 
+		test("a held wait without a continuation (an old checkpoint): the step continues the session in its log", () => {
+			const { session: _, ...flat } = waitPending("s1", null) as Extract<
+				Pending,
+				{ kind: "wait" }
+			>;
+			const old = {
+				...flat,
+				harnessSessionId: "h1",
+				prompt: "Carry on.",
+				resetAt: 1_500,
+			} as unknown as Pending;
+			expectTable(
+				{
+					state: stateOf({ pending: old }),
+					events: logOf(started("s1"), ...session("s1", "h1")),
+				},
+				all({
+					kind: "continue",
+					stepId: "s1",
+					harnessSessionId: "h1",
+					prompt: DEFAULT_RESUME_PROMPT,
+				}),
+			);
+		});
+
 		test("without a harness session the continued step has no follow-up prompt", () => {
 			const events = logOf(started("s1", NODE.id, 1, null, "decision"));
 			expectTable(

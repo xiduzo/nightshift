@@ -29,6 +29,7 @@ import { asc, eq } from "drizzle-orm";
 import { NIGHT_SHIFT } from "../../src/contract";
 import type { Engine, EngineInternals } from "../../src/engine";
 import { GateClosedError } from "../../src/gates";
+import { appendEvent } from "../../src/log/run-log/append";
 import { createRunLog, type RunLog } from "../../src/log/run-log/run-log";
 import type { TranscriptEntry } from "../../src/log/transcript/step-events";
 import type { LandedFact } from "../../src/read/landed-facts";
@@ -1993,6 +1994,128 @@ describe("recovery prunes", () => {
 			["worker", "pass"],
 			["check", "pass"],
 		]);
+	});
+});
+
+describe("recovery of an open run of an older shape", () => {
+	test("it ends interrupted with the reason, and the next run goes on", async () => {
+		const dying = scriptedHarness({ hang: true });
+		const first = makeEngine(dying.harness);
+		const project = await projectId(first);
+		const oldRun = "00000000-old-run";
+		await sandbox.db.insert(run).values({
+			id: oldRun,
+			spaceId: sandbox.spaceId,
+			projectId: project,
+			flowName: "night",
+			flow: JSON.stringify({
+				version: 1,
+				start: "loop",
+				nodes: [
+					{
+						id: "loop",
+						type: "foreach",
+						position: { x: 0, y: 0 },
+						source: { kind: "command", command: "true" },
+						flow: "build",
+						haltOn: [],
+					},
+				],
+				edges: [],
+			}),
+			title: "night",
+			worktreePath: sandbox.repoPath,
+			branch: "main",
+			baseRef: "main",
+			walkerId: sandbox.deviceId,
+		});
+		const push = (
+			type: string,
+			payload: unknown,
+			ids: { stepId?: string; sessionId?: string } = {},
+		) =>
+			appendEvent(
+				sandbox.db,
+				{
+					type: type as "RunEnded",
+					runId: oldRun,
+					...ids,
+					payload: payload as never,
+				},
+				sandbox.deviceId,
+			);
+		const stepStarted = (
+			stepId: string,
+			nodeId: string,
+			nodeType: string,
+			scope?: unknown,
+		) =>
+			push(
+				"StepStarted",
+				{
+					nodeId,
+					nodeType,
+					visit: 1,
+					transcriptPath: join(sandbox.dataDir, `${stepId}.ndjson`),
+					logPath: null,
+					scope,
+				},
+				{ stepId },
+			);
+		await push("RunStarted", {
+			projectId: project,
+			flowName: "night",
+			title: "night",
+			start: "loop",
+			params: {},
+		});
+		await stepStarted("old-loop", "loop", "foreach");
+		await push(
+			"ItemStarted",
+			{
+				item: { id: "12", number: 12, title: "first", url: null },
+				index: 1,
+				branch: null,
+				baseBranch: null,
+			},
+			{ stepId: "old-loop" },
+		);
+		await stepStarted("old-work", "work", "agent", {
+			forEachStepId: "old-loop",
+			itemId: "12",
+		});
+		await push(
+			"SessionStarted",
+			{ prompt: "Go", resumeSessionId: null },
+			{ stepId: "old-work", sessionId: "old-session" },
+		);
+		const next = await first.startRun({
+			projectId: project,
+			flow: flowOf([agent("worker", "Go")], []),
+		});
+		await waitFor(() => dying.sessions[0]);
+
+		const { harness, sessions } = scriptedHarness();
+		const second = makeEngine(
+			harness,
+			{ settings: settingsWith({ resumeInterruptedRuns: false }) },
+			{ resumeGraceMs: 0 },
+		);
+		await waitForStatus(second, oldRun, "interrupted");
+		const ended = await second.getRun(oldRun);
+		expect(ended.reason).toContain("Night Shift stopped while this run ran.");
+		expect(ended.steps.map((s) => [s.nodeId, s.outcome])).toEqual([
+			["loop", "interrupted"],
+			["work", "interrupted"],
+		]);
+		expect((await second.listRuns()).map((r) => r.status)).toEqual([
+			"interrupted",
+			"interrupted",
+		]);
+
+		await second.act(next.id, { kind: "resume" });
+		(await waitFor(() => sessions[0], { label: "the resume" })).finish();
+		expect(await waitForEnd(second, next.id)).toBe("finished");
 	});
 });
 

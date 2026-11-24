@@ -637,9 +637,8 @@ Decisions taken during the build, from the code and its comments:
     Subflow. No reader depends on the order between steps.
 
   For this, recovery reads the run's whole log, because its lifecycle
-  filter has no item events. It publishes on the bus. A step keeps its
-  outputs when its kind is in an old log but the engine no longer knows
-  it (a `gate` step). A run whose snapshot cannot be read ends its steps
+  filter has no item events. It publishes on the bus. A step of a kind
+  that the engine does not know reads as a Subflow. A run whose snapshot cannot be read ends its steps
   without their nodes. So no cut throws.
 - **The runner publishes `status-changed` on step chunks**
   (`runner.onCustom`). The `step-started` and `step-ended` custom stream
@@ -1030,11 +1029,8 @@ refuses a person's.
 The pending wait has one shape (`PendingWait`): the step, the visit, the
 reason, `until`, the message, the streak, `session` and `signal`.
 `session` is what a policy wait continues: the harness session and the
-follow-up prompt. It is null for a Wait node. A checkpoint written before
-2026-10-19 holds the continuation flat (`harnessSessionId`, `prompt`, and
-a `resetAt` nobody read). `pendingWaitOf` is the one reader of a pending
-wait, and it reads both shapes. A run that slept across the upgrade
-continues, and its next wake writes today's shape. `graph/step/sleep.test.ts`
+follow-up prompt. It is null for a Wait node. `pendingWaitOf` is the one reader of a pending
+wait. Without a `session` a step continues the session in its log. `graph/step/sleep.test.ts`
 runs plan, persist, interrupt and wake for both kinds of wait. It covers
 the timer, a signal, an early resume, the stop time, a full run cap, and
 a new daemon's restore.

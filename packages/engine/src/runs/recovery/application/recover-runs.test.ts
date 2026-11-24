@@ -78,7 +78,6 @@ describe("recoverRuns", () => {
 		const { ports, recover } = setup();
 		ports.openWork.add("run-1", ran("run-1"));
 		expect(await recover()).toEqual(["run-1"]);
-		expect(ports.openWork.pruned).toBe(1);
 		expect(ports.turns.taken).toEqual([
 			{ runId: "run-1", intent: { kind: "overdue", graceMs: 0 } },
 			{ runId: "run-1", intent: { kind: "prune" } },
@@ -157,14 +156,6 @@ describe("recoverRuns", () => {
 		expect(ports.turns.restored.map((r) => r.runId)).toEqual(["run-3"]);
 	});
 
-	test("checkpoints that cannot be pruned do not stop recovery", async () => {
-		const { ports, recover } = setup();
-		ports.openWork.add("run-1", ran("run-1"));
-		ports.openWork.failNext("prune");
-		expect(await recover()).toEqual(["run-1"]);
-		expect(warned[0]?.[0]).toBe("[engine] could not prune the checkpoints");
-	});
-
 	test("a run that cannot let go is logged, and recovery goes on", async () => {
 		const { ports, recover } = setup({
 			"run-1": "schedules are paused.",
@@ -172,7 +163,7 @@ describe("recoverRuns", () => {
 		});
 		ports.openWork.add("run-1", ran("run-1"));
 		ports.openWork.add("run-2", ran("run-2"));
-		ports.openWork.failNext("letGo");
+		ports.openWork.failNextLetGo();
 		expect(await recover()).toEqual([]);
 		expect(ports.openWork.letGone).toEqual(["run-2"]);
 		expect(warned[0]?.[0]).toBe(

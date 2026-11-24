@@ -69,15 +69,6 @@ export function saverFor(db: Database): LibsqlSaver {
 	return new LibsqlSaver(db.$client);
 }
 
-/**
- * Prunes every run's thread to what a resume reads (`pruneAll`): startup
- * recovery's sweep, which also cleans a database from before the saver
- * kept only the latest checkpoint.
- */
-export function pruneCheckpoints(db: Database): Promise<void> {
-	return saverFor(db).pruneAll();
-}
-
 export class LibsqlSaver extends BaseCheckpointSaver {
 	constructor(
 		private readonly client: Client,
@@ -357,22 +348,6 @@ export class LibsqlSaver extends BaseCheckpointSaver {
 			],
 			"write",
 		);
-	}
-
-	/**
-	 * Prunes every thread with more than it needs (`pruneThread`): the
-	 * one-off cleanup of a database from before the saver kept only the
-	 * latest checkpoint. Idempotent, and cheap: it reads no thread that holds
-	 * one checkpoint and no stray write.
-	 */
-	async pruneAll(): Promise<void> {
-		const { rows } = await this.client.execute(`
-      SELECT thread_id FROM lg_checkpoint GROUP BY thread_id HAVING count(*) > 1
-      UNION
-      SELECT w.thread_id FROM lg_write AS w WHERE NOT EXISTS (SELECT 1 FROM lg_checkpoint AS c
-        WHERE c.thread_id = w.thread_id AND c.checkpoint_ns = w.checkpoint_ns
-          AND c.checkpoint_id = w.checkpoint_id)`);
-		for (const row of rows) await this.pruneThread(String(row.thread_id));
 	}
 
 	async deleteThread(threadId: string): Promise<void> {

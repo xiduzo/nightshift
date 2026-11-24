@@ -32,10 +32,6 @@ export type RecoverRunsPorts = {
 export const recoverRuns =
 	(ports: RecoverRunsPorts) => async (): Promise<string[]> => {
 		const { openWork, turns } = ports;
-		// Every thread keeps only what a resume reads. Cheap once clean.
-		await openWork.pruneCheckpoints().catch((error) => {
-			console.warn("[engine] could not prune the checkpoints", error);
-		});
 		const toResume: string[] = [];
 		for (const [runId, events] of await openWork.walkedHere()) {
 			// The lifecycle events are enough to see what is open.

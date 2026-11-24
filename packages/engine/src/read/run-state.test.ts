@@ -187,7 +187,6 @@ test("harness session lookups", () => {
 		.harness("s2", "b", "h-2");
 	expect(lastHarnessSessionOfNode(foldRun(events), "worker")).toBe("h-1");
 	expect(lastHarnessSessionOfNode(foldRun(events), "check")).toBeNull();
-	// A session logged before Slice 8 names no harness: it ran on Claude Code.
 	expect(lastHarnessSession(foldRun(events))).toEqual({
 		harness: "claude-code",
 		harnessSessionId: "h-2",
@@ -263,7 +262,7 @@ test("a cost tally knows what it does not know", () => {
 	);
 	push(
 		"SessionStarted",
-		{ prompt: "go", resumeSessionId: null },
+		{ prompt: "go", resumeSessionId: null, harness: "claude-code" },
 		{
 			stepId: "s1",
 			sessionId: "b",
@@ -415,7 +414,11 @@ describe("sessionCost", () => {
 		const push: typeof b.push = (type, payload) =>
 			b.push(type, payload, { stepId: "s1", sessionId: "a" });
 		const events = b.events;
-		push("SessionStarted", { prompt: "go", resumeSessionId: null });
+		push("SessionStarted", {
+			prompt: "go",
+			resumeSessionId: null,
+			harness: "claude-code",
+		});
 		push("SessionUsage", { ...spent, costUsd: 0.1 });
 		push("SessionUsage", spent);
 		expect([...foldRun(events).sessions.values()][0]?.spent).toEqual(spent);
@@ -646,8 +649,8 @@ describe("sleeps", () => {
 	});
 });
 
-describe("node types of runs from before flow version 4", () => {
-	test("a Subflow step and a For Each step read as Call steps", () => {
+describe("an event of a shape this build does not know", () => {
+	test("a step of an unknown node type reads as a Call step", () => {
 		const b = log().runStarted();
 		const started = (stepId: string, nodeId: string, nodeType: string) =>
 			b.push(
@@ -663,13 +666,23 @@ describe("node types of runs from before flow version 4", () => {
 				{ stepId },
 			);
 		started("s1", "sub", "subflow");
-		started("s2", "loop", "foreach");
+		started("s2", "approve", "gate");
 		started("s3", "worker", "agent");
 		expect(deriveSteps(foldRun(b.events)).map((s) => s.nodeType)).toEqual([
 			"call",
 			"call",
 			"agent",
 		]);
+	});
+
+	test("a session that names no harness folds, and the run's cost counts it", () => {
+		const b = log().runStarted();
+		b.push("SessionStarted", { prompt: "go", resumeSessionId: null } as never, {
+			stepId: "s1",
+			sessionId: "a",
+		});
+		b.sessionEnded("s1", "a", "finished", 0.25);
+		expect(sumCost(foldRun(b.events)).usd).toBe(0.25);
 	});
 });
 

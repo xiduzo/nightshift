@@ -92,7 +92,7 @@ export type ThreadState =
 export type ThreadSnapshot = {
 	state: ThreadState;
 	values: Partial<RunStateValues>;
-	/** False for a thread that never ran, or a run from before this engine. */
+	/** False for a thread that never ran, or died before its first checkpoint. */
 	hasCheckpoint: boolean;
 	/** The thread still has a task: an interrupt, or a node a stop or a death cut short. */
 	hasTasks: boolean;

@@ -12,9 +12,7 @@ import type { ScoreName } from "./run";
  *   the option it took, `by` who chose it: a person, or its deadline.
  * - `useful`: a person said whether the run was useful ("Was this run
  *   useful?" on a finished run). `value` is 1 for yes and 0 for no. On the
- *   run. A later answer replaces the one before (`usefulAnswer`). An older
- *   build wrote it as `pr_useful`: `runScore` reads that name as `useful`,
- *   so every reader sees one name.
+ *   run. A later answer replaces the one before (`usefulAnswer`).
  * - `pr_merged`, `pr_closed`, `reverted_within_7d`: the optional scorer
  *   for code, what became of the pull request the run opened. A GitHub
  *   webhook of a schedule with `scorePullRequests` writes them, and so does
@@ -57,17 +55,14 @@ export function answeredBy(
 	return payload.score === "gate_decision" ? (payload.by ?? null) : null;
 }
 
-/** The older name of the useful answer. Older logs keep it: it is read as `useful`. */
-const OLD_USEFUL: ScoreName = "pr_useful";
-
-/** A `Scored` event as a run score. `pr_useful` reads as `useful`. */
+/** A `Scored` event as a run score. */
 export function runScore(e: {
 	stepId: string | null;
 	at: number;
 	payload: EnginePayloads["Scored"];
 }): RunScore {
 	return {
-		score: e.payload.score === OLD_USEFUL ? "useful" : e.payload.score,
+		score: e.payload.score,
 		value: e.payload.value,
 		label: e.payload.label,
 		stepId: e.stepId,
@@ -83,7 +78,6 @@ const OWN_SCORES: ReadonlySet<string> = new Set<ScoreName>([
 	"pr_merged",
 	"pr_closed",
 	"reverted_within_7d",
-	"pr_useful",
 ]);
 
 /** The name of a score a flow writes: letters, digits, `_` and `-`. */

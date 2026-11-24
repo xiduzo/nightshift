@@ -52,7 +52,6 @@ export {
 	type StepRung,
 	scopeKey,
 } from "./step";
-export { upgradePayload } from "./upgrade-payload";
 export type {
 	HoldSection,
 	LeaseWait,

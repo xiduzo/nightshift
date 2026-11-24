@@ -275,7 +275,7 @@ export function momentEvent(
 				"score.name": listed(
 					USAGE_EVENT.runScored,
 					"score.name",
-					scoreName(moment.score),
+					moment.score,
 					"_OTHER",
 				),
 				"score.value": scoreValue(moment.value),
@@ -371,9 +371,4 @@ export function momentEvent(
 function scoreValue(value: number): number {
 	if (!Number.isFinite(value)) return 0;
 	return Math.round(Math.max(0, value) * 100) / 100;
-}
-
-/** An older log names the useful answer `pr_useful`. It is the same score. */
-function scoreName(score: string): string {
-	return score === "pr_useful" ? "useful" : score;
 }

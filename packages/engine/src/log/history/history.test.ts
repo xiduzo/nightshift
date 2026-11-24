@@ -214,6 +214,48 @@ describe("a batch that lands", () => {
 		expect(session?.harnessSessionId).toBe("harness-1");
 	});
 
+	test("takes events of an older shape, and reads them", async () => {
+		const { stepId } = await walkOnA("r1");
+		await projectOnB();
+		const old = (type: string, payload: unknown) =>
+			a.log.append({
+				type: type as "ItemsRead",
+				runId: "r1",
+				stepId,
+				payload: payload as { count: number; open: number },
+			});
+		await old("StepStarted", {
+			nodeId: "n",
+			nodeType: "foreach",
+			visit: 2,
+			transcriptPath: "/logs/old.ndjson",
+			logPath: null,
+			scope: { forEachStepId: "gone", itemId: "12" },
+		});
+		await old("ItemStarted", {
+			item: { id: "12", number: 12, title: "first", url: null, body: "text" },
+			index: 1,
+			branch: null,
+			baseBranch: null,
+		});
+		await old("Scored", { score: "pr_useful", value: 1, label: null });
+		const added = await b.history.ingest(await rowsOfA());
+		expect(added.map((e) => e.type)).toEqual([
+			"RunStarted",
+			"StepStarted",
+			"HarnessSessionAssigned",
+			"StepStarted",
+			"ItemStarted",
+			"Scored",
+		]);
+		const read = await b.log.state("r1");
+		expect(read.steps.get(stepId)).toMatchObject({
+			nodeType: "call",
+			scope: null,
+			items: [{ facts: { id: "12", title: "first" }, open: true }],
+		});
+	});
+
 	test("saves what a Since last run step saw, on both Replicas; a key saved here later stays", async () => {
 		const { stepId } = await walkOnA("r1");
 		await a.log.append({

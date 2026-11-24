@@ -279,27 +279,6 @@ describe("LibsqlSaver", () => {
 		expect(await rows("lg_write", "run-1")).toEqual(before);
 	});
 
-	test("pruneAll prunes every thread that holds more than a resume reads", async () => {
-		const legacy = async (threadId: string, ids: string[]) => {
-			await sandbox.db.$client.batch(
-				ids.map((id) => ({
-					sql: "INSERT INTO lg_checkpoint (thread_id, checkpoint_ns, checkpoint_id, type, checkpoint, metadata) VALUES (?, '', ?, 'json', '{}', '{}')",
-					args: [threadId, id],
-				})),
-				"write",
-			);
-		};
-		await legacy("old-1", [uuid6(-3), uuid6(-3), uuid6(-3)]);
-		await legacy("old-2", [uuid6(-3), uuid6(-3)]);
-		await saver.put(thread("clean"), checkpoint(), metadata(-1), {});
-
-		await saver.pruneAll();
-
-		for (const threadId of ["old-1", "old-2", "clean"]) {
-			expect(await rows("lg_checkpoint", threadId)).toHaveLength(1);
-		}
-	});
-
 	test("deleteThread removes the thread's checkpoints and writes, nothing else", async () => {
 		const gone = await saver.put(
 			thread("gone"),

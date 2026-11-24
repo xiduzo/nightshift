@@ -3,12 +3,7 @@ import { event, project, run } from "@nightshift/db/schema";
 import { instant } from "@nightshift/time";
 import { sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
-import {
-	type EngineEventType,
-	type EventInput,
-	type LoggedEvent,
-	upgradePayload,
-} from "../events";
+import type { EngineEventType, EventInput, LoggedEvent } from "../events";
 
 /**
  * An event as a row of the log: how to append one, and how to read one
@@ -118,14 +113,18 @@ export function landedEvent(
 }
 
 export function parseEventRow(row: typeof event.$inferSelect): LoggedEvent {
-	const type = row.type as EngineEventType;
+	const payload = JSON.parse(row.payload);
+	// A scope with no parent step is no scope: the step is at the top level.
+	if (payload?.scope && typeof payload.scope.parentStepId !== "string") {
+		payload.scope = null;
+	}
 	return {
 		seq: row.seq,
 		runId: row.runId,
 		stepId: row.stepId,
 		sessionId: row.sessionId,
-		type,
-		payload: upgradePayload(type, JSON.parse(row.payload)),
+		type: row.type,
+		payload,
 		at: instant(row.at),
 	} as LoggedEvent;
 }

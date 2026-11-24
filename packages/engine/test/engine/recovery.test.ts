@@ -298,7 +298,7 @@ describe("startup recovery: what a dead daemon's work ends with", () => {
 		});
 	});
 
-	test("a step of a kind from an old log, in a run whose flow cannot be read, still ends", async () => {
+	test("a step of a kind this build does not know, in a run whose flow cannot be read, still ends", async () => {
 		await insertRun(sandbox.repoPath, "not a flow");
 		await deadDaemonLog((b) => b.step("g", "approve", "gate"));
 		const events = await recover((row) => JSON.parse(row.flow));
@@ -306,7 +306,7 @@ describe("startup recovery: what a dead daemon's work ends with", () => {
 			{
 				stepId: "g",
 				outcome: "interrupted",
-				outputs: { visit: 1, outcome: "interrupted" },
+				outputs: { ended: "", visit: 1, outcome: "interrupted" },
 				error: "Night Shift stopped while this ran.",
 			},
 		]);

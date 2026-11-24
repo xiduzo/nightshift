@@ -2,7 +2,6 @@
 
 export {
 	createRunWalks,
-	pruneCheckpoints,
 	type RunWalks,
 	type WalkFiles,
 } from "./checkpoints";

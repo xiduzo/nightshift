@@ -57,8 +57,8 @@ import {
  */
 
 /**
- * The state a thread without a checkpoint (a run from before this engine)
- * is re-entered with, from the log: the inputs and the stop time, the
+ * The state a thread without a checkpoint (the daemon died before the
+ * first one) is re-entered with, from the log: the inputs and the stop time, the
  * committed visits of every top-level node (`loggedVisits`), the node
  * outputs for templates and the edge counts. Without it every node with a
  * step in the log looks uncommitted (`Position.uncommitted`), so a Call
@@ -219,8 +219,8 @@ export function rerunNodeRefusal(flow: Flow, nodeId: string): string | null {
  * - a thread that ended or never ran: a jump to the top-level node the log
  *   points at (`resumeTarget`). A finished run re-enters on its own latest
  *   checkpoint, with the `reenteredNode`'s last visit taken back so the
- *   node reopens its step; a thread with no checkpoint (a run from before
- *   this engine) is seeded from the log (`reentryUpdate`).
+ *   node reopens its step; a thread with no checkpoint (the daemon died
+ *   before the first one) is seeded from the log (`reentryUpdate`).
  *
  * A rerun always jumps to its node, with the visits set to the log's
  * counts (`loggedVisits`: no step of an earlier walk is taken up again) and

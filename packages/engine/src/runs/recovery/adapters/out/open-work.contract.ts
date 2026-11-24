@@ -66,10 +66,6 @@ export function openWorkContract(
 			await under.close();
 		});
 
-		test("pruning the checkpoints settles when there is nothing to prune", async () => {
-			await under.openWork.pruneCheckpoints();
-		});
-
 		test("walkedHere gives the lifecycle events of the runs this computer walks, by run", async () => {
 			await under.add(
 				"run-1",

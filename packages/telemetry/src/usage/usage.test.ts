@@ -620,10 +620,10 @@ test("an explicit usage env of on may send before the notice is seen", async () 
 
 const PLATFORM = { os: "darwin", arch: "arm64", version: "1.0.0" };
 
-test("a useful answer leaves as run.scored, under one name for old and new logs", () => {
+test("a useful answer leaves as run.scored", () => {
 	const name = USAGE_EVENT.runScored;
 	const answer = momentEvent(
-		{ kind: "run-scored", runId: SECRET_RUN, score: "pr_useful", value: 0 },
+		{ kind: "run-scored", runId: SECRET_RUN, score: "useful", value: 0 },
 		"key",
 		PLATFORM,
 	);

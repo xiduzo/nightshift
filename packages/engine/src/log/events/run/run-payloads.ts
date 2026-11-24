@@ -240,9 +240,7 @@ export type ScoreName =
 	| "useful"
 	| "pr_merged"
 	| "pr_closed"
-	| "reverted_within_7d"
-	/** The older name of `useful`. Kept: older logs have it. Nothing writes it now. */
-	| "pr_useful";
+	| "reverted_within_7d";
 
 /** Where a Gate answer came from. `_OTHER` when the caller did not say. */
 export type GateVia = "web" | "phone" | "lock_screen" | "_OTHER";

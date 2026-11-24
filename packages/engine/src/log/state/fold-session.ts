@@ -17,7 +17,7 @@ export function applySessionEvent(
 			stepId: e.stepId,
 			prompt: e.payload.prompt,
 			resumeSessionId: e.payload.resumeSessionId,
-			harness: e.payload.harness ?? "claude-code",
+			harness: e.payload.harness,
 			harnessSessionId: null,
 			model: null,
 			startedAt: e.at,

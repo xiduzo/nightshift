@@ -15,9 +15,6 @@ import type { WaitPayloads } from "./wait-payloads";
  *
  * Transcript chunks (text deltas, tool calls, command output) never go here:
  * they live in the NDJSON transcript files.
- *
- * A payload written in an older shape is read in today's shape
- * (`upgrade-payload.ts`).
  */
 
 /**

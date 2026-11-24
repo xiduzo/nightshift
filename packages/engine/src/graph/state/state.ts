@@ -25,8 +25,8 @@ import {
  * node the run re-enters continues the same step and harness session.
  * The log keeps the facts a person reads and the ones crash recovery
  * needs; the state keeps what the next node reads. A finished run keeps
- * its latest checkpoint only (`runner.ts`), and a thread from before this
- * engine, with no checkpoint, is re-entered with these channels seeded from
+ * its latest checkpoint only (`runner.ts`), and a thread with no
+ * checkpoint is re-entered with these channels seeded from
  * the log (`reentryUpdate`).
  */
 

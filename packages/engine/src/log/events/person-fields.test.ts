@@ -95,7 +95,11 @@ const samples: { [T in EngineEventType]: EnginePayloads[T] } = {
 	StepEnded: { outcome: "pass", outputs: {}, error: null },
 	VariablesSet: { values: {}, scope: null },
 	GateOpened: { question: "Go?", choices: [{ name: "yes" }] },
-	SessionStarted: { prompt: "Go", resumeSessionId: null },
+	SessionStarted: {
+		prompt: "Go",
+		resumeSessionId: null,
+		harness: "claude-code",
+	},
 	HarnessSessionAssigned: { harnessSessionId: "h1", model: null },
 	SessionUsage: { usage, costUsd: null },
 	SessionEnded: {

@@ -1054,11 +1054,10 @@ describe("what a useful result costs", () => {
 			aRun({ id: "yes", costUsd: 2, metrics: scored([answer(1)]) }),
 			// The last answer counts.
 			aRun({ id: "no", costUsd: 1, metrics: scored([answer(1), answer(0)]) }),
-			// An older Host names the answer pr_useful.
 			aRun({
-				id: "old",
+				id: "also",
 				costUsd: 1,
-				metrics: scored([answer(1, "pr_useful")]),
+				metrics: scored([answer(1)]),
 			}),
 			// No answer, and it did not finish: its cost counts all the same.
 			aRun({ id: "failed", status: "failed", costUsd: 1.5 }),

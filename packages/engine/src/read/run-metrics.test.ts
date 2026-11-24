@@ -269,10 +269,10 @@ describe("runMetrics", () => {
 		]);
 	});
 
-	test("names a useful answer useful, an older log's pr_useful too", () => {
+	test("keeps every answer, oldest first", () => {
 		const { events } = night()
 			.at(1400)
-			.push("Scored", { score: "pr_useful", value: 1, label: null })
+			.push("Scored", { score: "useful", value: 1, label: null })
 			.at(1500)
 			.push("Scored", { score: "useful", value: 0, label: null });
 		expect(

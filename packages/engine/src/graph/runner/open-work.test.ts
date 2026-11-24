@@ -357,14 +357,16 @@ describe("closingEvents: a daemon that died", () => {
 });
 
 describe("closingEvents: an old log or a broken snapshot", () => {
-	test("a step of a kind that no longer exists keeps its outputs, for every cut", () => {
-		const { events } = log().started().step("g", "approve", "gate");
+	test("a step of a kind this build does not know ends as a Call step, for every cut", () => {
+		const { events } = log()
+			.started()
+			.step("g", "approve", "gate" as FlowNodeType);
 		expect(closingEvents(foldRun(events), STOPPED, FLOWS)).toEqual([
-			stepEnded("g", { visit: 1 }),
+			stepEnded("g", { ended: "", visit: 1 }),
 			runEnded("stopped"),
 		]);
 		expect(closingEvents(foldRun(events), INTERRUPTED, FLOWS)).toEqual([
-			stepEnded("g", { visit: 1 }, "interrupted", LOST),
+			stepEnded("g", { ended: "", visit: 1 }, "interrupted", LOST),
 			runEnded("interrupted", INTERRUPTED.reason),
 		]);
 	});

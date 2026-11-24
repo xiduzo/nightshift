@@ -120,9 +120,6 @@ export type SleepOutcome =
 	/** The wait would pass the stop time: the step ends `stopped` and the run parks. */
 	| { kind: "stop-time"; reason: string };
 
-const isPolicyReason = (reason: PendingWait["reason"]): boolean =>
-	reason === "usage-limit" || reason === "network";
-
 /** Why the run stopped instead of waiting: the wait would end after the stop time. */
 function stopTimeWaitReason(request: WaitRequest): string {
 	return request.reason === "usage-limit"
@@ -131,34 +128,14 @@ function stopTimeWaitReason(request: WaitRequest): string {
 }
 
 /**
- * A pending wait in today's shape: the one place that reads `pending` as a
- * sleep. A node passes the step the checkpoint holds for it
- * (`heldStep`, `graph/position/run-position.ts`).
- *
- * A checkpoint written before this module holds the wait's continuation
- * flat next to it (`harnessSessionId`, `prompt`, `resetAt`): a run that
- * slept across the upgrade is read as it is and written back in today's
- * shape on its next wake. `resetAt` was never read and is dropped.
+ * The pending wait of the step the checkpoint holds for a node (`heldStep`,
+ * `graph/position/run-position.ts`), or null when it holds no wait.
  */
 export function pendingWaitOf(
 	pending: Pending | null | undefined,
 ): PendingWait | null {
-	if (pending?.kind !== "wait") return null;
-	const raw = pending as PendingWait | LegacyPendingWait;
-	if ("session" in raw) return raw;
-	const { harnessSessionId, prompt, resetAt: _, ...wait } = raw;
-	return {
-		...wait,
-		session: isPolicyReason(raw.reason) ? { harnessSessionId, prompt } : null,
-	};
+	return pending?.kind === "wait" ? pending : null;
 }
-
-/** The shape of a pending wait before the sleep module (checkpoints up to 2026-10-19). */
-type LegacyPendingWait = Omit<PendingWait, "session"> & {
-	harnessSessionId: string | null;
-	prompt: string;
-	resetAt: number | null;
-};
 
 /**
  * The step's streak of waits for this reason: the pending wait's when the
@@ -379,9 +356,7 @@ export function waitNode(
 			until: pending.until,
 			message: pending.message,
 		}),
-		answer(raw, answer) {
-			// A checkpoint from before this module is read in today's shape.
-			const pending = pendingWaitOf(raw) as PendingWait;
+		answer(pending, answer) {
 			if (answer?.kind === "resume") {
 				return stopped(pending, answer.prompt ?? null);
 			}
@@ -412,7 +387,7 @@ export function waitNode(
 		// stopped, as a resume of a stopped sleep does.
 		stale: {
 			ctx,
-			letGo: (raw) => stopped(pendingWaitOf(raw) as PendingWait, null),
+			letGo: (pending) => stopped(pending, null),
 		},
 	});
 }

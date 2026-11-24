@@ -710,7 +710,7 @@ describe("pendingWaitOf: the one reader of a pending wait", () => {
 		streak: { count: 1, since: 1_000 },
 	};
 
-	test("reads today's shape as it is, and nothing that is not a wait", () => {
+	test("reads a pending wait as it is, and nothing that is not a wait", () => {
 		const pending: Pending = { ...base, reason: "usage-limit", session: null };
 		expect(pendingWaitOf(pending)).toBe(pending);
 		expect(pendingWaitOf(null)).toBeNull();
@@ -726,32 +726,5 @@ describe("pendingWaitOf: the one reader of a pending wait", () => {
 				reason: null,
 			}),
 		).toBeNull();
-	});
-
-	test("reads a checkpoint from before the module: the flat continuation becomes `session`, resetAt goes", () => {
-		const legacyAgent = {
-			...base,
-			reason: "usage-limit",
-			harnessSessionId: "h1",
-			prompt: "Carry on.",
-			resetAt: 1_500,
-		} as unknown as Pending;
-		expect(pendingWaitOf(legacyAgent)).toEqual({
-			...base,
-			reason: "usage-limit",
-			session: { harnessSessionId: "h1", prompt: "Carry on." },
-		});
-		const legacyWaitNode = {
-			...base,
-			reason: "duration",
-			harnessSessionId: null,
-			prompt: "",
-			resetAt: null,
-		} as unknown as Pending;
-		expect(pendingWaitOf(legacyWaitNode)).toEqual({
-			...base,
-			reason: "duration",
-			session: null,
-		});
 	});
 });

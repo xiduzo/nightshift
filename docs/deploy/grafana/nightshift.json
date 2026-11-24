@@ -157,7 +157,7 @@
 			"id": 15,
 			"type": "stat",
 			"title": "Useful runs",
-			"description": "Runs a person found useful. A no adds nothing. An older Night Shift names the score pr_useful.",
+			"description": "Runs a person found useful. A no adds nothing.",
 			"datasource": {
 				"type": "prometheus",
 				"uid": "${datasource}"
@@ -175,7 +175,7 @@
 						"type": "prometheus",
 						"uid": "${datasource}"
 					},
-					"expr": "sum(increase(nightshift_score_total{nightshift_project_id=~\"$project\", nightshift_flow_id=~\"$flow\", nightshift_score_name=~\"useful|pr_useful\"}[$__range])) or vector(0)",
+					"expr": "sum(increase(nightshift_score_total{nightshift_project_id=~\"$project\", nightshift_flow_id=~\"$flow\", nightshift_score_name=\"useful\"}[$__range])) or vector(0)",
 					"legendFormat": "useful"
 				}
 			],
