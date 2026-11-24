@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { FLOW_VERSION, flowSchema } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
+import { allowing } from "../../../access/adapters/out/in-memory-access";
 import { NIGHT_SHIFT } from "../../../contract";
 import { inMemorySourcesPorts } from "../adapters/out/in-memory-neighbours";
 import { syncKnowledgeSource } from "./sync-knowledge-source";
@@ -49,5 +50,23 @@ describe("syncKnowledgeSource", () => {
 		}).catch((error: unknown) => error);
 		expect(refusal).toBeInstanceOf(Refusal);
 		expect(ports.space.calls).toEqual(["flows.map"]);
+	});
+
+	test("owners, admins and members may, and nobody else", async () => {
+		const ports = inMemorySourcesPorts();
+		expect(
+			await ports.access.whoMay(
+				"space-1",
+				(actor) =>
+					syncKnowledgeSource(ports)({
+						actor,
+						spaceId: "space-1",
+						projectId: "p1",
+						name: "web",
+						startedBy: "person-1",
+					}),
+				() => ports.space.calls,
+			),
+		).toEqual(allowing("owner", "admin", "member"));
 	});
 });

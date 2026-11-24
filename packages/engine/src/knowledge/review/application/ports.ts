@@ -1,5 +1,3 @@
-import type { Permissions } from "@nightshift/auth";
-import type { Actor } from "../../../contract";
 import type { KnowledgeFile } from "../../files";
 import type { ProjectLearning } from "../../learnings";
 import type { KnowledgeSync, SourcesSpace } from "../../sources";
@@ -70,15 +68,4 @@ export type SourceSyncs = {
  */
 export type WaitingLearnings = {
 	learnings(projectIds: readonly string[]): Promise<ProjectLearning[]>;
-};
-
-/**
- * Who may act in a Space for this knowledge request.
- * @filledBy engine/runs
- */
-export type ReviewAccess = {
-	openSpace(
-		actor: Actor,
-		request: { spaceId: string; need?: Permissions },
-	): Promise<void>;
 };

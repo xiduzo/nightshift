@@ -1,4 +1,5 @@
 import type { Permissions } from "@nightshift/auth";
+import type { Access } from "../../access";
 import type { Actor } from "../../contract";
 import {
 	pausedTonight,
@@ -9,7 +10,6 @@ import { scheduleOf, withSchedule } from "../domain/saved-schedules";
 import type { ScheduleWatch } from "../domain/schedule-watch";
 import type {
 	Clock,
-	ScheduleAccess,
 	ScheduledProjects,
 	ScheduleLog,
 	ScheduleNotices,
@@ -20,7 +20,7 @@ import type {
 const STOPS_RUNS: Permissions = { run: ["stop"] };
 
 export type PauseScheduleTonightPorts = {
-	access: ScheduleAccess;
+	access: Pick<Access, "openSpace">;
 	projects: Pick<ScheduledProjects, "inSpace">;
 	store: Pick<ScheduleStore, "list" | "save">;
 	log: Pick<ScheduleLog, "histories">;

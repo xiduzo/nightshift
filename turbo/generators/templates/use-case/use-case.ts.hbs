@@ -1,8 +1,8 @@
 import type { Actor } from "{{{actorFromApplication}}}";
-import type { {{{slicePascal}}}Access } from "./ports";
+{{{accessImport}}}
 
 export type {{{useCasePascal}}}Ports = {
-	access: Pick<{{{slicePascal}}}Access, "openSpace">;
+	access: {{{accessType}}};
 };
 
 /** Which Space the request is for. */

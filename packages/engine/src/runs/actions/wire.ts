@@ -1,7 +1,7 @@
+import type { Access } from "../../access";
 import { rerunNodeRefusal } from "../../graph";
 import { deriveSteps, lastHarnessSession, parseRunFlow } from "../../read";
 import type { UsageNotes } from "../../usage";
-import type { Access } from "../access";
 import type { Walk } from "../walk";
 import {
 	type KeeperRunLeasesDeps,
@@ -21,7 +21,7 @@ import { stopRun } from "./application/stop-run";
  * The wiring of the actions: the one place that builds their real adapter
  * (the leases over the lease keeper) and binds each use case to its ports.
  * The ports every action shares come from `runs/walk`, the check of who
- * may act from `runs/access`.
+ * may act from `access`.
  */
 
 /** What the engine gives the actions: the sibling sub-verticals, and what the real adapter stands on. */

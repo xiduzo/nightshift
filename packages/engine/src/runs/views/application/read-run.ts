@@ -1,6 +1,6 @@
+import type { Access } from "../../../access";
 import type { Actor } from "../../../contract";
 import type { RunDetail } from "../../../read";
-import type { Access } from "../../access";
 import type { PrivatePaths, RunViews } from "./ports";
 
 export type ReadRunPorts = {

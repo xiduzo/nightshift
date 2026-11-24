@@ -4,6 +4,7 @@ import {
 	flowSchema,
 	singleAgentFlow,
 } from "@nightshift/flows";
+import { allowing } from "../../../access/adapters/out/in-memory-access";
 import { NIGHT_SHIFT } from "../../../contract";
 import { inMemoryTransferPorts } from "../adapters/out/in-memory-neighbours";
 import { importFlow } from "./import-flow";
@@ -78,5 +79,16 @@ describe("importFlow", () => {
 			importFlow(ports)(ada, { ...request, spaceId: "elsewhere" }),
 		).rejects.toMatchObject({ kind: "not-found" });
 		expect(ports.flows.saves).toEqual([]);
+	});
+
+	test("owners, admins and members may, and nobody else", async () => {
+		const ports = inMemoryTransferPorts();
+		expect(
+			await ports.access.whoMay(
+				"space",
+				(actor) => importFlow(ports)(actor, request),
+				() => ports.flows.saves,
+			),
+		).toEqual(allowing("owner", "admin", "member"));
 	});
 });

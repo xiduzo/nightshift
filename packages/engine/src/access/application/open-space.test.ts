@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { Refusal } from "@nightshift/refusal";
-import { NIGHT_SHIFT } from "../../../contract";
-import { inMemoryAccessPorts } from "../adapters/out/in-memory-space-members";
+import { NIGHT_SHIFT } from "../../contract";
+import { inMemoryAccess } from "../adapters/out/in-memory-access";
 import { SpaceNotFound } from "../domain/refusals";
 import { openSpace } from "./open-space";
 
@@ -19,7 +19,7 @@ const refusalOf = (work: Promise<unknown>) =>
 
 describe("openSpace", () => {
 	test("Night Shift acts in every Space", async () => {
-		const ports = inMemoryAccessPorts();
+		const ports = inMemoryAccess();
 		await openSpace(ports)(NIGHT_SHIFT, {
 			spaceId: SPACE,
 			need: { run: ["start"] },
@@ -27,7 +27,7 @@ describe("openSpace", () => {
 	});
 
 	test("a Person who is not a Member does not find the Space", async () => {
-		const ports = inMemoryAccessPorts();
+		const ports = inMemoryAccess();
 		ports.members.join("space-2", ADA.personId, "owner");
 		const refused = await refusalOf(openSpace(ports)(ADA, { spaceId: SPACE }));
 		expect(refused).toBeInstanceOf(SpaceNotFound);
@@ -36,7 +36,7 @@ describe("openSpace", () => {
 	});
 
 	test("a Member whose role does not allow the need is refused, in the words of a role", async () => {
-		const ports = inMemoryAccessPorts();
+		const ports = inMemoryAccess();
 		ports.members.join(SPACE, ADA.personId, "viewer");
 		await openSpace(ports)(ADA, { spaceId: SPACE });
 		const refused = await refusalOf(
@@ -50,7 +50,7 @@ describe("openSpace", () => {
 	});
 
 	test("a Member whose role allows the need acts", async () => {
-		const ports = inMemoryAccessPorts();
+		const ports = inMemoryAccess();
 		ports.members.join(SPACE, ADA.personId, "member");
 		expect(
 			await openSpace(ports)(ADA, {

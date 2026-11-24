@@ -1,13 +1,12 @@
 import type { Flow, FlowNode } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
+import { inMemoryAccess } from "../../../../access/adapters/out/in-memory-access";
 import type { Device, RunRef, Worktree } from "../../../../device";
 import type { Intent, Taken } from "../../../../graph";
 import type { RunTrigger } from "../../../../log";
 import type { ListedProject } from "../../../../projects";
 import { PROJECT_NOT_FOUND } from "../../../../projects/keep";
 import type { PlacedDevice, PlannedRun } from "../../..";
-import { inMemoryAccessPorts } from "../../../access/adapters/out/in-memory-space-members";
-import { openSpace } from "../../../access/application/open-space";
 import { inMemoryRunFacts } from "../../../walk/adapters/out/in-memory-run-facts";
 import { createStartHolds } from "../../../walk/domain/start-holds";
 import type { StartRunHerePorts } from "../../application/start-run-here";
@@ -181,7 +180,7 @@ export function plannedOn(
 
 /** Every port of the start in memory, and the twins a test reads. */
 export function inMemoryStartPorts() {
-	const access = inMemoryAccessPorts(HERE);
+	const access = inMemoryAccess(HERE);
 	const projects = inMemoryProjects();
 	const planner = inMemoryRunPlanner();
 	const keeper = inMemorySpaceKeeper();
@@ -209,7 +208,7 @@ export function inMemoryStartPorts() {
 	};
 	return {
 		access,
-		openSpace: openSpace(access),
+		openSpace: access.openSpace,
 		projects,
 		planner,
 		keeper,

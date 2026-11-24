@@ -1,9 +1,10 @@
 import { harnessFacts } from "@nightshift/agents/harness-facts";
 import type { Database } from "@nightshift/db";
 import { isCustomHarness } from "@nightshift/flows";
+import type { Access } from "./access";
 import type { RunBus, RunHistory, RunLog } from "./log";
 import type { Peers } from "./peers";
-import { type Access, wireViews } from "./runs";
+import { wireViews } from "./runs";
 
 /**
  * The views block of the engine's composition (`wire.ts`): what people

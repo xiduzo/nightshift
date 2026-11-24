@@ -1,11 +1,12 @@
 import type { Database } from "@nightshift/db";
+import type { Access } from "./access";
 import type { SpaceDocuments } from "./documents";
 import type { EngineOptions } from "./engine-options";
 import type { ProjectFlows } from "./flows";
 import type { Runner } from "./graph";
 import { type RunLog, runIdsOfProject } from "./log";
 import type { Projects } from "./projects";
-import type { Access, StartHolds } from "./runs";
+import type { StartHolds } from "./runs";
 import { wireSpaceMove } from "./space-move";
 
 /**

@@ -1,7 +1,6 @@
-import { type Permissions, RoleRefusal, roleAllows } from "@nightshift/auth";
-import type { PersonActor } from "../../../../contract";
+import { type Permissions, roleAllows } from "@nightshift/auth";
+import type { PersonActor } from "../../../contract";
 import type { SpaceMembers } from "../../application/ports";
-import { inMemoryRunRecords } from "./in-memory-run-records";
 
 /** Where a Member is written: the `member` rows of this Replica, or the Members of the Space document. */
 export type MemberSource = "replica" | "document";
@@ -46,15 +45,3 @@ export function inMemorySpaceMembers() {
 }
 
 export type InMemorySpaceMembers = ReturnType<typeof inMemorySpaceMembers>;
-
-/**
- * Every port of access in memory at once, with the refusal of a role:
- * where each use-case test starts.
- */
-export function inMemoryAccessPorts(walkerId?: string) {
-	return {
-		runs: inMemoryRunRecords(walkerId),
-		members: inMemorySpaceMembers(),
-		RoleRefusal,
-	};
-}

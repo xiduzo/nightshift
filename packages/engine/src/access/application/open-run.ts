@@ -1,6 +1,6 @@
 import type { Permissions, RoleRefusal } from "@nightshift/auth";
-import type { Actor } from "../../../contract";
-import type { RunRow } from "../../../log";
+import type { Actor } from "../../contract";
+import type { RunRow } from "../../log";
 import { RunNotFound } from "../domain/refusals";
 import type { RunRecords, SpaceMembers } from "./ports";
 

@@ -1,6 +1,6 @@
 import { Refusal } from "@nightshift/refusal";
+import type { Access } from "../../../access";
 import { type Actor, type Placement, personOf } from "../../../contract";
-import type { Access } from "../../access";
 import { markDefault } from "../domain/start-place";
 import type { RunPlanner } from "./ports";
 

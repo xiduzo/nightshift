@@ -1,4 +1,5 @@
-import { type Access, type Move, type Walk, wireActions } from "./runs";
+import type { Access } from "./access";
+import { type Move, type Walk, wireActions } from "./runs";
 import type { UsageNotes } from "./usage";
 
 /**

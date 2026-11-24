@@ -1,5 +1,4 @@
-import type { Permissions } from "@nightshift/auth";
-import type { Actor, Relay } from "../../../contract";
+import type { Relay } from "../../../contract";
 import type { RunStatus } from "../../../run-status";
 
 /**
@@ -38,21 +37,4 @@ export type ProjectRuns = {
 export type CloneImports = {
 	/** Imports the flows of this Device's Clone of the project, once. Never throws. */
 	importClone(projectId: string): Promise<void>;
-};
-
-/**
- * Who may act in a Space: the one check of a request a person makes.
- * @filledBy engine/runs
- */
-export type ProjectAccess = {
-	/**
-	 * Refuses an actor who may not act in the Space: a Person who is not a
-	 * Member of it (`SpaceNotFound`), or whose role does not allow `need`
-	 * (`RoleRefusal`). Without `need`, a Member may. Night Shift itself
-	 * may act in every Space.
-	 */
-	openSpace(
-		actor: Actor,
-		request: { spaceId: string; need?: Permissions },
-	): Promise<void>;
 };

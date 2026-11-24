@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { allowing } from "../../../access/adapters/out/in-memory-access";
 import type { Actor } from "../../../contract";
 import { PROJECT_NOT_FOUND } from "../../keep";
 import { inMemoryCatalogPorts } from "../adapters/out/in-memory-neighbours";
@@ -47,5 +48,21 @@ describe("renameProject", () => {
 			renameProject(ports)(ADA, { spaceId: "s2", projectId: "p1", name: "x" }),
 		).rejects.toThrow(PROJECT_NOT_FOUND);
 		expect(ports.projectLog.facts).toEqual([]);
+	});
+
+	test("owners, admins and members may, and nobody else", async () => {
+		const ports = seeded();
+		expect(
+			await ports.access.whoMay(
+				"s1",
+				(actor) =>
+					renameProject(ports)(actor, {
+						spaceId: "s1",
+						projectId: "p1",
+						name: "App",
+					}),
+				() => ports.projectLog.facts,
+			),
+		).toEqual(allowing("owner", "admin", "member"));
 	});
 });

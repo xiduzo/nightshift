@@ -1,4 +1,5 @@
 import { now as timeNow } from "@nightshift/time";
+import type { Access } from "../../access";
 import type { Actor } from "../../contract";
 import { fsNotTopicsFile } from "./adapters/out/fs-not-topics-file";
 import { drawMap } from "./application/draw-map";
@@ -6,7 +7,6 @@ import { markNotTopic } from "./application/mark-not-topic";
 import type {
 	AskedQuestions,
 	FolderHolds,
-	MapAccess,
 	MapEntries,
 	MapIndex,
 	MapLearnings,
@@ -21,7 +21,7 @@ import { createMapMemo } from "./domain/memo";
 
 /** What the knowledge gives knowledge/map: the ports another part fills, and what the real adapter stands on. */
 export type MapDeps = {
-	access: MapAccess;
+	access: Pick<Access, "openSpace">;
 	/** The knowledge folders on this computer (`files`). */
 	folders: {
 		folder(projectId: string): string;

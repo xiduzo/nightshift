@@ -1,5 +1,5 @@
 import { Refusal } from "@nightshift/refusal";
-import type { RunLog } from "../../../../log";
+import type { RunLog } from "../../../log";
 import type { RunRecords } from "../../application/ports";
 
 /** The runs of this Replica over the run log: its row of each run, and whether this computer walks it. */

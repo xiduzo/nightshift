@@ -1,21 +1,6 @@
-import type { Actor } from "{{{actorFromApplication}}}";
-
 /**
  * The driven ports of {{{slice}}}. A port of its own has a real adapter,
  * an in-memory adapter and a contract suite in `adapters/out/`. Another
  * slice or package fills a port with `@filledBy`: the composition of the
  * package passes it to `wire{{{slicePascal}}}`.
  */
-
-/**
- * Who may act in a Space: the one check of a request a person makes.
- * @filledBy engine/runs
- */
-export type {{{slicePascal}}}Access = {
-	/**
-	 * Refuses an actor who may not act in the Space: a Person who is not a
-	 * Member of it (`SpaceNotFound`). Night Shift itself may act in every
-	 * Space.
-	 */
-	openSpace(actor: Actor, request: { spaceId: string }): Promise<void>;
-};

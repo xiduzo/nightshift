@@ -1,5 +1,3 @@
-import type { Permissions } from "@nightshift/auth";
-import type { Actor } from "../../../contract";
 import type { FolderSnapshot } from "../../../folder-snapshot";
 import type {
 	IndexedFile,
@@ -163,17 +161,6 @@ export type SearchIndex = {
 	vectorModel(): string | null;
 	/** Drops every vector: a model embedded while this one took over. */
 	resetVectors(model: string): void;
-};
-
-/**
- * Who may act in a Space for this knowledge request.
- * @filledBy engine/runs
- */
-export type SearchAccess = {
-	openSpace(
-		actor: Actor,
-		request: { spaceId: string; need?: Permissions },
-	): Promise<void>;
 };
 
 /**

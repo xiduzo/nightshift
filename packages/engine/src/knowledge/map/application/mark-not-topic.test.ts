@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { allowing } from "../../../access/adapters/out/in-memory-access";
 import { NIGHT_SHIFT } from "../../../contract";
 import { inMemoryMapPorts } from "../adapters/out/in-memory-neighbours";
 import { parseNotTopics } from "../domain/not-topics";
@@ -72,5 +73,24 @@ describe("markNotTopic", () => {
 		}).catch((error: unknown) => error);
 		expect(refusal).toBe(failure);
 		expect(ports.holds.events).toEqual(["hold p1", "done p1"]);
+	});
+
+	test("owners, admins and members may, and nobody else", async () => {
+		const ports = inMemoryMapPorts();
+		expect(
+			await ports.access.whoMay(
+				"space-1",
+				(actor) =>
+					markNotTopic(ports)({
+						actor,
+						spaceId: "space-1",
+						projectId: "p1",
+						word: "deploy",
+						notTopic: true,
+						by: null,
+					}),
+				() => ports.holds.events,
+			),
+		).toEqual(allowing("owner", "admin", "member"));
 	});
 });

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { asDate } from "@nightshift/time";
+import { runRecord } from "../../../access/adapters/out/in-memory-run-records";
 import { NIGHT_SHIFT } from "../../../contract";
-import { runRecord } from "../../access/adapters/out/in-memory-run-records";
 import { inMemoryViewsPorts } from "../adapters/out/in-memory-neighbours";
 import { listProjectRuns } from "./list-project-runs";
 

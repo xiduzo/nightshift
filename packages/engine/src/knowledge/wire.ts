@@ -5,6 +5,7 @@ import {
 } from "@nightshift/agents/knowledge";
 import type { Database } from "@nightshift/db";
 import type { PageReaderSetting } from "@nightshift/flows";
+import type { Access } from "../access";
 import type { SpaceArchive } from "../archive";
 import type {
 	Actor,
@@ -311,17 +312,10 @@ export type Knowledge = {
 	close(): void;
 };
 
-/** Who may act in a Space. Filled by the runtime from `runs/access`. */
-export type KnowledgeAccess = {
-	openSpace(
-		actor: Actor,
-		request: { spaceId: string; need?: import("@nightshift/auth").Permissions },
-	): Promise<void>;
-};
-
 export type KnowledgeDeps = {
 	db: Database;
-	access: KnowledgeAccess;
+	/** Who may act in a Space (`access`). */
+	access: Pick<Access, "openSpace">;
 	/** Where this computer keeps its data: the folders and the index. */
 	dataDir: string;
 	/** This Replica's synced documents (knowledge among them). */

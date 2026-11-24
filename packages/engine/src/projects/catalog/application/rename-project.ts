@@ -1,5 +1,6 @@
 import type { Permissions } from "@nightshift/auth";
 import { Refusal } from "@nightshift/refusal";
+import type { Access } from "../../../access";
 import type { Actor } from "../../../contract";
 import {
 	asProjects,
@@ -11,13 +12,12 @@ import {
 	type SpaceProjects,
 	type ThisDevice,
 } from "../../keep";
-import type { ProjectAccess } from "./ports";
 
 /** What a role must allow for this request. */
 const ADD_PROJECTS: Permissions = { project: ["add"] };
 
 export type RenameProjectPorts = {
-	access: ProjectAccess;
+	access: Pick<Access, "openSpace">;
 	store: Pick<ProjectStore, "find" | "row">;
 	spaceProjects: Pick<SpaceProjects, "define" | "clones">;
 	projectLog: Pick<ProjectLog, "append">;

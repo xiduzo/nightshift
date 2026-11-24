@@ -1,5 +1,6 @@
 import type { Permissions } from "@nightshift/auth";
 import { Refusal } from "@nightshift/refusal";
+import type { Access } from "../../../access";
 import type { Actor } from "../../../contract";
 import {
 	defineProject,
@@ -9,13 +10,13 @@ import {
 	type SpaceProjects,
 } from "../../keep";
 import { noActiveRun, SLEEPS, WAITS_AT_GATE } from "../domain/words";
-import type { ProjectAccess, ProjectRuns } from "./ports";
+import type { ProjectRuns } from "./ports";
 
 /** What a role must allow for this request. */
 const REMOVE_PROJECTS: Permissions = { project: ["remove"] };
 
 export type RemoveProjectPorts = {
-	access: ProjectAccess;
+	access: Pick<Access, "openSpace">;
 	store: Pick<ProjectStore, "find" | "row">;
 	spaceProjects: Pick<SpaceProjects, "define">;
 	projectLog: Pick<ProjectLog, "append">;

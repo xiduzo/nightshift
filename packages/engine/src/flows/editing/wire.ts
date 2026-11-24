@@ -1,3 +1,4 @@
+import type { Access } from "../../access";
 import { dismissFlowNotice } from "./application/dismiss-flow-notice";
 import { forgetNodeMemory } from "./application/forget-node-memory";
 import { listFlowNotices } from "./application/list-flow-notices";
@@ -6,7 +7,6 @@ import { listFlows } from "./application/list-flows";
 import { listKeptValues } from "./application/list-kept-values";
 import { listNodeMemory } from "./application/list-node-memory";
 import type {
-	FlowEditingAccess,
 	FlowUsage,
 	KeptValues,
 	Names,
@@ -34,7 +34,7 @@ const NO_NAMES = async () => new Map<string, string>();
  * project is in the Space first.
  */
 export function wireEditing(deps: {
-	access: FlowEditingAccess;
+	access: Pick<Access, "openSpace">;
 	projects: SpaceProjects;
 	flows: SavedFlows;
 	/** Without them, a revision names nobody and no Device. */

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { Refusal } from "@nightshift/refusal";
 import { asDate } from "@nightshift/time";
+import { allowing } from "../../access/adapters/out/in-memory-access";
 import { NIGHT_SHIFT } from "../../contract";
 import { inMemorySpaceMovePorts } from "../adapters/out/in-memory-neighbours";
 import { STILL_RUNNING } from "../domain/move";
@@ -106,5 +107,55 @@ describe("moveProject", () => {
 			"release starts from",
 			"release schedules",
 		]);
+	});
+
+	test("owners and admins of the Space it leaves may, and nobody else", async () => {
+		const ports = seeded();
+		for (const person of [
+			"a-stranger",
+			"the-viewer",
+			"the-member",
+			"the-admin",
+			"the-owner",
+		]) {
+			ports.access.members.join("to", person, "owner");
+		}
+		expect(
+			await ports.access.whoMay(
+				"from",
+				(actor) =>
+					moveProject(ports)(actor, {
+						spaceId: "from",
+						projectId: "app",
+						toSpaceId: "to",
+					}),
+				() => ports.steps,
+			),
+		).toEqual(allowing("owner", "admin"));
+	});
+
+	test("owners and admins of the Space it goes to may, and nobody else", async () => {
+		const ports = seeded();
+		for (const person of [
+			"a-stranger",
+			"the-viewer",
+			"the-member",
+			"the-admin",
+			"the-owner",
+		]) {
+			ports.access.members.join("from", person, "owner");
+		}
+		expect(
+			await ports.access.whoMay(
+				"to",
+				(actor) =>
+					moveProject(ports)(actor, {
+						spaceId: "from",
+						projectId: "app",
+						toSpaceId: "to",
+					}),
+				() => ports.steps,
+			),
+		).toEqual(allowing("owner", "admin"));
 	});
 });

@@ -1,6 +1,9 @@
-import type { Permissions } from "@nightshift/auth";
 import type { JsonValue, Schedule, WebhookEvent } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
+import {
+	type InMemoryAccess,
+	inMemoryAccess,
+} from "../../../access/adapters/out/in-memory-access";
 import type { Actor, StartRunInput } from "../../../contract";
 import type { RunTrigger } from "../../../log";
 import { PROJECT_NOT_FOUND } from "../../../projects/keep";
@@ -9,7 +12,6 @@ import type { RunStatus } from "../../../run-status";
 import type {
 	Clock,
 	PullRequestScorer,
-	ScheduleAccess,
 	ScheduledProjects,
 	ScheduledRuns,
 	ScheduleNotices,
@@ -45,29 +47,6 @@ export function inMemoryClock(at: number): InMemoryClock {
 		},
 	});
 	return clock;
-}
-
-/** Who may act in the Spaces of a test: everyone, until the test refuses Persons. */
-export type InMemoryScheduleAccess = ScheduleAccess & {
-	/** Every Space that was opened, for whom and for what, in order. */
-	opened: { actor: Actor; spaceId: string; need?: Permissions }[];
-	/** From now on `openSpace` throws this for an actor that is a Person. */
-	refuse(error: unknown): void;
-};
-
-export function inMemoryScheduleAccess(): InMemoryScheduleAccess {
-	let refusal: { error: unknown } | null = null;
-	const access: InMemoryScheduleAccess = {
-		opened: [],
-		refuse: (error) => {
-			refusal = { error };
-		},
-		async openSpace(actor, request) {
-			access.opened.push({ actor, ...request });
-			if (refusal && "personId" in actor) throw refusal.error;
-		},
-	};
-	return access;
 }
 
 /** The runs a schedule started, and what a test says of them. */
@@ -355,7 +334,7 @@ export function inMemoryScheduleNotices(): InMemoryScheduleNotices {
 /** Every port of the slice, in memory. */
 export type InMemorySchedulePorts = {
 	clock: InMemoryClock;
-	access: InMemoryScheduleAccess;
+	access: InMemoryAccess;
 	store: InMemoryScheduleStore;
 	log: InMemoryScheduleLog;
 	runs: InMemoryScheduledRuns;
@@ -371,7 +350,7 @@ export type InMemorySchedulePorts = {
 export function inMemorySchedulePorts(at: number): InMemorySchedulePorts {
 	return {
 		clock: inMemoryClock(at),
-		access: inMemoryScheduleAccess(),
+		access: inMemoryAccess(),
 		store: inMemoryScheduleStore(),
 		log: inMemoryScheduleLog(),
 		runs: inMemoryScheduledRuns(),

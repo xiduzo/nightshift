@@ -1,6 +1,6 @@
+import type { Access } from "../../../access";
 import { type Actor, commandOf, permissionOf } from "../../../contract";
 import { RunRefusal, refuseUnless } from "../../../run-status";
-import type { Access } from "../../access";
 import type { RunFacts, StartHolds, Turns, Walkers } from "../../walk";
 import { RESUME_ON_ITS_WAY } from "../domain/action-rules";
 

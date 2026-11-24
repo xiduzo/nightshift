@@ -1,7 +1,7 @@
+import type { Access } from "../../../access";
 import { type Actor, commandOf, permissionOf } from "../../../contract";
 import type { deriveSteps } from "../../../read";
 import { refuseUnless } from "../../../run-status";
-import type { Access } from "../../access";
 import type { RunFacts, StartHolds, Turns, Walkers } from "../../walk";
 import { refuseRestart } from "../domain/action-rules";
 

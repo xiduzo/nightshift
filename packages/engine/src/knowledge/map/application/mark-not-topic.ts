@@ -1,16 +1,17 @@
 import type { Permissions } from "@nightshift/auth";
+import type { Access } from "../../../access";
 import type { Actor } from "../../../contract";
 import {
 	formatNotTopics,
 	markNotTopic as marked,
 	parseNotTopics,
 } from "../domain/not-topics";
-import type { FolderHolds, MapAccess, NotTopicsFile } from "./ports";
+import type { FolderHolds, NotTopicsFile } from "./ports";
 
 const CHANGES_KNOWLEDGE: Permissions = { run: ["start"] };
 
 export type MarkNotTopicPorts = {
-	access: MapAccess;
+	access: Pick<Access, "openSpace">;
 	notTopics: NotTopicsFile;
 	holds: FolderHolds;
 	now: () => number;

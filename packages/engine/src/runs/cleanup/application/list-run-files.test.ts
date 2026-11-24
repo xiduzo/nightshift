@@ -1,16 +1,27 @@
 import { describe, expect, test } from "bun:test";
-import type { Actor } from "../../../contract";
+import { allowing } from "../../../access/adapters/out/in-memory-access";
+import { runRecord } from "../../../access/adapters/out/in-memory-run-records";
 import { inMemoryCleanupPorts } from "../adapters/out/in-memory-neighbours";
 import { listRunFiles } from "./list-run-files";
 
 /** The files of a run's folder for an actor, on in-memory adapters. The clock is at day 10, `cleanUpAfterDays` is 7. */
 
-const ADA: Actor = { personId: "person-ada", door: "session" };
+const ADA = { personId: "person-ada", door: "session" as const };
 const DAY_MS = 24 * 60 * 60_000;
 const REPORT = { path: "report.md", size: 3, modifiedAt: 1 };
 
-function setup() {
+/** Every port, with the run `run-1` of `space-1` in access, and `ADA` a viewer there. */
+function seeded() {
 	const ports = inMemoryCleanupPorts();
+	ports.access.members.join("space-1", ADA.personId, "viewer");
+	for (const id of ["run-1", "run-2", "run-copy", "run-gone"]) {
+		ports.access.runs.add(runRecord({ id, spaceId: "space-1" }));
+	}
+	return ports;
+}
+
+function setup() {
+	const ports = seeded();
 	return { ports, list: listRunFiles(ports) };
 }
 
@@ -26,20 +37,7 @@ describe("listRunFiles", () => {
 			cleanupAt: 8 * DAY_MS,
 			removed: null,
 		});
-		expect(ports.access.opened).toEqual([
-			{ actor: ADA, runId: "run-1", spaceId: "space-1" },
-		]);
 		expect(ports.runs.reads).toEqual(["row run-1", "state run-1"]);
-	});
-
-	test("a run the actor may not see is refused before any read", async () => {
-		const { ports, list } = setup();
-		ports.runs.add({ id: "run-1", runFolder: true });
-		ports.access.refuse(new Error("not found"));
-		await expect(
-			list(ADA, { runId: "run-1", spaceId: "space-1" }),
-		).rejects.toThrow("not found");
-		expect(ports.runs.reads).toEqual([]);
 	});
 
 	test("a run that works in a copy of the project, or that this computer does not know, has no files", async () => {
@@ -87,5 +85,23 @@ describe("listRunFiles", () => {
 			at: 42,
 			by: "cleanup",
 		});
+	});
+
+	test("every Member of the run's Space may, before any read, and nobody else", async () => {
+		const { ports, list } = setup();
+		ports.runs.add({ id: "run-1", runFolder: true });
+		const asked = ports.access.whoMay(
+			"space-1",
+			(actor) => list(actor, { runId: "run-1" }),
+			() => ports.runs.reads,
+		);
+		expect(await asked).toEqual(allowing("owner", "admin", "member", "viewer"));
+	});
+
+	test("a run of another Space than the one asked for is not found", async () => {
+		const { list } = setup();
+		await expect(
+			list(ADA, { runId: "run-1", spaceId: "space-2" }),
+		).rejects.toMatchObject({ kind: "not-found" });
 	});
 });

@@ -1,11 +1,11 @@
 import type { Database } from "@nightshift/db";
+import { wireAccess } from "./access";
 import { memberRole, type SpaceDocuments } from "./documents";
 import type { RunLog } from "./log";
-import { wireAccess } from "./runs";
 
 /**
  * The access block of the engine's composition (`wire.ts`): who may see
- * or act on a run, or act in a Space (`runs/access/`). Lane R1 of the
+ * or act on a run, or act in a Space (`access/`). Lane R1 of the
  * hexagon series owns this file.
  *
  * It gives `access.openRun` and `access.openSpace`, and `access.runs`: the

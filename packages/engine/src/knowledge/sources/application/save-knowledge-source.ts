@@ -5,15 +5,16 @@ import {
 	type KnowledgeSource,
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
+import type { Access } from "../../../access";
 import type { Actor } from "../../../contract";
 import { savedSource, withSourceSchedule } from "../domain/source-flows";
 import { OWNER_ONLY, type SourceRights, savedSchedules } from "../domain/syncs";
-import type { SourcesAccess, SourcesSpace } from "./ports";
+import type { SourcesSpace } from "./ports";
 
 const SAVES_FLOWS: Permissions = { flow: ["save"] };
 
 export type SaveKnowledgeSourcePorts = {
-	access: SourcesAccess;
+	access: Pick<Access, "openSpace">;
 	space: Pick<SourcesSpace, "flows" | "listSchedules" | "saveSchedules">;
 	/** This computer: a source that reads a folder here syncs here. */
 	device: { id: string };

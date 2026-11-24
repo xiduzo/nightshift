@@ -1,12 +1,10 @@
-import type { Permissions } from "@nightshift/auth";
-import type { Actor } from "../../../../contract";
+import { inMemoryAccess } from "../../../../access/adapters/out/in-memory-access";
 import type { KnowledgeFile } from "../../../files";
 import type { ProjectLearning } from "../../../learnings";
 import type { KnowledgeSync } from "../../../sources";
 import type {
 	FolderHolds,
 	ListedFiles,
-	ReviewAccess,
 	SourceSyncs,
 	WaitingLearnings,
 } from "../../application/ports";
@@ -73,7 +71,7 @@ export function inMemoryWaitingLearnings() {
 export function inMemoryReviewPorts() {
 	let clock = 1_000;
 	return {
-		access: inMemoryReviewAccess(),
+		access: inMemoryAccess(),
 		log: inMemoryKnowledgeUseLog(),
 		questions: inMemoryQuestionSetFile(),
 		holds: inMemoryFolderHolds(),
@@ -86,24 +84,4 @@ export function inMemoryReviewPorts() {
 			clock = at;
 		},
 	};
-}
-
-export type InMemoryReviewAccess = ReviewAccess & {
-	opened: { actor: Actor; spaceId: string; need?: Permissions }[];
-	refuse(error: unknown): void;
-};
-
-export function inMemoryReviewAccess(): InMemoryReviewAccess {
-	let refusal: { error: unknown } | null = null;
-	const access: InMemoryReviewAccess = {
-		opened: [],
-		refuse: (error) => {
-			refusal = { error };
-		},
-		async openSpace(actor, request) {
-			access.opened.push({ actor, ...request });
-			if (refusal && "personId" in actor) throw refusal.error;
-		},
-	};
-	return access;
 }

@@ -1,5 +1,5 @@
 import type { Permissions } from "@nightshift/auth";
-import type { PersonActor } from "../../../contract";
+import type { PersonActor } from "../../contract";
 import type { RunRecord } from "./open-run";
 
 /**

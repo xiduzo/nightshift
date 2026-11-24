@@ -1,8 +1,8 @@
+import type { Access } from "../../../access";
 import { type Actor, commandOf, permissionOf } from "../../../contract";
 import type { rerunNodeRefusal } from "../../../graph";
 import type { parseRunFlow } from "../../../read";
 import { RunRefusal, refuseUnless } from "../../../run-status";
-import type { Access } from "../../access";
 import type { RunFacts, StartHolds, Turns, Walkers } from "../../walk";
 
 export type RerunFromNodePorts = {

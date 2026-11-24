@@ -1,4 +1,3 @@
-import type { Permissions } from "@nightshift/auth";
 import type {
 	FlowSources,
 	JsonValue,
@@ -28,23 +27,6 @@ import type {
  * package fills the others (`@filledBy`): `createEngine` passes them to
  * `wireSchedules`.
  */
-
-/**
- * Who may act in a Space: the one check of a request a person makes.
- * @filledBy engine/runs
- */
-export type ScheduleAccess = {
-	/**
-	 * Refuses an actor who may not act in the Space: a Person who is not a
-	 * Member of it (`SpaceNotFound`), or whose role does not allow `need`
-	 * (`RoleRefusal`). Without `need`, a Member may. Night Shift itself
-	 * may act in every Space.
-	 */
-	openSpace(
-		actor: Actor,
-		request: { spaceId: string; need?: Permissions },
-	): Promise<void>;
-};
 
 /** The schedules of a project, as its flow document keeps them. */
 export type ScheduleStore = {

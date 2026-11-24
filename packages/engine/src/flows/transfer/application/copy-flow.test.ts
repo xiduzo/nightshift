@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { flowSchema, singleAgentFlow } from "@nightshift/flows";
+import { allowing } from "../../../access/adapters/out/in-memory-access";
 import { inMemoryTransferPorts } from "../adapters/out/in-memory-neighbours";
 import { copyFlow } from "./copy-flow";
 
@@ -59,5 +60,17 @@ describe("copyFlow", () => {
 			{ projectId: "project", spaceId: "space" },
 			{ projectId: "elsewhere", spaceId: "space" },
 		]);
+	});
+
+	test("owners, admins and members may, and nobody else", async () => {
+		const ports = inMemoryTransferPorts();
+		await ports.flows.save("project", "build", quick);
+		expect(
+			await ports.access.whoMay(
+				"space",
+				(actor) => copyFlow(ports)(actor, request),
+				() => ports.flows.saves,
+			),
+		).toEqual(allowing("owner", "admin", "member"));
 	});
 });

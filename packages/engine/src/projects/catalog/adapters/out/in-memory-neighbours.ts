@@ -1,11 +1,9 @@
-import type { Permissions } from "@nightshift/auth";
-import type { Actor } from "../../../../contract";
+import { inMemoryAccess } from "../../../../access/adapters/out/in-memory-access";
 import type { RunStatus } from "../../../../run-status";
 import { inMemoryKeepPorts } from "../../../keep/adapters/out/in-memory-neighbours";
 import type {
 	CloneImports,
 	HostRelay,
-	ProjectAccess,
 	ProjectRuns,
 } from "../../application/ports";
 
@@ -79,31 +77,17 @@ export function inMemoryCloneImports() {
 	return twin satisfies CloneImports;
 }
 
-/** Who may act in the Spaces of a test: everyone, until the test refuses Persons. */
-export type InMemoryProjectAccess = ProjectAccess & {
-	opened: { actor: Actor; spaceId: string; need?: Permissions }[];
-	refuse(error: unknown): void;
-};
-
-export function inMemoryProjectAccess(): InMemoryProjectAccess {
-	let refusal: { error: unknown } | null = null;
-	const access: InMemoryProjectAccess = {
-		opened: [],
-		refuse: (error) => {
-			refusal = { error };
-		},
-		async openSpace(actor, request) {
-			access.opened.push({ actor, ...request });
-			if (refusal && "personId" in actor) throw refusal.error;
-		},
-	};
-	return access;
-}
-
-/** Every port of the catalog in memory at once: where each use-case test starts. */
+/**
+ * Every port of the catalog in memory at once: where each use-case test
+ * starts. `person-ada` is an admin of the Spaces `s1`, `s2` and `team`.
+ */
 export function inMemoryCatalogPorts() {
+	const access = inMemoryAccess();
+	for (const spaceId of ["s1", "s2", "team"]) {
+		access.members.join(spaceId, "person-ada", "admin");
+	}
 	return {
-		access: inMemoryProjectAccess(),
+		access,
 		...inMemoryKeepPorts(),
 		relay: inMemoryHostRelay(),
 		runs: inMemoryProjectRuns(),

@@ -1,6 +1,6 @@
+import type { Access } from "../access";
 import type { SpaceDocuments } from "../documents";
 import { yjsSpacePolicies } from "./adapters/out/yjs-space-policies";
-import type { SpaceAccess } from "./application/ports";
 import { readUsageAllowed } from "./application/read-usage-allowed";
 import { setSpaceUsage } from "./application/set-space-usage";
 
@@ -11,7 +11,7 @@ import { setSpaceUsage } from "./application/set-space-usage";
 
 /** What the package gives spaces: what the real adapters stand on. */
 export type SpacesDeps = {
-	access: SpaceAccess;
+	access: Pick<Access, "openSpace">;
 	/** The Space documents: each holds the policy of its Space. */
 	documents: Pick<SpaceDocuments, "open" | "openAll">;
 };

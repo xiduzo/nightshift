@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import type { Access } from "../access";
 import type { UsageNotes } from "../usage";
 import {
 	createScheduleTicker,
@@ -19,7 +20,6 @@ import { pauseScheduleTonight } from "./application/pause-schedule-tonight";
 import type {
 	Clock,
 	PullRequestScorer,
-	ScheduleAccess,
 	ScheduledProjects,
 	ScheduledRuns,
 	ScheduleNotices,
@@ -52,7 +52,7 @@ export type SchedulesDeps = {
 	/** How often the scheduler looks for due schedules. Default 30 000 ms. */
 	tickMs?: number;
 	/** Who may act in a Space: each use case a person asks checks it first. */
-	access: ScheduleAccess;
+	access: Pick<Access, "openSpace">;
 	runs: ScheduledRuns;
 	projects: ScheduledProjects;
 	offers: ScheduleOffers;

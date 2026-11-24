@@ -1,5 +1,5 @@
+import type { Access } from "../../../access";
 import { type Actor, commandOf, permissionOf } from "../../../contract";
-import type { Access } from "../../access";
 import type { RunFacts, Turns, Walkers } from "../../walk";
 import { refuseRelease } from "../domain/action-rules";
 import type { RunLeases } from "./ports";

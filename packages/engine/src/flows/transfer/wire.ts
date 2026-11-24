@@ -1,4 +1,5 @@
 import type { Database } from "@nightshift/db";
+import type { Access } from "../../access";
 import type { Git } from "../../git";
 import { drizzleClonesHere } from "./adapters/out/drizzle-clones-here";
 import { fsCloneFolders } from "./adapters/out/fs-clone-folders";
@@ -14,7 +15,6 @@ import type {
 	CloneDocuments,
 	DeviceProfiles,
 	DocumentMerges,
-	FlowTransferAccess,
 	FlowUsage,
 	ImportMigrations,
 	Migrations,
@@ -36,7 +36,7 @@ export type FlowTransfer = ReturnType<typeof wireTransfer>;
  * merge of Personal).
  */
 export function wireTransfer(deps: {
-	access: FlowTransferAccess;
+	access: Pick<Access, "openSpace">;
 	db: Database;
 	git: Pick<Git, "run">;
 	/** The flow documents, for the import of a Clone's folder. */

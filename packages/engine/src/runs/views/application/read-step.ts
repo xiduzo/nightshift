@@ -1,6 +1,6 @@
+import type { Access } from "../../../access";
 import type { Actor } from "../../../contract";
 import type { StepDetail } from "../../../read";
-import type { Access } from "../../access";
 import type { RunViews } from "./ports";
 
 export type ReadStepPorts = {

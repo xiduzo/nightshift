@@ -1,7 +1,8 @@
 import type { Database } from "@nightshift/db";
+import type { Access } from "./access";
 import type { ArtifactStore } from "./artifacts";
 import { wireGates } from "./gates";
-import type { Access, Views, Walk } from "./runs";
+import type { Views, Walk } from "./runs";
 
 /**
  * The gates block of the engine's composition (`wire.ts`): the questions

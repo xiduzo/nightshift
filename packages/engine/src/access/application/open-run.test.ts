@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import type { Refusal } from "@nightshift/refusal";
-import { NIGHT_SHIFT } from "../../../contract";
+import { NIGHT_SHIFT } from "../../contract";
+import { inMemoryAccess } from "../adapters/out/in-memory-access";
 import { runRecord } from "../adapters/out/in-memory-run-records";
-import { inMemoryAccessPorts } from "../adapters/out/in-memory-space-members";
 import { RunNotFound } from "../domain/refusals";
 import { openRun } from "./open-run";
 
@@ -14,7 +14,7 @@ const ADA = { personId: "person-ada", door: "session" as const };
 
 /** Ports with one run in `SPACE`, walked here, and one in `OTHER`, walked elsewhere. */
 function setup() {
-	const ports = inMemoryAccessPorts();
+	const ports = inMemoryAccess();
 	ports.runs.add(runRecord({ id: "run-1", spaceId: SPACE }));
 	ports.runs.add(
 		runRecord({ id: "run-2", spaceId: OTHER, walkerId: "device-far" }),

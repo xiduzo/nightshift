@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import type { PersonActor } from "../../../../contract";
+import type { PersonActor } from "../../../contract";
 import type { SpaceMembers } from "../../application/ports";
 
 /** One adapter of `SpaceMembers` to test, over the Members of two Spaces. */

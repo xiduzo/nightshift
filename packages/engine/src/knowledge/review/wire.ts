@@ -1,5 +1,6 @@
 import type { Database } from "@nightshift/db";
 import { now as timeNow } from "@nightshift/time";
+import type { Access } from "../../access";
 import type { Actor } from "../../contract";
 import type { SourceRun, SourcesSpace } from "../sources";
 import { drizzleKnowledgeUseLog } from "./adapters/out/drizzle-knowledge-use-log";
@@ -17,7 +18,6 @@ import { markQuestion } from "./application/mark-question";
 import type {
 	FolderHolds,
 	ListedFiles,
-	ReviewAccess,
 	SourceSyncs,
 	WaitingLearnings,
 } from "./application/ports";
@@ -33,7 +33,7 @@ import type { AskedQuestion, KnowledgeUseReport } from "./domain/use";
 
 /** What the knowledge gives knowledge/review: the ports another part fills, and what the real adapters stand on. */
 export type ReviewDeps = {
-	access: ReviewAccess;
+	access: Pick<Access, "openSpace">;
 	/** The event log: the searches and reads of agents. */
 	db: Database;
 	/** The knowledge folders on this computer (`files`). */

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { flowSchema, singleAgentFlow } from "@nightshift/flows";
+import { allowing } from "../../../access/adapters/out/in-memory-access";
 import { inMemoryEditingPorts } from "../adapters/out/in-memory-neighbours";
 import { removeFlow } from "./remove-flow";
 
@@ -32,5 +33,19 @@ describe("removeFlow", () => {
 			name: "build",
 		});
 		await expect(remove).rejects.toThrow("This project does not exist.");
+	});
+
+	test("owners, admins and members may, and nobody else", async () => {
+		const ports = inMemoryEditingPorts();
+		await ports.flows.save("project", "build", quick);
+		expect(
+			await ports.access.whoMay("space", (actor) =>
+				removeFlow(ports)(actor, {
+					spaceId: "space",
+					projectId: "project",
+					name: "build",
+				}),
+			),
+		).toEqual(allowing("owner", "admin", "member"));
 	});
 });

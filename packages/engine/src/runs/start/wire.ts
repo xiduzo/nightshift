@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
+import type { Access } from "../../access";
 import { kindOf, resolveInputs, runFolderOn } from "../../graph";
 import { runDueAt } from "../../log";
 import type { Projects } from "../../projects";
-import type { Access } from "../access";
 import type { StartHolds, wireWalk } from "../walk";
 import {
 	type DirectorySpaceKeeperDeps,
@@ -48,7 +48,7 @@ export type StartDeps = {
 	starters: ReadStartersDeps;
 	/** The projects of this Replica (`projects/`). */
 	projects: Pick<Projects, "find">;
-	/** Who may act in a Space (`runs/access`). */
+	/** Who may act in a Space (`access`). */
 	openSpace: Access["openSpace"];
 	/** The walk: the start's Turn, the run's facts, and the start holds of a Space move. */
 	turns: Pick<Walk["turns"], "take">;

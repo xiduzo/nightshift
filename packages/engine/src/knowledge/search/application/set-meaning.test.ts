@@ -1,9 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { NIGHT_SHIFT } from "../../../contract";
 import {
-	inMemoryMeaningSetting,
-	inMemorySearchAccess,
-} from "../adapters/out/in-memory-neighbours";
+	allowing,
+	inMemoryAccess,
+} from "../../../access/adapters/out/in-memory-access";
+import { NIGHT_SHIFT } from "../../../contract";
+import { inMemoryMeaningSetting } from "../adapters/out/in-memory-neighbours";
 import type { KnowledgeMeaningStatus } from "../domain/meaning";
 import { setMeaning } from "./set-meaning";
 
@@ -18,13 +19,11 @@ const turnedOff: KnowledgeMeaningStatus = {
 	percent: null,
 };
 
-const person = { personId: "ada", door: "session" as const };
-
 describe("setMeaning", () => {
 	test("writes the setting and returns how far search by meaning is", async () => {
 		const documents = inMemoryMeaningSetting();
 		const status = await setMeaning({
-			access: inMemorySearchAccess(),
+			access: inMemoryAccess(),
 			documents,
 			meaning: async () => turnedOff,
 		})({
@@ -37,22 +36,24 @@ describe("setMeaning", () => {
 		expect(status).toEqual(turnedOff);
 	});
 
-	test("refuses a person whose role does not allow it, before it writes", async () => {
-		const access = inMemorySearchAccess();
-		const refused = new Error("role");
-		access.refuse(refused);
-		const documents = inMemoryMeaningSetting();
-		const refusal = await setMeaning({
-			access,
-			documents,
+	test("owners, admins and members may, and nobody else", async () => {
+		const ports = {
+			access: inMemoryAccess(),
+			documents: inMemoryMeaningSetting(),
 			meaning: async () => turnedOff,
-		})({
-			actor: person,
-			spaceId: "space-1",
-			projectId: "p1",
-			on: true,
-		}).catch((error: unknown) => error);
-		expect(refusal).toBe(refused);
-		expect(documents.written).toEqual([]);
+		};
+		expect(
+			await ports.access.whoMay(
+				"space-1",
+				(actor) =>
+					setMeaning(ports)({
+						actor,
+						spaceId: "space-1",
+						projectId: "p1",
+						on: true,
+					}),
+				() => ports.documents.written,
+			),
+		).toEqual(allowing("owner", "admin", "member"));
 	});
 });

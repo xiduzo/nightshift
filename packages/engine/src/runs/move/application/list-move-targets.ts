@@ -1,5 +1,5 @@
+import type { Access } from "../../../access";
 import type { Actor, OwnDevice } from "../../../contract";
-import type { Access } from "../../access";
 import { movable, signedOut } from "../domain/move-rules";
 import type { MoveDevices } from "./ports";
 

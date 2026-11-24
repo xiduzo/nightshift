@@ -1,4 +1,5 @@
 import type { Database } from "@nightshift/db";
+import type { Access } from "./access";
 import type { DeviceDirectory } from "./contract";
 import type { FlowDocuments, SpaceDocuments } from "./documents";
 import type { EngineOptions } from "./engine-options";
@@ -16,7 +17,6 @@ import type { RunLog } from "./log";
 import { forgetMemory, listMemory } from "./memory";
 import type { Projects } from "./projects";
 import { namesOf } from "./read";
-import type { Access } from "./runs";
 import { wireCopies } from "./settings";
 import { listKeptValues, resetKeptValue } from "./variables";
 

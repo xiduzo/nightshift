@@ -1,11 +1,11 @@
 import { Refusal } from "@nightshift/refusal";
+import type { Access } from "../../../access";
 import {
 	type Actor,
 	type NodeToPlace,
 	type OwnDevice,
 	personOf,
 } from "../../../contract";
-import type { Access } from "../../access";
 import type { RunPlanner } from "./ports";
 
 export type ListDevicesPorts = {

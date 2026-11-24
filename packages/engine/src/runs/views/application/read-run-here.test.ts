@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { runRecord } from "../../access/adapters/out/in-memory-run-records";
+import { runRecord } from "../../../access/adapters/out/in-memory-run-records";
 import { inMemoryViewsPorts } from "../adapters/out/in-memory-neighbours";
 import { readRunHere } from "./read-run-here";
 

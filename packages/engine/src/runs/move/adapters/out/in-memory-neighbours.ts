@@ -1,6 +1,6 @@
+import { THIS_COMPUTER } from "../../../../access/adapters/out/in-memory-run-records";
 import type { Held } from "../../../../graph";
 import { olderNightShift } from "../../../../graph";
-import { THIS_COMPUTER } from "../../../access/adapters/out/in-memory-run-records";
 import { inMemoryActionPorts } from "../../../actions/adapters/out/in-memory-neighbours";
 import { inMemoryMoveDevices } from "./in-memory-move-devices";
 import { inMemoryWalkHandover } from "./in-memory-walk-handover";

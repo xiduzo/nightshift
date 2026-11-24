@@ -1,19 +1,15 @@
 import type { Permissions } from "@nightshift/auth";
 import { Refusal } from "@nightshift/refusal";
+import type { Access } from "../../access";
 import type { Actor } from "../../contract";
 import { STILL_RUNNING } from "../domain/move";
 import { type MoveProjectsPorts, moveProjects } from "./move-projects";
-import type {
-	MoveLog,
-	ProjectLookup,
-	ProjectRuns,
-	SpaceMoveAccess,
-} from "./ports";
+import type { MoveLog, ProjectLookup, ProjectRuns } from "./ports";
 
 const MOVE_PROJECTS: Permissions = { project: ["move"] };
 
 export type MoveProjectPorts = MoveProjectsPorts & {
-	access: SpaceMoveAccess;
+	access: Pick<Access, "openSpace">;
 	projectLookup: ProjectLookup;
 	projectRuns: ProjectRuns;
 	moveLog: MoveLog;

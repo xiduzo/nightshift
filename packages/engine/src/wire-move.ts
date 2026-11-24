@@ -1,7 +1,8 @@
 import type { Database } from "@nightshift/db";
+import type { Access } from "./access";
 import type { RunWalks } from "./graph";
 import type { Peers } from "./peers";
-import { type Access, type Move, type Walk, wireMove } from "./runs";
+import { type Move, type Walk, wireMove } from "./runs";
 
 /**
  * The move block of the engine's composition (`wire.ts`): the move of a

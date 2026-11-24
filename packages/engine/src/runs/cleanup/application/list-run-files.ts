@@ -1,8 +1,8 @@
+import type { Access } from "../../../access";
 import type { Actor } from "../../../contract";
 import { knownRun, NO_FILES, type RunFiles } from "../domain/run-files";
 import { cleanupTime } from "../domain/safety";
 import type {
-	CleanupAccess,
 	CleanupGround,
 	CleanupRuns,
 	RemovalLog,
@@ -10,7 +10,7 @@ import type {
 } from "./ports";
 
 export type ListRunFilesPorts = {
-	access: CleanupAccess;
+	access: Pick<Access, "openRun">;
 	runs: Pick<CleanupRuns, "runRow" | "runState" | "isActive">;
 	folders: Pick<RunFolderFiles, "list">;
 	removalLog: Pick<RemovalLog, "removals">;

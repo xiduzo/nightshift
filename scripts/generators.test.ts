@@ -56,11 +56,19 @@ const MAP_FILES = Object.fromEntries(
 const ENGINE_MAP = MAP_FILES[mapFileOf("engine")] as string;
 const PLACEHOLDER = /\{\{\{(\w+)\}\}\}/g;
 
-/** The ring check of the fixture, with `engine/runs` as a mechanism: it has no rings here. */
-const OPTIONS = {
-	...DEFAULTS,
-	mechanisms: [...(DEFAULTS.mechanisms ?? []), "engine/runs"],
-};
+/** Who may act: an engine slice imports it, a port above the engine names it. */
+const ACCESS = Object.fromEntries(
+	Object.entries({
+		"index.ts": 'export { type Access, wireAccess } from "./wire";',
+		"wire.ts":
+			'import { openSpace } from "./application/open-space";\nexport type Access = { openSpace: typeof openSpace };\nexport function wireAccess(): Access {\n\treturn { openSpace };\n}',
+		"application/open-space.ts": "export function openSpace() {}",
+		"application/open-space.test.ts":
+			'import { openSpace } from "./open-space";\nopenSpace();',
+		"adapters/out/in-memory-access.ts":
+			"export function inMemoryAccess() {}\nexport function allowing() {}",
+	}).map(([file, text]) => [`packages/engine/src/access/${file}`, `${text}\n`]),
+);
 
 const roots: string[] = [];
 afterAll(() => {
@@ -105,8 +113,7 @@ function repositoryWithMap(): string {
 				".": "./src/index.ts",
 			}),
 			"packages/devices/src/index.ts": "export {};\n",
-			// What the access port of a generated slice names: @filledBy engine/runs.
-			"packages/engine/src/runs/index.ts": "export {};\n",
+			...ACCESS,
 			"scripts/capabilities.ts": MAP,
 			...MAP_FILES,
 		},
@@ -149,7 +156,7 @@ function generate(root: string, pkg: string): void {
 test("a template holds no Handlebars but {{{name}}}", () => {
 	const files = readdirSync(TEMPLATES, { recursive: true, encoding: "utf8" });
 	const templates = files.filter((file) => file.endsWith(".hbs"));
-	expect(templates.length).toBe(13);
+	expect(templates.length).toBe(16);
 	for (const file of templates) {
 		const rest = readFileSync(join(TEMPLATES, file), "utf8").replace(
 			PLACEHOLDER,
@@ -179,7 +186,7 @@ test("turbo gen has the three generators, and each file they add has its templat
 	const adds = actionsOf({ ...slice, package: "engine", useCaseWhat: "y" })
 		.filter((action) => typeof action === "object" && action.type === "add")
 		.map((action) => action as PlopTypes.AddActionConfig);
-	expect(adds.length).toBe(6);
+	expect(adds.length).toBe(5);
 	for (const add of adds) {
 		expect(add.path).toStartWith(
 			join(TEMPLATES, "../../../packages/engine/src/widgets/"),
@@ -217,7 +224,7 @@ describe("what the generators make keeps the ring check", () => {
 	for (const pkg of ["engine", "devices"]) {
 		test(`a slice of ${pkg} with two use cases and an adapter`, async () => {
 			const root = repositoryWithMap();
-			expect(await checkRings(root, OPTIONS)).toEqual([]);
+			expect(await checkRings(root, DEFAULTS)).toEqual([]);
 			generate(root, pkg);
 			const out = `packages/${pkg}/src/spend/adapters/out`;
 			for (const file of [
@@ -227,7 +234,7 @@ describe("what the generators make keeps the ring check", () => {
 			]) {
 				expect(readFileSync(join(root, file), "utf8")).toContain("import");
 			}
-			expect(await checkRings(root, OPTIONS)).toEqual([]);
+			expect(await checkRings(root, DEFAULTS)).toEqual([]);
 			const wire = readFileSync(
 				join(root, `packages/${pkg}/src/spend/wire.ts`),
 				"utf8",
@@ -296,7 +303,7 @@ describe("a use case of a slice without an access port", () => {
 					about: "The notes.",
 				}),
 			);
-			expect(await checkRings(root, OPTIONS)).toEqual([]);
+			expect(await checkRings(root, DEFAULTS)).toEqual([]);
 			const useCase = readFileSync(
 				join(root, `${dir}/application/keep-note.ts`),
 				"utf8",
@@ -343,16 +350,25 @@ describe("a sub-vertical", () => {
 				about: "x",
 			}),
 		);
-		expect(await checkRings(root, OPTIONS)).toEqual([]);
+		expect(await checkRings(root, DEFAULTS)).toEqual([]);
 		const wire = readFileSync(join(root, `${SLICE}/pauses/wire.ts`), "utf8");
 		expect(wire).toContain("export function wirePauses(");
 		expect(wire).toContain("\t\tresumeSchedule: resumeSchedule(ports),\n");
-		const ports = readFileSync(
-			join(root, `${SLICE}/pauses/application/ports.ts`),
+		const useCase = readFileSync(
+			join(root, `${SLICE}/pauses/application/resume-schedule.ts`),
 			"utf8",
 		);
-		expect(ports).toContain('from "../../../contract"');
-		expect(ports).toContain("export type PausesAccess = {");
+		expect(useCase).toContain('from "../../../contract"');
+		expect(useCase).toContain('import type { Access } from "../../../access";');
+		expect(useCase).toContain('access: Pick<Access, "openSpace">;');
+		expect(wire).toContain('import type { Access } from "../../access";');
+		const twins = readFileSync(
+			join(root, `${SLICE}/pauses/adapters/out/in-memory-neighbours.ts`),
+			"utf8",
+		);
+		expect(twins).toContain(
+			'from "../../../../access/adapters/out/in-memory-access";',
+		);
 	});
 });
 

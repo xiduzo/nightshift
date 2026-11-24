@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { allowing } from "../../../access/adapters/out/in-memory-access";
 import { NIGHT_SHIFT } from "../../../contract";
 import { inMemoryReviewPorts } from "../adapters/out/in-memory-neighbours";
 import { parseQuestions } from "../domain/questions";
@@ -65,5 +66,24 @@ describe("markQuestion", () => {
 		}).catch((caught: unknown) => caught);
 		expect(error).toBe(failure);
 		expect(ports.holds.events).toEqual(["hold p1", "done p1"]);
+	});
+
+	test("owners, admins and members may, and nobody else", async () => {
+		const ports = inMemoryReviewPorts();
+		expect(
+			await ports.access.whoMay(
+				"space-1",
+				(actor) =>
+					markQuestion(ports)({
+						actor,
+						spaceId: "space-1",
+						projectId: "p1",
+						query: "q",
+						answers: ["a.md"],
+						by: null,
+					}),
+				() => ports.holds.events,
+			),
+		).toEqual(allowing("owner", "admin", "member"));
 	});
 });

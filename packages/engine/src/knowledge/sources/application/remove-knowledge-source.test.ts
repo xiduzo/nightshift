@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { FLOW_VERSION, type Flow, flowSchema } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
+import { allowing } from "../../../access/adapters/out/in-memory-access";
 import { NIGHT_SHIFT } from "../../../contract";
 import { inMemorySourcesPorts } from "../adapters/out/in-memory-neighbours";
 import { OWNER_ONLY } from "../domain/syncs";
@@ -120,5 +121,27 @@ describe("removeKnowledgeSource", () => {
 		expect((refusal as Refusal).message).toBe(
 			"This project has no such source. It may have been removed.",
 		);
+	});
+
+	test("owners, admins and members may, and nobody else", async () => {
+		// With the files it asks for a second right.
+		for (const files of [false, true]) {
+			const ports = setup();
+			expect(
+				await ports.access.whoMay(
+					"space-1",
+					(actor) =>
+						removeKnowledgeSource(ports)({
+							actor,
+							spaceId: "space-1",
+							projectId: "p1",
+							name: "web",
+							files,
+							may: owner,
+						}),
+					() => ports.space.calls,
+				),
+			).toEqual(allowing("owner", "admin", "member"));
+		}
 	});
 });

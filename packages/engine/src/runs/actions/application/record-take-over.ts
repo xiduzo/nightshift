@@ -1,7 +1,7 @@
+import type { Access } from "../../../access";
 import { type Actor, permissionOf, personOf } from "../../../contract";
 import type { lastHarnessSession } from "../../../read";
 import { RunRefusal, WALKED_ELSEWHERE } from "../../../run-status";
-import type { Access } from "../../access";
 import type { RunFacts, Turns } from "../../walk";
 import { takenOverBefore } from "../domain/action-rules";
 

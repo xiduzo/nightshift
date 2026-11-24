@@ -1,5 +1,6 @@
 import type { Permissions } from "@nightshift/auth";
 import { Refusal } from "@nightshift/refusal";
+import type { Access } from "../../../access";
 import type { Actor } from "../../../contract";
 import {
 	asProjects,
@@ -22,13 +23,13 @@ import {
 	type ThisDevice,
 } from "../../keep";
 import { alreadyHere, folderName, HOSTED_NEEDS_REMOTE } from "../domain/words";
-import type { CloneImports, HostRelay, ProjectAccess } from "./ports";
+import type { CloneImports, HostRelay } from "./ports";
 
 /** What a role must allow for this request. */
 const ADD_PROJECTS: Permissions = { project: ["add"] };
 
 export type AddProjectPorts = {
-	access: ProjectAccess;
+	access: Pick<Access, "openSpace">;
 	store: Pick<
 		ProjectStore,
 		"here" | "byRemote" | "row" | "keepHosted" | "addClone" | "cloneRow"

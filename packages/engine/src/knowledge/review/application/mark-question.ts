@@ -1,4 +1,5 @@
 import type { Permissions } from "@nightshift/auth";
+import type { Access } from "../../../access";
 import type { Actor } from "../../../contract";
 import { isReadable } from "../../files";
 import {
@@ -7,12 +8,12 @@ import {
 	markQuestion as marked,
 	parseQuestions,
 } from "../domain/questions";
-import type { FolderHolds, QuestionSetFile, ReviewAccess } from "./ports";
+import type { FolderHolds, QuestionSetFile } from "./ports";
 
 const CHANGES_KNOWLEDGE: Permissions = { run: ["start"] };
 
 export type MarkQuestionPorts = {
-	access: ReviewAccess;
+	access: Pick<Access, "openSpace">;
 	questions: QuestionSetFile;
 	holds: FolderHolds;
 	now: () => number;

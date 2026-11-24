@@ -1,4 +1,5 @@
 import { Refusal } from "@nightshift/refusal";
+import type { Access } from "../../../access";
 import {
 	type Actor,
 	commandOf,
@@ -7,7 +8,6 @@ import {
 } from "../../../contract";
 import type { RunRow } from "../../../log";
 import { isTestRun, refuseUnless } from "../../../run-status";
-import type { Access } from "../../access";
 import type { RunFacts, Turns, Walkers } from "../../walk";
 import {
 	notYourDevice,

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { Refusal } from "@nightshift/refusal";
+import { allowing } from "../../../access/adapters/out/in-memory-access";
 import { type Actor, NIGHT_SHIFT } from "../../../contract";
 import { inMemoryCatalogPorts } from "../adapters/out/in-memory-neighbours";
 import { alreadyHere, HOSTED_NEEDS_REMOTE } from "../domain/words";
@@ -105,5 +106,18 @@ describe("addProject", () => {
 		await expect(
 			addProject(ports)(ADA, { spaceId: "team", repoPath: "/work/local" }),
 		).rejects.toThrow(HOSTED_NEEDS_REMOTE);
+	});
+
+	test("owners, admins and members may, and nobody else", async () => {
+		const ports = inMemoryCatalogPorts();
+		ports.repos.add("/work/app", "git@github.com:acme/app.git");
+		expect(
+			await ports.access.whoMay(
+				"s1",
+				(actor) =>
+					addProject(ports)(actor, { spaceId: "s1", repoPath: "/work/app" }),
+				() => ports.projectLog.facts,
+			),
+		).toEqual(allowing("owner", "admin", "member"));
 	});
 });

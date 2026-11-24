@@ -1,4 +1,5 @@
 import type { Database } from "@nightshift/db";
+import type { Access } from "../../access";
 import { createRunBranches, type Git, keptRefsOf } from "../../git";
 import type { RunLog } from "../../log";
 import type { RunFolders } from "../../run-folders";
@@ -6,7 +7,6 @@ import { startCleanupJob } from "./adapters/in/cleanup-timer";
 import { drizzleRemovalLog } from "./adapters/out/drizzle-removal-log";
 import { listRunFiles } from "./application/list-run-files";
 import type {
-	CleanupAccess,
 	CleanupGround,
 	CleanupProjects,
 	CleanupRuns,
@@ -24,7 +24,7 @@ import { sweepRunFolders } from "./application/sweep-run-folders";
 /** What the package gives cleanup: the ports another slice fills, and what the real adapters stand on. */
 export type CleanupDeps = {
 	/** Who may see a run (`openRun` of the engine's `runs`). */
-	access: CleanupAccess;
+	access: Pick<Access, "openRun">;
 	runs: CleanupRuns;
 	projects: CleanupProjects;
 	ground: CleanupGround;

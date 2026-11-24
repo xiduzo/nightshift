@@ -1,17 +1,13 @@
 import type { Permissions } from "@nightshift/auth";
 import type { Flow, FlowIssue } from "@nightshift/flows";
+import type { Access } from "../../../access";
 import { type Actor, personOf } from "../../../contract";
-import type {
-	FlowEditingAccess,
-	FlowUsage,
-	SavedFlows,
-	SpaceProjects,
-} from "./ports";
+import type { FlowUsage, SavedFlows, SpaceProjects } from "./ports";
 
 const SAVES_FLOWS: Permissions = { flow: ["save"] };
 
 export type SaveFlowPorts = {
-	access: FlowEditingAccess;
+	access: Pick<Access, "openSpace">;
 	projects: SpaceProjects;
 	flows: Pick<SavedFlows, "flows" | "save">;
 	usage?: FlowUsage;

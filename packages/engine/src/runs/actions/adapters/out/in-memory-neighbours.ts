@@ -1,3 +1,9 @@
+import { inMemoryAccess } from "../../../../access/adapters/out/in-memory-access";
+import {
+	runRecord,
+	THIS_COMPUTER,
+} from "../../../../access/adapters/out/in-memory-run-records";
+import type { RunRecord } from "../../../../access/application/open-run";
 import { rerunNodeRefusal } from "../../../../graph";
 import { foldRun, type RunState } from "../../../../log";
 import {
@@ -5,13 +11,6 @@ import {
 	lastHarnessSession,
 	parseRunFlow,
 } from "../../../../read";
-import {
-	runRecord,
-	THIS_COMPUTER,
-} from "../../../access/adapters/out/in-memory-run-records";
-import { inMemoryAccessPorts } from "../../../access/adapters/out/in-memory-space-members";
-import type { RunRecord } from "../../../access/application/open-run";
-import { openRun } from "../../../access/application/open-run";
 import { inMemoryRunFacts } from "../../../walk/adapters/out/in-memory-run-facts";
 import { inMemoryTurns } from "../../../walk/adapters/out/in-memory-turns";
 import { inMemoryWalkers } from "../../../walk/adapters/out/in-memory-walkers";
@@ -38,7 +37,7 @@ export function stateOf(fields: Partial<RunState>): RunState {
  * state: the run's facts read that state, and its Turns check it.
  */
 export function inMemoryActionPorts(options: { reachable?: boolean } = {}) {
-	const access = inMemoryAccessPorts(THIS_COMPUTER);
+	const access = inMemoryAccess(THIS_COMPUTER);
 	access.members.join(SPACE, ADA.personId, "member");
 	access.members.join(SPACE, VIC.personId, "viewer");
 	const states = new Map<string, RunState>();
@@ -51,7 +50,6 @@ export function inMemoryActionPorts(options: { reachable?: boolean } = {}) {
 	const turns = inMemoryTurns();
 	return {
 		...access,
-		openRun: openRun(access),
 		facts,
 		turns,
 		walkers: inMemoryWalkers(options),

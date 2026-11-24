@@ -1,5 +1,6 @@
 import type { Permissions } from "@nightshift/auth";
 import { Refusal } from "@nightshift/refusal";
+import type { Access } from "../../access";
 import { type Actor, personOf } from "../../contract";
 import type { RunSummary } from "../../read";
 import { openRunOf, openRunRefusalWords } from "../domain/open-run";
@@ -7,7 +8,6 @@ import { scheduleOf } from "../domain/saved-schedules";
 import { scheduledStart } from "../domain/scheduled-start";
 import type {
 	Clock,
-	ScheduleAccess,
 	ScheduledProjects,
 	ScheduledRuns,
 	ScheduleLog,
@@ -18,7 +18,7 @@ import type {
 const STARTS_RUNS: Permissions = { run: ["start"] };
 
 export type RunScheduleNowPorts = {
-	access: ScheduleAccess;
+	access: Pick<Access, "openSpace">;
 	projects: Pick<ScheduledProjects, "inSpace">;
 	runs: Pick<ScheduledRuns, "shownTo" | "status" | "start">;
 	store: Pick<ScheduleStore, "list">;

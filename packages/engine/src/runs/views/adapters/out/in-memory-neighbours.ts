@@ -1,7 +1,5 @@
+import { inMemoryAccess } from "../../../../access/adapters/out/in-memory-access";
 import { type Actor, personOf } from "../../../../contract";
-import { inMemoryAccessPorts } from "../../../access/adapters/out/in-memory-space-members";
-import { openRun } from "../../../access/application/open-run";
-import { openSpace } from "../../../access/application/open-space";
 import type { PrivatePaths } from "../../application/ports";
 import {
 	inMemoryRunViews,
@@ -58,7 +56,7 @@ export type InMemoryPrivatePaths = ReturnType<typeof inMemoryPrivatePaths>;
  * adds (`addRun`) is a row of both the views and access.
  */
 export function inMemoryViewsPorts(given: Partial<RunViewsNeighbours> = {}) {
-	const access = inMemoryAccessPorts();
+	const access = inMemoryAccess();
 	const views = inMemoryRunViews(given, THIS_COMPUTER);
 	const paths = inMemoryPrivatePaths();
 	return {
@@ -66,8 +64,8 @@ export function inMemoryViewsPorts(given: Partial<RunViewsNeighbours> = {}) {
 		paths,
 		/** The runs and the Members that access reads. */
 		access,
-		openRun: openRun(access),
-		openSpace: openSpace(access),
+		openRun: access.openRun,
+		openSpace: access.openSpace,
 		/** Adds a run's row to the views and to access. */
 		addRun(row: Parameters<typeof views.add>[0]) {
 			views.add(row);

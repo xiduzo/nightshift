@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { formatLearnings } from "@nightshift/flows";
 import type { Refusal } from "@nightshift/refusal";
+import { allowing } from "../../../access/adapters/out/in-memory-access";
 import { NIGHT_SHIFT } from "../../../contract";
 import { inMemoryLearningsPorts } from "../adapters/out/in-memory-neighbours";
 import { tellLearning } from "./tell-learning";
@@ -80,5 +81,23 @@ describe("tellLearning", () => {
 		);
 		expect(refusal?.kind).toBe("not-found");
 		expect(ports.folder.read("p1", TOLD)).not.toContain("Again.");
+	});
+
+	test("owners, admins and members may, and nobody else", async () => {
+		const ports = inMemoryLearningsPorts();
+		expect(
+			await ports.access.whoMay(
+				"space-1",
+				(actor) =>
+					tellLearning(ports)({
+						actor,
+						spaceId: "space-1",
+						projectId: "p1",
+						note: "Ask Bo.",
+						by: ADA,
+					}),
+				() => ports.holds.log,
+			),
+		).toEqual(allowing("owner", "admin", "member"));
 	});
 });

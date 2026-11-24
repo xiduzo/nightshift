@@ -1,4 +1,3 @@
-import type { Permissions } from "@nightshift/auth";
 import type {
 	Flow,
 	FlowMigration,
@@ -7,7 +6,7 @@ import type {
 	Schedule,
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
-import type { Actor } from "../../../../contract";
+import { inMemoryAccess } from "../../../../access/adapters/out/in-memory-access";
 import type { ProfileView } from "../../../../settings";
 import type { UsageMoment } from "../../../../usage";
 import type { FlowMergePlan } from "../../../store";
@@ -16,7 +15,6 @@ import type {
 	CloneDocuments,
 	DeviceProfiles,
 	DocumentMerges,
-	FlowTransferAccess,
 	FlowUsage,
 	ImportMigrations,
 	Migrations,
@@ -290,29 +288,13 @@ export function inMemoryFlowUsage(): InMemoryFlowUsage {
  * 1000.
  */
 
-export type InMemoryFlowTransferAccess = FlowTransferAccess & {
-	opened: { actor: Actor; spaceId: string; need?: Permissions }[];
-	refuse(error: unknown): void;
-};
-
-export function inMemoryFlowTransferAccess(): InMemoryFlowTransferAccess {
-	let refusal: { error: unknown } | null = null;
-	const access: InMemoryFlowTransferAccess = {
-		opened: [],
-		refuse: (error) => {
-			refusal = { error };
-		},
-		async openSpace(actor, request) {
-			access.opened.push({ actor, ...request });
-			if (refusal && "personId" in actor) throw refusal.error;
-		},
-	};
-	return access;
-}
-
+/** Every port in memory at once. `ada` is a member of the Spaces `space` and `elsewhere`. */
 export function inMemoryTransferPorts() {
+	const access = inMemoryAccess();
+	access.members.join("space", "ada", "member");
+	access.members.join("elsewhere", "ada", "member");
 	return {
-		access: inMemoryFlowTransferAccess(),
+		access,
 		documents: inMemoryCloneDocuments(),
 		folders: inMemoryCloneFolders(),
 		saved: inMemorySavedDocuments(),

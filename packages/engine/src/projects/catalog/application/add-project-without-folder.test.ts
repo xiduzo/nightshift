@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { allowing } from "../../../access/adapters/out/in-memory-access";
 import type { Actor } from "../../../contract";
 import { HOSTED_ELSEWHERE } from "../../keep";
 import { inMemoryCatalogPorts } from "../adapters/out/in-memory-neighbours";
@@ -55,5 +56,20 @@ describe("addProjectWithoutFolder", () => {
 		await expect(
 			addProjectWithoutFolder(alone)(ADA, { spaceId: "team", name: "Leads" }),
 		).rejects.toThrow(HOSTED_ELSEWHERE);
+	});
+
+	test("owners, admins and members may, and nobody else", async () => {
+		const ports = inMemoryCatalogPorts();
+		expect(
+			await ports.access.whoMay(
+				"s1",
+				(actor) =>
+					addProjectWithoutFolder(ports)(actor, {
+						spaceId: "s1",
+						name: "Leads",
+					}),
+				() => ports.projectLog.facts,
+			),
+		).toEqual(allowing("owner", "admin", "member"));
 	});
 });

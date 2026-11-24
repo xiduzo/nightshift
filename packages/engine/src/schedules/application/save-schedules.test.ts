@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { FLOW_VERSION, type Flow, type Schedule } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
-import { type Actor, NIGHT_SHIFT } from "../../contract";
+import { allowing } from "../../access/adapters/out/in-memory-access";
 import { NOT_ON_THIS_COMPUTER } from "../../projects";
 import type { UsageMoment } from "../../usage";
 import { inMemorySchedulePorts } from "../adapters/out/in-memory-neighbours";
@@ -11,7 +11,7 @@ import { saveSchedules } from "./save-schedules";
 
 const P = "project-1";
 const SPACE = "space-1";
-const ANN: Actor = { personId: "person-ann", door: "session" };
+const ANN = { personId: "person-ann", door: "session" as const };
 // biome-ignore lint/suspicious/noTemplateCurlyInString: a secret reference, as a person writes it.
 const HOOK_SECRET = "${HOOK_SECRET}";
 
@@ -46,6 +46,9 @@ function nightly(extra: Partial<Schedule> = {}): Schedule {
 /** A project in a Space, with a Clone here unless the test says otherwise. */
 function project(clone: { hasFolder?: boolean; clonedHere?: boolean } = {}) {
 	const ports = inMemorySchedulePorts(0);
+	for (const spaceId of [SPACE, "space-2"]) {
+		ports.access.members.join(spaceId, ANN.personId, "member");
+	}
 	ports.projects.add({ id: P, spaceId: SPACE, ...clone });
 	ports.store.seed(P);
 	const usage: UsageMoment[] = [];
@@ -56,6 +59,7 @@ function project(clone: { hasFolder?: boolean; clonedHere?: boolean } = {}) {
 	return {
 		ports,
 		usage,
+		saveAs: save,
 		save: (schedules: Schedule[], timeZone?: string, spaceId = SPACE) =>
 			save(ANN, {
 				spaceId,
@@ -63,9 +67,6 @@ function project(clone: { hasFolder?: boolean; clonedHere?: boolean } = {}) {
 				schedules,
 				...(timeZone !== undefined ? { timeZone } : {}),
 			}),
-		/** As Night Shift itself: a caller in this process. */
-		saveAsNightShift: (schedules: Schedule[]) =>
-			save(NIGHT_SHIFT, { spaceId: SPACE, projectId: P, schedules }),
 		saved: async () =>
 			(await ports.store.list(P, { validate: false })).schedules,
 	};
@@ -210,22 +211,19 @@ describe("the save of a project's schedules", () => {
 		]);
 	});
 
-	test("asks whether the person is a Member of the Space, before it reads anything", async () => {
-		const { ports, save, saveAsNightShift, saved } = project();
-		const gone = new Refusal("not-found", "No such Space.");
-		ports.access.refuse(gone);
-		expect(await refusalOf(save([nightly({ enabled: false })]))).toBe(gone);
-		// Being a Member is enough: no role is asked for.
-		expect(ports.access.opened).toEqual([{ actor: ANN, spaceId: SPACE }]);
-		expect(ports.offers.asked).toEqual([]);
-		expect(await saved()).toEqual([]);
-
-		// A caller in this process acts as Night Shift: it may.
-		await saveAsNightShift([nightly({ enabled: false })]);
-		expect(ports.access.opened[1]).toEqual({
-			actor: NIGHT_SHIFT,
-			spaceId: SPACE,
-		});
-		expect(await saved()).toEqual([nightly({ enabled: false })]);
+	test("every Member may, whatever the role (the door decides who may save), and nobody else", async () => {
+		const { ports, saveAs } = project();
+		expect(
+			await ports.access.whoMay(
+				SPACE,
+				(actor) =>
+					saveAs(actor, {
+						spaceId: SPACE,
+						projectId: P,
+						schedules: [nightly({ enabled: false })],
+					}),
+				() => ports.offers.asked,
+			),
+		).toEqual(allowing("owner", "admin", "member", "viewer"));
 	});
 });

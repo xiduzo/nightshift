@@ -1,17 +1,13 @@
 import type { AnswerFile } from "@nightshift/flows";
-import { askAnswerProblem } from "../../../graph";
-import { foldRun, type RunState } from "../../../log";
-import { type AnsweredGate, inboxOrder, type OpenGate } from "../../../read";
+import { inMemoryAccess } from "../../../access/adapters/out/in-memory-access";
 import {
 	runRecord,
 	THIS_COMPUTER,
-} from "../../../runs/access/adapters/out/in-memory-run-records";
-import { inMemoryAccessPorts } from "../../../runs/access/adapters/out/in-memory-space-members";
-import {
-	openRun,
-	type RunRecord,
-} from "../../../runs/access/application/open-run";
-import { openSpace } from "../../../runs/access/application/open-space";
+} from "../../../access/adapters/out/in-memory-run-records";
+import type { RunRecord } from "../../../access/application/open-run";
+import { askAnswerProblem } from "../../../graph";
+import { foldRun, type RunState } from "../../../log";
+import { type AnsweredGate, inboxOrder, type OpenGate } from "../../../read";
 import { inMemoryRunFacts } from "../../../runs/walk/adapters/out/in-memory-run-facts";
 import { inMemoryTurns } from "../../../runs/walk/adapters/out/in-memory-turns";
 import { inMemoryWalkers } from "../../../runs/walk/adapters/out/in-memory-walkers";
@@ -129,7 +125,7 @@ export function openGate(
 export function inMemoryGatePorts(
 	options: { reachable?: boolean; now?: number } = {},
 ) {
-	const access = inMemoryAccessPorts(THIS_COMPUTER);
+	const access = inMemoryAccess(THIS_COMPUTER);
 	access.members.join(SPACE, ADA.personId, "member");
 	access.members.join(SPACE, VIC.personId, "viewer");
 	const states = new Map<string, RunState>();
@@ -143,8 +139,6 @@ export function inMemoryGatePorts(
 	let at = options.now ?? 0;
 	return {
 		...access,
-		openRun: openRun(access),
-		openSpace: openSpace(access),
 		facts,
 		turns,
 		walkers: inMemoryWalkers(options),

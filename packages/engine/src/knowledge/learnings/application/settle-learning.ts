@@ -1,19 +1,15 @@
 import type { Permissions } from "@nightshift/auth";
 import { ACCEPTED_LEARNINGS_DIR, proposedLearningOf } from "@nightshift/flows";
+import type { Access } from "../../../access";
 import type { Actor } from "../../../contract";
 import { proposedFile } from "../domain/proposed";
 import { learningGone } from "../domain/waiting";
-import type {
-	FolderHolds,
-	LearningEntries,
-	LearningFolder,
-	LearningsAccess,
-} from "./ports";
+import type { FolderHolds, LearningEntries, LearningFolder } from "./ports";
 
 const CHANGES_KNOWLEDGE: Permissions = { run: ["start"] };
 
 export type SettleLearningPorts = {
-	access: LearningsAccess;
+	access: Pick<Access, "openSpace">;
 	folder: Pick<LearningFolder, "bytes" | "append" | "remove">;
 	documents: Pick<LearningEntries, "open">;
 	holds: FolderHolds;

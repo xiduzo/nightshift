@@ -1,4 +1,5 @@
 import type { Database } from "@nightshift/db";
+import type { Access } from "./access";
 import type { DeviceDirectory, Relay, StartRunInput } from "./contract";
 import { addressKey } from "./device";
 import { capabilitiesFor, kindOf, unfit } from "./graph";
@@ -6,7 +7,6 @@ import type { RunLog, RunTrigger } from "./log";
 import type { Projects } from "./projects";
 import type { RunSummary } from "./read";
 import {
-	type Access,
 	type PlacementPort,
 	wirePlacement,
 	wireStart,

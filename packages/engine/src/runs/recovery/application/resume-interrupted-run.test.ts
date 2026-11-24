@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
+import { runRecord } from "../../../access/adapters/out/in-memory-run-records";
 import type { TakeOptions } from "../../../graph";
 import type { EnginePayloads } from "../../../log";
-import { runRecord } from "../../access/adapters/out/in-memory-run-records";
 import {
 	eventsOf,
 	inMemoryRecoveryPorts,

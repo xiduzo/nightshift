@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { wireSpaces as wireAuthSpaces } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
+import type { Access } from "./access";
 import type { DeviceDirectory } from "./contract";
 import type { SpaceDocuments } from "./documents";
 import type { EngineOptions } from "./engine-options";
@@ -15,7 +16,6 @@ import {
 	wireClones,
 	wireKeep,
 } from "./projects";
-import type { Access } from "./runs";
 import { wireSpaces } from "./spaces";
 
 /**
@@ -41,7 +41,7 @@ export function wireEngineProjects(deps: {
 	runner: () => Pick<Runner, "isActive">;
 	/** The import of a Clone's flows, made after this block (`wire-flows.ts`). */
 	cloneImports: () => CloneImports;
-	/** Who may act in a Space (`runs/access`). */
+	/** Who may act in a Space (`access`). */
 	access: Pick<Access, "openSpace">;
 }) {
 	const { db, log: runLog, documents, directory } = deps;

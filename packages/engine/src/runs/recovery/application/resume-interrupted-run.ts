@@ -1,6 +1,6 @@
 import { Refusal } from "@nightshift/refusal";
+import type { Access } from "../../../access";
 import { NIGHT_SHIFT } from "../../../contract";
-import type { Access } from "../../access";
 import type { RunFacts, StartHolds, Turns } from "../../walk";
 import type { checkResume } from "./check-resume";
 import type { OpenWork } from "./ports";

@@ -1,9 +1,10 @@
+import type { Access } from "../../../access";
 import type { Actor } from "../../../contract";
 import type { RunFile } from "../domain/run-files";
-import type { CleanupAccess, RunFolderFiles } from "./ports";
+import type { RunFolderFiles } from "./ports";
 
 export type ReadRunFilePorts = {
-	access: CleanupAccess;
+	access: Pick<Access, "openRun">;
 	folders: Pick<RunFolderFiles, "file">;
 };
 

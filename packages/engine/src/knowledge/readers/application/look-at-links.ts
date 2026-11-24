@@ -1,4 +1,5 @@
 import type { Permissions } from "@nightshift/auth";
+import type { Access } from "../../../access";
 import type { Actor } from "../../../contract";
 import {
 	emptyLook,
@@ -21,14 +22,13 @@ import type {
 	PageReader,
 	ReaderServices,
 	ReaderSettings,
-	ReadersAccess,
 	SiteFacts,
 } from "./ports";
 
 const SAVES_FLOWS: Permissions = { flow: ["save"] };
 
 export type LookAtLinksPorts = {
-	access: ReadersAccess;
+	access: Pick<Access, "openSpace">;
 	settings: Pick<ReaderSettings, "setting">;
 	services: ReaderServices;
 	sites: SiteFacts;

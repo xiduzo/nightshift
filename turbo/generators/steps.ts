@@ -100,6 +100,30 @@ function actorOf(
 	return { application: "@nightshift/engine", adapters: "@nightshift/engine" };
 }
 
+/**
+ * How a slice asks who may act. A slice of the engine takes the use case
+ * of `access` through its barrel. A package above the engine has a port
+ * `<Slice>Access` that the engine's `access` fills.
+ */
+function accessData(pkg: string, depth: number, name: string): Data {
+	const up = "../".repeat(depth);
+	const port = `${pascal(name)}Access`;
+	if (pkg !== "engine") {
+		return {
+			accessType: `Pick<${port}, "openSpace">`,
+			accessImport: `import type { ${port} } from "./ports";`,
+			wireAccessImport: `import type { ${port} } from "./application/ports";`,
+		};
+	}
+	return {
+		accessType: 'Pick<Access, "openSpace">',
+		accessImport: `import type { Access } from "../${up}access";`,
+		wireAccessImport: `import type { Access } from "${up}access";`,
+		accessFromApplication: `../${up}access`,
+		accessFromAdapters: `../../${up}access`,
+	};
+}
+
 const refuse = (message: string): never => {
 	throw new GeneratorRefusal(message);
 };
@@ -175,12 +199,19 @@ function useCaseData(root: string, pkg: string, slice: string, name: string) {
 }
 
 /**
- * The two shapes of a generated use case. `access` asks the port
- * `<Slice>Access` who may act first. `plain` is for a slice without that
- * port: it takes the actor (or, below the engine, the request alone) and
- * asks nothing.
+ * The shapes of a generated use case. `access` asks the engine's `access`
+ * who may act first. `port` does so through the port `<Slice>Access`, above
+ * the engine. `plain` is for a slice that has neither: it takes the actor
+ * (or, below the engine, the request alone) and asks nothing.
  */
-type UseCaseShape = "access" | "plain";
+type UseCaseShape = "access" | "port" | "plain";
+
+/** The template of a use case of each shape, and of its test. */
+const TEMPLATE_OF: Record<UseCaseShape, { useCase: string; test: string }> = {
+	access: { useCase: "use-case", test: "use-case" },
+	port: { useCase: "use-case", test: "port-access" },
+	plain: { useCase: "plain", test: "plain" },
+};
 
 /** The steps that add a use case to a slice: its file, its test, and its line in `wire.ts`. */
 function useCaseFiles(
@@ -213,19 +244,19 @@ function useCaseFiles(
 			[`${useCaseCamel}: ${useCaseCamel}(ports),`],
 			`the return of wire${pascal(paths.name)} in ${paths.wire}`,
 		);
-	const template = shape === "access" ? "use-case" : "plain";
+	const template = TEMPLATE_OF[shape];
 	return {
 		steps: [
 			{
 				kind: "add",
 				path: useCase.path,
-				template: `use-case/${template}.ts.hbs`,
+				template: `use-case/${template.useCase}.ts.hbs`,
 				data: all,
 			},
 			{
 				kind: "add",
 				path: test,
-				template: `use-case/${template}.test.ts.hbs`,
+				template: `use-case/${template.test}.test.ts.hbs`,
 				data: all,
 			},
 			{ kind: "edit", path: paths.wire, edit: editWire },
@@ -249,6 +280,7 @@ function sliceData(pkg: string, slice: string): Data {
 		slicePascal: pascal(name),
 		actorFromApplication: actor?.application ?? "",
 		actorFromAdapters: actor?.adapters ?? "",
+		...accessData(pkg, depth, name),
 		// The parts of a plain use case and its test that name the Actor.
 		actorImport: actor
 			? `import type { Actor } from "${actor.application}";\n`
@@ -259,7 +291,7 @@ function sliceData(pkg: string, slice: string): Data {
 			? 'const ADA: Actor = { personId: "person-ada", door: "session" };\n'
 			: "",
 		whoAsks: actor
-			? "It checks no role: the slice has no access port."
+			? "It checks no role: the slice does not ask access."
 			: `${pkg} is below the engine: the use case takes the request alone.`,
 	};
 }
@@ -274,8 +306,9 @@ function declares(root: string, path: string, start: string): boolean {
 /**
  * The shape of a new use case of `slice`. Fails when the slice lacks the
  * twins `inMemory<Slice>Ports`, where every generated use-case test
- * starts. `access` when the slice has the port `<Slice>Access` and its
- * package an `Actor`. A slice that `turbo gen slice` started has both.
+ * starts. `access` when those twins hold the engine's in-memory access,
+ * `port` when the slice has the port `<Slice>Access` and its package an
+ * `Actor`. A slice that `turbo gen slice` started has one of them.
  */
 function shapeOf(root: string, pkg: string, slice: string): UseCaseShape {
 	const paths = sliceDir(pkg, slice);
@@ -287,10 +320,17 @@ function shapeOf(root: string, pkg: string, slice: string): UseCaseShape {
 			`${paths.neighbours} has no function inMemory${name}Ports: a generated use-case test starts from it. Add it (it returns every port of the slice in memory), or write this use case by hand (docs/steering/STRUCTURE.md, section 9).`,
 		);
 	}
-	const access =
+	if (
+		readFileSync(join(root, paths.neighbours), "utf8").includes(
+			"access: inMemoryAccess()",
+		)
+	) {
+		return "access";
+	}
+	const port =
 		actorOf(pkg, paths.depth) &&
 		declares(root, paths.ports, `export type ${name}Access`);
-	return access ? "access" : "plain";
+	return port ? "port" : "plain";
 }
 
 /** Fails when a file of a slice is not the shape the generators made. */
@@ -349,7 +389,7 @@ export function sliceSteps(root: string, answers: SliceAnswers): Step[] {
 	const data = sliceData(pkg, slice);
 	if (!actorOf(pkg, 1)) {
 		refuse(
-			`${pkg} is below the engine, so it has no Actor for the access port of a new slice. Shape this slice by hand (docs/steering/STRUCTURE.md, section 9). "turbo gen use-case" and "turbo gen adapter" work in it.`,
+			`${pkg} is below the engine, so it has no Actor, and nothing to ask who may act, for a new slice. Shape this slice by hand (docs/steering/STRUCTURE.md, section 9). "turbo gen use-case" and "turbo gen adapter" work in it.`,
 		);
 	}
 	checkNew(root, pkg, slice);
@@ -360,12 +400,27 @@ export function sliceSteps(root: string, answers: SliceAnswers): Step[] {
 		useCaseAbout: sentence(answers.useCaseAbout, "what the use case does"),
 	};
 	const useCase = useCaseData(root, pkg, slice, answers.useCase);
-	const first = useCaseFiles(pkg, slice, useCase, all, "access");
+	const inEngine = pkg === "engine";
+	const first = useCaseFiles(
+		pkg,
+		slice,
+		useCase,
+		all,
+		inEngine ? "access" : "port",
+	);
 	const added = [
 		{ path: `${paths.dir}/index.ts`, template: "slice/index.ts.hbs" },
 		{ path: paths.wire, template: "slice/wire.ts.hbs" },
-		{ path: paths.ports, template: "slice/ports.ts.hbs" },
-		{ path: paths.neighbours, template: "slice/in-memory-neighbours.ts.hbs" },
+		// In the engine `access` is no port: the first adapter starts `ports.ts`.
+		...(inEngine
+			? []
+			: [{ path: paths.ports, template: "slice/ports-with-access.ts.hbs" }]),
+		{
+			path: paths.neighbours,
+			template: inEngine
+				? "slice/in-memory-neighbours.ts.hbs"
+				: "slice/in-memory-neighbours-with-access.ts.hbs",
+		},
 	];
 	// A sub-vertical is not on the capability map: its vertical is.
 	const map = paths.depth === 1 ? [mapFileOf(pkg)] : [];
@@ -484,8 +539,17 @@ export function adapterSteps(root: string, answers: AdapterAnswers): Step[] {
 		);
 	checkEdit(root, paths.wire, editWire);
 	checkEdit(root, paths.neighbours, editTwins);
-	checkEdit(root, paths.ports, (text) => text);
 	return [
+		...(existsSync(portsFile)
+			? []
+			: [
+					{
+						kind: "add" as const,
+						path: paths.ports,
+						template: "slice/ports.ts.hbs",
+						data: all,
+					},
+				]),
 		{
 			kind: "append",
 			path: paths.ports,

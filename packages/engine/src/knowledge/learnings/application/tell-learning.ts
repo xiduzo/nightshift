@@ -4,6 +4,7 @@ import {
 	proposedLearningOf,
 	toldLearningFileName,
 } from "@nightshift/flows";
+import type { Access } from "../../../access";
 import type { Actor } from "../../../contract";
 import { acceptNote, proposedFile } from "../domain/proposed";
 import {
@@ -13,17 +14,12 @@ import {
 	noteIn,
 	type WaitingNote,
 } from "../domain/waiting";
-import type {
-	FolderHolds,
-	LearningEntries,
-	LearningFolder,
-	LearningsAccess,
-} from "./ports";
+import type { FolderHolds, LearningEntries, LearningFolder } from "./ports";
 
 const CHANGES_KNOWLEDGE: Permissions = { run: ["start"] };
 
 export type TellLearningPorts = {
-	access: LearningsAccess;
+	access: Pick<Access, "openSpace">;
 	folder: Pick<LearningFolder, "has" | "text" | "append" | "write" | "remove">;
 	documents: Pick<LearningEntries, "open">;
 	holds: FolderHolds;

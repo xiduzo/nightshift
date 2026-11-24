@@ -290,7 +290,7 @@ packages/engine/src/
                            Signal, release a lease, useful, take over.
                            actOnRun(actor, { spaceId, runId, action })
                            hands an action to the use case of its kind.
-                           Each opens the run for the actor (runs/access),
+                           Each opens the run for the actor (access),
                            refuses by the run's one rule (run-status/,
                            RunRefusal), and takes the action as a Turn of
                            the runner (take, or hold for a stop after the

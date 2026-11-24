@@ -1,4 +1,5 @@
 import type { Database } from "@nightshift/db";
+import { wireAccess } from "../access";
 import { createSpaceArchive, type SpaceArchive } from "../archive";
 import {
 	createSyncedDocuments,
@@ -13,7 +14,6 @@ import {
 	type KnowledgeFolderLocks,
 } from "../knowledge/sync";
 import { yjsKnowledgeDocuments } from "../knowledge/sync/adapters/out/yjs-knowledge-documents";
-import { wireAccess } from "../runs";
 
 type KnowledgeDeps = Parameters<typeof wireKnowledge>[0];
 

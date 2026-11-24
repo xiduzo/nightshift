@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { allowing } from "../../../access/adapters/out/in-memory-access";
 import { NIGHT_SHIFT } from "../../../contract";
 import { inMemoryReadersPorts } from "../adapters/out/in-memory-neighbours";
 import { lookAtLinks } from "./look-at-links";
@@ -305,5 +306,19 @@ describe("lookAtLinks", () => {
 		expect(looks.map((one) => one.title)).toEqual(
 			urls.map((_, index) => `Page ${index}`),
 		);
+	});
+
+	test("owners, admins and members may, and nobody else", async () => {
+		const ports = inMemoryReadersPorts();
+		expect(
+			await ports.access.whoMay("space-1", (actor) =>
+				lookAtLinks(ports)({
+					actor,
+					spaceId: "space-1",
+					projectId: "p1",
+					urls: [],
+				}),
+			),
+		).toEqual(allowing("owner", "admin", "member"));
 	});
 });

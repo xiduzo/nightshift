@@ -1,4 +1,5 @@
 import type { Database } from "@nightshift/db";
+import type { Access } from "../access";
 import type { SpaceDocuments } from "../documents";
 import { drizzleMoveStore } from "./adapters/out/drizzle-move-store";
 import { yjsSpaceEntries } from "./adapters/out/yjs-space-entries";
@@ -14,7 +15,6 @@ import type {
 	ProjectRuns,
 	ProjectsMovedHook,
 	Reread,
-	SpaceMoveAccess,
 	ThisWalker,
 } from "./application/ports";
 
@@ -26,7 +26,7 @@ import type {
 /** What the engine gives the Space move. */
 export type SpaceMoveDeps = {
 	db: Database;
-	access: SpaceMoveAccess;
+	access: Pick<Access, "openSpace">;
 	documents: Pick<SpaceDocuments, "open" | "remove">;
 	holds: MoveHolds;
 	walker: ThisWalker;

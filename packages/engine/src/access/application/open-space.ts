@@ -1,5 +1,5 @@
 import type { Permissions, RoleRefusal } from "@nightshift/auth";
-import type { Actor } from "../../../contract";
+import type { Actor } from "../../contract";
 import { SpaceNotFound } from "../domain/refusals";
 import type { SpaceMembers } from "./ports";
 

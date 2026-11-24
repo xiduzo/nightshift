@@ -1,12 +1,13 @@
 import type { Permissions } from "@nightshift/auth";
+import type { Access } from "../../../access";
 import type { Actor } from "../../../contract";
 import { type SourceRun, sourceNamed } from "../domain/syncs";
-import type { SourcesAccess, SourcesSpace } from "./ports";
+import type { SourcesSpace } from "./ports";
 
 const CHANGES_KNOWLEDGE: Permissions = { run: ["start"] };
 
 export type SyncKnowledgeSourcePorts<Run extends SourceRun> = {
-	access: SourcesAccess;
+	access: Pick<Access, "openSpace">;
 	space: Pick<SourcesSpace<Run>, "flows" | "startRun">;
 };
 

@@ -1,18 +1,14 @@
 import type { Schedule, ScheduleIssue } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
+import type { Access } from "../../access";
 import type { Actor } from "../../contract";
 import { NOT_ON_THIS_COMPUTER } from "../../projects";
 import type { UsageNotes } from "../../usage";
 import { withTimeZone } from "../domain/saved-schedules";
-import type {
-	ScheduleAccess,
-	ScheduledProjects,
-	ScheduleOffers,
-	ScheduleStore,
-} from "./ports";
+import type { ScheduledProjects, ScheduleOffers, ScheduleStore } from "./ports";
 
 export type SaveSchedulesPorts = {
-	access: ScheduleAccess;
+	access: Pick<Access, "openSpace">;
 	projects: Pick<ScheduledProjects, "inSpace">;
 	offers: ScheduleOffers;
 	store: Pick<ScheduleStore, "flows" | "save">;

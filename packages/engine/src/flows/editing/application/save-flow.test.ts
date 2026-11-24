@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { flowSchema, singleAgentFlow } from "@nightshift/flows";
+import { allowing } from "../../../access/adapters/out/in-memory-access";
 import { NIGHT_SHIFT } from "../../../contract";
 import { inMemoryEditingPorts } from "../adapters/out/in-memory-neighbours";
 import { saveFlow } from "./save-flow";
@@ -46,5 +47,16 @@ describe("saveFlow", () => {
 		await expect(save).rejects.toThrow("This project does not exist.");
 		expect(ports.flows.saves).toEqual([]);
 		expect(ports.usage.notes).toEqual([]);
+	});
+
+	test("owners, admins and members may, and nobody else", async () => {
+		const ports = inMemoryEditingPorts();
+		expect(
+			await ports.access.whoMay(
+				"space",
+				(actor) => saveFlow(ports)(actor, request),
+				() => ports.flows.saves,
+			),
+		).toEqual(allowing("owner", "admin", "member"));
 	});
 });

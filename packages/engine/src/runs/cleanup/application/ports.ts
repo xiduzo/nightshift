@@ -1,4 +1,3 @@
-import type { Actor } from "../../../contract";
 import type { RunStatus } from "../../../run-status";
 import type { RunFile } from "../domain/run-files";
 import type { RunCopyState, WorktreeRemoved } from "../domain/safety";
@@ -9,23 +8,6 @@ import type { RunCopyState, WorktreeRemoved } from "../domain/safety";
  * Another vertical fills the others (`@filledBy`): the engine's
  * composition passes them to `wireCleanup`.
  */
-
-/**
- * Who may see a run: the one check of a request a person makes about a
- * run (`openRun` of the engine's `runs`).
- * @filledBy engine/runs
- */
-export type CleanupAccess = {
-	/**
-	 * Refuses an actor who may not see the run, or a run of another Space
-	 * than the one asked for (`RunNotFound`). Night Shift itself may open
-	 * every run.
-	 */
-	openRun(
-		actor: Actor,
-		request: { runId: string; spaceId?: string },
-	): Promise<unknown>;
-};
 
 /**
  * What the cleanup reads of the runs of this computer.

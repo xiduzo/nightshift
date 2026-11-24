@@ -1,9 +1,9 @@
 import type { Flow } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
+import type { Access } from "../../../access";
 import { NIGHT_SHIFT } from "../../../contract";
 import type { RunRow, RunState } from "../../../log";
 import type { awaitsWorktree, runWorktree } from "../../../read";
-import type { Access } from "../../access";
 import { type ResumeSettings, resumeBlock } from "../domain/resume-block";
 import type { Workplaces } from "./ports";
 

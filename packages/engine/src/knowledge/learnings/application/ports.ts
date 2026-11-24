@@ -1,4 +1,3 @@
-import type { Permissions } from "@nightshift/auth";
 import type { Actor } from "../../../contract";
 import type { TranscriptEntry } from "../../../log";
 import type { CloseNotes as SearchCloseNotes } from "../../search";
@@ -152,14 +151,3 @@ export type AskLearner = (input: {
 	runId: string;
 	signal: AbortSignal;
 }) => Promise<string[]>;
-
-/**
- * Who may act in a Space for a learnings request.
- * @filledBy engine/runs
- */
-export type LearningsAccess = {
-	openSpace(
-		actor: Actor,
-		request: { spaceId: string; need?: Permissions },
-	): Promise<void>;
-};

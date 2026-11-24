@@ -1,13 +1,14 @@
 import type { Permissions } from "@nightshift/auth";
 import { Refusal } from "@nightshift/refusal";
+import type { Access } from "../../access";
 import type { Actor } from "../../contract";
 import { USAGE_ON_HOST } from "../domain/policy";
-import type { SpaceAccess, SpacePolicies } from "./ports";
+import type { SpacePolicies } from "./ports";
 
 const SPACE_SETTINGS: Permissions = { space: ["settings"] };
 
 export type SetSpaceUsagePorts = {
-	access: SpaceAccess;
+	access: Pick<Access, "openSpace">;
 	spacePolicies: Pick<SpacePolicies, "setUsage">;
 };
 

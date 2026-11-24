@@ -1,32 +1,25 @@
 import { describe, expect, test } from "bun:test";
-import type { Actor } from "{{{actorFromApplication}}}";
+import { allowing } from "{{{accessFromApplication}}}/adapters/out/in-memory-access";
 import { inMemory{{{slicePascal}}}Ports } from "../adapters/out/in-memory-neighbours";
 import { {{{useCaseCamel}}} } from "./{{{useCase}}}";
 
 /** The use case {{{useCaseCamel}}}, on in-memory adapters. */
 
 const SPACE = "space-1";
-const ADA: Actor = { personId: "person-ada", door: "session" };
-
-/** What a request refuses with, or null. */
-const refusalOf = (work: Promise<unknown>) =>
-	work.then(
-		() => null,
-		(error: unknown) => error,
-	);
 
 describe("{{{useCaseCamel}}}", () => {
-	test("asks whether the person may act in the Space, before anything else", async () => {
+	test("every Member of the Space may, and nobody else", async () => {
 		const ports = inMemory{{{slicePascal}}}Ports();
-		const refusal = new Error("That Space does not exist.");
-		ports.access.refuse(refusal);
-		expect(await refusalOf({{{useCaseCamel}}}(ports)(ADA, { spaceId: SPACE }))).toBe(refusal);
-		expect(ports.access.opened).toEqual([{ actor: ADA, spaceId: SPACE }]);
+		expect(
+			await ports.access.whoMay(SPACE, (actor) =>
+				{{{useCaseCamel}}}(ports)(actor, { spaceId: SPACE }),
+			),
+		).toEqual(allowing("owner", "admin", "member", "viewer"));
 	});
 
-	test("a Member of the Space may", async () => {
+	test("answers a Member", async () => {
 		const ports = inMemory{{{slicePascal}}}Ports();
-		expect(await {{{useCaseCamel}}}(ports)(ADA, { spaceId: SPACE })).toBeUndefined();
-		expect(ports.access.opened).toEqual([{ actor: ADA, spaceId: SPACE }]);
+		const viewer = ports.access.as("viewer", SPACE);
+		expect(await {{{useCaseCamel}}}(ports)(viewer, { spaceId: SPACE })).toBeUndefined();
 	});
 });

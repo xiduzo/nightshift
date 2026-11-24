@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { Refusal } from "@nightshift/refusal";
+import { allowing } from "../../../access/adapters/out/in-memory-access";
 import { NIGHT_SHIFT } from "../../../contract";
 import { inMemorySourcesPorts } from "../adapters/out/in-memory-neighbours";
 import { OWNER_ONLY } from "../domain/syncs";
@@ -95,5 +96,23 @@ describe("saveKnowledgeSource", () => {
 			"This schedule is not valid: ",
 		);
 		expect(ports.space.calls).toEqual([]);
+	});
+
+	test("owners, admins and members may, and nobody else", async () => {
+		const ports = inMemorySourcesPorts();
+		expect(
+			await ports.access.whoMay(
+				"space-1",
+				(actor) =>
+					saveKnowledgeSource(ports)({
+						actor,
+						spaceId: "space-1",
+						projectId: "p1",
+						source: web,
+						may: member,
+					}),
+				() => ports.space.calls,
+			),
+		).toEqual(allowing("owner", "admin", "member"));
 	});
 });

@@ -1,5 +1,3 @@
-import type { Permissions } from "@nightshift/auth";
-import type { Actor } from "../../../contract";
 import type { MemoryFlow, NodeMemory as Remembered } from "../../../memory";
 import type { UsageMoment } from "../../../usage";
 import type { KeptFlow, KeptValue } from "../../../variables";
@@ -61,15 +59,4 @@ export type NodeMemory = {
  */
 export type FlowUsage = {
 	note(moment: UsageMoment): void;
-};
-
-/**
- * Who may act in a Space for a flow request.
- * @filledBy engine/runs
- */
-export type FlowEditingAccess = {
-	openSpace(
-		actor: Actor,
-		request: { spaceId: string; need?: Permissions },
-	): Promise<void>;
 };

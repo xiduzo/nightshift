@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { allowing } from "../../../access/adapters/out/in-memory-access";
 import type { Actor } from "../../../contract";
 import { inMemoryCatalogPorts } from "../adapters/out/in-memory-neighbours";
 import { SLEEPS, stillRunning, WAITS_AT_GATE } from "../domain/words";
@@ -44,5 +45,17 @@ describe("removeProject", () => {
 			).rejects.toThrow(words);
 			expect(ports.projectLog.facts).toEqual([]);
 		}
+	});
+
+	test("owners and admins may, and nobody else", async () => {
+		const ports = seeded();
+		expect(
+			await ports.access.whoMay(
+				"s1",
+				(actor) =>
+					removeProject(ports)(actor, { spaceId: "s1", projectId: "p1" }),
+				() => ports.projectLog.facts,
+			),
+		).toEqual(allowing("owner", "admin"));
 	});
 });

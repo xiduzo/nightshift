@@ -1,5 +1,5 @@
+import type { Access } from "../../access";
 import { olderNightShift } from "../../graph";
-import type { Access } from "../access";
 import type { Walk } from "../walk";
 import {
 	type ArchiveWalkHandoverDeps,
@@ -19,7 +19,7 @@ import { moveRun } from "./application/move-run";
  * the walk state over the Space archive and this computer's walk files)
  * and binds each use case to its ports. The ports every use case that
  * writes to a run shares come from `runs/walk`, the check of who may act
- * from `runs/access`.
+ * from `access`.
  */
 
 /** What the engine gives the move: the sibling sub-verticals, and what the real adapters stand on. */

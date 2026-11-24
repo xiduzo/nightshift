@@ -1,4 +1,6 @@
 import { Refusal } from "@nightshift/refusal";
+import type { Access } from "../../../../access";
+import { inMemoryRunRecords } from "../../../../access/adapters/out/in-memory-run-records";
 import { openWork as whatIsOpen } from "../../../../graph";
 import {
 	type EngineEventType,
@@ -7,8 +9,6 @@ import {
 	type LoggedEvent,
 } from "../../../../log";
 import { awaitsWorktree, runWorktree } from "../../../../read";
-import type { Access } from "../../../access";
-import { inMemoryRunRecords } from "../../../access/adapters/out/in-memory-run-records";
 import { inMemoryRunFacts } from "../../../walk/adapters/out/in-memory-run-facts";
 import { inMemoryTurns } from "../../../walk/adapters/out/in-memory-turns";
 import { inMemoryOpenWork } from "./in-memory-open-work";

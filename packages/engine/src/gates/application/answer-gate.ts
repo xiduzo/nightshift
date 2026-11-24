@@ -1,3 +1,4 @@
+import type { Access } from "../../access";
 import {
 	type Actor,
 	commandOf,
@@ -5,7 +6,7 @@ import {
 	type RunActionRequest,
 } from "../../contract";
 import type { askAnswerProblem } from "../../graph";
-import type { Access, Walk } from "../../runs";
+import type { Walk } from "../../runs";
 import {
 	ANSWER_ON_ITS_WAY,
 	closedWhy,
@@ -18,7 +19,7 @@ import { lockScreenRefusal, NeedsApp } from "../domain/lock-screen";
 import type { AnswerFiles, GateLists } from "./ports";
 
 export type AnswerGatePorts = {
-	/** Opens the run for the actor (`runs/access`). */
+	/** Opens the run for the actor (`access`). */
 	openRun: Access["openRun"];
 	facts: Pick<Walk["facts"], "state">;
 	turns: Pick<Walk["turns"], "take">;

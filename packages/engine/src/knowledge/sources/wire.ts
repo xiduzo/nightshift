@@ -1,5 +1,6 @@
 import type { FlowIssue, KnowledgeSource } from "@nightshift/flows";
 import { now as timeNow } from "@nightshift/time";
+import type { Access } from "../../access";
 import type { Actor } from "../../contract";
 import { timerWait } from "./adapters/out/timer-wait";
 import { listFillingFlows } from "./application/list-filling-flows";
@@ -10,7 +11,6 @@ import {
 import type {
 	ReaderReady,
 	SourceFiles,
-	SourcesAccess,
 	SourcesSpace,
 } from "./application/ports";
 import { removeKnowledgeSource } from "./application/remove-knowledge-source";
@@ -30,7 +30,7 @@ import type {
 
 /** What the knowledge gives knowledge/sources: the ports another part fills. */
 export type SourcesDeps = {
-	access: SourcesAccess;
+	access: Pick<Access, "openSpace">;
 	/** This Device's knowledge: the files, and the removal of a folder. */
 	files: SourceFiles;
 	readers: ReaderReady;

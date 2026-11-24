@@ -1,4 +1,5 @@
 import type { Schedule, ScheduleIssue } from "@nightshift/flows";
+import type { Access } from "../../access";
 import type { Actor } from "../../contract";
 import type { RunStatus } from "../../run-status";
 import { withoutEndedPause } from "../domain/pause-tonight";
@@ -12,7 +13,6 @@ import {
 } from "../domain/webhook-delivery";
 import type {
 	Clock,
-	ScheduleAccess,
 	ScheduledProjects,
 	ScheduledRuns,
 	ScheduleLog,
@@ -60,7 +60,7 @@ export type ScheduleList = {
 };
 
 export type ListSchedulesPorts = {
-	access: ScheduleAccess;
+	access: Pick<Access, "openSpace">;
 	projects: Pick<ScheduledProjects, "inSpace">;
 	store: Pick<ScheduleStore, "list">;
 	log: Pick<ScheduleLog, "histories" | "deliveries">;

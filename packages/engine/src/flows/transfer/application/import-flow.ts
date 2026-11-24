@@ -4,10 +4,10 @@ import {
 	suffixedName,
 	withAgentProfiles,
 } from "@nightshift/flows";
+import type { Access } from "../../../access";
 import { type Actor, personOf } from "../../../contract";
 import { importedFlow, namesOf, type SavedFlow } from "../domain/flow-files";
 import type {
-	FlowTransferAccess,
 	FlowUsage,
 	ImportMigrations,
 	SavedFlows,
@@ -17,7 +17,7 @@ import type {
 const SAVES_FLOWS: Permissions = { flow: ["save"] };
 
 export type ImportFlowPorts = {
-	access: FlowTransferAccess;
+	access: Pick<Access, "openSpace">;
 	projects: SpaceProjects;
 	flows: Pick<SavedFlows, "flows" | "save">;
 	/** Without them, a node keeps its profile's name and its Device's name, to pick again. */

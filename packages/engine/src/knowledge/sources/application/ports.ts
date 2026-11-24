@@ -1,6 +1,4 @@
-import type { Permissions } from "@nightshift/auth";
 import type { Flow, FlowIssue, Schedule } from "@nightshift/flows";
-import type { Actor } from "../../../contract";
 import type { KnowledgeListing } from "../../files";
 import type { FlowMap } from "../domain/source-flows";
 import type { SourceRun } from "../domain/syncs";
@@ -63,15 +61,4 @@ export type ReaderReady = {
 export type Wait = {
 	/** Resolves after `ms`. */
 	wait(ms: number): Promise<void>;
-};
-
-/**
- * Who may act in a Space for this knowledge request.
- * @filledBy engine/runs
- */
-export type SourcesAccess = {
-	openSpace(
-		actor: Actor,
-		request: { spaceId: string; need?: Permissions },
-	): Promise<void>;
 };

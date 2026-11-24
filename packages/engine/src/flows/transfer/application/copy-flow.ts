@@ -1,5 +1,6 @@
 import type { Permissions } from "@nightshift/auth";
 import { loadFlowSource } from "@nightshift/flows";
+import type { Access } from "../../../access";
 import { type Actor, personOf } from "../../../contract";
 import {
 	namesOf,
@@ -7,17 +8,12 @@ import {
 	notValidFlow,
 	type SavedFlow,
 } from "../domain/flow-files";
-import type {
-	FlowTransferAccess,
-	FlowUsage,
-	SavedFlows,
-	SpaceProjects,
-} from "./ports";
+import type { FlowUsage, SavedFlows, SpaceProjects } from "./ports";
 
 const SAVES_FLOWS: Permissions = { flow: ["save"] };
 
 export type CopyFlowPorts = {
-	access: FlowTransferAccess;
+	access: Pick<Access, "openSpace">;
 	projects: SpaceProjects;
 	flows: Pick<SavedFlows, "flows" | "save">;
 	usage?: FlowUsage | undefined;

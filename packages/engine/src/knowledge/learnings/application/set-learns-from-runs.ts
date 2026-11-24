@@ -1,11 +1,12 @@
 import type { Permissions } from "@nightshift/auth";
+import type { Access } from "../../../access";
 import type { Actor } from "../../../contract";
-import type { LearningEntries, LearningsAccess } from "./ports";
+import type { LearningEntries } from "./ports";
 
 const CHANGES_KNOWLEDGE: Permissions = { run: ["start"] };
 
 export type SetLearnsFromRunsPorts = {
-	access: LearningsAccess;
+	access: Pick<Access, "openSpace">;
 	documents: Pick<LearningEntries, "open">;
 };
 

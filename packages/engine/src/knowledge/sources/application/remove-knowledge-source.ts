@@ -1,5 +1,6 @@
 import type { Permissions } from "@nightshift/auth";
 import { Refusal } from "@nightshift/refusal";
+import type { Access } from "../../../access";
 import type { Actor } from "../../../contract";
 import { foldersOf, foldersOthersFill } from "../domain/source-flows";
 import {
@@ -8,13 +9,13 @@ import {
 	savedSchedules,
 	sourceNamed,
 } from "../domain/syncs";
-import type { SourceFiles, SourcesAccess, SourcesSpace } from "./ports";
+import type { SourceFiles, SourcesSpace } from "./ports";
 
 const REMOVES_FLOWS: Permissions = { flow: ["remove"] };
 const CHANGES_KNOWLEDGE: Permissions = { run: ["start"] };
 
 export type RemoveKnowledgeSourcePorts = {
-	access: SourcesAccess;
+	access: Pick<Access, "openSpace">;
 	space: Pick<SourcesSpace, "flows" | "listSchedules" | "saveSchedules">;
 	files: Pick<SourceFiles, "removeFolder">;
 };

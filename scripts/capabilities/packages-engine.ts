@@ -3,6 +3,9 @@ import { MECHANISM as M } from "./kinds";
 
 /** The verticals of `packages/engine` (`scripts/capabilities.ts` says how to place one). */
 export const PACKAGE_ENGINE: Record<string, Place> = {
+	// Who may see or act on a run, or act in a Space: the one check every
+	// capability asks. It imports no other capability.
+	access: "access",
 	// The guided setup of an agent CLI and of a decider.
 	agents: "agents",
 	// What a Replica keeps of a Space for the other Replicas, by hash.
@@ -51,8 +54,7 @@ export const PACKAGE_ENGINE: Record<string, Place> = {
 	// The read model of a run: pure projections of the log. The walk
 	// (`graph`) reads them too, so they are machinery, not part of `runs`.
 	read: M,
-	// The run path in rings, one sub-vertical per part: who may see or
-	// act on a run (`access`), what every use case that writes to a run
+	// The run path in rings, one sub-vertical per part: what every use case that writes to a run
 	// shares (`walk`), what people see of the runs (`views`), the start,
 	// the actions, the move and the recovery.
 	runs: "runs",

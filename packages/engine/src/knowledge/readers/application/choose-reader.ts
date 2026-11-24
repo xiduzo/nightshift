@@ -1,12 +1,13 @@
 import type { Permissions } from "@nightshift/auth";
 import type { PageReaderSetting } from "@nightshift/flows";
+import type { Access } from "../../../access";
 import type { Actor } from "../../../contract";
-import type { ReaderSettings, ReadersAccess } from "./ports";
+import type { ReaderSettings } from "./ports";
 
 const CHANGES_KNOWLEDGE: Permissions = { run: ["start"] };
 
 export type ChooseReaderPorts = {
-	access: ReadersAccess;
+	access: Pick<Access, "openSpace">;
 	settings: Pick<ReaderSettings, "choose">;
 };
 

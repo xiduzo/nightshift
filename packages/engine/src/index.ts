@@ -8,6 +8,7 @@
  * able to name it. Remove a name that no other workspace's code imports.
  */
 
+export { RunNotFound, SpaceNotFound, wireAccess } from "./access";
 export {
 	type ArchiveHost,
 	type ArchiveRef,
@@ -236,11 +237,8 @@ export {
 	type PlanInput,
 	type PlannedRun,
 	type RunHere,
-	RunNotFound,
-	SpaceNotFound,
 	START_DEADLINE_MS,
 	UNREACHABLE_DEVICE,
-	wireAccess,
 } from "./runs";
 export type {
 	ScheduleList,

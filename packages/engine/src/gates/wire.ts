@@ -1,6 +1,7 @@
+import type { Access } from "../access";
 import { askAnswerProblem } from "../graph";
 import { inboxOrder } from "../read";
-import type { Access, Walk } from "../runs";
+import type { Walk } from "../runs";
 import {
 	type AuthMemberSpacesDeps,
 	authMemberSpaces,
@@ -16,7 +17,7 @@ import type { AnswerFiles, GateLists } from "./application/ports";
  * The wiring of the Gates: the one place that builds their real adapter
  * (the Spaces of a Person over `@nightshift/auth`) and binds each use case
  * to its ports. The ports an answer shares with every action on a run come
- * from `runs/walk`, the check of who may act from `runs/access`.
+ * from `runs/walk`, the check of who may act from `access`.
  */
 
 /** What the engine gives the Gates: the runs' access and walk, and what the ports stand on. */

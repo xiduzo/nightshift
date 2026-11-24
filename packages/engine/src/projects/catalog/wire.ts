@@ -1,3 +1,4 @@
+import type { Access } from "../../access";
 import type {
 	Keep,
 	NewIds,
@@ -10,12 +11,7 @@ import { addProject } from "./application/add-project";
 import { addProjectWithoutFolder } from "./application/add-project-without-folder";
 import { listBranches } from "./application/list-branches";
 import { listProjects } from "./application/list-projects";
-import type {
-	CloneImports,
-	HostRelay,
-	ProjectAccess,
-	ProjectRuns,
-} from "./application/ports";
+import type { CloneImports, HostRelay, ProjectRuns } from "./application/ports";
 import { removeProject } from "./application/remove-project";
 import { renameProject } from "./application/rename-project";
 import { useProjectFolder } from "./application/use-project-folder";
@@ -28,7 +24,7 @@ import { useProjectFolder } from "./application/use-project-folder";
 
 /** What the engine gives the catalog. */
 export type CatalogDeps = Keep & {
-	access: ProjectAccess;
+	access: Pick<Access, "openSpace">;
 	projectLog: ProjectLog;
 	thisDevice: ThisDevice;
 	repos: Repos;

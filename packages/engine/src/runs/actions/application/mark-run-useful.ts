@@ -1,7 +1,7 @@
+import type { Access } from "../../../access";
 import { type Actor, commandOf, permissionOf } from "../../../contract";
 import { isTestRun } from "../../../run-status";
 import type { UsageNotes } from "../../../usage";
-import type { Access } from "../../access";
 import type { RunFacts, Walkers } from "../../walk";
 
 export type MarkRunUsefulPorts = {

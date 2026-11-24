@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { formatLearnings } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
+import { allowing } from "../../../access/adapters/out/in-memory-access";
 import { NIGHT_SHIFT } from "../../../contract";
 import { inMemoryLearningsPorts } from "../adapters/out/in-memory-neighbours";
 import { settleLearning } from "./settle-learning";
@@ -90,5 +91,24 @@ describe("settleLearning", () => {
 			}),
 		);
 		expect((gone as Refusal).kind).toBe("not-found");
+	});
+
+	test("owners, admins and members may, and nobody else", async () => {
+		const ports = inMemoryLearningsPorts();
+		ports.folder.put("p1", PROPOSED, TEXT);
+		expect(
+			await ports.access.whoMay(
+				"space-1",
+				(actor) =>
+					settleLearning(ports)({
+						actor,
+						spaceId: "space-1",
+						projectId: "p1",
+						id: "run-1.s1.md",
+						decision: "keep",
+					}),
+				() => ports.holds.log,
+			),
+		).toEqual(allowing("owner", "admin", "member"));
 	});
 });

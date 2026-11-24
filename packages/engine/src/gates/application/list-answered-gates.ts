@@ -1,10 +1,10 @@
+import type { Access } from "../../access";
 import type { Actor } from "../../contract";
 import type { AnsweredGate } from "../../read";
-import type { Access } from "../../runs";
 import type { GateLists } from "./ports";
 
 export type ListAnsweredGatesPorts = {
-	/** Opens the Space for the actor (`runs/access`). */
+	/** Opens the Space for the actor (`access`). */
 	openSpace: Access["openSpace"];
 	gates: Pick<GateLists, "answered">;
 };

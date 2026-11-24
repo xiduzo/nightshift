@@ -1,3 +1,4 @@
+import type { Access } from "./access";
 import type { ArtifactStore } from "./artifacts";
 import type { AnswerCost } from "./assistant";
 import type { Actor } from "./contract";
@@ -7,7 +8,7 @@ import { type RunLog, scopeKey } from "./log";
 import type { WithPaths } from "./peers";
 import type { Catalog } from "./projects";
 import type { RunStreamItem } from "./read";
-import type { Access, Actions, Cleanup, Move, Start, Views } from "./runs";
+import type { Actions, Cleanup, Move, Start, Views } from "./runs";
 import type { Schedules } from "./schedules";
 import { readServiceLog } from "./services";
 import type { SpaceEngine } from "./space-engine";
@@ -50,7 +51,7 @@ export type SpacesDeps = {
 	moveProject: SpaceMove["moveProject"];
 
 	// --- access, and the files of a run that other slices keep (R1) ---
-	/** Opens a run for an actor: the one check of who may see or act on it (`runs/access`). */
+	/** Opens a run for an actor: the one check of who may see or act on it (`access`). */
 	openRun: Access["openRun"];
 	/** The files of run folders on this computer (`cleanup/`): each use case opens the run for the actor first. */
 	runFiles: Pick<Cleanup, "listRunFiles" | "readRunFile">;

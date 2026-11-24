@@ -1,4 +1,4 @@
-import type { Access } from "../access";
+import type { Access } from "../../access";
 import {
 	type DrizzleRunViewsDeps,
 	drizzleRunViews,
@@ -23,7 +23,7 @@ import { watchRun } from "./application/watch-run";
 export type ViewsDeps = DrizzleRunViewsDeps & {
 	/** Hides the worktree paths of runs on Devices the actor does not own (`Peers.pathsFor`). */
 	pathsFor: PrivatePaths["for"];
-	/** Who may see a run or a Space (`runs/access`). */
+	/** Who may see a run or a Space (`access`). */
 	access: Pick<Access, "openRun" | "openSpace">;
 };
 

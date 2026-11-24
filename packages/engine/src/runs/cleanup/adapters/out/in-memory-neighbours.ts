@@ -1,9 +1,8 @@
 import { Refusal } from "@nightshift/refusal";
 import { asDate } from "@nightshift/time";
-import type { Actor } from "../../../../contract";
+import { inMemoryAccess } from "../../../../access/adapters/out/in-memory-access";
 import type { RunStatus } from "../../../../run-status";
 import type {
-	CleanupAccess,
 	CleanupGround,
 	CleanupProjects,
 	CleanupRuns,
@@ -22,24 +21,6 @@ import { inMemoryRemovalLog } from "./in-memory-removal-log";
  */
 
 const DAY_MS = 24 * 60 * 60_000;
-
-/** Who may see the runs of a test: everyone, until the test refuses Persons. */
-export function inMemoryCleanupAccess() {
-	let refusal: { error: unknown } | null = null;
-	const access = {
-		/** Every run that was opened, and for whom, in order. */
-		opened: [] as { actor: Actor; runId: string; spaceId?: string }[],
-		/** From now on `openRun` throws this for an actor that is a Person. */
-		refuse(error: unknown) {
-			refusal = { error };
-		},
-		async openRun(actor: Actor, request: { runId: string; spaceId?: string }) {
-			access.opened.push({ actor, ...request });
-			if (refusal && "personId" in actor) throw refusal.error;
-		},
-	};
-	return access satisfies CleanupAccess;
-}
 
 /** A run as the twin keeps it. */
 export type TwinRun = {
@@ -275,7 +256,7 @@ export function inMemoryRunFolderFiles() {
 /** Every port of cleanup in memory at once: where each use-case test starts. */
 export function inMemoryCleanupPorts() {
 	return {
-		access: inMemoryCleanupAccess(),
+		access: inMemoryAccess(),
 		runs: inMemoryCleanupRuns(),
 		projects: inMemoryCleanupProjects(),
 		ground: inMemoryCleanupGround(),

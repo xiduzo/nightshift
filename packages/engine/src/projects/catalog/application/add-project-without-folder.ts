@@ -1,5 +1,6 @@
 import type { Permissions } from "@nightshift/auth";
 import { Refusal } from "@nightshift/refusal";
+import type { Access } from "../../../access";
 import type { Actor } from "../../../contract";
 import {
 	asProjects,
@@ -14,13 +15,13 @@ import {
 	type SpaceProjects,
 	type ThisDevice,
 } from "../../keep";
-import type { HostRelay, ProjectAccess } from "./ports";
+import type { HostRelay } from "./ports";
 
 /** What a role must allow for this request. */
 const ADD_PROJECTS: Permissions = { project: ["add"] };
 
 export type AddProjectWithoutFolderPorts = {
-	access: ProjectAccess;
+	access: Pick<Access, "openSpace">;
 	store: Pick<ProjectStore, "row" | "keepHostedWithoutFolder">;
 	spaceProjects: Pick<SpaceProjects, "create" | "clones">;
 	projectLog: Pick<ProjectLog, "append">;

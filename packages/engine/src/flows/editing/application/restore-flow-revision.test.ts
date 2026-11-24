@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { flowSchema, singleAgentFlow } from "@nightshift/flows";
+import { allowing } from "../../../access/adapters/out/in-memory-access";
 import { inMemoryEditingPorts } from "../adapters/out/in-memory-neighbours";
 import { restoreFlowRevision } from "./restore-flow-revision";
 
@@ -54,5 +55,22 @@ describe("restoreFlowRevision", () => {
 			revisionId: "r",
 		});
 		await expect(restore).rejects.toThrow("This project does not exist.");
+	});
+
+	test("owners, admins and members may, and nobody else", async () => {
+		const ports = inMemoryEditingPorts();
+		await ports.flows.save("project", "build", quick("One"));
+		const [first] = await ports.flows.revisions("project", "build");
+		expect(
+			await ports.access.whoMay(
+				"space",
+				(actor) =>
+					restoreFlowRevision(ports)(actor, {
+						...of,
+						revisionId: first?.id ?? "",
+					}),
+				() => ports.flows.saves,
+			),
+		).toEqual(allowing("owner", "admin", "member"));
 	});
 });

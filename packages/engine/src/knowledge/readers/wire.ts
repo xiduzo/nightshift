@@ -1,5 +1,6 @@
 import { PAGE_READER_ENV, type PageReaderSetting } from "@nightshift/flows";
 import { now } from "@nightshift/time";
+import type { Access } from "../../access";
 import type { Actor } from "../../contract";
 import type { AddressRules } from "../../web-access";
 import { openReaderRoute } from "./adapters/in/reader-endpoint";
@@ -11,7 +12,7 @@ import { checkReaderReady } from "./application/check-reader-ready";
 import { chooseReader } from "./application/choose-reader";
 import { lookAtLinks } from "./application/look-at-links";
 import { openStepReader } from "./application/open-step-reader";
-import type { ReaderSettings, ReadersAccess } from "./application/ports";
+import type { ReaderSettings } from "./application/ports";
 import { createLookMemo, type LinkLook } from "./domain/link-look";
 import type { ReaderSecret } from "./domain/reader-choice";
 
@@ -27,7 +28,7 @@ import type { ReaderSecret } from "./domain/reader-choice";
 
 /** What the knowledge gives knowledge/readers: the ports another part fills, and what the real adapters stand on. */
 export type ReadersDeps = {
-	access: ReadersAccess;
+	access: Pick<Access, "openSpace">;
 	/** Where this computer keeps its data: the marks are in its `knowledge/.reads/`. */
 	dataDir: string;
 	/** The project's reader setting, as its Space has it. */

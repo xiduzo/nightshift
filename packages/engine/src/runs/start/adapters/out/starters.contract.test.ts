@@ -1,11 +1,11 @@
 import { createDb } from "@nightshift/db";
 import { migrateDb } from "@nightshift/db/migrate";
 import { project, run, user } from "@nightshift/db/schema";
+import { runRecord } from "../../../../access/adapters/out/in-memory-run-records";
 import { createRunLog } from "../../../../log";
 import { appendEvent } from "../../../../log/run-log/append";
 import { ownDevice } from "../../../../testing/alone-directory";
 import { localSpaceId } from "../../../../testing/test-support";
-import { runRecord } from "../../../access/adapters/out/in-memory-run-records";
 import { inMemoryStarters } from "./in-memory-starters";
 import { readStarters } from "./read-starters";
 import { startersContract } from "./starters.contract";

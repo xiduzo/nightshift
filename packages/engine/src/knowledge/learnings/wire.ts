@@ -1,5 +1,6 @@
 import type { AgentEvent } from "@nightshift/agents/types";
 import { now as timeNow } from "@nightshift/time";
+import type { Access } from "../../access";
 import type { Actor } from "../../contract";
 import type { TranscriptEntry } from "../../log";
 import { followEndedRuns } from "./adapters/in/follow-ended-runs";
@@ -17,7 +18,6 @@ import type {
 	ContentArchive,
 	FolderHolds,
 	LearningEntries,
-	LearningsAccess,
 	LearningsNotifications,
 	RunsToLearnFrom,
 	SpaceStatus,
@@ -49,7 +49,7 @@ import type {
 
 /** What the knowledge gives knowledge/learnings: the ports another part fills, and what the real adapter stands on. */
 export type LearningsDeps = {
-	access: LearningsAccess;
+	access: Pick<Access, "openSpace">;
 	/** The knowledge folders on this computer (`files`). */
 	folders: { folder(projectId: string): string };
 	documents: LearningEntries;

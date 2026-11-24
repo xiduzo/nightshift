@@ -1,8 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { Schedule } from "@nightshift/flows";
-import { Refusal } from "@nightshift/refusal";
 import { atLocal } from "@nightshift/time/testing";
-import { type Actor, NIGHT_SHIFT } from "../../contract";
+import { allowing } from "../../access/adapters/out/in-memory-access";
 import { inMemorySchedulePorts } from "../adapters/out/in-memory-neighbours";
 import { createScheduleWatch } from "../domain/schedule-watch";
 import { resumeScheduleTonight } from "./resume-schedule-tonight";
@@ -16,7 +15,7 @@ function at(day: number, hours: number, minutes = 0, seconds = 0): number {
 
 const P = "project-1";
 const SPACE = "space-1";
-const ANN: Actor = { personId: "person-ann", door: "session" };
+const ANN = { personId: "person-ann", door: "session" as const };
 
 function nightly(extra: Partial<Schedule> = {}): Schedule {
 	return {
@@ -32,6 +31,9 @@ function nightly(extra: Partial<Schedule> = {}): Schedule {
 /** A project in a Space with `schedules`, at `now`. */
 function project(schedules: Schedule[], now = at(16, 12)) {
 	const ports = inMemorySchedulePorts(now);
+	for (const spaceId of [SPACE, "space-2"]) {
+		ports.access.members.join(spaceId, ANN.personId, "member");
+	}
 	ports.projects.add({ id: P, spaceId: SPACE });
 	ports.store.seed(P, { schedules });
 	const resume = resumeScheduleTonight({
@@ -40,11 +42,9 @@ function project(schedules: Schedule[], now = at(16, 12)) {
 	});
 	return {
 		ports,
+		resumeAs: resume,
 		resume: (scheduleId: string, spaceId = SPACE) =>
 			resume(ANN, { spaceId, projectId: P, scheduleId }),
-		/** As Night Shift itself: a caller in this process. */
-		resumeAsNightShift: (scheduleId: string) =>
-			resume(NIGHT_SHIFT, { spaceId: SPACE, projectId: P, scheduleId }),
 		saved: async () =>
 			(await ports.store.list(P, { validate: false })).schedules,
 	};
@@ -137,25 +137,18 @@ describe("Resume tonight", () => {
 		expect(ports.notices.changes).toEqual([]);
 	});
 
-	test("asks whether the person may stop runs in the Space, before it reads anything", async () => {
-		const paused = nightly({ pausedUntil: at(17, 6) });
-		const { ports, resume, resumeAsNightShift, saved } = project([paused]);
-		const role = new Refusal("forbidden", "Your role cannot.");
-		ports.access.refuse(role);
-		expect(await refusalOf(resume("nightly"))).toBe(role);
-		expect(ports.access.opened).toEqual([
-			{ actor: ANN, spaceId: SPACE, need: { run: ["stop"] } },
-		]);
-		expect(await saved()).toEqual([paused]);
-		expect(ports.notices.changes).toEqual([]);
-
-		// A caller in this process acts as Night Shift: no role applies.
-		await resumeAsNightShift("nightly");
-		expect(ports.access.opened[1]).toEqual({
-			actor: NIGHT_SHIFT,
-			spaceId: SPACE,
-			need: { run: ["stop"] },
-		});
-		expect(await saved()).toEqual([nightly()]);
+	test("owners, admins and members may, and nobody else", async () => {
+		const { ports, resumeAs } = project([nightly({ pausedUntil: at(17, 6) })]);
+		// `space-2` does not have the project: the role is asked before it.
+		for (const spaceId of [SPACE, "space-2"]) {
+			expect(
+				await ports.access.whoMay(
+					spaceId,
+					(actor) =>
+						resumeAs(actor, { spaceId, projectId: P, scheduleId: "nightly" }),
+					() => ports.notices.changes,
+				),
+			).toEqual(allowing("owner", "admin", "member"));
+		}
 	});
 });
