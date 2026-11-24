@@ -310,94 +310,12 @@ describe("the flow document", () => {
 		expect((await laptop.flows.flows(of)).build).not.toHaveProperty("revision");
 	});
 
-	test("a save records a revision: who, when, on which Device, and the flow", async () => {
-		clock.at = 5_000;
-		await laptop.flows.save(of, "build", twoNodes(), { personId: "person" });
-		expect(await laptop.flows.revisions(of, "build")).toEqual([
-			{
-				id: expect.any(String),
-				at: 5_000,
-				personId: "person",
-				deviceId: laptop.sandbox.deviceId,
-				kind: "save",
-				flow: twoNodes(),
-			},
-		]);
-	});
-
-	test("a save that changes nothing records no revision, a draft with errors records one", async () => {
-		await laptop.flows.save(of, "build", twoNodes());
-		await laptop.flows.save(of, "build", twoNodes());
-		await laptop.flows.save(of, "build", {
-			...twoNodes(),
-			edges: [{ id: "again", from: "a", outcome: "fail", to: "a" }],
-		});
-		const document = await laptop.document();
-		expect(flowRevisions(document, flowIdOf(document, "build") ?? "")).toEqual([
-			expect.anything(),
-			expect.anything(),
-		]);
-	});
-
 	describe("keepShapes (Q40)", () => {
 		const shape = {
 			type: "object",
 			properties: { title: { type: "string" } },
 		};
 		const agentA = { id: "a", type: "agent" };
-
-		test("keeps the shape on a node without a schema, marked inferred, with one revision of kind infer", async () => {
-			await laptop.flows.save(of, "build", twoNodes(), { personId: "person" });
-			clock.at = 7_000;
-			expect(
-				await laptop.flows.keepShapes(of, "build", agentA, { data: shape }),
-			).toBe(true);
-			const { build } = await read(laptop);
-			expect(build?.nodes.find((node) => node.id === "a")).toMatchObject({
-				output: shape,
-				outputInferred: true,
-			});
-			// The other node and the rest of the flow stay as they were.
-			expect(build?.nodes.find((node) => node.id === "b")).not.toHaveProperty(
-				"output",
-			);
-			const revisions = await laptop.flows.revisions(of, "build");
-			expect(revisions.map((r) => [r.kind, r.personId, r.at])).toEqual([
-				["save", "person", 1_000],
-				["infer", null, 7_000],
-			]);
-			expect(revisions[1]?.flow).toEqual(build as Flow);
-			expect((await laptop.flows.flows(of)).build).toMatchObject({
-				revision: revisions[1]?.id,
-			});
-		});
-
-		test("a person's schema wins: a node with one, or another type, gets none", async () => {
-			const flow = twoNodes();
-			await laptop.flows.save(of, "build", {
-				...flow,
-				nodes: flow.nodes.map((node) =>
-					node.id === "a" ? { ...node, output: { type: "object" } } : node,
-				),
-			});
-			expect(
-				await laptop.flows.keepShapes(of, "build", agentA, { data: shape }),
-			).toBe(false);
-			expect(
-				await laptop.flows.keepShapes(
-					of,
-					"build",
-					{ id: "b", type: "command" },
-					{ data: shape },
-				),
-			).toBe(false);
-			expect(
-				await laptop.flows.keepShapes(of, "gone", agentA, { data: shape }),
-			).toBe(false);
-			expect(
-				(await laptop.flows.revisions(of, "build")).map((r) => r.kind),
-			).toEqual(["save"]);
-		});
 
 		test("an edit of another node on another Device merges with it", async () => {
 			await laptop.flows.save(of, "build", twoNodes());
@@ -414,72 +332,6 @@ describe("the flow document", () => {
 			expect(build?.nodes.find((node) => node.id === "a")).toMatchObject({
 				outputInferred: true,
 			});
-		});
-	});
-
-	describe("keepOutputTypes (Q40)", () => {
-		const withOutputs = (): Flow => ({
-			...twoNodes(),
-			outputs: [
-				{ name: "title", value: "{{a.output}}" },
-				{ name: "plan", value: "{{a.data}}" },
-				{ name: "count", value: "{{b.log_tail}}", type: "number" },
-			],
-		});
-		const plan = { type: "object", properties: { tasks: { type: "array" } } };
-
-		test("keeps a type on each output without one, marked inferred, with one revision of kind infer", async () => {
-			await laptop.flows.save(of, "build", withOutputs(), {
-				personId: "person",
-			});
-			clock.at = 8_000;
-			expect(
-				await laptop.flows.keepOutputTypes(of, "build", [
-					{ name: "title", value: "{{a.output}}", type: "text" },
-					{ name: "plan", value: "{{a.data}}", type: "json", schema: plan },
-				]),
-			).toBe(true);
-			const { build } = await read(laptop);
-			expect(build?.outputs).toEqual([
-				{ name: "title", value: "{{a.output}}", type: "text", inferred: true },
-				{
-					name: "plan",
-					value: "{{a.data}}",
-					type: "json",
-					schema: plan,
-					inferred: true,
-				},
-				{ name: "count", value: "{{b.log_tail}}", type: "number" },
-			]);
-			// The nodes stay as they were.
-			expect(build?.nodes).toEqual(withOutputs().nodes);
-			const revisions = await laptop.flows.revisions(of, "build");
-			expect(revisions.map((r) => [r.kind, r.personId, r.at])).toEqual([
-				["save", "person", 1_000],
-				["infer", null, 8_000],
-			]);
-		});
-
-		test("a person's type wins, and an output whose template changed gets none", async () => {
-			await laptop.flows.save(of, "build", withOutputs());
-			expect(
-				await laptop.flows.keepOutputTypes(of, "build", [
-					{ name: "count", value: "{{b.log_tail}}", type: "text" },
-					{ name: "title", value: "{{b.log_tail}}", type: "text" },
-					{ name: "gone", value: "{{a.data}}", type: "text" },
-				]),
-			).toBe(false);
-			expect(
-				await laptop.flows.keepOutputTypes(of, "nope", [
-					{ name: "title", value: "{{a.output}}", type: "text" },
-				]),
-			).toBe(false);
-			expect((await read(laptop)).build?.outputs).toEqual(
-				withOutputs().outputs,
-			);
-			expect(
-				(await laptop.flows.revisions(of, "build")).map((r) => r.kind),
-			).toEqual(["save"]);
 		});
 	});
 

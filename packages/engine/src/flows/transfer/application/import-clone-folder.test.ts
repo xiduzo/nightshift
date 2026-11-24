@@ -87,6 +87,24 @@ describe("importCloneFolder", () => {
 		expect(ports.folders.files("/repos/one")).not.toBeNull();
 	});
 
+	test("keeps a folder git tracks part of, and the notice says so", async () => {
+		const ports = inMemoryTransferPorts();
+		for (const name of ["build", "night"]) {
+			ports.folders.write(
+				"/repos/one",
+				`flows/${name}.json`,
+				canonicalFlowJson(quick),
+			);
+		}
+		ports.folders.track("/repos/one", ["flows/build.json"]);
+		const result = await importCloneFolder(ports)({ clone });
+		expect(result).toMatchObject({ status: "imported", deleted: false });
+		expect(
+			ports.documents.document("project").notices.map((n) => n.message),
+		).toEqual([expect.stringContaining("Git tracks part of that folder")]);
+		expect(ports.folders.files("/repos/one")).not.toBeNull();
+	});
+
 	test("does not remove the folder when the documents do not flush", async () => {
 		const ports = inMemoryTransferPorts();
 		ports.folders.write(

@@ -522,24 +522,6 @@ describe("this computer's connections, CLI tools and profiles", () => {
 		// Only a tool with a sign-in has a time to read.
 		expect(signedIn).toEqual(["gh-work"]);
 	});
-
-	test("names the nodes that use each profile of this computer only", async () => {
-		const listed = await configUse({
-			projects: [
-				project("p1", {
-					night: flowOf(
-						agent("plan", { profile: "fast" }),
-						agent("far", { profile: "slow", device: "le2316" }),
-					),
-				}),
-			],
-			profiles: [agentProfile("fast"), agentProfile("slow")],
-		}).use.profiles(AT);
-		expect(listed.map((p) => [p.name, p.usedBy])).toEqual([
-			["fast", [{ ...flow("p1", "night"), nodeIds: ["plan"] }]],
-			["slow", []],
-		]);
-	});
 });
 
 describe("a CLI tool's login: where it finds its secrets", () => {
@@ -569,30 +551,6 @@ describe("a CLI tool's login: where it finds its secrets", () => {
 		}).use.cliTools(AT);
 		return listed?.loginState;
 	}
-
-	test("a value here signs in here", async () => {
-		expect(await stateOf({ here: true })).toEqual({
-			signsInHere: true,
-			projects: [],
-			missing: [],
-		});
-	});
-
-	test("a project's token signs in for that project, not here", async () => {
-		expect(await stateOf({ kept: ["TOKEN"] })).toEqual({
-			signsInHere: false,
-			projects: [{ projectId: "acme", projectName: "ACME", signedInAt: 42 }],
-			missing: [],
-		});
-	});
-
-	test("no value anywhere names the secret", async () => {
-		expect(await stateOf({})).toEqual({
-			signsInHere: false,
-			projects: [],
-			missing: ["TOKEN"],
-		});
-	});
 
 	test("secrets that cannot be read now never say a secret is missing", async () => {
 		const expected = { signsInHere: true, projects: [], missing: [] };

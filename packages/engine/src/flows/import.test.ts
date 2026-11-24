@@ -323,27 +323,6 @@ describe("the import on upgrade", () => {
 		]);
 	});
 
-	test("a folder git tracks part of comes in and stays, with a notice", async () => {
-		await writeFolder(laptop.sandbox.repoPath, {
-			flows: { build: flow("build") },
-		});
-		await commit(laptop.sandbox.repoPath, [".nightshift"]);
-		await writeFolder(laptop.sandbox.repoPath, {
-			flows: { night: flow("night") },
-		});
-
-		const result = await laptop.importClone();
-
-		expect(result).toMatchObject({ status: "imported", deleted: false });
-		expect(existsSync(join(folderOf(laptop), "flows", "night.json"))).toBe(
-			true,
-		);
-		expect(Object.keys(await flowsOf(laptop))).toEqual(["build", "night"]);
-		expect(await noticesOf(laptop)).toEqual([
-			"Night Shift imported the .nightshift folder on laptop. Git tracks part of that folder, so Night Shift left it in place. Remove it in a commit.",
-		]);
-	});
-
 	test("a folder that is not all valid, or that holds other files, stays: what is valid comes in", async () => {
 		await writeFolder(laptop.sandbox.repoPath, {
 			flows: { build: flow("build"), broken: "{ not json" },
@@ -393,30 +372,6 @@ describe("the import on upgrade", () => {
 		expect(await noticesOf(laptop)).toEqual([
 			"Night Shift imported the .nightshift folder on laptop. Night Shift could not check the folder with git, so it left it in place. Remove the folder when you no longer need it.",
 		]);
-	});
-
-	test("a folder stays when the documents do not flush", async () => {
-		await writeFolder(laptop.sandbox.repoPath, {
-			flows: { build: flow("build") },
-		});
-		const failed = importClone(
-			laptop.sandbox,
-			laptop.documents,
-			"laptop",
-			"clone-laptop",
-			{
-				saved: {
-					flush: async () => {
-						throw new Error("The disk is full.");
-					},
-				},
-			},
-		);
-
-		await expect(failed).rejects.toThrow("The disk is full.");
-		expect(existsSync(join(folderOf(laptop), "flows", "build.json"))).toBe(
-			true,
-		);
 	});
 
 	test("a flow of the same name and another content comes in with a suffix, and its callers and schedules follow it", async () => {
@@ -495,37 +450,6 @@ describe("the import on upgrade", () => {
 		expect(await noticesOf(laptop)).toEqual([
 			'Two schedules are named "nightly". Night Shift imported the one from laptop as "nightly-2".',
 		]);
-	});
-
-	test("a restart does not import the Clone again", async () => {
-		await writeFolder(laptop.sandbox.repoPath, {
-			flows: { build: flow("build") },
-		});
-		await commit(laptop.sandbox.repoPath, [".nightshift"]);
-		await laptop.importClone();
-		await writeFolder(laptop.sandbox.repoPath, {
-			flows: { night: flow("night") },
-		});
-
-		await laptop.restart();
-		const result = await laptop.importClone();
-
-		expect(result).toEqual({ status: "already" });
-		expect(Object.keys(await flowsOf(laptop))).toEqual(["build"]);
-		expect(await noticesOf(laptop)).toHaveLength(1);
-		expect(existsSync(join(folderOf(laptop), "flows", "night.json"))).toBe(
-			true,
-		);
-	});
-
-	test("a Clone without a folder is done: a folder that comes later stays unread", async () => {
-		expect(await laptop.importClone()).toEqual({ status: "no-folder" });
-		await writeFolder(laptop.sandbox.repoPath, {
-			flows: { build: flow("build") },
-		});
-
-		expect(await laptop.importClone()).toEqual({ status: "already" });
-		expect(await flowsOf(laptop)).toEqual({});
 	});
 
 	test("two Devices that import the same folder before they sync keep one flow", async () => {

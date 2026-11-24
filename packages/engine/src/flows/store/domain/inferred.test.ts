@@ -39,6 +39,10 @@ describe("what a run infers", () => {
 			),
 		).toBeNull();
 		expect(outputsWithTypes(undefined, types)).toBeNull();
+		// An output whose template changed since the run keeps none.
+		expect(
+			outputsWithTypes([{ name: "summary", value: "{{b.text}}" }], types),
+		).toBeNull();
 	});
 
 	test("notices read oldest first, and one that does not read is left out", () => {

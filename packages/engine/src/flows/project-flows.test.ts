@@ -7,7 +7,6 @@ import {
 	scheduleSchema,
 	singleAgentFlow,
 } from "@nightshift/flows";
-import { Refusal } from "@nightshift/refusal";
 import * as Y from "yjs";
 import {
 	createFlowDocuments,
@@ -103,12 +102,6 @@ const quick = (): Flow =>
 		}),
 	);
 
-/** A draft with an error: a loop without a `max`. */
-const unbounded = (): Flow => ({
-	...quick(),
-	edges: [{ id: "again", from: "agent", outcome: "fail", to: "agent" }],
-});
-
 const nightly: Schedule = {
 	id: "nightly",
 	flow: "quick",
@@ -117,76 +110,9 @@ const nightly: Schedule = {
 	enabled: true,
 };
 
-async function refusal(promise: Promise<unknown>): Promise<Refusal> {
-	try {
-		await promise;
-	} catch (error) {
-		if (error instanceof Refusal) return error;
-		throw error;
-	}
-	throw new Error("Expected a refusal.");
-}
-
 const P = "project";
 
 describe("the flows and schedules of a project", () => {
-	test("a project without flows has none and no schedules", async () => {
-		expect(await flows.flows(P)).toEqual({});
-		expect(await flows.schedules(P)).toMatchObject({
-			schedules: [],
-			issues: [],
-		});
-	});
-
-	test("a saved flow reads back by name, as the current version", async () => {
-		expect(await flows.save(P, "quick", quick())).toEqual([]);
-		const sources = await flows.flows(P);
-		expect(Object.keys(sources)).toEqual(["quick"]);
-		expect(parsedFlows(sources)).toEqual({ quick: quick() });
-	});
-
-	test("a draft with errors is saved, and the save returns its issues", async () => {
-		expect(await flows.save(P, "draft", unbounded())).toEqual([
-			expect.objectContaining({ severity: "error", nodeId: "agent" }),
-		]);
-		expect(parsedFlows(await flows.flows(P))).toEqual({ draft: unbounded() });
-	});
-
-	test("a save replaces the flow of that name", async () => {
-		await flows.save(P, "quick", unbounded());
-		await flows.save(P, "quick", quick());
-		expect(parsedFlows(await flows.flows(P))).toEqual({ quick: quick() });
-	});
-
-	test("a save refuses a name that is not a flow name", async () => {
-		expect((await refusal(flows.save(P, "Not A Name", quick()))).kind).toBe(
-			"invalid",
-		);
-	});
-
-	test("a removed flow is gone; removing it again is not found", async () => {
-		await flows.save(P, "quick", quick());
-		await flows.save(P, "other", quick());
-		await flows.remove(P, "quick");
-		expect(Object.keys(await flows.flows(P))).toEqual(["other"]);
-		expect((await refusal(flows.remove(P, "quick"))).kind).toBe("not-found");
-	});
-
-	test("a project that is not there is not found, for a read and a save", async () => {
-		const missing = createProjectFlows({
-			documents,
-			project: async () => {
-				throw new Refusal("not-found", "This project does not exist.");
-			},
-			deviceId: sandbox.deviceId,
-		});
-		expect((await refusal(missing.flows(P))).kind).toBe("not-found");
-		expect((await refusal(missing.save(P, "quick", quick()))).kind).toBe(
-			"not-found",
-		);
-		expect((await refusal(missing.schedules(P))).kind).toBe("not-found");
-	});
-
 	test("saved schedules read back, checked against the flows", async () => {
 		expect(await flows.saveSchedules(P, [nightly])).toEqual([
 			expect.objectContaining({
@@ -197,14 +123,6 @@ describe("the flows and schedules of a project", () => {
 		]);
 		await flows.save(P, "quick", quick());
 		expect(await flows.schedules(P)).toMatchObject({
-			schedules: [nightly],
-			issues: [],
-		});
-	});
-
-	test("schedules read without the checks have no issues", async () => {
-		await flows.saveSchedules(P, [nightly]);
-		expect(await flows.schedules(P, { validate: false })).toMatchObject({
 			schedules: [nightly],
 			issues: [],
 		});

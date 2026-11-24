@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
 	canonicalFlowJson,
+	FLOW_VERSION,
 	flowSchema,
 	singleAgentFlow,
 } from "@nightshift/flows";
@@ -70,6 +71,22 @@ describe("importFlow", () => {
 			message:
 				"This file is not a flow. Choose a flow file that Night Shift exported.",
 		});
+		expect(ports.flows.saves).toEqual([]);
+	});
+
+	test("refuses a flow from a newer Night Shift, and saves nothing", async () => {
+		const ports = inMemoryTransferPorts();
+		const json = JSON.stringify({
+			...JSON.parse(request.json),
+			version: FLOW_VERSION + 1,
+		});
+		const refused = await importFlow(ports)(ada, { ...request, json }).catch(
+			(error: unknown) => error as Error,
+		);
+		expect(refused).toMatchObject({ kind: "invalid" });
+		expect((refused as Error).message).toContain(
+			"newer version of Night Shift",
+		);
 		expect(ports.flows.saves).toEqual([]);
 	});
 

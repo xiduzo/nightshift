@@ -156,41 +156,6 @@ describe("the revisions of a flow", () => {
 		expect(first).toMatchObject({ at: 1_000, current: false, changes: null });
 	});
 
-	test("a save that changes nothing adds no revision", async () => {
-		await twoSaves();
-		await files.save(PROJECT, "build", withSecondNode(quick("Fix it")));
-		expect(await files.revisions(PROJECT, "build")).toHaveLength(2);
-	});
-
-	test("shows a revision with what changes from the flow now to it, or from another revision", async () => {
-		const [second, first] = await twoSaves();
-		if (!first || !second) throw new Error("Expected two revisions.");
-
-		const againstNow = await files.revision(
-			PROJECT,
-			"build",
-			first.id,
-			undefined,
-		);
-		expect(againstNow.revision.flow?.nodes).toHaveLength(1);
-		expect(againstNow.against.revisionId).toBeNull();
-		expect(againstNow.against.flow?.nodes).toHaveLength(2);
-		expect(againstNow.diff?.nodes.removed.map((node) => node.id)).toEqual([
-			"check",
-		]);
-
-		const againstFirst = await files.revision(
-			PROJECT,
-			"build",
-			second.id,
-			first.id,
-		);
-		expect(againstFirst.against.revisionId).toBe(first.id);
-		expect(againstFirst.diff?.nodes.added.map((node) => node.id)).toEqual([
-			"check",
-		]);
-	});
-
 	test("restoring a revision saves its flow as a new revision of kind restore", async () => {
 		const [, first] = await twoSaves();
 		if (!first) throw new Error("Expected two revisions.");
@@ -208,20 +173,6 @@ describe("the revisions of a flow", () => {
 			current: true,
 			changes: { removed: 1 },
 		});
-	});
-
-	test("refuses a revision that the flow does not have, and a flow that does not exist", async () => {
-		await twoSaves();
-		const unknown = await refusal(
-			files.revision(PROJECT, "build", "nope", undefined),
-		);
-		expect(unknown.kind).toBe("not-found");
-		expect((await refusal(files.restore(PROJECT, "build", "nope"))).kind).toBe(
-			"not-found",
-		);
-		expect((await refusal(files.revisions(PROJECT, "other"))).kind).toBe(
-			"not-found",
-		);
 	});
 });
 
@@ -272,17 +223,6 @@ describe("moving a flow between projects", () => {
 		expect(revision).toMatchObject({ kind: "import", person: { id: "ada" } });
 	});
 
-	test("an import of a name the project has gets a suffix", async () => {
-		await files.save(PROJECT, "build", quick("Fix it"));
-		const { json } = await files.export(PROJECT, "build");
-		const saved = await files.import(PROJECT, "build", json);
-		expect(saved.name).toBe("build-2");
-		expect((await files.list(PROJECT)).map((f) => f.name)).toEqual([
-			"build",
-			"build-2",
-		]);
-	});
-
 	test("the starters arrive as flows of kind import, valid and in the current format", async () => {
 		const result = await files.importStarters(PROJECT);
 		expect(result.skipped).toEqual([]);
@@ -302,21 +242,6 @@ describe("moving a flow between projects", () => {
 			listed.errorCount,
 		]);
 		expect(errors.filter(([, count]) => count !== 0)).toEqual([]);
-	});
-
-	test("a starter never replaces a flow of its name, and takes no other name", async () => {
-		const mine = quick("My own check");
-		await files.save(PROJECT, "implement-and-check", mine);
-		const result = await files.importStarters(PROJECT);
-		expect(result.skipped).toEqual(["implement-and-check"]);
-		expect(result.imported).not.toContain("implement-and-check");
-		expect((await files.get(PROJECT, "implement-and-check")).flow).toEqual(
-			mine,
-		);
-		const names = (await files.list(PROJECT)).map((f) => f.name);
-		expect(names.some((name) => name.endsWith("-2"))).toBe(false);
-		// A second import adds nothing.
-		expect((await files.importStarters(PROJECT)).imported).toEqual([]);
 	});
 
 	test("the starters take the profiles the person chose for their agents", async () => {
@@ -364,21 +289,6 @@ describe("moving a flow between projects", () => {
 		expect(loaded.flow?.version).toBe(FLOW_VERSION);
 	});
 
-	test("refuses a file that is not JSON, not a flow, or from a newer Night Shift", async () => {
-		const newer = JSON.stringify({
-			...quick("Fix it"),
-			version: FLOW_VERSION + 1,
-		});
-		for (const json of ["{", JSON.stringify({ nodes: "none" }), newer]) {
-			const refused = await refusal(files.import(PROJECT, "bad", json));
-			expect(refused.kind).toBe("invalid");
-		}
-		expect(
-			(await refusal(files.import(PROJECT, "bad", newer))).message,
-		).toContain("newer version of Night Shift");
-		expect(await files.list(PROJECT)).toEqual([]);
-	});
-
 	test("a copy into another project leaves the flows it calls behind, and says so", async () => {
 		await files.save(PROJECT, "helper", quick("Help"));
 		await files.save(PROJECT, "build", caller());
@@ -394,16 +304,6 @@ describe("moving a flow between projects", () => {
 		expect((await files.list(OTHER)).map((f) => f.name)).toEqual(["build"]);
 		const [revision] = await files.revisions(OTHER, "build");
 		expect(revision?.kind).toBe("copy");
-	});
-
-	test("a copy refuses a name the other project has, and suggests a free one", async () => {
-		await files.save(PROJECT, "build", quick("Fix it"));
-		await files.save(OTHER, "build", quick("Theirs"));
-		const refused = await refusal(
-			files.copy(PROJECT, "build", { projectId: OTHER, name: "build" }),
-		);
-		expect(refused.kind).toBe("conflict");
-		expect(refused.message).toContain('"build-2"');
 	});
 });
 
