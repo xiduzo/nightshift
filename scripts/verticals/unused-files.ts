@@ -14,7 +14,7 @@
  *   `run-header.ios.tsx` or `run-header.android.tsx` for one import, so an
  *   import of one of them counts for all of them.
  * - A script of the workspace's `package.json` that names the file
- *   (`bun src/features/cli/data-migrate.ts`).
+ *   (`bun src/features/runs/migrate.ts`).
  * - An entry of the package (`exports`).
  *
  * A test does not count as an importer: a file that only its test imports

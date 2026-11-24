@@ -27,8 +27,7 @@ In Night Shift, open **Settings → Monitoring**:
    tenant id, can stay as written.
 
 A header keeps only the `${NAME}` reference. The key stays in the secrets,
-and the record of a step shows it as `•••`. Headers saved by an older
-Night Shift move to the Secrets page at start, as `OTEL_HEADER_<NAME>`.
+and the record of a step shows it as `•••`.
 
 A change applies at once, with no restart. A new value of a secret that a
 header reads applies at once too. Each computer has its own setting

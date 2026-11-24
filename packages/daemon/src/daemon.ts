@@ -4,7 +4,6 @@ import type { Context } from "@nightshift/api/context";
 import {
 	databaseUrl,
 	ensureDataDir,
-	legacyData,
 	resolveDataDir,
 } from "@nightshift/db/data-dir";
 import { migrateDb } from "@nightshift/db/migrate";
@@ -39,7 +38,7 @@ import {
 	processDatabase,
 	stopOnSignals,
 } from "./runtime";
-import { moveTelemetryHeaders, usageFacts } from "./telemetry";
+import { usageFacts } from "./telemetry";
 import { wireDaemonAccess } from "./wire-access";
 import { wireDaemonAssistant } from "./wire-assistant";
 import { openOwner, wireDaemonAuth } from "./wire-auth";
@@ -157,18 +156,6 @@ async function makeDaemon(
 	);
 	// Before anything else: production refuses to start without a secret.
 	const authSecret = daemonAuthSecret(env, dataDir);
-
-	// Run history from before the data directory is never moved for you.
-	const legacy = legacyData({
-		dataDir,
-		databaseUrlSet: Boolean(env.DATABASE_URL?.trim()),
-	});
-	const legacyPaths = [legacy.database, ...legacy.files].filter(Boolean);
-	if (legacyPaths.length > 0) {
-		console.warn(
-			`Earlier run history is in ${legacyPaths.join(", ")}. This daemon keeps its data in ${dataDir}. To copy it there, stop the daemon and run \`bun run data:migrate${dev ? " --dev" : ""}\`.`,
-		);
-	}
 
 	const url = databaseUrl(env, dataDir);
 	// One client per process: a `bun --hot` reload takes the one it has.
@@ -291,16 +278,8 @@ async function makeDaemon(
 	 * default): its Claude Code sessions' own telemetry, and once it
 	 * follows the engine below, the runs it walks as OpenTelemetry spans
 	 * and metrics. It follows the setting and the secrets of its headers
-	 * itself. Headers kept the old way move into both first.
+	 * itself.
 	 */
-	await moveTelemetryHeaders({
-		dataDir,
-		keyStore,
-		settings,
-		secrets: connections,
-	}).catch((error) =>
-		console.warn("[telemetry] the export's headers were not moved:", error),
-	);
 	let usageSnapshot:
 		| (() => Promise<{
 				agents: number;

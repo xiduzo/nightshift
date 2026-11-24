@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync } from "node:fs";
+import { mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -19,9 +19,7 @@ import { fileURLToPath } from "node:url";
 export const DATABASE_FILE = "nightshift.db";
 
 /** The checkout of Night Shift this module runs from. Only dev mode uses it. */
-export const checkoutRoot = fileURLToPath(
-	new URL("../../../../", import.meta.url),
-);
+const checkoutRoot = fileURLToPath(new URL("../../../../", import.meta.url));
 
 export type DataDirSystem = {
 	platform: NodeJS.Platform;
@@ -79,43 +77,4 @@ export function databaseUrl(
 export function ensureDataDir(dataDir: string): string {
 	mkdirSync(dataDir, { recursive: true });
 	return dataDir;
-}
-
-const hasEntries = (dir: string) =>
-	existsSync(dir) && readdirSync(dir).length > 0;
-
-/**
- * Run history in the places that came before the data directory: the
- * checkout's `local.db` and `~/.nightshift/{transcripts,logs}`. Listed only
- * when the data directory does not have its own yet, so a person who moved
- * the data sees nothing.
- */
-export function legacyData(input: {
-	dataDir: string;
-	/** Whether `DATABASE_URL` is set: then the database is where it says. */
-	databaseUrlSet: boolean;
-	home?: string;
-	root?: string;
-}): { database: string | null; files: string[] } {
-	const home = input.home ?? homedir();
-	const root = input.root ?? checkoutRoot;
-	const oldDb = join(root, "local.db");
-	const database =
-		!input.databaseUrlSet &&
-		existsSync(oldDb) &&
-		!existsSync(join(input.dataDir, DATABASE_FILE))
-			? oldDb
-			: null;
-	const oldDir = join(home, ".nightshift");
-	const files =
-		resolve(oldDir) === resolve(input.dataDir)
-			? []
-			: ["transcripts", "logs"]
-					.map((name) => ({
-						from: join(oldDir, name),
-						to: join(input.dataDir, name),
-					}))
-					.filter(({ from, to }) => hasEntries(from) && !hasEntries(to))
-					.map(({ from }) => from);
-	return { database, files };
 }

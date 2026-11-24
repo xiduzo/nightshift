@@ -1,14 +1,7 @@
-import { afterEach, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { describe, expect, test } from "bun:test";
 import { join, resolve } from "node:path";
 
-import {
-	appDataDir,
-	databaseUrl,
-	legacyData,
-	resolveDataDir,
-} from "./data-dir";
+import { appDataDir, databaseUrl, resolveDataDir } from "./data-dir";
 
 const mac = { platform: "darwin" as const, home: "/Users/ada", env: {} };
 
@@ -82,50 +75,5 @@ describe("databaseUrl", () => {
 		expect(databaseUrl({ DATABASE_URL: "" }, "/d")).toBe(
 			"file:/d/nightshift.db",
 		);
-	});
-});
-
-describe("legacyData", () => {
-	let dir: string;
-	afterEach(() => rmSync(dir, { recursive: true, force: true }));
-
-	function setup() {
-		dir = mkdtempSync(join(tmpdir(), "ns-data-"));
-		const home = join(dir, "home");
-		const root = join(dir, "checkout");
-		const dataDir = join(dir, "data");
-		mkdirSync(join(home, ".nightshift", "transcripts", "run"), {
-			recursive: true,
-		});
-		mkdirSync(root, { recursive: true });
-		writeFileSync(join(root, "local.db"), "");
-		return { home, root, dataDir };
-	}
-
-	test("lists the old database and transcripts", () => {
-		const paths = setup();
-		expect(legacyData({ ...paths, databaseUrlSet: false })).toEqual({
-			database: join(paths.root, "local.db"),
-			files: [join(paths.home, ".nightshift", "transcripts")],
-		});
-	});
-
-	test("ignores the old database when DATABASE_URL is set or the new one exists", () => {
-		const paths = setup();
-		expect(legacyData({ ...paths, databaseUrlSet: true }).database).toBeNull();
-		mkdirSync(paths.dataDir);
-		writeFileSync(join(paths.dataDir, "nightshift.db"), "");
-		expect(legacyData({ ...paths, databaseUrlSet: false }).database).toBeNull();
-	});
-
-	test("lists nothing when the data directory is the old one", () => {
-		const paths = setup();
-		expect(
-			legacyData({
-				...paths,
-				dataDir: join(paths.home, ".nightshift"),
-				databaseUrlSet: true,
-			}),
-		).toEqual({ database: null, files: [] });
 	});
 });

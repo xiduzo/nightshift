@@ -8,7 +8,6 @@
 		"dev": "NIGHTSHIFT_DEV=true bun run --hot --preload ./src/hot-preload.ts src/main.ts",
 		"test": "bun test",
 		"start": "bun run dist/main.mjs",
-		"data:migrate": "bun src/features/cli/data-migrate.ts",
 		"env:generate": "varlock codegen",
 		"auth:generate": "varlock run -- bun x auth@latest generate --config src/auth-config.ts --output ../../packages/db/src/schema/auth.ts --yes",
 		"join": "bun src/join-cli.ts",

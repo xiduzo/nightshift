@@ -274,10 +274,6 @@ Flows and schedules are Night Shift data too, in the flow documents ([ADR 2](adr
 - `bun run night` and the desktop app use the app data folder of the OS: `~/Library/Application Support/Night Shift` on macOS, `$XDG_DATA_HOME/nightshift` (else `~/.local/share/nightshift`) on Linux, `%APPDATA%\Night Shift` on Windows.
 - `bun run dev` sets `NIGHTSHIFT_DEV=true` and uses `.nightshift-dev/` in its own checkout (gitignored). A dev daemon never opens the night's database, and two checkouts never share one. The `db:push`, `db:studio` and `db:migrate` scripts open the same dev database. It connects only to a Host on this computer, unless `NIGHTSHIFT_DEV_LINK_HOST=true` is set (ADR 20).
 - `NIGHTSHIFT_DATA_DIR` sets the folder for either one. `DATABASE_URL` sets only the database, for example a libsql server. Otherwise, leave it unset.
-- Night Shift never moves history from before for you: the checkout's `local.db`, `~/.nightshift/transcripts` and `~/.nightshift/logs`. The daemon names it at start. To copy it into the data directory:
-  1. Stop the daemon.
-  2. Run `bun run data:migrate` (add `--dev` for the dev folder). It copies and never moves. It refuses a data directory that already has data.
-  3. Remove `DATABASE_URL` from `apps/server/.env`.
 
 **Projects.** Add project checks the chosen folder before it adds it, in this order:
 
@@ -369,7 +365,7 @@ NIGHTSHIFT_CURSOR_BIN=/path/to/agent
 NIGHTSHIFT_PI_BIN=/path/to/pi
 ```
 
-**Agent Profiles.** A profile is a harness, a model, an effort, a permission mode, tool sets and connections under one name. The database saves it (`agent_profile`), and you edit it on the Agents page. A Project has no profiles of its own ([ADR 3](adr/0003-a-profile-belongs-to-one-device.md)).
+**Agent Profiles.** A profile is a harness, a model, an effort, a permission mode, tool sets and connections under one name. The Device document saves it, and you edit it on the Agents page. A Project has no profiles of its own ([ADR 3](adr/0003-a-profile-belongs-to-one-device.md)).
 
 - A profile belongs to one Device. Its identity is the Device and the profile's id, and its name is a label.
 - An Agent node names that pair in `profile` (the editor shows "builder on LE2316"). The node may set any of those fields itself. Its own value wins, and tool sets and connections add up.
