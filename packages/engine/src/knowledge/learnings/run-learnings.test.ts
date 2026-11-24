@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { readdir, readFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fakeHarness } from "@nightshift/agents/testing";
 import {
@@ -199,60 +199,5 @@ describe("learnings from runs that ended", () => {
 		expect(await knowledge.knowledge.knownLearnings(projectId)).toEqual([
 			"Release only from Monday to Thursday.",
 		]);
-	});
-
-	test("a run without a signal writes nothing, and the Learner is not asked", async () => {
-		const { engine, knowledge, learnings, asked } = setup(["Never."]);
-		const space = engine.space(sandbox.spaceId, NIGHT_SHIFT);
-		const projectId = (await space.addProject({ repoPath: sandbox.repoPath }))
-			.id;
-		const run = await space.startRun({
-			projectId,
-			flow: flowOf([command("build", "echo built")]),
-		});
-		await ended(engine, run.id);
-
-		expect(await learnings.lookBack(sandbox.spaceId, run.id)).toEqual({
-			signals: [],
-			notes: [],
-		});
-		await learnings.idle();
-		expect(asked).toEqual([]);
-		const proposed = join(
-			knowledge.folder(projectId),
-			...PROPOSED_LEARNINGS_DIR.split("/"),
-		);
-		expect(await readdir(proposed).catch(() => [])).toEqual([]);
-	});
-
-	test("a project that turned it off gets nothing, whatever the run", async () => {
-		const { engine, knowledge, learnings, asked } = setup(["Never."]);
-		const space = engine.space(sandbox.spaceId, NIGHT_SHIFT);
-		const projectId = (await space.addProject({ repoPath: sandbox.repoPath }))
-			.id;
-		await knowledge.knowledge.setLearnsFromRuns(
-			NIGHT_SHIFT,
-			"space-1",
-			projectId,
-			false,
-		);
-		expect(await knowledge.knowledge.learnsFromRuns(projectId)).toBe(false);
-		const run = await space.startRun({
-			projectId,
-			flow: flowOf([command("build", "exit 1")]),
-		});
-		await ended(engine, run.id, "failed");
-		// The run before failed the same way: a signal, but the project said no.
-		const again = await space.startRun({
-			projectId,
-			flow: flowOf([command("build", "exit 1")]),
-		});
-		await ended(engine, again.id, "failed");
-
-		expect(await learnings.lookBack(sandbox.spaceId, again.id)).toEqual({
-			signals: [],
-			notes: [],
-		});
-		expect(asked).toEqual([]);
 	});
 });

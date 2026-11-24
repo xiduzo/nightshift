@@ -84,6 +84,23 @@ describe("settleNote", () => {
 		expect(refusal?.message).toBe(
 			"This note no longer waits. Someone kept, changed or deleted it.",
 		);
+		const missing = (id: string, index: number) =>
+			refusalOf(
+				settleNote(ports)({
+					actor: NIGHT_SHIFT,
+					spaceId: "space-1",
+					projectId: "p1",
+					note: { id, index },
+					decision: "keep",
+					by: ADA,
+				}),
+			);
+		expect((await missing("run-1.s1.md", 5))?.message).toContain(
+			"This note no longer waits.",
+		);
+		expect((await missing("../x.md", 0))?.message).toContain(
+			"This learning no longer waits.",
+		);
 		expect(ports.folder.read("p1", ACCEPTED)).toBeUndefined();
 	});
 

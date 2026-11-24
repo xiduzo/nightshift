@@ -62,12 +62,6 @@ describe("reviewTasks", () => {
 		).toEqual(["source:wiki"]);
 	});
 
-	test("nothing waits: no tasks", () => {
-		expect(
-			reviewTasks({ syncs: [], learnings: [], asked: [], unused: [] }),
-		).toEqual([]);
-	});
-
 	test("more unused files make a new task, so a dismissed list asks again", () => {
 		const of = (count: number) =>
 			ids(

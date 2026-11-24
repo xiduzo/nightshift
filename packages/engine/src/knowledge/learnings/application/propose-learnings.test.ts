@@ -33,6 +33,18 @@ describe("proposeLearnings", () => {
 		expect(ports.folder.files.size).toBe(0);
 	});
 
+	test("refuses a step that could leave the folder", async () => {
+		const ports = inMemoryLearningsPorts();
+		await expect(
+			proposeLearnings(ports)({
+				projectId: "p1",
+				step: { runId: "../x" },
+				notes: ["Out."],
+			}),
+		).rejects.toThrow('"../x" is not an id.');
+		expect(ports.folder.files.size).toBe(0);
+	});
+
 	test("the look back at a run writes to the run's own file", async () => {
 		const ports = inMemoryLearningsPorts();
 		await proposeLearnings(ports)({

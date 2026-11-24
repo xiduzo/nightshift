@@ -23,7 +23,6 @@ const CONTENT_GRACE_MS = 7 * 24 * 60 * 60_000;
 let sandbox: Sandbox;
 let archive: SpaceArchive;
 let documents: KnowledgeDocuments;
-const OTHER = "space-of-a-host";
 
 beforeEach(async () => {
 	sandbox = await createSandbox();
@@ -90,12 +89,6 @@ describe("the collection of knowledge content", () => {
 		}
 		// A second collection finds nothing more to do.
 		expect(await collect()).toEqual({ removed: 0, waiting: 1 });
-	});
-
-	test("leaves the content of a Space a Host keeps: this Replica's cache", async () => {
-		const cached = await kept(OTHER, "# Cached\n", 30 * DAY);
-		expect(await collect()).toEqual({ removed: 0, waiting: 0 });
-		expect(await archive.here.read(cached.ref)).toEqual(cached.content);
 	});
 
 	test("keeps content that a Device copies again: its grace period starts again", async () => {

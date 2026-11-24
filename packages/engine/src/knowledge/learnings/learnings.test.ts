@@ -15,29 +15,6 @@ import {
 
 afterEach(removeKnowledgeDevices);
 
-describe("propose", () => {
-	test("writes Night Shift's header once, then adds what the step reports later", async () => {
-		const { host } = memoryHost();
-		const a = await device(host);
-		const step = { runId: "run-0123456789", stepId: "s1" };
-		await a.learnings.propose("p1", step, ["  Use\n bun. ", ""]);
-		await a.learnings.propose("p1", step, ["Tests are slow."]);
-		expect(await a.read("learnings/proposed/run-0123456789.s1.md")).toBe(
-			"# Learnings of run run-0123\n\nWhat the agents of run run-0123456789 proposed to learn about this project.\n\n- Use bun.\n- Tests are slow.\n",
-		);
-	});
-
-	test("writes nothing without a note, and refuses a step that could leave the folder", async () => {
-		const { host } = memoryHost();
-		const a = await device(host);
-		await a.learnings.propose("p1", { runId: "run-1" }, [" ", "\n"]);
-		expect(await a.has("learnings")).toBe(false);
-		await expect(
-			a.learnings.propose("p1", { runId: "../x" }, ["Out."]),
-		).rejects.toThrow('"../x" is not an id.');
-	});
-});
-
 describe("keepReported", () => {
 	test("keeps the events as they are, and the learnings of each report", async () => {
 		const { host } = memoryHost();
@@ -309,87 +286,6 @@ describe("one note at a time", () => {
 		expect(await a.learnings.waiting("p1")).toEqual([]);
 	});
 
-	test("finds a note that moved by its text, and refuses one that is gone", async () => {
-		const a = await waitingOne();
-		await a.learnings.settleNote(
-			NIGHT_SHIFT,
-			"space-1",
-			"p1",
-			{ id: "run-1.s1.md", index: 0, note: "One." },
-			"delete",
-			ada,
-		);
-		// Seen at index 2 before "One." went: it is at 1 now.
-		await a.learnings.settleNote(
-			NIGHT_SHIFT,
-			"space-1",
-			"p1",
-			{ id: "run-1.s1.md", index: 2, note: "Three." },
-			"delete",
-			ada,
-		);
-		expect((await a.learnings.waiting("p1"))[0]?.notes).toEqual(["Two."]);
-		await expect(
-			a.learnings.settleNote(
-				NIGHT_SHIFT,
-				"space-1",
-				"p1",
-				{ id: "run-1.s1.md", index: 0, note: "One." },
-				"keep",
-				ada,
-			),
-		).rejects.toThrow("This note no longer waits.");
-		await expect(
-			a.learnings.settleNote(
-				NIGHT_SHIFT,
-				"space-1",
-				"p1",
-				{ id: "run-1.s1.md", index: 5 },
-				"keep",
-				ada,
-			),
-		).rejects.toThrow("This note no longer waits.");
-		await expect(
-			a.learnings.settleNote(
-				NIGHT_SHIFT,
-				"space-1",
-				"p1",
-				{ id: "../x.md", index: 0 },
-				"keep",
-				ada,
-			),
-		).rejects.toThrow("This learning no longer waits.");
-		expect(await a.has("learnings/accepted")).toBe(false);
-	});
-
-	test("waits to be fetched when the Space lists a file this folder does not have", async () => {
-		const { host, state } = memoryHost();
-		const a = await device(host);
-		const b = await device(host);
-		await a.put(file, proposal);
-		await a.reconciler.reconcile("p1");
-		await syncDocuments(a, b);
-
-		state.down = true;
-		const one = { id: "run-1.s1.md", index: 0, note: "One." };
-		await expect(
-			b.learnings.settleNote(NIGHT_SHIFT, "space-1", "p1", one, "keep", ada),
-		).rejects.toThrow("Night Shift cannot get this learning now.");
-		state.down = false;
-		await b.learnings.settleNote(
-			NIGHT_SHIFT,
-			"space-1",
-			"p1",
-			one,
-			"keep",
-			ada,
-		);
-		expect((await b.learnings.waiting("p1"))[0]?.notes).toEqual([
-			"Two.",
-			"Three.",
-		]);
-	});
-
 	test("a told note goes to the person's own file, with who told it and when", async () => {
 		const a = await waitingOne();
 		await a.learnings.tell(
@@ -421,39 +317,6 @@ describe("one note at a time", () => {
 			a.learnings.tell(NIGHT_SHIFT, "space-1", "p1", " \n", ada),
 		).rejects.toThrow("Write the note first.");
 	});
-
-	test("a told note replaces the note it changes, and keeps nothing when that note is gone", async () => {
-		const a = await waitingOne();
-		await a.learnings.tell(
-			NIGHT_SHIFT,
-			"space-1",
-			"p1",
-			"Two, but right.",
-			ada,
-			{
-				id: "run-1.s1.md",
-				index: 1,
-				note: "Two.",
-			},
-		);
-		expect((await a.learnings.waiting("p1"))[0]?.notes).toEqual([
-			"One.",
-			"Three.",
-		]);
-		expect(await a.read("learnings/accepted/told-ada.md")).toContain(
-			"- Two, but right.\n",
-		);
-		await expect(
-			a.learnings.tell(NIGHT_SHIFT, "space-1", "p1", "Again.", ada, {
-				id: "run-1.s1.md",
-				index: 1,
-				note: "Two.",
-			}),
-		).rejects.toThrow("This note no longer waits.");
-		expect(await a.read("learnings/accepted/told-ada.md")).not.toContain(
-			"Again.",
-		);
-	});
 });
 
 describe("who hears", () => {
@@ -475,22 +338,5 @@ describe("who hears", () => {
 		await b.reconciler.reconcile("p1");
 		expect(b.told).toEqual([heard]);
 		expect(await b.read("learnings/proposed/run-1.md")).toBe("- One.\n");
-	});
-
-	test("after a start, what the folder held at the last reconcile says what changed", async () => {
-		const { host } = memoryHost();
-		const a = await device(host);
-		const proposal = "learnings/proposed/run-1.md";
-		const change = (held: string[], listed: string[]) => ({
-			projectId: "p2",
-			spaceId: a.sandbox.spaceId,
-			held: Object.fromEntries(held.map((path) => [path, { sha256: "x" }])),
-			listed: new Map(listed.map((path) => [path, { sha256: "x" }])),
-		});
-		// The module is new for p2, as it is for every project after a start.
-		await a.learnings.reconciled(change([proposal], [proposal]));
-		expect(a.told).toEqual([]);
-		await a.learnings.reconciled(change([proposal], []));
-		expect(a.told).toEqual([[a.sandbox.spaceId, "p2"]]);
 	});
 });

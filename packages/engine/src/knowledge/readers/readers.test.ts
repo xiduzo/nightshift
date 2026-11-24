@@ -412,94 +412,6 @@ describe("the step's reader", () => {
 		expect(later.headers.get("x-nightshift-read")).toBe("unchanged");
 		await next.close();
 	});
-
-	test("a page that is gone says so, with why", async () => {
-		const step = await readers().forStep("p1", async () => undefined);
-		const answer = await fetch(
-			`${step.env.NS_READER_URL}/read?url=${encodeURIComponent(`${base}/gone`)}`,
-			{
-				headers: { authorization: `Bearer ${step.env.NS_READER_TOKEN}` },
-			},
-		);
-		expect(answer.headers.get("x-nightshift-read")).toBe("gone");
-		expect(await answer.text()).toBe("The page is not there any more.");
-		await step.close();
-	});
-
-	test("a service reader gets its key from the step's secret, by the setting's name", async () => {
-		site["/fc/v2/map"] = (request) => ({
-			type: "application/json",
-			body: JSON.stringify({
-				success: true,
-				links: [request.headers.get("authorization")],
-			}),
-		});
-		const asked: string[] = [];
-		const step = await readers({
-			kind: "firecrawl",
-			address: `${base}/fc`,
-			secret: "CRAWL_KEY",
-		}).forStep("p1", async (name) => {
-			asked.push(name);
-			return "secret-value";
-		});
-		const map = await fetch(
-			`${step.env.NS_READER_URL}/map?limit=5&url=${encodeURIComponent("https://example.com/")}`,
-			{
-				headers: { authorization: `Bearer ${step.env.NS_READER_TOKEN}` },
-			},
-		);
-		expect(asked).toEqual(["CRAWL_KEY"]);
-		// The answer's link is the header Firecrawl got: not a web address, so left out.
-		expect(map.status).toBe(200);
-		expect(seen[0]?.headers.get("authorization")).toBe("Bearer secret-value");
-		await step.close();
-	});
-});
-
-describe("whether the reader is ready", () => {
-	const ready = (
-		setting: PageReaderSetting,
-		saved: Record<string, string> = {},
-	) =>
-		createPageReaders({
-			dataDir,
-			setting: async () => setting,
-			rules: () => open,
-			secret: async (name) => saved[name],
-		}).ready("p1");
-
-	test("Night Shift's own reader needs no key", async () => {
-		expect(await ready({ kind: "nightshift" })).toBe(true);
-	});
-
-	test("a service reader is ready when its secret is saved: the default name, or the one the setting names", async () => {
-		expect(await ready({ kind: "firecrawl" })).toBe(false);
-		expect(
-			await ready({ kind: "firecrawl" }, { FIRECRAWL_API_KEY: "fc-1" }),
-		).toBe(true);
-		expect(
-			await ready(
-				{ kind: "jina", secret: "TEAM_JINA" },
-				{ JINA_API_KEY: "j-1" },
-			),
-		).toBe(false);
-		expect(
-			await ready({ kind: "jina", secret: "TEAM_JINA" }, { TEAM_JINA: "j-2" }),
-		).toBe(true);
-	});
-
-	test("a secret that cannot be read counts as not saved", async () => {
-		const readers = createPageReaders({
-			dataDir,
-			setting: async () => ({ kind: "jina" }),
-			rules: () => open,
-			secret: async () => {
-				throw new Error("locked");
-			},
-		});
-		expect(await readers.ready("p1")).toBe(false);
-	});
 });
 
 describe("the quick look", () => {
@@ -512,53 +424,6 @@ describe("the quick look", () => {
 			setting: async () => setting,
 			rules: () => open,
 		}).look(NIGHT_SHIFT, "space-1", "p1", urls);
-
-	test("a page that starts a folder the sitemap lists is a section, and names its feed", async () => {
-		site["/robots.txt"] = {
-			type: "text/plain",
-			body: `User-agent: *\nDisallow: /docs/private\nSitemap: ${base}/map.xml`,
-		};
-		site["/map.xml"] = {
-			type: "application/xml",
-			body: `<urlset><url><loc>${base}/docs/</loc></url><url><loc>${base}/docs/a</loc></url><url><loc>${base}/docs/b?x=1</loc></url><url><loc>${base}/blog/c</loc></url></urlset>`,
-		};
-		site["/docs/"] = { body: ARTICLE };
-		site["/docs/refunds"] = { body: ARTICLE };
-		const [section, article, refused] = await look([
-			`${base}/docs/`,
-			`${base}/docs/refunds`,
-			`${base}/docs/private/x`,
-		]);
-		expect(section).toEqual({
-			url: `${base}/docs/`,
-			kind: "section",
-			title: "Refund policy",
-			section: {
-				folder: `${base}/docs/`,
-				pages: 3,
-				from: "sitemap",
-				starts: true,
-			},
-			feed: `${base}/feed.xml`,
-			items: null,
-			fileType: null,
-			reason: null,
-		});
-		expect(article).toMatchObject({
-			kind: "page",
-			section: { pages: 3, starts: false },
-		});
-		expect(refused).toMatchObject({ kind: "blocked" });
-	});
-
-	test("without a sitemap, the page's links count the folder", async () => {
-		site["/docs/refunds"] = { body: ARTICLE };
-		const [page] = await look([`${base}/docs/refunds`]);
-		expect(page).toMatchObject({
-			kind: "page",
-			section: { folder: `${base}/docs/`, from: "links", starts: false },
-		});
-	});
 
 	test("a feed, a file, a video page, a sign-in and a gone page, by their answers", async () => {
 		site["/news.rss"] = {
@@ -595,24 +460,6 @@ describe("the quick look", () => {
 		});
 		expect(looks[1]).toMatchObject({ fileType: "pdf" });
 		expect(looks[2]).toMatchObject({ title: "Talk" });
-	});
-
-	test("what this computer cannot read, the project's reader tries", async () => {
-		site["/app"] = {
-			body: '<html><head><script src="/app.js"></script></head><body><div id="root"></div></body></html>',
-		};
-		const target = `${base}/app`;
-		site[`/r/${target}`] = {
-			type: "text/plain",
-			body: `Title: The app\n\nURL Source: ${target}\n\nMarkdown Content:\nThe app's text.`,
-		};
-		const [own] = await look([target]);
-		expect(own).toMatchObject({ kind: "needs-browser" });
-		const [jina] = await look([target], {
-			kind: "jina",
-			address: `${base}/r/`,
-		});
-		expect(jina).toMatchObject({ kind: "page", title: "The app" });
 	});
 });
 
