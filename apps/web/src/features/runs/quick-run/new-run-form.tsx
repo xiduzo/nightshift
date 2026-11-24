@@ -17,7 +17,7 @@ import {
 	TabsList,
 	TabsTrigger,
 } from "@nightshift/ui/components/tabs";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { MessageSquareTextIcon, WorkflowIcon } from "lucide-react";
 import { useState } from "react";
@@ -30,7 +30,8 @@ import {
 import { useHasFolder } from "@/features/projects";
 import type { PermissionMode } from "@/shared/api";
 import { orpc } from "@/shared/api";
-import { runMutations } from "../queries";
+import { runMutations, runQueries } from "../queries";
+import { profileHere } from "./profile-here";
 import { DEFAULT_PERMISSION, QuickRunPrompt } from "./quick-run-prompt";
 
 type QuickRunMode = "flow" | "prompt";
@@ -76,23 +77,41 @@ export function QuickRunDialog({
 		}),
 	);
 
-	const canSubmit = prompt.trim() !== "" && !startRun.isPending;
+	const devices = useQuery({
+		...runQueries.devices(projectId),
+		enabled: open && agent.profile !== undefined,
+		meta: { quietErrors: true },
+	});
+
+	const canSubmit =
+		prompt.trim() !== "" && !startRun.isPending && !devices.isLoading;
 
 	const submit = () => {
 		if (!canSubmit) return;
 		let flow: ReturnType<typeof singleAgentFlow>;
 		try {
-			const chosen = requestAgent(
+			const { profile: picked, ...chosen } = requestAgent(
 				agent,
 				(harness) => harnessInfo(harness).defaultModel,
 			);
+			const profile =
+				picked === undefined
+					? undefined
+					: profileHere(picked, devices.data ?? []);
+			if (profile === null) {
+				setFlowError(
+					`Night Shift cannot find the profile "${picked}" on this computer. Pick another profile.`,
+				);
+				return;
+			}
 			flow = singleAgentFlow({
 				prompt: prompt.trim(),
 				...chosen,
+				profile,
 				// A profile brings its own mode unless the person picked one.
 				permissionMode:
 					permissionMode ??
-					(chosen.profile === undefined ? DEFAULT_PERMISSION : undefined),
+					(profile === undefined ? DEFAULT_PERMISSION : undefined),
 			});
 		} catch (error) {
 			setFlowError(
