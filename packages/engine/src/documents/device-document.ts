@@ -10,6 +10,7 @@ import {
 import { instant, now } from "@nightshift/time";
 import { eq } from "drizzle-orm";
 import type * as Y from "yjs";
+import { writeExplicitEntries } from "./explicit-entries";
 import {
 	createSyncedDocuments,
 	documentName,
@@ -33,7 +34,7 @@ import type { PersistedDocument } from "./ydoc";
 export type DeviceDocument = PersistedDocument & {
 	/** Name → `{ description, settings, updatedAt }`. */
 	readonly profiles: Y.Map<unknown>;
-	/** Name → `{ description, updatedAt }`. */
+	/** Name → `{ description, program, login, git, updatedAt }`. */
 	readonly cliTools: Y.Map<unknown>;
 	/** Name → `{ description, server, updatedAt }`. `${NAME}` references, never values. */
 	readonly connections: Y.Map<unknown>;
@@ -122,7 +123,30 @@ export async function openDeviceDocument(options: {
 				document.facts.set("secrets", legacy.secrets);
 		});
 	}
+	await writeExplicitTools(document);
 	return document;
+}
+
+/** What a CLI tool without these fields has: none of them. */
+const NO_TOOL_SETUP = { program: null, login: null, git: null };
+
+/**
+ * CONVERSION, with an end (`writeExplicitEntries`): each CLI tool of this
+ * Device gets the fields it misses. A failure never stops the start.
+ */
+async function writeExplicitTools(document: DeviceDocument): Promise<void> {
+	try {
+		const { written, entries } = await writeExplicitEntries(
+			document,
+			document.cliTools,
+			NO_TOOL_SETUP,
+		);
+		if (written > 0) {
+			console.log(`Explicit CLI tools: ${written} of ${entries} written.`);
+		}
+	} catch (error) {
+		console.error("The CLI tools were not made explicit:", error);
+	}
 }
 
 /**
@@ -152,7 +176,11 @@ async function readLegacyRows(db: Database) {
 	const cliTools: [string, unknown][] = (await db.select().from(cliTool)).map(
 		(row) => [
 			row.name,
-			{ description: row.description, updatedAt: instant(row.updatedAt) },
+			{
+				description: row.description,
+				...NO_TOOL_SETUP,
+				updatedAt: instant(row.updatedAt),
+			},
 		],
 	);
 	const profiles: [string, unknown][] = [];
