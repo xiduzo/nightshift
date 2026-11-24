@@ -17,7 +17,6 @@
  */
 import { randomUUID } from "node:crypto";
 import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
-import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { Refusal } from "@nightshift/refusal";
@@ -519,23 +518,6 @@ export async function* runAdapterSession(options: {
 		if (!ended) abortController.abort();
 		await options.cleanup?.().catch(() => {});
 	}
-}
-
-/** A free TCP port on 127.0.0.1, for a harness server of one session. */
-export function freePort(): Promise<number> {
-	return new Promise((resolve, reject) => {
-		const server = createServer();
-		server.unref();
-		server.once("error", reject);
-		server.listen(0, "127.0.0.1", () => {
-			const address = server.address();
-			const port =
-				typeof address === "object" && address ? address.port : undefined;
-			server.close(() =>
-				port === undefined ? reject(new Error("No free port")) : resolve(port),
-			);
-		});
-	});
 }
 
 /** The marker file the sandbox middleware writes into the workspace root. */
