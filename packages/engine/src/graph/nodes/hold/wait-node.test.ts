@@ -1,6 +1,5 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
-import { Command } from "@langchain/langgraph";
 import type { WaitNode } from "@nightshift/flows";
 import { parseInstant, now as timeNow } from "@nightshift/time";
 import { atLocal } from "@nightshift/time/testing";
@@ -10,13 +9,16 @@ import { deriveSteps } from "../../../read/run-views";
 import {
 	command,
 	drive,
+	edge,
 	flowOf,
 	held,
 	MINUTE,
 	payloads,
+	resume,
 	startRun,
+	walk,
 } from "../../../testing/graph";
-import { createSandbox, type Sandbox } from "../../../testing/test-support";
+import { sandboxPerTest } from "../../../testing/sandbox-per-test";
 import { parseTime } from "./wait";
 
 /**
@@ -39,13 +41,7 @@ const wait = (
 	...extra,
 });
 
-let sandbox: Sandbox;
-beforeEach(async () => {
-	sandbox = await createSandbox();
-});
-afterEach(async () => {
-	await sandbox.cleanup();
-});
+const sandbox = sandboxPerTest();
 
 /** A clock the test moves. */
 function clock(start = timeNow()) {
@@ -64,11 +60,8 @@ describe("the Wait node", () => {
 		const time = clock(start);
 		const h = await startRun(
 			sandbox,
-			flowOf({
+			flowOf([wait("at", { kind: "time", at: "{{when}}" })], [], {
 				inputs: [{ name: "when" }],
-				start: "at",
-				nodes: [wait("at", { kind: "time", at: "{{when}}" })],
-				edges: [],
 			}),
 			{ inputs: { when: "07:00" } },
 		);
@@ -95,11 +88,7 @@ describe("the Wait node", () => {
 		// A time in the past: the wake time is that time, and the runner's timer fires at once.
 		const past = await startRun(
 			sandbox,
-			flowOf({
-				start: "at",
-				nodes: [wait("at", { kind: "time", at: "2026-10-17T20:00" })],
-				edges: [],
-			}),
+			flowOf([wait("at", { kind: "time", at: "2026-10-17T20:00" })]),
 		);
 		past.ctx.now = time.now;
 		const parked = await drive(past, { inputs: {} });
@@ -107,28 +96,18 @@ describe("the Wait node", () => {
 			kind: "wait",
 			until: atLocal(2026, 9, 17, 20, 0),
 		});
-		await drive(
-			past,
-			new Command({ resume: { kind: "wake", early: false } }),
-			past.graph(),
-		);
+		await resume(past, { kind: "wake", early: false }, past.graph());
 		expect(deriveSteps(foldRun(await past.events()))[0]?.outcome).toBe("done");
 	});
 
 	test("a time that does not parse fails the step with a plain message", async () => {
-		const h = await startRun(
+		const { h, parked, state } = await walk(
 			sandbox,
-			flowOf({
+			flowOf([wait("at", { kind: "time", at: "{{when}}" })], [], {
 				inputs: [{ name: "when" }],
-				start: "at",
-				nodes: [wait("at", { kind: "time", at: "{{when}}" })],
-				edges: [],
 			}),
 			{ inputs: { when: "after lunch" } },
 		);
-		const { parked, state } = await drive(h, {
-			inputs: { when: "after lunch" },
-		});
 		expect(parked).toEqual([
 			{
 				kind: "parked",
@@ -152,18 +131,17 @@ describe("the Wait node", () => {
 		const time = clock();
 		const h = await startRun(
 			sandbox,
-			flowOf({
-				inputs: [{ name: "flag" }],
-				start: "ci",
-				nodes: [
+			flowOf(
+				[
 					wait("ci", {
 						kind: "command",
 						command: 'echo "checking {{flag}}"; test -f "{{flag}}"',
 						everyMinutes: 5,
 					}),
 				],
-				edges: [],
-			}),
+				[],
+				{ inputs: [{ name: "flag" }] },
+			),
 			{ inputs: { flag: "green" } },
 		);
 		h.ctx.now = time.now;
@@ -190,11 +168,7 @@ describe("the Wait node", () => {
 			stepId,
 			payload: { early: false },
 		});
-		const second = await drive(
-			h,
-			new Command({ resume: { kind: "wake", early: false } }),
-			h.graph(),
-		);
+		const second = await resume(h, { kind: "wake", early: false }, h.graph());
 		expect(second.parked[0]).toMatchObject({
 			kind: "wait",
 			stepId,
@@ -213,11 +187,7 @@ describe("the Wait node", () => {
 			stepId,
 			payload: { early: false },
 		});
-		const third = await drive(
-			h,
-			new Command({ resume: { kind: "wake", early: false } }),
-			h.graph(),
-		);
+		const third = await resume(h, { kind: "wake", early: false }, h.graph());
 		expect(third.parked).toEqual([]);
 		expect(third.state.ended?.status).toBe("finished");
 		expect(third.state.nodes.ci).toEqual({
@@ -264,9 +234,8 @@ describe("the Wait node", () => {
 		const time = clock();
 		const h = await startRun(
 			sandbox,
-			flowOf({
-				start: "ci",
-				nodes: [
+			flowOf(
+				[
 					wait(
 						"ci",
 						{
@@ -279,8 +248,8 @@ describe("the Wait node", () => {
 					),
 					command("fix", "echo fix"),
 				],
-				edges: [{ id: "e1", from: "ci", outcome: "red", to: "fix" }],
-			}),
+				[edge("e1", "ci", "red", "fix")],
+			),
 		);
 		h.ctx.now = time.now;
 		const first = await drive(h, { inputs: {} });
@@ -300,11 +269,7 @@ describe("the Wait node", () => {
 			stepId,
 			payload: { early: false },
 		});
-		const second = await drive(
-			h,
-			new Command({ resume: { kind: "wake", early: false } }),
-			h.graph(),
-		);
+		const second = await resume(h, { kind: "wake", early: false }, h.graph());
 		expect(second.parked).toEqual([]);
 		expect(second.state.nodes.ci).toEqual({
 			outcome: "red",
@@ -320,22 +285,18 @@ describe("the Wait node", () => {
 		const time = clock();
 		const h = await startRun(
 			sandbox,
-			flowOf({
-				start: "ci",
-				nodes: [
-					wait(
-						"ci",
-						{
-							kind: "command",
-							command:
-								'if [ -f ok ]; then exit 0; fi; echo \'{"outcome": "green"}\' > "$NS_OUTPUT"; exit 1',
-							everyMinutes: 5,
-						},
-						{ outcomes: [{ name: "green" }] },
-					),
-				],
-				edges: [],
-			}),
+			flowOf([
+				wait(
+					"ci",
+					{
+						kind: "command",
+						command:
+							'if [ -f ok ]; then exit 0; fi; echo \'{"outcome": "green"}\' > "$NS_OUTPUT"; exit 1',
+						everyMinutes: 5,
+					},
+					{ outcomes: [{ name: "green" }] },
+				),
+			]),
 		);
 		h.ctx.now = time.now;
 		const first = await drive(h, { inputs: {} });
@@ -351,11 +312,7 @@ describe("the Wait node", () => {
 			stepId,
 			payload: { early: false },
 		});
-		const second = await drive(
-			h,
-			new Command({ resume: { kind: "wake", early: false } }),
-			h.graph(),
-		);
+		const second = await resume(h, { kind: "wake", early: false }, h.graph());
 		expect(second.state.nodes.ci).toMatchObject({ outcome: "done" });
 		expect(second.state.ended?.status).toBe("finished");
 	});
@@ -364,11 +321,7 @@ describe("the Wait node", () => {
 		const time = clock();
 		const h = await startRun(
 			sandbox,
-			flowOf({
-				start: "deploy",
-				nodes: [wait("deploy", { kind: "signal", name: "deployed" })],
-				edges: [],
-			}),
+			flowOf([wait("deploy", { kind: "signal", name: "deployed" })]),
 		);
 		h.ctx.now = time.now;
 		const first = await drive(h, { inputs: {} });
@@ -403,11 +356,7 @@ describe("the Wait node", () => {
 			stepId,
 			payload: { early: true },
 		});
-		const woken = await drive(
-			h,
-			new Command({ resume: { kind: "wake", early: true } }),
-			h.graph(),
-		);
+		const woken = await resume(h, { kind: "wake", early: true }, h.graph());
 		expect(woken.parked[0]).toMatchObject({
 			kind: "wait",
 			stepId,
@@ -425,9 +374,9 @@ describe("the Wait node", () => {
 			stepId,
 			payload: { early: true, signal: "deployed" },
 		});
-		const signalled = await drive(
+		const signalled = await resume(
 			h,
-			new Command({ resume: { kind: "signal", name: "deployed" } }),
+			{ kind: "signal", name: "deployed" },
 			h.graph(),
 		);
 		expect(signalled.parked).toEqual([]);
@@ -443,9 +392,8 @@ describe("the Wait node", () => {
 		const time = clock();
 		const h = await startRun(
 			sandbox,
-			flowOf({
-				start: "ci",
-				nodes: [
+			flowOf(
+				[
 					wait(
 						"ci",
 						{ kind: "signal", name: "ci-done" },
@@ -461,8 +409,8 @@ describe("the Wait node", () => {
 					),
 					command("fix", "echo fix"),
 				],
-				edges: [{ id: "e1", from: "ci", outcome: "red", to: "fix" }],
-			}),
+				[edge("e1", "ci", "red", "fix")],
+			),
 		);
 		h.ctx.now = time.now;
 		await drive(h, { inputs: {} });
@@ -485,15 +433,13 @@ describe("the Wait node", () => {
 				stepId,
 				payload: { early: true, signal: "ci-done" },
 			});
-			return drive(
+			return resume(
 				h,
-				new Command({
-					resume: {
-						kind: "signal",
-						name: "ci-done",
-						data: { body: { conclusion }, headers: {} },
-					},
-				}),
+				{
+					kind: "signal",
+					name: "ci-done",
+					data: { body: { conclusion }, headers: {} },
+				},
 				h.graph(),
 			);
 		};
@@ -512,21 +458,16 @@ describe("the Wait node", () => {
 	});
 
 	test("a signal with rules: a person's signal brings no event and ends it done", async () => {
-		const h = await startRun(
+		const { h } = await walk(
 			sandbox,
-			flowOf({
-				start: "ci",
-				nodes: [
-					wait(
-						"ci",
-						{ kind: "signal", name: "ci-done" },
-						{ outcomes: [{ name: "green", when: "event.body.ok" }] },
-					),
-				],
-				edges: [],
-			}),
+			flowOf([
+				wait(
+					"ci",
+					{ kind: "signal", name: "ci-done" },
+					{ outcomes: [{ name: "green", when: "event.body.ok" }] },
+				),
+			]),
 		);
-		await drive(h, { inputs: {} });
 		const stepId = deriveSteps(foldRun(await h.events()))[0]?.id as string;
 		await h.log.append({
 			type: "WaitEnded",
@@ -534,9 +475,9 @@ describe("the Wait node", () => {
 			stepId,
 			payload: { early: true, signal: "ci-done" },
 		});
-		const signalled = await drive(
+		const signalled = await resume(
 			h,
-			new Command({ resume: { kind: "signal", name: "ci-done" } }),
+			{ kind: "signal", name: "ci-done" },
 			h.graph(),
 		);
 		expect(signalled.state.nodes.ci).toMatchObject({ outcome: "done" });
@@ -546,10 +487,8 @@ describe("the Wait node", () => {
 		const time = clock();
 		const h = await startRun(
 			sandbox,
-			flowOf({
-				inputs: [{ name: "pr" }],
-				start: "ci",
-				nodes: [
+			flowOf(
+				[
 					wait(
 						"ci",
 						{
@@ -569,8 +508,9 @@ describe("the Wait node", () => {
 						},
 					),
 				],
-				edges: [],
-			}),
+				[],
+				{ inputs: [{ name: "pr" }] },
+			),
 			{ inputs: { pr: "7" } },
 		);
 		h.ctx.now = time.now;
@@ -603,15 +543,13 @@ describe("the Wait node", () => {
 			stepId,
 			payload: { early: true, signal: "ci-done" },
 		});
-		const neutral = await drive(
+		const neutral = await resume(
 			h,
-			new Command({
-				resume: {
-					kind: "signal",
-					name: "ci-done",
-					data: { body: { conclusion: "neutral" }, headers: {} },
-				},
-			}),
+			{
+				kind: "signal",
+				name: "ci-done",
+				data: { body: { conclusion: "neutral" }, headers: {} },
+			},
 			h.graph(),
 		);
 		expect(neutral.parked[0]).toMatchObject({
@@ -630,11 +568,7 @@ describe("the Wait node", () => {
 			stepId,
 			payload: { early: false },
 		});
-		const polled = await drive(
-			h,
-			new Command({ resume: { kind: "wake", early: false } }),
-			h.graph(),
-		);
+		const polled = await resume(h, { kind: "wake", early: false }, h.graph());
 		expect(polled.parked).toEqual([]);
 		expect(polled.state.nodes.ci).toEqual({
 			outcome: "merged",
@@ -649,21 +583,17 @@ describe("the Wait node", () => {
 		const time = clock();
 		const h = await startRun(
 			sandbox,
-			flowOf({
-				start: "ci",
-				nodes: [
-					wait(
-						"ci",
-						{
-							kind: "any",
-							signal: { name: "ci-done" },
-							command: { command: "exit 1", everyMinutes: 10 },
-						},
-						{ outcomes: [{ name: "green", when: "event.body.ok" }] },
-					),
-				],
-				edges: [],
-			}),
+			flowOf([
+				wait(
+					"ci",
+					{
+						kind: "any",
+						signal: { name: "ci-done" },
+						command: { command: "exit 1", everyMinutes: 10 },
+					},
+					{ outcomes: [{ name: "green", when: "event.body.ok" }] },
+				),
+			]),
 		);
 		h.ctx.now = time.now;
 		await drive(h, { inputs: {} });
@@ -675,15 +605,13 @@ describe("the Wait node", () => {
 			stepId,
 			payload: { early: true, signal: "ci-done" },
 		});
-		const signalled = await drive(
+		const signalled = await resume(
 			h,
-			new Command({
-				resume: {
-					kind: "signal",
-					name: "ci-done",
-					data: { body: { ok: true }, headers: {} },
-				},
-			}),
+			{
+				kind: "signal",
+				name: "ci-done",
+				data: { body: { ok: true }, headers: {} },
+			},
 			h.graph(),
 		);
 		expect(signalled.state.nodes.ci).toMatchObject({
@@ -697,9 +625,8 @@ describe("the Wait node", () => {
 		const time = clock();
 		const h = await startRun(
 			sandbox,
-			flowOf({
-				start: "deploy",
-				nodes: [
+			flowOf(
+				[
 					wait(
 						"deploy",
 						{ kind: "signal", name: "deployed" },
@@ -707,8 +634,8 @@ describe("the Wait node", () => {
 					),
 					command("late", "echo late"),
 				],
-				edges: [{ id: "e1", from: "deploy", outcome: "timeout", to: "late" }],
-			}),
+				[edge("e1", "deploy", "timeout", "late")],
+			),
 		);
 		h.ctx.now = time.now;
 		const first = await drive(h, { inputs: {} });
@@ -724,11 +651,7 @@ describe("the Wait node", () => {
 			stepId,
 			payload: { early: false },
 		});
-		const second = await drive(
-			h,
-			new Command({ resume: { kind: "wake", early: false } }),
-			h.graph(),
-		);
+		const second = await resume(h, { kind: "wake", early: false }, h.graph());
 		expect(second.state.ended?.nodeId).toBe("late");
 		expect(second.state.nodes.deploy).toEqual({
 			outcome: "timeout",
@@ -739,17 +662,13 @@ describe("the Wait node", () => {
 		// A command past its deadline: the poll is not run again.
 		const poll = await startRun(
 			sandbox,
-			flowOf({
-				start: "ci",
-				nodes: [
-					wait(
-						"ci",
-						{ kind: "command", command: "false", everyMinutes: 10 },
-						{ timeoutMinutes: 15 },
-					),
-				],
-				edges: [],
-			}),
+			flowOf([
+				wait(
+					"ci",
+					{ kind: "command", command: "false", everyMinutes: 10 },
+					{ timeoutMinutes: 15 },
+				),
+			]),
 		);
 		poll.ctx.now = time.now;
 		const polled = await drive(poll, { inputs: {} });
@@ -762,9 +681,9 @@ describe("the Wait node", () => {
 			stepId: pollId,
 			payload: { early: false },
 		});
-		const again = await drive(
+		const again = await resume(
 			poll,
-			new Command({ resume: { kind: "wake", early: false } }),
+			{ kind: "wake", early: false },
 			poll.graph(),
 		);
 		// Cut to the deadline: 5 minutes, not 10.
@@ -776,9 +695,9 @@ describe("the Wait node", () => {
 			stepId: pollId,
 			payload: { early: false },
 		});
-		const out = await drive(
+		const out = await resume(
 			poll,
-			new Command({ resume: { kind: "wake", early: false } }),
+			{ kind: "wake", early: false },
 			poll.graph(),
 		);
 		// No edge on timeout: the run parks as failed.

@@ -30,6 +30,7 @@ import { createRunner, type Runner } from "../graph/runner/runner";
 import {
 	type DriveOutcome,
 	driveGraph,
+	inputOf,
 	openThread,
 	type RunGraph,
 	type StreamInput,
@@ -42,6 +43,7 @@ import {
 	type Parked,
 	type Pending,
 	type PositionState,
+	type ResumeValue,
 	type RunEvent,
 	type RunStateValues,
 } from "../graph/state/state";
@@ -65,6 +67,7 @@ import { defaultRunSettings } from "../settings/settings";
 import { keptValues } from "../variables/kept";
 import {
 	connectionsOf,
+	endsWith,
 	type Sandbox,
 	TEST_DEVICE_ID,
 	type TestDeviceDeps,
@@ -388,6 +391,31 @@ export async function drive(
 }
 
 /**
+ * A new run of the flow, driven from its start until it stops. `inputs` are
+ * the run's inputs, in its log and in its thread. `h` is for what the test
+ * does next: an answer, a wake, a look at the log.
+ */
+export async function walk(
+	sandbox: Sandbox,
+	flow: Flow,
+	options: StartOptions = {},
+): Promise<Driven & { h: Harness }> {
+	const h = await startRun(sandbox, flow, options);
+	return { h, ...(await drive(h, { inputs: options.inputs ?? {} })) };
+}
+
+/**
+ * Answers the interrupt the run stopped at, as the runner does, and drives
+ * on until it stops again. Default: on the thread's own graph, as `drive`.
+ */
+export const resume = (
+	h: Harness,
+	answer: ResumeValue,
+	graph?: RunGraph,
+): Promise<Driven> =>
+	drive(h, inputOf({ kind: "resume", value: answer }), graph);
+
+/**
  * The one step the state holds (a wait, a park or a Gate), or null when it
  * holds none. Throws when it holds several: a test of parallel branches
  * reads them by node (`heldOf`).
@@ -410,7 +438,7 @@ export const payloads = <T extends EngineEventType>(
  * A real runner over the harness's database, log, bus and Device, as the
  * engine makes one. Each run's flow comes from its row. It opens its own
  * threads: a drive of the harness and a Turn of the runner are two daemons
- * on one database.
+ * on one database. It lets go of its runs when the sandbox is cleaned up.
  */
 export function testRunner(
 	h: Harness,
@@ -420,11 +448,13 @@ export function testRunner(
 	} = {},
 ): Runner {
 	const { shared, ...rest } = overrides;
-	return createRunner({
+	const runner = createRunner({
 		...h.deps,
 		flowOf: parseRunFlow,
 		calledFlowsOf: parseCalledFlows,
 		...rest,
 		shared: { ...h.deps.shared, ...shared },
 	});
+	endsWith(h.deps.db, runner.release);
+	return runner;
 }

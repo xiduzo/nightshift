@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { fakeHarness, reportingScript } from "@nightshift/agents/testing";
 import type { AgentNode, Policy } from "@nightshift/flows";
 import { now } from "@nightshift/time";
@@ -12,12 +12,10 @@ import {
 	payloads,
 	startRun,
 	testRunner,
+	walk,
 } from "../../testing/graph";
-import {
-	createSandbox,
-	type Sandbox,
-	waitFor,
-} from "../../testing/test-support";
+import { sandboxPerTest } from "../../testing/sandbox-per-test";
+import { waitFor } from "../../testing/test-support";
 
 /**
  * The guards of the run policy on the compiled graph, with the fake
@@ -60,13 +58,7 @@ const call = (name: string, input: unknown): FakeStep => ({
 	result: "ok",
 });
 
-let sandbox: Sandbox;
-beforeEach(async () => {
-	sandbox = await createSandbox();
-});
-afterEach(async () => {
-	await sandbox.cleanup();
-});
+const sandbox = sandboxPerTest();
 
 describe("the run budget", () => {
 	test("the spend so far past the budget stops the session and the run, failed, with a budget warning", async () => {
@@ -120,14 +112,13 @@ describe("the run budget", () => {
 				usage: { inputTokens: 1_000_000, outputTokens: 0 },
 			},
 		});
-		const h = await startRun(
+		const { h, parked } = await walk(
 			sandbox,
 			withPolicy([agent("first"), agent("second")], { budgetUsd: 2 }, [
 				edge("e1", "first", "pass", "second"),
 			]),
 			{ harness },
 		);
-		const { parked } = await drive(h, { inputs: {} });
 		const reason =
 			'The run spent $3.00 of its $2.00 budget, so it stopped before node "second". Resume it to spend up to $2.00 more.';
 		expect(parked[0]).toMatchObject({ status: "failed", reason });
@@ -150,12 +141,11 @@ describe("the run budget", () => {
 				usage: { inputTokens: 500_000, outputTokens: 0, costUsd: 1.5 },
 			},
 		});
-		const h = await startRun(
+		const { h, parked } = await walk(
 			sandbox,
 			withPolicy([agent("worker")], { budgetUsd: 1.5 }),
 			{ harness },
 		);
-		const { parked } = await drive(h, { inputs: {} });
 		expect(parked[0]).toMatchObject({
 			status: "failed",
 			reason:
@@ -170,12 +160,9 @@ describe("the run budget", () => {
 			model: "claude-sonnet-4-6",
 			steps: [spent(10_000_000), ...(reportingScript("pass").steps ?? [])],
 		});
-		const h = await startRun(
-			sandbox,
-			flowOf({ start: "worker", nodes: [agent("worker")], edges: [] }),
-			{ harness },
-		);
-		const { state } = await drive(h, { inputs: {} });
+		const { h, state } = await walk(sandbox, flowOf([agent("worker")]), {
+			harness,
+		});
 		expect(state.ended?.status).toBe("finished");
 		expect(harness.calls[0]?.maxBudgetUsd).toBeUndefined();
 		expect(payloads(await h.events(), "RunWarned")).toEqual([]);
@@ -185,7 +172,7 @@ describe("the run budget", () => {
 describe("the turn limit", () => {
 	test("goes to Claude Code on the command line: the node's own, else the policy's", async () => {
 		const harness = fakeHarness(reportingScript("pass"));
-		const h = await startRun(
+		await walk(
 			sandbox,
 			withPolicy(
 				[agent("own", { maxTurns: 7 }), agent("policy")],
@@ -194,7 +181,6 @@ describe("the turn limit", () => {
 			),
 			{ harness },
 		);
-		await drive(h, { inputs: {} });
 		expect(harness.calls.map((c) => c.maxTurns)).toEqual([7, 9]);
 	});
 
@@ -203,16 +189,14 @@ describe("the turn limit", () => {
 			steps: [{ type: "text", text: "Still working." }],
 			outcome: { type: "finished", limit: "turns" },
 		});
-		const h = await startRun(
+		const { h } = await walk(
 			sandbox,
-			flowOf({
-				start: "worker",
-				nodes: [agent("worker", { maxTurns: 4 }), agent("fixer")],
-				edges: [edge("e1", "worker", "fail", "fixer")],
-			}),
+			flowOf(
+				[agent("worker", { maxTurns: 4 }), agent("fixer")],
+				[edge("e1", "worker", "fail", "fixer")],
+			),
 			{ harness },
 		);
-		await drive(h, { inputs: {} });
 		const logged = await h.events();
 		const message =
 			"The agent reached its limit of 4 turns, so the step stopped.";
@@ -236,16 +220,11 @@ describe("the turn limit", () => {
 				{ type: "wait", ms: 30_000 },
 			],
 		});
-		const h = await startRun(
+		const { h, parked } = await walk(
 			sandbox,
-			flowOf({
-				start: "worker",
-				nodes: [agent("worker", { harness: "opencode", maxTurns: 2 })],
-				edges: [],
-			}),
+			flowOf([agent("worker", { harness: "opencode", maxTurns: 2 })]),
 			{ harness, harnessName: "opencode" },
 		);
-		const { parked } = await drive(h, { inputs: {} });
 		const message =
 			"The agent reached its limit of 2 turns, so the step stopped.";
 		expect(parked[0]).toMatchObject({
@@ -272,11 +251,7 @@ describe("the turn limit", () => {
 		});
 		const h = await startRun(
 			sandbox,
-			flowOf({
-				start: "worker",
-				nodes: [agent("worker", { maxTurns: 4 })],
-				edges: [],
-			}),
+			flowOf([agent("worker", { maxTurns: 4 })]),
 			{ harness },
 		);
 		const runner = testRunner(h);
@@ -310,12 +285,11 @@ describe("the stall guard", () => {
 				{ type: "wait", ms: 30_000 },
 			],
 		});
-		const h = await startRun(
+		const { h, parked } = await walk(
 			sandbox,
 			withPolicy([agent("worker")], { idleMinutes: 1 }),
 			{ harness },
 		);
-		const { parked } = await drive(h, { inputs: {} });
 		const message =
 			"The agent showed no activity for 1 min, so the step stopped.";
 		const logged = await h.events();
@@ -332,12 +306,11 @@ describe("the stall guard", () => {
 
 	test("the node's own idle limit wins over the policy's", async () => {
 		const harness = fakeHarness(reportingScript("pass"));
-		const h = await startRun(
+		const { h } = await walk(
 			sandbox,
 			withPolicy([agent("worker", { idleMinutes: 3 })], { idleMinutes: 1 }),
 			{ harness },
 		);
-		await drive(h, { inputs: {} });
 		expect(payloads(await h.events(), "StepStarted")[0]?.idleMs).toBe(
 			3 * MINUTE,
 		);
@@ -354,12 +327,7 @@ describe("the loop guard", () => {
 				{ type: "wait", ms: 30_000 },
 			],
 		});
-		const h = await startRun(
-			sandbox,
-			flowOf({ start: "worker", nodes: [agent("worker")], edges: [] }),
-			{ harness },
-		);
-		await drive(h, { inputs: {} });
+		const { h } = await walk(sandbox, flowOf([agent("worker")]), { harness });
 		const logged = await h.events();
 		const message =
 			"The agent called Bash 3 times in a row with the same input, so the step stopped.";
@@ -382,12 +350,9 @@ describe("the loop guard", () => {
 				...(reportingScript("pass").steps ?? []),
 			],
 		});
-		const h = await startRun(
-			sandbox,
-			flowOf({ start: "worker", nodes: [agent("worker")], edges: [] }),
-			{ harness },
-		);
-		const { state } = await drive(h, { inputs: {} });
+		const { h, state } = await walk(sandbox, flowOf([agent("worker")]), {
+			harness,
+		});
 		expect(state.ended?.status).toBe("finished");
 		expect(payloads(await h.events(), "RunWarned")).toEqual([]);
 	});

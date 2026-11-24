@@ -242,6 +242,13 @@ export function lifetimeOf(db: Database): AbortController {
 	return lifetime;
 }
 
+const endings = new WeakMap<Database, (() => Promise<void>)[]>();
+
+/** The sandbox of this database does `end` first when it is cleaned up. */
+export function endsWith(db: Database, end: () => Promise<void>): void {
+	endings.set(db, [...(endings.get(db) ?? []), end]);
+}
+
 export type Sandbox = {
 	root: string;
 	repoPath: string;
@@ -315,6 +322,7 @@ export async function createSandbox(): Promise<Sandbox> {
 		spaceId: await localSpaceId(db),
 		openDocument: () => openDeviceDocument({ db, deviceId }),
 		cleanup: async () => {
+			for (const end of endings.get(db) ?? []) await end();
 			lifetimeOf(db).abort();
 			await rm(root, { recursive: true, force: true });
 		},

@@ -1,28 +1,28 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { Command } from "@langchain/langgraph";
 import { step } from "@nightshift/db/schema";
+import type { CommandNode } from "@nightshift/flows";
 import { eq } from "drizzle-orm";
 import { createArtifactStore } from "../../../artifacts/store";
 import { foldRun } from "../../../log";
 import { readTranscriptFile } from "../../../log/transcript/transcripts";
 import { deriveSteps } from "../../../read/run-views";
 import {
+	command,
 	drive,
+	edge,
 	flowOf,
 	held,
 	payloads,
+	resume,
 	startRun,
+	walk,
 } from "../../../testing/graph";
 import { testKnowledge } from "../../../testing/knowledge";
-import {
-	connectionsOf,
-	createSandbox,
-	type Sandbox,
-	TEST_DEVICE_ID,
-} from "../../../testing/test-support";
+import { sandboxPerTest } from "../../../testing/sandbox-per-test";
+import { connectionsOf, TEST_DEVICE_ID } from "../../../testing/test-support";
 
 /**
  * The Command node on the compiled graph, with a real shell, run log and
@@ -30,43 +30,17 @@ import {
  * with what the engine writes today (engine.test.ts "a command step").
  */
 
-const command = (
-	id: string,
-	cmd: string,
-	extra: Record<string, unknown> = {},
-) => ({
-	id,
-	type: "command" as const,
-	position: { x: 0, y: 0 },
-	command: cmd,
-	...extra,
-});
-
-let sandbox: Sandbox;
-beforeEach(async () => {
-	sandbox = await createSandbox();
-});
-/** The knowledge search indexes a test opened. */
-const closes: (() => void)[] = [];
-afterEach(async () => {
-	for (const close of closes.splice(0)) close();
-	await sandbox.cleanup();
-});
+const sandbox = sandboxPerTest();
 
 describe("the Command node", () => {
 	test("exit 0 passes: the log, the transcript, the log file and the state are as the engine writes them", async () => {
-		const h = await startRun(
+		const { h, parked, events, state, next } = await walk(
 			sandbox,
-			flowOf({
+			flowOf([command("ship", 'echo "shipped: {{task}}"')], [], {
 				inputs: [{ name: "task" }],
-				start: "ship",
-				nodes: [command("ship", 'echo "shipped: {{task}}"')],
-				edges: [],
 			}),
+			{ inputs: { task: "the thing" } },
 		);
-		const { parked, events, state, next } = await drive(h, {
-			inputs: { task: "the thing" },
-		});
 		expect(parked).toEqual([]);
 		expect(next).toEqual([]);
 		expect(await h.types()).toEqual(["RunStarted", "StepStarted", "StepEnded"]);
@@ -159,18 +133,16 @@ describe("the Command node", () => {
 	});
 
 	test("a non-zero exit fails with the exit code and the tail of both streams, and takes the fail edge", async () => {
-		const h = await startRun(
+		const { h, parked, state } = await walk(
 			sandbox,
-			flowOf({
-				start: "check",
-				nodes: [
+			flowOf(
+				[
 					command("check", "echo attempt; echo oops >&2; exit 3"),
 					command("fixed", "true"),
 				],
-				edges: [{ id: "e1", from: "check", outcome: "fail", to: "fixed" }],
-			}),
+				[edge("e1", "check", "fail", "fixed")],
+			),
 		);
-		const { parked, state } = await drive(h, { inputs: {} });
 		expect(parked).toEqual([]);
 		expect(state.ended?.nodeId).toBe("fixed");
 
@@ -207,11 +179,10 @@ describe("the Command node", () => {
 	});
 
 	test("a failure without an edge parks the run as failed, with today's reason", async () => {
-		const h = await startRun(
+		const { h, parked, next, state } = await walk(
 			sandbox,
-			flowOf({ start: "check", nodes: [command("check", "false")], edges: [] }),
+			flowOf([command("check", "false")]),
 		);
-		const { parked, next, state } = await drive(h, { inputs: {} });
 		const [check] = deriveSteps(foldRun(await h.events()));
 		expect(next).toEqual(["park__check"]);
 		expect(parked).toEqual([
@@ -237,11 +208,7 @@ describe("the Command node", () => {
 		const controller = new AbortController();
 		const h = await startRun(
 			sandbox,
-			flowOf({
-				start: "slow",
-				nodes: [command("slow", "echo started; sleep 30")],
-				edges: [],
-			}),
+			flowOf([command("slow", "echo started; sleep 30")]),
 			{ signal: controller.signal },
 		);
 		setTimeout(() => controller.abort(), 200);
@@ -280,15 +247,10 @@ describe("the Command node", () => {
 	});
 
 	test("a parked command resumes as a new visit", async () => {
-		const h = await startRun(
+		const { h, ...first } = await walk(
 			sandbox,
-			flowOf({
-				start: "check",
-				nodes: [command("check", "test -f fixed")],
-				edges: [],
-			}),
+			flowOf([command("check", "test -f fixed")]),
 		);
-		const first = await drive(h, { inputs: {} });
 		expect(first.parked[0]).toMatchObject({ status: "failed" });
 		await Bun.write(join(sandbox.repoPath, "fixed"), "");
 		await h.log.append({
@@ -297,11 +259,7 @@ describe("the Command node", () => {
 			payload: { nodeId: "check", stepId: null, prompt: null, by: "person" },
 		});
 		// A new compile over the same saver: a new daemon.
-		const resumed = await drive(
-			h,
-			new Command({ resume: { kind: "resume" } }),
-			h.graph(),
-		);
+		const resumed = await resume(h, { kind: "resume" }, h.graph());
 		expect(resumed.state.ended?.status).toBe("finished");
 		expect(
 			deriveSteps(foldRun(await h.events())).map((s) => [s.visit, s.outcome]),
@@ -313,11 +271,10 @@ describe("the Command node", () => {
 	});
 
 	test("output json: what the command prints is `data`, and a later node reads a path into it", async () => {
-		const h = await startRun(
+		const { h, parked, state } = await walk(
 			sandbox,
-			flowOf({
-				start: "check",
-				nodes: [
+			flowOf(
+				[
 					command("check", `echo '{"tests": 3, "names": ["a", "b"]}'`, {
 						stdout: "json",
 					}),
@@ -326,10 +283,9 @@ describe("the Command node", () => {
 						`echo "{{check.data.tests}}:{{check.data.names.1}}"`,
 					),
 				],
-				edges: [{ id: "e1", from: "check", outcome: "pass", to: "report" }],
-			}),
+				[edge("e1", "check", "pass", "report")],
+			),
 		);
-		const { parked, state } = await drive(h, { inputs: {} });
 		expect(parked).toEqual([]);
 		expect(state.ended?.nodeId).toBe("report");
 		const logged = await h.events();
@@ -350,18 +306,16 @@ describe("the Command node", () => {
 	});
 
 	test("output json: output that is not JSON fails the step with a plain reason", async () => {
-		const h = await startRun(
+		const { h, parked, state } = await walk(
 			sandbox,
-			flowOf({
-				start: "check",
-				nodes: [
+			flowOf(
+				[
 					command("check", "echo not json", { stdout: "json" }),
 					command("after", "true"),
 				],
-				edges: [{ id: "e1", from: "check", outcome: "fail", to: "after" }],
-			}),
+				[edge("e1", "check", "fail", "after")],
+			),
 		);
-		const { parked, state } = await drive(h, { inputs: {} });
 		expect(parked).toEqual([]);
 		expect(state.ended?.nodeId).toBe("after");
 		const logged = await h.events();
@@ -378,34 +332,21 @@ describe("the Command node", () => {
 	});
 
 	test("output text keeps stdout out of the outputs", async () => {
-		const h = await startRun(
+		const { h } = await walk(
 			sandbox,
-			flowOf({
-				start: "check",
-				nodes: [command("check", `echo '{"a": 1}'`)],
-				edges: [],
-			}),
+			flowOf([command("check", `echo '{"a": 1}'`)]),
 		);
-		await drive(h, { inputs: {} });
 		const [ended] = payloads(await h.events(), "StepEnded");
 		expect(ended?.outputs).not.toHaveProperty("data");
 	});
 
 	test("the command gets the project's knowledge folder in NS_KNOWLEDGE", async () => {
-		const { knowledge, folder, close } = testKnowledge(sandbox);
-		closes.push(close);
-		const h = await startRun(
+		const { knowledge, folder } = testKnowledge(sandbox);
+		await walk(
 			sandbox,
-			flowOf({
-				start: "sync",
-				nodes: [
-					command("sync", 'printf "# Home\\n" > "$NS_KNOWLEDGE/home.md"'),
-				],
-				edges: [],
-			}),
+			flowOf([command("sync", 'printf "# Home\\n" > "$NS_KNOWLEDGE/home.md"')]),
 			{ knowledge },
 		);
-		await drive(h, { inputs: {} });
 		expect(await readFile(join(folder("project-1"), "home.md"), "utf8")).toBe(
 			"# Home\n",
 		);
@@ -414,11 +355,7 @@ describe("the Command node", () => {
 	test("the files the command puts in NS_ARTIFACTS become artifacts of its step", async () => {
 		const h = await startRun(
 			sandbox,
-			flowOf({
-				start: "design",
-				nodes: [command("design", 'printf png > "$NS_ARTIFACTS/frame.png"')],
-				edges: [],
-			}),
+			flowOf([command("design", 'printf png > "$NS_ARTIFACTS/frame.png"')]),
 		);
 		const store = createArtifactStore(sandbox.dataDir);
 		h.local.artifacts = store;
@@ -497,17 +434,13 @@ describe("the Command node", () => {
 			const h = withSecrets(
 				await startRun(
 					sandbox,
-					flowOf({
-						start: "login",
-						nodes: [
-							command(
-								"login",
-								`printf '{"token": "%s"}' "$API_PASSWORD" > "$NS_OUTPUT"`,
-								{ secrets: ["API_PASSWORD"] },
-							),
-						],
-						edges: [],
-					}),
+					flowOf([
+						command(
+							"login",
+							`printf '{"token": "%s"}' "$API_PASSWORD" > "$NS_OUTPUT"`,
+							{ secrets: ["API_PASSWORD"] },
+						),
+					]),
 				),
 			);
 			const { parked, state } = await drive(h, { inputs: {} });
@@ -520,15 +453,11 @@ describe("the Command node", () => {
 			const h = withSecrets(
 				await startRun(
 					sandbox,
-					flowOf({
-						start: "login",
-						nodes: [
-							command("login", `touch ${marker}`, {
-								secrets: ["API_USER", "API_SUPPORT_PASSWORD"],
-							}),
-						],
-						edges: [],
-					}),
+					flowOf([
+						command("login", `touch ${marker}`, {
+							secrets: ["API_USER", "API_SUPPORT_PASSWORD"],
+						}),
+					]),
 				),
 			);
 			const { parked } = await drive(h, { inputs: {} });
@@ -556,20 +485,13 @@ describe("the Command node", () => {
 		];
 
 		test("the exit code picks its exit and that edge", async () => {
-			const h = await startRun(
+			const { h, parked, state } = await walk(
 				sandbox,
-				flowOf({
-					start: "check",
-					nodes: [
-						command("check", "exit 127", { exits }),
-						command("install", "true"),
-					],
-					edges: [
-						{ id: "e1", from: "check", outcome: "not-found", to: "install" },
-					],
-				}),
+				flowOf(
+					[command("check", "exit 127", { exits }), command("install", "true")],
+					[edge("e1", "check", "not-found", "install")],
+				),
 			);
-			const { parked, state } = await drive(h, { inputs: {} });
 			expect(parked).toEqual([]);
 			expect(state.ended?.nodeId).toBe("install");
 			expect(payloads(await h.events(), "StepEnded")[0]).toEqual({
@@ -585,33 +507,23 @@ describe("the Command node", () => {
 		});
 
 		test("a code without an exit ends on the catch-all", async () => {
-			const h = await startRun(
+			const { state } = await walk(
 				sandbox,
-				flowOf({
-					start: "check",
-					nodes: [
-						command("check", "exit 4", { exits }),
-						command("after", "true"),
-					],
-					edges: [{ id: "e1", from: "check", outcome: "other", to: "after" }],
-				}),
+				flowOf(
+					[command("check", "exit 4", { exits }), command("after", "true")],
+					[edge("e1", "check", "other", "after")],
+				),
 			);
-			const { state } = await drive(h, { inputs: {} });
 			expect(state.ended?.nodeId).toBe("after");
 			expect(state.nodes.check?.outcome).toBe("other");
 			expect(state.nodes.check?.exit_code).toBe(4);
 		});
 
 		test("exit 0 without an edge finishes the run; another exit without an edge fails it", async () => {
-			const ok = await startRun(
+			const passed = await walk(
 				sandbox,
-				flowOf({
-					start: "check",
-					nodes: [command("check", "true", { exits })],
-					edges: [],
-				}),
+				flowOf([command("check", "true", { exits })]),
 			);
-			const passed = await drive(ok, { inputs: {} });
 			expect(passed.parked).toEqual([]);
 			expect(passed.state.ended).toMatchObject({
 				status: "finished",
@@ -619,15 +531,10 @@ describe("the Command node", () => {
 				reason: null,
 			});
 
-			const bad = await startRun(
+			const failed = await walk(
 				sandbox,
-				flowOf({
-					start: "check",
-					nodes: [command("check", "exit 127", { exits })],
-					edges: [],
-				}),
+				flowOf([command("check", "exit 127", { exits })]),
 			);
-			const failed = await drive(bad, { inputs: {} });
 			expect(failed.parked[0]).toMatchObject({
 				status: "failed",
 				reason:
@@ -636,19 +543,14 @@ describe("the Command node", () => {
 		});
 
 		test("without a catch-all, a code that is not listed errors the step", async () => {
-			const h = await startRun(
+			const { parked } = await walk(
 				sandbox,
-				flowOf({
-					start: "check",
-					nodes: [
-						command("check", "exit 5", {
-							exits: [{ name: "success", code: 0 }],
-						}),
-					],
-					edges: [],
-				}),
+				flowOf([
+					command("check", "exit 5", {
+						exits: [{ name: "success", code: 0 }],
+					}),
+				]),
 			);
-			const { parked } = await drive(h, { inputs: {} });
 			expect(parked[0]).toMatchObject({
 				status: "failed",
 				reason:
@@ -657,18 +559,16 @@ describe("the Command node", () => {
 		});
 
 		test("output json that is not JSON ends on the catch-all", async () => {
-			const h = await startRun(
+			const { h, state } = await walk(
 				sandbox,
-				flowOf({
-					start: "check",
-					nodes: [
+				flowOf(
+					[
 						command("check", "echo not json", { stdout: "json", exits }),
 						command("after", "true"),
 					],
-					edges: [{ id: "e1", from: "check", outcome: "other", to: "after" }],
-				}),
+					[edge("e1", "check", "other", "after")],
+				),
 			);
-			const { state } = await drive(h, { inputs: {} });
 			expect(state.ended?.nodeId).toBe("after");
 			const [ended] = payloads(await h.events(), "StepEnded");
 			expect(ended).toMatchObject({
@@ -680,21 +580,19 @@ describe("the Command node", () => {
 
 	describe("NS_OUTPUT", () => {
 		test("the JSON the command writes there is `data`; stdout stays the log", async () => {
-			const h = await startRun(
+			const { h, parked, state } = await walk(
 				sandbox,
-				flowOf({
-					start: "check",
-					nodes: [
+				flowOf(
+					[
 						command(
 							"check",
 							`echo "counting"; echo '{"tests": 3}' > "$NS_OUTPUT"; echo done`,
 						),
 						command("report", `echo "{{check.data.tests}}"`),
 					],
-					edges: [{ id: "e1", from: "check", outcome: "pass", to: "report" }],
-				}),
+					[edge("e1", "check", "pass", "report")],
+				),
 			);
-			const { parked, state } = await drive(h, { inputs: {} });
 			expect(parked).toEqual([]);
 			expect(state.nodes.check?.data).toEqual({ tests: 3 });
 			expect(state.nodes.check?.log_tail).toBe("counting\ndone");
@@ -704,11 +602,10 @@ describe("the Command node", () => {
 		});
 
 		test("the file wins over stdout with output json; an empty file leaves stdout", async () => {
-			const h = await startRun(
+			const { state } = await walk(
 				sandbox,
-				flowOf({
-					start: "file",
-					nodes: [
+				flowOf(
+					[
 						command(
 							"file",
 							`echo '{"from": "stdout"}'; echo '{"from": "file"}' > "$NS_OUTPUT"`,
@@ -718,10 +615,9 @@ describe("the Command node", () => {
 							stdout: "json",
 						}),
 					],
-					edges: [{ id: "e1", from: "file", outcome: "pass", to: "printed" }],
-				}),
+					[edge("e1", "file", "pass", "printed")],
+				),
 			);
-			const { state } = await drive(h, { inputs: {} });
 			expect(state.nodes.file?.data).toEqual({ from: "file" });
 			expect(state.nodes.printed?.data).toEqual({ from: "stdout" });
 		});
@@ -737,15 +633,10 @@ describe("the Command node", () => {
 					text: "high",
 				},
 			});
-			const h = await startRun(
+			const { h, parked } = await walk(
 				sandbox,
-				flowOf({
-					start: "replicate",
-					nodes: [command("replicate", `echo '${data}' > "$NS_OUTPUT"`)],
-					edges: [],
-				}),
+				flowOf([command("replicate", `echo '${data}' > "$NS_OUTPUT"`)]),
 			);
-			const { parked } = await drive(h, { inputs: {} });
 			expect(parked).toEqual([]);
 			const logged = await h.events();
 			const [derived] = deriveSteps(foldRun(logged));
@@ -781,21 +672,19 @@ describe("the Command node", () => {
 		});
 
 		test("each step gets a new, empty file of its own, and it goes when the step ends", async () => {
-			const h = await startRun(
+			const { parked, state } = await walk(
 				sandbox,
-				flowOf({
-					start: "first",
-					nodes: [
+				flowOf(
+					[
 						command(
 							"first",
 							`echo "$NS_OUTPUT"; echo '{"n": 1}' > "$NS_OUTPUT"`,
 						),
 						command("second", `test ! -s "$NS_OUTPUT" && echo "$NS_OUTPUT"`),
 					],
-					edges: [{ id: "e1", from: "first", outcome: "pass", to: "second" }],
-				}),
+					[edge("e1", "first", "pass", "second")],
+				),
 			);
-			const { parked, state } = await drive(h, { inputs: {} });
 			expect(parked).toEqual([]);
 			const first = String(state.nodes.first?.log_tail);
 			const second = String(state.nodes.second?.log_tail);
@@ -806,18 +695,16 @@ describe("the Command node", () => {
 		});
 
 		test("a file that is not JSON ends on the catch-all, whatever output says", async () => {
-			const h = await startRun(
+			const { h, state } = await walk(
 				sandbox,
-				flowOf({
-					start: "check",
-					nodes: [
+				flowOf(
+					[
 						command("check", `echo 'count=3' > "$NS_OUTPUT"`),
 						command("after", "true"),
 					],
-					edges: [{ id: "e1", from: "check", outcome: "fail", to: "after" }],
-				}),
+					[edge("e1", "check", "fail", "after")],
+				),
 			);
-			const { state } = await drive(h, { inputs: {} });
 			expect(state.ended?.nodeId).toBe("after");
 			expect(payloads(await h.events(), "StepEnded")[0]).toMatchObject({
 				outcome: "fail",
@@ -827,7 +714,7 @@ describe("the Command node", () => {
 	});
 
 	describe("data.outcome", () => {
-		const exits = [
+		const exits: CommandNode["exits"] = [
 			{ name: "created", code: 0 },
 			{ name: "exists", code: "data" },
 			{ name: "failure", code: 1 },
@@ -836,18 +723,17 @@ describe("the Command node", () => {
 		const pick = (cmd: string) =>
 			startRun(
 				sandbox,
-				flowOf({
-					start: "branch",
-					nodes: [
+				flowOf(
+					[
 						command("branch", cmd, { exits }),
 						command("reuse", "true"),
 						command("fix", "true"),
 					],
-					edges: [
-						{ id: "e1", from: "branch", outcome: "exists", to: "reuse" },
-						{ id: "e2", from: "branch", outcome: "failure", to: "fix" },
+					[
+						edge("e1", "branch", "exists", "reuse"),
+						edge("e2", "branch", "failure", "fix"),
 					],
-				}),
+				),
 			);
 
 		test("data that names an exit ends on it and takes its edge", async () => {
@@ -879,37 +765,27 @@ describe("the Command node", () => {
 		});
 
 		test("stdout JSON with output json picks too", async () => {
-			const h = await startRun(
+			const { state } = await walk(
 				sandbox,
-				flowOf({
-					start: "branch",
-					nodes: [
-						command("branch", `echo '{"outcome": "exists"}'`, {
-							exits,
-							stdout: "json",
-						}),
-					],
-					edges: [],
-				}),
+				flowOf([
+					command("branch", `echo '{"outcome": "exists"}'`, {
+						exits,
+						stdout: "json",
+					}),
+				]),
 			);
-			const { state } = await drive(h, { inputs: {} });
 			expect(state.nodes.branch?.outcome).toBe("exists");
 		});
 
 		test("an exit only data picks ends the run as chosen when it has no edge", async () => {
-			const h = await startRun(
+			const { parked, state } = await walk(
 				sandbox,
-				flowOf({
-					start: "branch",
-					nodes: [
-						command("branch", `echo '{"outcome": "exists"}' > "$NS_OUTPUT"`, {
-							exits,
-						}),
-					],
-					edges: [],
-				}),
+				flowOf([
+					command("branch", `echo '{"outcome": "exists"}' > "$NS_OUTPUT"`, {
+						exits,
+					}),
+				]),
 			);
-			const { parked, state } = await drive(h, { inputs: {} });
 			expect(parked).toEqual([]);
 			expect(state.ended).toMatchObject({
 				status: "finished",
@@ -928,18 +804,14 @@ describe("the Command node", () => {
 
 		test("a node without a schema gives the shape of its data, and the Walker keeps it", async () => {
 			const kept: unknown[] = [];
-			const h = await startRun(
+			const { h } = await walk(
 				sandbox,
-				flowOf({
-					start: "check",
-					nodes: [
-						command(
-							"check",
-							`echo '{"tests": 3, "outcome": "pass", "names": ["a"]}' > "$NS_OUTPUT"`,
-						),
-					],
-					edges: [],
-				}),
+				flowOf([
+					command(
+						"check",
+						`echo '{"tests": 3, "outcome": "pass", "names": ["a"]}' > "$NS_OUTPUT"`,
+					),
+				]),
 				{
 					flowName: "nightly",
 					keepShapes: async (flow, node, shapes) => {
@@ -947,7 +819,6 @@ describe("the Command node", () => {
 					},
 				},
 			);
-			await drive(h, { inputs: {} });
 			const shapes = {
 				data: {
 					type: "object",
@@ -980,25 +851,16 @@ describe("the Command node", () => {
 			};
 			const data = `echo '{"tests": 3}' > "$NS_OUTPUT"`;
 			const runs = [
+				await startRun(sandbox, flowOf([command("a", data)]), { keepShapes }),
 				await startRun(
 					sandbox,
-					flowOf({ start: "a", nodes: [command("a", data)], edges: [] }),
-					{ keepShapes },
-				),
-				await startRun(
-					sandbox,
-					flowOf({
-						start: "a",
-						nodes: [command("a", data, { output: schema })],
-						edges: [],
-					}),
+					flowOf([command("a", data, { output: schema })]),
 					{ flowName: "nightly", keepShapes },
 				),
-				await startRun(
-					sandbox,
-					flowOf({ start: "a", nodes: [command("a", "true")], edges: [] }),
-					{ flowName: "nightly", keepShapes },
-				),
+				await startRun(sandbox, flowOf([command("a", "true")]), {
+					flowName: "nightly",
+					keepShapes,
+				}),
 			];
 			for (const h of runs) {
 				await drive(h, { inputs: {} });
@@ -1010,19 +872,14 @@ describe("the Command node", () => {
 		});
 
 		test("data that does not fit a schema a person wrote errors the step", async () => {
-			const h = await startRun(
+			const { h, parked } = await walk(
 				sandbox,
-				flowOf({
-					start: "check",
-					nodes: [
-						command("check", `echo '{"tests": "three"}' > "$NS_OUTPUT"`, {
-							output: schema,
-						}),
-					],
-					edges: [],
-				}),
+				flowOf([
+					command("check", `echo '{"tests": "three"}' > "$NS_OUTPUT"`, {
+						output: schema,
+					}),
+				]),
 			);
-			const { parked } = await drive(h, { inputs: {} });
 			expect(parked).toHaveLength(1);
 			const [ended] = payloads(await h.events(), "StepEnded");
 			expect(ended?.outcome).toBe("error");
@@ -1032,20 +889,15 @@ describe("the Command node", () => {
 		});
 
 		test("data that does not fit an inferred schema warns, and the step goes on", async () => {
-			const h = await startRun(
+			const { h, parked, state } = await walk(
 				sandbox,
-				flowOf({
-					start: "check",
-					nodes: [
-						command("check", `echo '{"tests": "three"}' > "$NS_OUTPUT"`, {
-							output: schema,
-							outputInferred: true,
-						}),
-					],
-					edges: [],
-				}),
+				flowOf([
+					command("check", `echo '{"tests": "three"}' > "$NS_OUTPUT"`, {
+						output: schema,
+						outputInferred: true,
+					}),
+				]),
 			);
-			const { parked, state } = await drive(h, { inputs: {} });
 			expect(parked).toEqual([]);
 			expect(state.nodes.check?.outcome).toBe("pass");
 			const logged = await h.events();
@@ -1061,21 +913,16 @@ describe("the Command node", () => {
 		});
 
 		test("the keys the data may always hold do not break a schema", async () => {
-			const h = await startRun(
+			const { state } = await walk(
 				sandbox,
-				flowOf({
-					start: "check",
-					nodes: [
-						command(
-							"check",
-							`echo '{"tests": 3, "outcome": "pass", "scores": {"found": 1}}' > "$NS_OUTPUT"`,
-							{ output: { ...schema, additionalProperties: false } },
-						),
-					],
-					edges: [],
-				}),
+				flowOf([
+					command(
+						"check",
+						`echo '{"tests": 3, "outcome": "pass", "scores": {"found": 1}}' > "$NS_OUTPUT"`,
+						{ output: { ...schema, additionalProperties: false } },
+					),
+				]),
 			);
-			const { state } = await drive(h, { inputs: {} });
 			expect(state.nodes.check?.outcome).toBe("pass");
 		});
 	});

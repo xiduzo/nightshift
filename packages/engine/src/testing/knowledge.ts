@@ -14,6 +14,7 @@ import {
 	type KnowledgeFolderLocks,
 } from "../knowledge/sync";
 import { yjsKnowledgeDocuments } from "../knowledge/sync/adapters/out/yjs-knowledge-documents";
+import { endsWith } from "./test-support";
 
 type KnowledgeDeps = Parameters<typeof wireKnowledge>[0];
 
@@ -23,8 +24,8 @@ type KnowledgeDeps = Parameters<typeof wireKnowledge>[0];
  * writes as another computer would: the knowledge documents (`documents`, and
  * `persisted` to sync one as a Link does), the folder of a project and its
  * Space archive (`archive`, a new one unless the test
- * gives the one of its peer engine). `close` ends the Knowledge. Content
- * stays on this computer until the archive is connected to the Hosts.
+ * gives the one of its peer engine). The Knowledge ends with the sandbox;
+ * `close` ends it sooner. Content stays on this computer until the archive is connected to the Hosts.
  */
 export function testKnowledge(
 	sandbox: { db: Database; dataDir: string; deviceId: string },
@@ -79,6 +80,7 @@ export function testKnowledge(
 		notifications,
 		...rest,
 	});
+	endsWith(sandbox.db, async () => knowledge.close());
 	return {
 		knowledge,
 		documents: yjsKnowledgeDocuments({

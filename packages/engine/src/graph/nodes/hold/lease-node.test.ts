@@ -1,5 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { Command } from "@langchain/langgraph";
+import { beforeEach, describe, expect, test } from "bun:test";
 import type { LeaseNode } from "@nightshift/flows";
 import { HostUnreachableError } from "../../../contract";
 import { createLeaseKeeper, createLeaseStore } from "../../../leases";
@@ -11,9 +10,10 @@ import {
 	type Harness,
 	MINUTE,
 	payloads,
+	resume,
 	startRun,
 } from "../../../testing/graph";
-import { createSandbox, type Sandbox } from "../../../testing/test-support";
+import { sandboxPerTest } from "../../../testing/sandbox-per-test";
 import type { LeaseTaker } from "../../context/context";
 
 /**
@@ -30,14 +30,10 @@ const lease = (extra: Partial<LeaseNode> = {}): LeaseNode => ({
 	...extra,
 });
 
-let sandbox: Sandbox;
+const sandbox = sandboxPerTest();
 let now: number;
 beforeEach(async () => {
-	sandbox = await createSandbox();
 	now = 1_000_000;
-});
-afterEach(async () => {
-	await sandbox.cleanup();
 });
 
 /** The keeper of the engine, over the sandbox's store: this Replica keeps the Space. */
@@ -136,20 +132,12 @@ describe("the Lease node", () => {
 		});
 
 		now += MINUTE;
-		const second = await drive(
-			h,
-			new Command({ resume: { kind: "wake", early: false } }),
-			h.graph(),
-		);
+		const second = await resume(h, { kind: "wake", early: false }, h.graph());
 		expect(second.parked[0]).toMatchObject({ reason: "lease" });
 
 		await leases.release("other");
 		now += 2 * MINUTE;
-		const third = await drive(
-			h,
-			new Command({ resume: { kind: "wake", early: false } }),
-			h.graph(),
-		);
+		const third = await resume(h, { kind: "wake", early: false }, h.graph());
 		expect(third.outcome.kind).toBe("ended");
 		const [step] = deriveSteps(foldRun(await h.events()));
 		expect(step).toMatchObject({
@@ -167,22 +155,14 @@ describe("the Lease node", () => {
 		const h = await leaseRun(lease({ waitMinutes: 2 }), leases);
 		await drive(h, { inputs: { branch: "feature/x" } });
 		now += MINUTE;
-		const second = await drive(
-			h,
-			new Command({ resume: { kind: "wake", early: false } }),
-			h.graph(),
-		);
+		const second = await resume(h, { kind: "wake", early: false }, h.graph());
 		// The next ask is at the end of the wait.
 		expect(second.parked[0]).toMatchObject({
 			reason: "lease",
 			until: 1_000_000 + 2 * MINUTE,
 		});
 		now += MINUTE;
-		await drive(
-			h,
-			new Command({ resume: { kind: "wake", early: false } }),
-			h.graph(),
-		);
+		await resume(h, { kind: "wake", early: false }, h.graph());
 		const [step] = deriveSteps(foldRun(await h.events()));
 		expect(step).toMatchObject({
 			outcome: "busy",
@@ -215,11 +195,7 @@ describe("the Lease node", () => {
 			'Waits for the computer that keeps this Space, to take the lease "branch:feature/x".',
 		);
 		now += 3 * MINUTE;
-		const second = await drive(
-			h,
-			new Command({ resume: { kind: "wake", early: false } }),
-			h.graph(),
-		);
+		const second = await resume(h, { kind: "wake", early: false }, h.graph());
 		expect(second.parked[0]).toMatchObject({
 			reason: "lease",
 			until: now + MINUTE,
@@ -227,13 +203,7 @@ describe("the Lease node", () => {
 		reachable = true;
 		now += MINUTE;
 		expect(
-			(
-				await drive(
-					h,
-					new Command({ resume: { kind: "wake", early: false } }),
-					h.graph(),
-				)
-			).outcome.kind,
+			(await resume(h, { kind: "wake", early: false }, h.graph())).outcome.kind,
 		).toBe("ended");
 	});
 

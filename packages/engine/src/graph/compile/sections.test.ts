@@ -1,9 +1,9 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import type { Flow } from "@nightshift/flows";
 import { foldRun } from "../../log";
 import { deriveSteps } from "../../read/run-views";
-import { command, drive, edge, flowOf, startRun } from "../../testing/graph";
-import { createSandbox, type Sandbox } from "../../testing/test-support";
+import { command, edge, flowOf, startRun, walk } from "../../testing/graph";
+import { sandboxPerTest } from "../../testing/sandbox-per-test";
 import { compileFlow } from "./compile";
 
 /**
@@ -12,13 +12,7 @@ import { compileFlow } from "./compile";
  * the same steps as the flow without.
  */
 
-let sandbox: Sandbox;
-beforeEach(async () => {
-	sandbox = await createSandbox();
-});
-afterEach(async () => {
-	await sandbox.cleanup();
-});
+const sandbox = sandboxPerTest();
 
 const plain = flowOf(
 	[command("build", "true"), command("check", "true"), command("fix", "true")],
@@ -52,8 +46,7 @@ describe("Sections", () => {
 
 	test("run the same steps", async () => {
 		const runOf = async (flow: Flow) => {
-			const h = await startRun(sandbox, flow);
-			const { parked, next } = await drive(h, { inputs: {} });
+			const { h, parked, next } = await walk(sandbox, flow);
 			const events = await h.events();
 			return {
 				parked,
