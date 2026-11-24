@@ -214,3 +214,14 @@ Each entry names its source. "Read" means found by reading and not reproduced.
   11 of 12 mutants are red. The last is a dialog that a viewer cannot open.
 - Not seen in a browser. New flow, Import, Delete flow, Save in the editor, project Rename,
   Move and Remove, and Copy from GitHub are still enabled for a viewer.
+
+### P1a. Dead code of devices (84f852e3a, 9b0f6ec61, 5b0a22f9a)
+
+- Ten dead forwards and two barrel aliases are gone: 28 files, +9/-247.
+- Placement: 35 of 64 mutants stayed green over seven suites. A new test of the use case
+  catches 32. Three are left, read as equivalent or not reachable.
+- Membership: 48 of 107 mutants stay green over the merge and split suites. Other suites were
+  not tried, and some of the 48 are equivalent. Tests come before a change of its shape.
+- None of create-placement, create-home-membership, merge-steps and split-steps is a use
+  case. The proposed shape: five requests for placement, seven for membership, shared steps
+  in `domain/`. Not built.
