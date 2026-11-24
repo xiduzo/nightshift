@@ -36,7 +36,7 @@ import { MoveProjectDialog, RenameProjectDialog } from "./project-actions";
 import { ProjectClonesDialog } from "./project-clones-dialog";
 import { projectFolder } from "./projects";
 import { projectMutations } from "./queries";
-import { useMayChange } from "./use-may-change";
+import { useMayChange, useMayMoveOrRemove } from "./use-may-change";
 
 /**
  * The ⋯ menu of a project: the computers that have it, its folder here,
@@ -56,6 +56,7 @@ export function ProjectMenu({
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
 	const mayChange = useMayChange();
+	const mayMoveOrRemove = useMayMoveOrRemove();
 	const folder = useChooseProjectFolder(project);
 	const withFolder = hasFolder(project);
 	const [dialog, setDialog] = useState<
@@ -116,7 +117,7 @@ export function ProjectMenu({
 						Rename…
 					</DropdownMenuItem>
 					<DropdownMenuItem
-						disabled={!mayChange}
+						disabled={!mayMoveOrRemove}
 						onClick={() => setDialog("move")}
 					>
 						<ArrowRightLeftIcon aria-hidden="true" />
@@ -125,7 +126,7 @@ export function ProjectMenu({
 					<DropdownMenuSeparator />
 					<DropdownMenuItem
 						variant="destructive"
-						disabled={!mayChange || remove.isPending}
+						disabled={!mayMoveOrRemove || remove.isPending}
 						onClick={() => setDialog("remove")}
 					>
 						<Trash2Icon aria-hidden="true" />

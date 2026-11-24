@@ -13,8 +13,8 @@ import { toast } from "sonner";
 import { PageSection } from "@/shared/page";
 import { spaceMutations, spaceQueries } from "./queries";
 
-/** An owner can do everything an admin can, so both may set this. */
-function isSpaceAdmin(role: string | null | undefined): boolean {
+/** An owner can do everything an admin can: the Space settings, and the move and remove of a project. */
+export function isSpaceAdmin(role: string | null | undefined): boolean {
 	return role === "owner" || role === "admin";
 }
 

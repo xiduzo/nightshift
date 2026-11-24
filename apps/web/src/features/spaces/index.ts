@@ -5,5 +5,5 @@ export { MembersPage } from "./members-page";
 export { spaceQueries } from "./queries";
 export { SpaceSwitcher } from "./space-switcher";
 export { SpaceTabs } from "./space-tabs";
-export { SpaceUsageSection } from "./space-usage";
+export { isSpaceAdmin, SpaceUsageSection } from "./space-usage";
 export { useSwitchSpace } from "./use-switch-space";

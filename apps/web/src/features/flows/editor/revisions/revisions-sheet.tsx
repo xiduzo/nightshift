@@ -39,6 +39,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { EyeIcon, HistoryIcon, RotateCcwIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { useMayChange } from "@/features/projects";
 import type { FlowRevisionItem } from "@/shared/api";
 import { formatDateTime } from "@/shared/format";
 import { LocalTime } from "@/shared/time";
@@ -233,6 +234,7 @@ function RevisionDetail({
 	onShow: (revision: RevisionOnCanvas) => void;
 	onRestored: (flow: Flow, issues: FlowIssue[]) => void;
 }) {
+	const mayChange = useMayChange();
 	const view = useQuery(
 		flowQueries.revision(projectId, name, item.id, previous?.id),
 	);
@@ -288,7 +290,7 @@ function RevisionDetail({
 				<Button
 					variant="outline"
 					size="sm"
-					disabled={flow === null || (item.current && !dirty)}
+					disabled={!mayChange || flow === null || (item.current && !dirty)}
 					title={
 						item.current && !dirty
 							? "The flow is this revision now."

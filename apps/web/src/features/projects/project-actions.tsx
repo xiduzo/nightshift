@@ -30,7 +30,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { ArrowRightLeftIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
-import { spaceQueries } from "@/features/spaces";
+import { isSpaceAdmin, spaceQueries } from "@/features/spaces";
 import type { Project } from "@/shared/api";
 import { projectMutations } from "./queries";
 
@@ -160,9 +160,7 @@ function MoveProjectForm({
 	// Only an owner or an admin of a Space may move projects into it.
 	const targets = (spaces.data?.spaces ?? [])
 		.filter(
-			(space) =>
-				space.id !== spaces.data?.active &&
-				(space.role === "owner" || space.role === "admin"),
+			(space) => space.id !== spaces.data?.active && isSpaceAdmin(space.role),
 		)
 		.map((space) => ({ value: space.id, label: spaceName(space) }));
 	const [spaceId, setSpaceId] = useState<string | null>(null);

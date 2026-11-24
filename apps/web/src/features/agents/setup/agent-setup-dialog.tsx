@@ -25,6 +25,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { CircleAlertIcon, CircleCheckIcon, PlusIcon } from "lucide-react";
 import { Fragment, useState } from "react";
 import { toast } from "sonner";
+import { useMayChange } from "@/features/projects";
 import type {
 	AgentSetupStatus,
 	DeciderSetupStatus,
@@ -259,6 +260,7 @@ function ProjectStep({
 	onLater: () => void;
 	onAdd: () => void;
 }) {
+	const mayChange = useMayChange();
 	return (
 		<>
 			<DialogHeader>
@@ -271,7 +273,11 @@ function ProjectStep({
 				<Button variant="outline" onClick={onLater}>
 					{done ? "Done" : "Later"}
 				</Button>
-				<Button variant={done ? "outline" : "default"} onClick={onAdd}>
+				<Button
+					variant={done ? "outline" : "default"}
+					disabled={!mayChange}
+					onClick={onAdd}
+				>
 					<PlusIcon data-icon="inline-start" />
 					Add project
 				</Button>

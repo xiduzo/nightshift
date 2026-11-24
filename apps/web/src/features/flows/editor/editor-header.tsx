@@ -158,7 +158,7 @@ export function EditorHeader({
 						Export as file
 					</DropdownMenuItem>
 					<DropdownMenuItem
-						disabled={!everSaved}
+						disabled={!mayChange || !everSaved}
 						onClick={() => setCopying(true)}
 					>
 						<CopyIcon aria-hidden="true" />

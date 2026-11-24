@@ -39,6 +39,7 @@ const { FlowList } = await import("./flow-list");
 const { CalledFlowField } = await import(
 	"./editor/inspector/call/called-flow-fields"
 );
+const { RevisionsSheet } = await import("./editor/revisions/revisions-sheet");
 const { SectionInspector } = await import(
 	"./editor/sections/section-inspector"
 );
@@ -104,6 +105,15 @@ const calledBy = (flow: string) => (
 		onPick={() => {}}
 	/>
 );
+const revisionItem = {
+	id: "r1",
+	at: 0,
+	kind: "save",
+	person: null,
+	device: { name: "MacBook" },
+	changes: null,
+	current: false,
+};
 const sectioned = {
 	...newFlow(),
 	sections: [{ id: "s", label: "Part", nodes: [] }],
@@ -126,8 +136,10 @@ function Schedules() {
 	);
 }
 
+type Role = "owner" | "admin" | "member" | "viewer";
+
 /** The data each control needs to show, and the role of the person. */
-function cacheFor(role: "viewer" | "member") {
+function cacheFor(role: Role) {
 	const client = new QueryClient({
 		defaultOptions: {
 			queries: { retry: false, staleTime: Number.POSITIVE_INFINITY },
@@ -142,6 +154,12 @@ function cacheFor(role: "viewer" | "member") {
 		{ node: "n1", scope: "two", keys: 2, updatedAt: 0 },
 	]);
 	put(flowQueries.list("p1"), []);
+	put(flowQueries.revisions("p1", "night"), [revisionItem]);
+	put(flowQueries.revision("p1", "night", "r1", undefined), {
+		revision: { flow: newFlow() },
+		against: { flow: null },
+		diff: null,
+	});
 	put(flowQueries.notices("p1"), [{ id: "i1", message: "Imported." }]);
 	put(projectQueries.sources(), { folderPicker: true });
 	put(projectQueries.copies(), []);
@@ -153,7 +171,7 @@ const settle = () => act(() => new Promise((done) => setTimeout(done, 50)));
 
 /** Renders it, opens the menu of `menu`, and reads whether each control is disabled. */
 async function disabled(
-	role: "viewer" | "member",
+	role: Role,
 	element: ReactNode,
 	controls: readonly string[],
 	menu?: string,
@@ -223,7 +241,7 @@ describe("a Viewer sees it disabled, a Member can use it", () => {
 		[
 			"the actions in the menu of a project",
 			() => <ProjectMenu project={project} />,
-			["Rename…", "Move to Space…", "Remove project"],
+			["Rename…"],
 			"Actions for One",
 		],
 		[
@@ -268,6 +286,23 @@ describe("a Viewer sees it disabled, a Member can use it", () => {
 			),
 			["Make subflow"],
 		],
+		[
+			"the restore of a revision",
+			() => (
+				<RevisionsSheet
+					projectId="p1"
+					name="night"
+					open
+					onOpenChange={() => {}}
+					selectedId="r1"
+					onSelect={() => {}}
+					dirty={false}
+					onShow={() => {}}
+					onRestored={() => {}}
+				/>
+			),
+			["Restore this revision"],
+		],
 		["a new schedule", () => <Schedules />, ["Add schedule"]],
 		[
 			"the menu of a schedule",
@@ -287,4 +322,20 @@ describe("a Viewer sees it disabled, a Member can use it", () => {
 			);
 		});
 	}
+});
+
+test.each([
+	["viewer", true],
+	["member", true],
+	["admin", false],
+	["owner", false],
+] as const)("the move and remove of a project, as a %s", async (role, off) => {
+	expect(
+		await disabled(
+			role,
+			<ProjectMenu project={project} />,
+			["Move to Space…", "Remove project"],
+			"Actions for One",
+		),
+	).toEqual([off, off]);
 });

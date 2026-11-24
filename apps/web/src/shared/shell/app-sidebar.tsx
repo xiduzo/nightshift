@@ -71,7 +71,11 @@ import { type ComponentProps, useState } from "react";
 import { describeRunStatuses, RunsDonut } from "@/features/dashboard";
 import { ThisDeviceLabel } from "@/features/devices";
 import { useOpenGates } from "@/features/gates";
-import { AddProjectDialog, projectQueries } from "@/features/projects";
+import {
+	AddProjectDialog,
+	projectQueries,
+	useMayChange,
+} from "@/features/projects";
 import { SpaceSwitcher } from "@/features/spaces";
 import type { Project } from "@/shared/api";
 import { useSidebarRange } from "./use-sidebar-range";
@@ -170,6 +174,7 @@ export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
  * The chevron opens or closes any other. Add project sits below the list.
  */
 function NavProjects({ projects }: { projects: Project[] | undefined }) {
+	const mayChange = useMayChange();
 	const [adding, setAdding] = useState(false);
 	const range = useSidebarRange();
 	return (
@@ -183,6 +188,8 @@ function NavProjects({ projects }: { projects: Project[] | undefined }) {
 					<SidebarMenuButton
 						tooltip="Add project"
 						className="text-sidebar-foreground/70"
+						// On the button itself: the tooltip keeps a `disabled` beside it.
+						render={<button type="button" disabled={!mayChange} />}
 						onClick={() => setAdding(true)}
 					>
 						<PlusIcon aria-hidden="true" />

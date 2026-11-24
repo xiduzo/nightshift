@@ -460,6 +460,30 @@ describe("the flow editor: keys", () => {
 		},
 	);
 
+	test.each(["viewer", "member"] as const)(
+		"Copy into project, as a %s of the Space: off for a viewer only",
+		async (role) => {
+			mount({}, role);
+			const more = document.querySelector(
+				'[aria-label="More actions for demo"]',
+			);
+			fireEvent.click(more as Element);
+			await settled();
+			const items = [
+				...document.querySelectorAll<HTMLElement>("[role='menuitem']"),
+			];
+			const off = (name: string) =>
+				items
+					.find((one) => one.textContent === name)
+					?.getAttribute("aria-disabled") === "true";
+			expect(items.map((one) => one.textContent)).toContain(
+				"Copy into project…",
+			);
+			expect(off("Copy into project…")).toBe(role === "viewer");
+			expect(off("Export as file")).toBe(false);
+		},
+	);
+
 	test("Cmd+G makes a Section of the selected nodes", async () => {
 		mount();
 		select({ kind: "nodes", ids: ["a", "b"] });

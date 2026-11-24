@@ -22,7 +22,11 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { CircleCheckIcon, CircleDashedIcon, PlusIcon } from "lucide-react";
 import { type ReactNode, useState } from "react";
-import { AddProjectDialog, projectQueries } from "@/features/projects";
+import {
+	AddProjectDialog,
+	projectQueries,
+	useMayChange,
+} from "@/features/projects";
 import type { AgentProfileRow } from "@/shared/api";
 import { profileQueries } from "../queries";
 import { AgentSetupDialog } from "./agent-setup-dialog";
@@ -98,6 +102,7 @@ function SetupCardBody({
 		open: false,
 		start: "agent",
 	});
+	const mayChange = useMayChange();
 	const [adding, setAdding] = useState(false);
 
 	const agent = agentRow(profiles, setup.isError ? null : setup.data);
@@ -149,7 +154,12 @@ function SetupCardBody({
 				);
 			case "add-project":
 				return (
-					<Button size="sm" variant={variant} onClick={() => setAdding(true)}>
+					<Button
+						size="sm"
+						variant={variant}
+						disabled={!mayChange}
+						onClick={() => setAdding(true)}
+					>
 						<PlusIcon data-icon="inline-start" />
 						Add project
 					</Button>
