@@ -7,13 +7,7 @@ import {
 
 import type { NodeAction, StepContext } from "../context";
 import { heldStep, holdEnded } from "../position";
-import type {
-	Parked,
-	Pending,
-	PendingGate,
-	ResumeValue,
-	RunStateValues,
-} from "../state";
+import type { Parked, Pending, ResumeValue, RunStateValues } from "../state";
 
 /**
  * The one interrupting graph node. Three nodes park a thread at an
@@ -88,7 +82,7 @@ export function interruptNode<K extends Pending["kind"]>(spec: {
 
 type GateSpec = Parameters<typeof interruptNode<"gate">>[0];
 
-/** The node opens its Gate again, in a new visit. */
+/** The node starts over with no Gate held. */
 export function askAgain(node: { id: string }): Command {
 	return new Command({
 		update: { pending: { [node.id]: null } },
@@ -99,7 +93,8 @@ export function askAgain(node: { id: string }): Command {
 /**
  * The ask node of a Gate (`ask__<id>`): it waits with the Gate the node
  * opened. A stop can end the Gate's step before the Gate was checkpointed.
- * Then the node asks again in a new visit, unless `letGo` says otherwise.
+ * Then the node starts over: it asks again in a new visit, and an Agent that
+ * asks takes its step up (the resume point).
  */
 export function gateNode(
 	node: { id: string },
@@ -108,7 +103,6 @@ export function gateNode(
 		answer: GateSpec["answer"];
 		/** What opens at the node, in the error when none is. Default: a Gate. */
 		what?: "question";
-		letGo?(pending: PendingGate): Command | Promise<Command>;
 	},
 ): NodeAction {
 	return interruptNode({
@@ -124,6 +118,6 @@ export function gateNode(
 			...(pending.deadline ? { deadline: pending.deadline } : {}),
 		}),
 		answer: spec.answer,
-		stale: { ctx, letGo: spec.letGo ?? (() => askAgain(node)) },
+		stale: { ctx, letGo: () => askAgain(node) },
 	});
 }

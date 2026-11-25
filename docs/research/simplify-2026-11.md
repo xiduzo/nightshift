@@ -380,7 +380,8 @@ Each entry names its source. "Read" means found by reading and not reproduced.
   list dropped entries it could not read, and the cleanup took the work of a run whose flow
   could not be read. A test now runs each sweep over such data.
 - A flaky CI test came from 14 test files that never ended their engine.
-- Open: a stop in a short moment after an Agent asks makes the first resume stop again.
+- A stop in a short moment after an Agent asks made the first resume stop again. Now one resume
+  continues the step, with the prompt of the person.
 - Not covered: a browser, a phone, two real daemons over a network.
 
 ### Numbers (scc, 5ff33c00b to 332649c77, before the review fixes)

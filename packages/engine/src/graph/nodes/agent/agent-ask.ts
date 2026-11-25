@@ -7,14 +7,8 @@ import {
 	type StepContext,
 } from "../../context";
 import { commitVisit } from "../../position";
-import {
-	askAgain,
-	gateNode,
-	parkCommand,
-	route,
-	type StepEnd,
-} from "../../route";
-import type { PendingGate, PendingParked, RunStateUpdate } from "../../state";
+import { gateNode, route } from "../../route";
+import type { PendingGate, PendingParked } from "../../state";
 import { beginStep, resumePromptOf, scoreGate, sessionOf } from "../../step";
 
 import { answerRetryGate } from "../decide";
@@ -41,7 +35,7 @@ import { answerRetryGate } from "../decide";
  *   one, and the session goes on with the resume's prompt
  *   (`RESUME_RULES.agent`). The agent asks again when it still needs input.
  * - a stop that ended the step before the Gate was checkpointed (`stale`):
- *   the run parks as stopped on the step, and a resume goes on as above.
+ *   a resume takes the step up at the resume point, and goes on as above.
  */
 export function agentAskNode(node: AgentNode, ctx: StepContext): NodeAction {
 	return gateNode(node, ctx, {
@@ -83,8 +77,6 @@ export function agentAskNode(node: AgentNode, ctx: StepContext): NodeAction {
 			};
 			return new Command({ update: { pending: asked }, goto: node.id });
 		},
-		letGo: (pending) =>
-			pending.climb ? askAgain(node) : parkOnStep(ctx, node, pending),
 	});
 }
 
@@ -114,51 +106,6 @@ function askOutputs(pending: PendingGate): StepOutputs {
 }
 
 /**
- * The Gate's step as a stop ended it in the log: the outputs the session
- * gave, and the harness session a resume goes on with.
- */
-async function stoppedStep(
-	ctx: StepContext,
-	node: AgentNode,
-	pending: PendingGate,
-): Promise<{ end: StepEnd; update: RunStateUpdate; prompt: string | null }> {
-	const runState = await ctx.log.state(ctx.run.id);
-	const step = runState.steps.get(pending.stepId);
-	const outputs = { ...askOutputs(pending), outcome: "stopped" };
-	return {
-		end: {
-			stepId: pending.stepId,
-			visit: pending.visit,
-			outcome: "stopped",
-			outputs,
-			error: null,
-			harnessSessionId: sessionOf(step),
-		},
-		update: {
-			nodes: { [node.id]: outputs },
-			...commitVisit(node, pending.visit),
-		},
-		prompt: step ? resumePromptOf(runState, step) : null,
-	};
-}
-
-/** A stop ended the Gate's step before the Gate was checkpointed: the run parks as stopped on it. */
-async function parkOnStep(
-	ctx: StepContext,
-	node: AgentNode,
-	pending: PendingGate,
-): Promise<Command> {
-	const { end, update } = await stoppedStep(ctx, node, pending);
-	return parkCommand({
-		node,
-		status: "stopped",
-		reason: null,
-		step: end,
-		update,
-	});
-}
-
-/**
  * A person resumed the run that a stop ended at the Gate: the node takes
  * the step up as a parked one, so its session goes on with the resume's
  * prompt.
@@ -168,16 +115,24 @@ async function resumeOnStep(
 	node: AgentNode,
 	pending: PendingGate,
 ): Promise<Command> {
-	const { end, update, prompt } = await stoppedStep(ctx, node, pending);
+	const runState = await ctx.log.state(ctx.run.id);
+	const step = runState.steps.get(pending.stepId);
 	const parked: PendingParked = {
 		kind: "parked",
-		stepId: end.stepId,
+		stepId: pending.stepId,
 		nodeId: node.id,
-		visit: end.visit,
-		harnessSessionId: end.harnessSessionId ?? null,
-		prompt: prompt ?? DEFAULT_RESUME_PROMPT,
+		visit: pending.visit,
+		harnessSessionId: sessionOf(step),
+		prompt: (step && resumePromptOf(runState, step)) ?? DEFAULT_RESUME_PROMPT,
 		status: "stopped",
 		reason: null,
 	};
-	return new Command({ update: { ...update, pending: parked }, goto: node.id });
+	return new Command({
+		update: {
+			nodes: { [node.id]: { ...askOutputs(pending), outcome: "stopped" } },
+			...commitVisit(node, pending.visit),
+			pending: parked,
+		},
+		goto: node.id,
+	});
 }
