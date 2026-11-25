@@ -1,4 +1,4 @@
-import { inspect, isDeepStrictEqual } from "node:util";
+import { inspect } from "node:util";
 import { SECRET_MASK, type SecretMask } from "./secret-mask";
 
 /** The fields of an error that its class may hold. */
@@ -12,95 +12,108 @@ const WORDS = ["message", "stack", "name", "cause"];
  */
 export function redactError(error: unknown, mask: SecretMask): unknown {
 	try {
-		const hidden = hide(error, mask, new Set());
-		return holds(hidden, mask, new Set()) ? plainError(error, mask) : hidden;
+		return holds(error, mask) ? hide(error, mask, new Map()) : error;
 	} catch {
 		return plainError(error, mask);
 	}
 }
 
-function hide(error: unknown, mask: SecretMask, seen: Set<unknown>): unknown {
-	if (typeof error === "string") return mask.text(error);
-	if (typeof error !== "object" || error === null || seen.has(error)) {
-		return error;
-	}
-	seen.add(error);
-	const inside = (value: unknown) => hide(value, mask, seen);
-	if (Array.isArray(error)) return error.map(inside);
-	if (error instanceof Error) return hiddenError(error, mask, inside);
-	if (isPlain(error)) {
-		return Object.fromEntries(
-			Object.entries(error).map(([key, field]) => [
-				mask.text(key),
-				inside(field),
-			]),
-		);
-	}
-	// Another class (a Response, a Map, a Buffer) stays, or goes as a whole.
-	const words = ArrayBuffer.isView(error)
-		? Buffer.from(error.buffer, error.byteOffset, error.byteLength).toString()
-		: inspect(
-				[
-					error,
-					Symbol.iterator in error ? [...(error as Iterable<unknown>)] : [],
-				],
-				{
-					depth: 8,
-					maxArrayLength: null,
-					maxStringLength: null,
-				},
-			);
-	return mask.text(words) === words ? error : SECRET_MASK;
-}
-
-function hiddenError(
-	error: Error,
+/** `made`: what each object became, so one that is met again is the same one. */
+function hide(
+	value: unknown,
 	mask: SecretMask,
-	inside: (value: unknown) => unknown,
-): Error {
-	const fields = new Map<string | symbol, unknown>();
-	let changed = false;
-	for (const name of new Set([...Reflect.ownKeys(error), ...WORDS])) {
-		if (!Reflect.has(error, name)) continue;
-		let was: unknown;
-		try {
-			was = Reflect.get(error, name);
-		} catch {
-			// A field that cannot be read holds nothing that can be shown.
-			continue;
+	made: Map<object, unknown>,
+): unknown {
+	if (typeof value === "string") return mask.text(value);
+	if (typeof value !== "object" || value === null) return value;
+	if (made.has(value)) return made.get(value);
+	const inside = (field: unknown) => hide(field, mask, made);
+	if (Array.isArray(value)) {
+		const list: unknown[] = [];
+		made.set(value, list);
+		for (const item of value) list.push(inside(item));
+		return list;
+	}
+	if (isPlain(value)) {
+		const object = {};
+		made.set(value, object);
+		for (const [key, field] of Object.entries(value)) {
+			put(object, mask.text(key), inside(field), true);
 		}
-		const now = inside(was);
-		const other = !isDeepStrictEqual(now, was);
-		changed ||= other;
-		if (other || Object.hasOwn(error, name)) fields.set(name, now);
-		if (
-			other &&
-			!Reflect.defineProperty(error, name, { value: now, configurable: true })
-		) {
-			fields.set(CANNOT, true);
+		return object;
+	}
+	if (!(value instanceof Error)) {
+		return holds(value, mask) ? SECRET_MASK : value;
+	}
+	const error = canChange(value, mask) ? value : shellOf(value, mask);
+	made.set(value, error);
+	for (const [name, field] of fieldsOf(value)) {
+		const hidden = holds(field, mask) ? inside(field) : field;
+		if (error !== value || hidden !== field) {
+			put(
+				error,
+				name,
+				hidden,
+				Object.prototype.propertyIsEnumerable.call(value, name),
+			);
 		}
 	}
-	if (!changed || !fields.has(CANNOT)) return error;
-	fields.delete(CANNOT);
-	return copyOf(error, fields) ?? plainError(error, mask);
+	if (error === value || readsAsError(error)) return error;
+	const plain = plainError(value, mask);
+	made.set(value, plain);
+	return plain;
 }
 
-/** Whether a value is still in it, as when two frozen errors are the cause of each other. */
-function holds(error: unknown, mask: SecretMask, seen: Set<unknown>): boolean {
-	if (typeof error === "string") return mask.text(error) !== error;
-	if (typeof error !== "object" || error === null || seen.has(error)) {
-		return false;
+/** Whether a value is anywhere in it. A list of work: it ends at any depth, and on a cycle. */
+function holds(value: unknown, mask: SecretMask): boolean {
+	const seen = new Set<unknown>();
+	const work = [value];
+	while (work.length > 0) {
+		const next = work.pop();
+		if (typeof next === "string" && mask.text(next) !== next) return true;
+		if (typeof next !== "object" || next === null || seen.has(next)) continue;
+		seen.add(next);
+		if (Array.isArray(next)) for (const item of next) work.push(item);
+		else if (next instanceof Error || isPlain(next)) {
+			for (const [name, field] of fieldsOf(next)) {
+				if (typeof name === "string" && isPlain(next)) work.push(name);
+				work.push(field);
+			}
+		} else work.push(wordsOf(next));
 	}
-	seen.add(error);
-	if (!isPlain(error) && !Array.isArray(error) && !(error instanceof Error)) {
-		return false;
-	}
-	return [...new Set([...Reflect.ownKeys(error), ...WORDS])].some((name) => {
+	return false;
+}
+
+/** The fields of an object, and what an error's class holds. One that cannot be read shows nothing. */
+function fieldsOf(value: object): [string | symbol, unknown][] {
+	const names = new Set([
+		...Reflect.ownKeys(value),
+		...(value instanceof Error ? WORDS : []),
+	]);
+	return [...names].flatMap((name): [string | symbol, unknown][] => {
 		try {
-			return holds(Reflect.get(error, name), mask, seen);
+			return Reflect.has(value, name) ? [[name, Reflect.get(value, name)]] : [];
 		} catch {
-			return false;
+			return [];
 		}
+	});
+}
+
+/** An object of another class (a Response, a Map, a Buffer) as words. */
+function wordsOf(value: object): string {
+	if (ArrayBuffer.isView(value)) {
+		return Buffer.from(
+			value.buffer,
+			value.byteOffset,
+			value.byteLength,
+		).toString();
+	}
+	const items =
+		Symbol.iterator in value ? [...(value as Iterable<unknown>)] : [];
+	return inspect([value, items], {
+		depth: 8,
+		maxArrayLength: null,
+		maxStringLength: null,
 	});
 }
 
@@ -109,37 +122,44 @@ function isPlain(value: object): boolean {
 	return proto === Object.prototype || proto === null;
 }
 
-/** Marks an error with a field that cannot change. */
-const CANNOT = Symbol("cannot");
+function put(
+	target: object,
+	name: string | symbol,
+	value: unknown,
+	enumerable: boolean,
+): void {
+	// A DOMException has no setter for its message.
+	Object.defineProperty(target, name, {
+		value,
+		enumerable,
+		configurable: true,
+		writable: true,
+	});
+}
 
-/** A new error of the same class with these fields; nothing when it does not work as one. */
-function copyOf(
-	error: Error,
-	fields: ReadonlyMap<string | symbol, unknown>,
-): Error | null {
+/** Whether each field with a value can be another one. */
+function canChange(error: Error, mask: SecretMask): boolean {
+	return fieldsOf(error).every(
+		([name, field]) =>
+			!holds(field, mask) ||
+			(Object.getOwnPropertyDescriptor(error, name)?.configurable ??
+				Object.isExtensible(error)),
+	);
+}
+
+/** A new error of the same class, without its fields yet. */
+function shellOf(error: Error, mask: SecretMask): Error {
+	return error instanceof DOMException
+		? new DOMException(mask.text(error.message), mask.text(error.name))
+		: Object.setPrototypeOf(new Error(), Object.getPrototypeOf(error));
+}
+
+/** Whether its words read without a throw: a class may keep them in private fields. */
+function readsAsError(error: Error): boolean {
 	try {
-		const copy: Error =
-			error instanceof DOMException
-				? new DOMException(
-						String(fields.get("message") ?? ""),
-						String(fields.get("name") ?? error.name),
-					)
-				: Object.setPrototypeOf(new Error(), Object.getPrototypeOf(error));
-		for (const [name, field] of fields) {
-			const value = field === error ? copy : field;
-			Object.defineProperty(copy, name, {
-				value,
-				enumerable: Object.prototype.propertyIsEnumerable.call(error, name),
-				configurable: true,
-				writable: true,
-			});
-		}
-		// Its words must read without a throw.
-		return typeof copy.name === "string" && typeof `${copy}` === "string"
-			? copy
-			: null;
+		return typeof error.name === "string" && typeof `${error}` === "string";
 	} catch {
-		return null;
+		return false;
 	}
 }
 

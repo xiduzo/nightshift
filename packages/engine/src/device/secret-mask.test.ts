@@ -94,6 +94,16 @@ test("the names of an object keep their order, also a name that JavaScript treat
 	);
 });
 
+test("data that holds itself ends, and keeps its shape", () => {
+	const data: Record<string, unknown> = { a: VALUE, list: [] };
+	data.self = data;
+	(data.list as unknown[]).push(data);
+	const out = secretMask([VALUE]).json(data) as typeof data;
+	expect(out.a).toBe("•••");
+	expect(out.self).toBe(out);
+	expect((out.list as unknown[])[0]).toBe(out);
+});
+
 test("a large text is hidden in the time of one look at it, not one for each string", () => {
 	const row = JSON.stringify({ id: 1, name: "row", tags: ["a", "b"] });
 	const text = `[${`${row},`.repeat(60_000)}"${VALUE}"]`;

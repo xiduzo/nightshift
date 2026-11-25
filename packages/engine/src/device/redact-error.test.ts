@@ -82,6 +82,66 @@ describe("an error that cannot change", () => {
 	});
 });
 
+test("an object that is in two fields, or in itself, keeps the error", () => {
+	const shared: Record<string, unknown> = { token: VALUE, list: [VALUE] };
+	shared.self = shared;
+	const cycle: unknown[] = [VALUE];
+	cycle.push(cycle);
+	const error = Object.assign(new TypeError("bad"), {
+		code: "E_BAD",
+		request: shared,
+		config: shared,
+		cycle,
+	});
+	const out = hide(error) as typeof error;
+	expect(out).toBe(error);
+	expect([out.code, out.name]).toEqual(["E_BAD", "TypeError"]);
+	expect(out.request).toBe(out.config);
+	expect(out.request.self).toBe(out.request);
+	expect(out.request.token).toBe("•••");
+	expect(out.request.list).toEqual(["•••"]);
+	expect(out.cycle[0]).toBe("•••");
+	expect(out.cycle[1]).toBe(out.cycle);
+});
+
+test("a frozen error that an object in it names again is one error after", () => {
+	const error = Object.assign(new RangeError(`bad ${VALUE}`), {
+		code: "E_BAD",
+		info: {} as Record<string, unknown>,
+	});
+	error.info.of = error;
+	const out = hide(Object.freeze(error)) as typeof error;
+	expect(out).toBeInstanceOf(RangeError);
+	expect(out.code).toBe("E_BAD");
+	expect(out.info.of).toBe(out);
+});
+
+test("an error with nothing to hide keeps each thing in it", () => {
+	let deep: unknown = 1;
+	for (let i = 0; i < 100_000; i++) deep = [deep];
+	const data = { a: [1] };
+	const error = Object.assign(new Error("bad"), { data, deep });
+	expect(hide(error)).toBe(error);
+	expect(error.data).toBe(data);
+	expect(error.deep).toBe(deep);
+});
+
+test("what has no value in it stays as it is, beside what has", () => {
+	const data = { a: [1] };
+	const page = new URL("https://a.example/");
+	const error = Object.assign(new Error(`bad ${VALUE}`), {
+		data,
+		info: { page, token: VALUE },
+	});
+	Object.defineProperty(error, "fixed", { value: 1 });
+	expect(hide(error)).toBe(error);
+	expect(error.message).toBe("bad •••");
+	expect(error.data).toBe(data);
+	expect(error.info.page).toBe(page);
+	expect(error.info.token).toBe("•••");
+	expect(hide(data)).toBe(data);
+});
+
 test("a field that cannot be read does not replace the error", () => {
 	const error = new Error(`bad ${VALUE}`);
 	Object.defineProperty(error, "odd", {

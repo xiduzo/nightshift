@@ -109,7 +109,10 @@ function replaced(text: string, forms: readonly string[]): string {
 	return out;
 }
 
-/** The data with the values hidden. A list of work, not a recursion: any depth passes. */
+/**
+ * The data with the values hidden. A list of work, not a recursion: any
+ * depth passes, and data that holds itself ends.
+ */
 function hideJson(
 	value: unknown,
 	found: { forms: readonly string[]; documents: readonly Document[] },
@@ -124,11 +127,15 @@ function hideJson(
 	const text = (item: string) =>
 		strings.has(item) ? SECRET_MASK : replaced(item, found.forms);
 	const work: { from: object; to: object }[] = [];
+	const made = new Map<object, object>();
 	const hide = (item: unknown): unknown => {
 		if (typeof item === "string") return text(item);
 		if (typeof item !== "object" || item === null) return item;
 		if (objects.some((object) => isSame(object, item))) return SECRET_MASK;
+		const before = made.get(item);
+		if (before) return before;
 		const to = Array.isArray(item) ? new Array(item.length) : {};
+		made.set(item, to);
 		work.push({ from: item, to });
 		return to;
 	};
