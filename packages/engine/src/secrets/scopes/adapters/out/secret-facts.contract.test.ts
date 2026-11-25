@@ -49,4 +49,36 @@ describe("the Device document holds names and times only", () => {
 		});
 		expect([...yjsSecretFacts(document).saved()]).toEqual([["NEW", 4]]);
 	});
+
+	test("a write keeps each entry it cannot read, as it is and in its place", async () => {
+		const document = await deviceDocument();
+		const later = { name: "LATER", setAt: { by: "ada" } };
+		const extra = { name: "KEPT", setAt: 2, from: "vault" };
+		await document.change(() => {
+			document.facts.set("secrets", ["OLD", extra, later, 7]);
+			document.facts.set("secretsUsedAt", { KEPT: 3, LATER: { at: 4 } });
+		});
+		const facts = yjsSecretFacts(document);
+		await facts.writeSaved(new Map([...facts.saved(), ["NEW", 5]]));
+		expect(document.facts.get("secrets")).toEqual([
+			"OLD",
+			extra,
+			later,
+			7,
+			{ name: "NEW", setAt: 5 },
+		]);
+		await facts.writeSaved(new Map([["NEW", 6]]), ["KEPT"]);
+		expect(document.facts.get("secrets")).toEqual([
+			"OLD",
+			{ name: "NEW", setAt: 6 },
+			later,
+			7,
+		]);
+		expect(document.facts.get("secretsUsedAt")).toEqual({ LATER: { at: 4 } });
+		await facts.writeUsed(new Map([["NEW", 8]]));
+		expect(document.facts.get("secretsUsedAt")).toEqual({
+			LATER: { at: 4 },
+			NEW: 8,
+		});
+	});
 });

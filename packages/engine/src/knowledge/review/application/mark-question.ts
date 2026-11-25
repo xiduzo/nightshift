@@ -4,7 +4,6 @@ import type { Actor } from "../../../contract";
 import { isReadable } from "../../files";
 import type { KnowledgeReconciler } from "../../sync";
 import {
-	formatQuestions,
 	type KnowledgeQuestion,
 	markQuestion as marked,
 	parseQuestions,
@@ -35,7 +34,8 @@ export type MarkQuestion = {
  * a step does: the set goes to the Space when the hold ends. Returns the
  * set, newest mark first.
  *
- * Refuses a Person who may not change knowledge (`access.openSpace`).
+ * Refuses a Person who may not change knowledge (`access.openSpace`), and
+ * a set it cannot read (`conflict`).
  */
 export const markQuestion =
 	(ports: MarkQuestionPorts) =>
@@ -46,17 +46,14 @@ export const markQuestion =
 		await ports.access.openSpace(actor, { spaceId, need: CHANGES_KNOWLEDGE });
 		const hold = await ports.holds.startStep(projectId);
 		try {
-			const next = marked(
-				parseQuestions(await ports.questions.read(projectId)),
-				{
-					...mark,
-					// Only a file an agent reads can answer.
-					answers: mark.answers.filter(isReadable),
-					at: ports.now(),
-				},
-			);
-			await ports.questions.write(projectId, formatQuestions(next));
-			return next;
+			const next = marked(await ports.questions.read(projectId), {
+				...mark,
+				// Only a file an agent reads can answer.
+				answers: mark.answers.filter(isReadable),
+				at: ports.now(),
+			});
+			await ports.questions.write(projectId, next);
+			return parseQuestions(next);
 		} finally {
 			await hold.done();
 		}

@@ -54,6 +54,52 @@ describe("markNotTopic", () => {
 		]);
 	});
 
+	test("keeps each word of the file it cannot read, as it is and in its place", async () => {
+		const ports = inMemoryMapPorts();
+		const stored = () => JSON.parse(ports.notTopics.files.get("p1") ?? "null");
+		const extra = { word: "kept", markedAt: 1, by: null, note: "x" };
+		ports.notTopics.files.set(
+			"p1",
+			JSON.stringify({ version: 1, words: ["old", extra, 7], more: true }),
+		);
+		ports.setNow(5);
+		const mark = (word: string, notTopic: boolean) =>
+			markNotTopic(ports)(NIGHT_SHIFT, {
+				spaceId: "space-1",
+				projectId: "p1",
+				word,
+				notTopic,
+				by: null,
+			});
+		expect(await mark("new", true)).toEqual(["new", "kept"]);
+		expect(stored()).toEqual({
+			version: 1,
+			words: [{ word: "new", markedAt: 5, by: null }, "old", extra, 7],
+			more: true,
+		});
+		await mark("kept", false);
+		await mark("new", false);
+		expect(stored().words).toEqual(["old", 7]);
+	});
+
+	test("refuses to write over a file it cannot read", async () => {
+		for (const text of ['{"version":2,"words":[]}', "{not json"]) {
+			const ports = inMemoryMapPorts();
+			ports.notTopics.files.set("p1", text);
+			await expect(
+				markNotTopic(ports)(NIGHT_SHIFT, {
+					spaceId: "space-1",
+					projectId: "p1",
+					word: "deploy",
+					notTopic: true,
+					by: null,
+				}),
+			).rejects.toThrow("Night Shift cannot read the saved words.");
+			expect(ports.notTopics.files.get("p1")).toBe(text);
+			expect(ports.sync.holds).toEqual(["hold p1", "done p1"]);
+		}
+	});
+
 	test("ends the hold when the write fails", async () => {
 		const ports = inMemoryMapPorts();
 		const failure = new Error("disk");

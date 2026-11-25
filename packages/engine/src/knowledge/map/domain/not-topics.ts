@@ -1,3 +1,4 @@
+import { Refusal } from "@nightshift/refusal";
 import { z } from "zod";
 
 /**
@@ -26,7 +27,7 @@ const notTopicSchema = z.object({
 	by: z.string().nullable(),
 });
 
-const fileSchema = z.object({
+const fileSchema = z.looseObject({
 	version: z.literal(1),
 	words: z.array(z.unknown()),
 });
@@ -35,40 +36,48 @@ const keyOf = (word: string) => word.trim().replace(/\s+/g, " ").toLowerCase();
 
 /** The words of the file. A file that is not valid, and each word in it that is not, counts as none. */
 export function parseNotTopics(text: string | null): NotTopic[] {
-	if (text === null) return [];
-	let json: unknown;
-	try {
-		json = JSON.parse(text);
-	} catch {
-		return [];
-	}
-	const file = fileSchema.safeParse(json);
-	if (!file.success) return [];
-	return file.data.words.flatMap((word) => {
-		const parsed = notTopicSchema.safeParse(word);
+	return (fileOf(text)?.words ?? []).flatMap((item) => {
+		const parsed = notTopicSchema.safeParse(item);
 		return parsed.success ? [parsed.data] : [];
 	});
 }
 
-/** The file for `words`. */
-export function formatNotTopics(words: readonly NotTopic[]): string {
-	return `${JSON.stringify({ version: 1, words }, null, 2)}\n`;
+/** The file, each word as it is stored. Null: there is none, or it does not read. */
+function fileOf(text: string | null) {
+	if (text === null) return null;
+	try {
+		return fileSchema.parse(JSON.parse(text));
+	} catch {
+		return null;
+	}
 }
 
-/** The list with `word` marked as not a topic, or with it put back. The newest mark comes first. */
+/**
+ * The file with `word` marked as not a topic, or with it put back. The
+ * newest mark comes first. A word it cannot read stays as it is. Refuses a
+ * file it cannot read.
+ */
 export function markNotTopic(
-	words: readonly NotTopic[],
+	text: string | null,
 	mark: { word: string; notTopic: boolean; at: number; by: string | null },
-): NotTopic[] {
+): string {
+	const file = text === null ? { version: 1, words: [] } : fileOf(text);
+	if (file === null) {
+		throw new Refusal(
+			"conflict",
+			"Night Shift cannot read the saved words. Update Night Shift to change them.",
+		);
+	}
 	const key = keyOf(mark.word);
-	const others = words.filter((known) => keyOf(known.word) !== key);
-	if (!mark.notTopic) return others;
-	return [
-		{
-			word: mark.word.trim().replace(/\s+/g, " "),
-			markedAt: mark.at,
-			by: mark.by,
-		},
-		...others,
-	];
+	const others = file.words.filter((item) => {
+		const parsed = notTopicSchema.safeParse(item);
+		return !parsed.success || keyOf(parsed.data.word) !== key;
+	});
+	const marked: NotTopic = {
+		word: mark.word.trim().replace(/\s+/g, " "),
+		markedAt: mark.at,
+		by: mark.by,
+	};
+	const words = mark.notTopic ? [marked, ...others] : others;
+	return `${JSON.stringify({ ...file, words }, null, 2)}\n`;
 }

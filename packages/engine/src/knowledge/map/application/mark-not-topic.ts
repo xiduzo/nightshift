@@ -2,11 +2,7 @@ import type { Permissions } from "@nightshift/auth";
 import type { Access } from "../../../access";
 import type { Actor } from "../../../contract";
 import type { KnowledgeReconciler } from "../../sync";
-import {
-	formatNotTopics,
-	markNotTopic as marked,
-	parseNotTopics,
-} from "../domain/not-topics";
+import { markNotTopic as marked, parseNotTopics } from "../domain/not-topics";
 import type { NotTopicsFile } from "./ports";
 
 const CHANGES_KNOWLEDGE: Permissions = { run: ["start"] };
@@ -32,7 +28,8 @@ export type MarkNotTopic = {
  * it back. It holds the folder as a step does: the list goes to the Space
  * when the hold ends. Returns the list, newest mark first.
  *
- * Refuses a Person who may not change knowledge (`access.openSpace`).
+ * Refuses a Person who may not change knowledge (`access.openSpace`), and
+ * a list it cannot read (`conflict`).
  */
 export const markNotTopic =
 	(ports: MarkNotTopicPorts) =>
@@ -43,15 +40,12 @@ export const markNotTopic =
 		await ports.access.openSpace(actor, { spaceId, need: CHANGES_KNOWLEDGE });
 		const hold = await ports.holds.startStep(projectId);
 		try {
-			const next = marked(
-				parseNotTopics(await ports.notTopics.read(projectId)),
-				{
-					...mark,
-					at: ports.now(),
-				},
-			);
-			await ports.notTopics.write(projectId, formatNotTopics(next));
-			return next.map(({ word }) => word);
+			const next = marked(await ports.notTopics.read(projectId), {
+				...mark,
+				at: ports.now(),
+			});
+			await ports.notTopics.write(projectId, next);
+			return parseNotTopics(next).map(({ word }) => word);
 		} finally {
 			await hold.done();
 		}

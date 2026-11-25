@@ -48,6 +48,67 @@ describe("markQuestion", () => {
 		]);
 	});
 
+	test("keeps each question of the file it cannot read, as it is and in its place", async () => {
+		const ports = await reviewPorts();
+		const older = { query: "old", answer: "a.md" };
+		const extra = {
+			query: "kept",
+			answers: ["b.md"],
+			markedAt: 1,
+			by: null,
+			note: "x",
+		};
+		const write = (questions: unknown[]) =>
+			ports.questions.files.set(
+				"p1",
+				JSON.stringify({ version: 1, questions, more: true }),
+			);
+		const stored = () => JSON.parse(ports.questions.files.get("p1") ?? "null");
+		write([older, extra, "words"]);
+		ports.setNow(5);
+		const mark = (query: string, answers: string[]) =>
+			markQuestion(ports)(NIGHT_SHIFT, {
+				spaceId: "space-1",
+				projectId: "p1",
+				query,
+				answers,
+				by: null,
+			});
+		const next = await mark("new", ["c.md"]);
+		expect(next.map(({ query }) => query)).toEqual(["new", "kept"]);
+		expect(stored()).toEqual({
+			version: 1,
+			questions: [
+				{ query: "new", answers: ["c.md"], markedAt: 5, by: null },
+				older,
+				extra,
+				"words",
+			],
+			more: true,
+		});
+		await mark("kept", []);
+		await mark("new", []);
+		expect(stored().questions).toEqual([older, "words"]);
+	});
+
+	test("refuses to write over a file it cannot read", async () => {
+		for (const text of ['{"version":2,"questions":[]}', "{not json"]) {
+			const ports = await reviewPorts();
+			ports.questions.files.set("p1", text);
+			await expect(
+				markQuestion(ports)(NIGHT_SHIFT, {
+					spaceId: "space-1",
+					projectId: "p1",
+					query: "q",
+					answers: ["a.md"],
+					by: null,
+				}),
+			).rejects.toThrow("Night Shift cannot read the saved questions.");
+			expect(ports.questions.files.get("p1")).toBe(text);
+			expect(ports.sync.holds).toEqual(["hold p1", "done p1"]);
+		}
+	});
+
 	test("ends the hold when the write fails", async () => {
 		const ports = await reviewPorts();
 		const failure = new Error("disk");

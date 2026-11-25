@@ -1,3 +1,4 @@
+import { Refusal } from "@nightshift/refusal";
 import { z } from "zod";
 
 /**
@@ -30,7 +31,7 @@ const questionSchema = z.object({
 	by: z.string().nullable(),
 });
 
-const fileSchema = z.object({
+const fileSchema = z.looseObject({
 	version: z.literal(1),
 	questions: z.array(z.unknown()),
 });
@@ -42,49 +43,68 @@ export function questionKey(query: string): string {
 
 /** The questions of the set's file. A file that is not valid, and each question in it that is not, counts as none. */
 export function parseQuestions(text: string | null): KnowledgeQuestion[] {
-	if (text === null) return [];
-	let json: unknown;
-	try {
-		json = JSON.parse(text);
-	} catch {
-		return [];
-	}
-	const file = fileSchema.safeParse(json);
-	if (!file.success) return [];
-	return file.data.questions.flatMap((question) => {
-		const parsed = questionSchema.safeParse(question);
+	return (fileOf(text)?.questions ?? []).flatMap((item) => {
+		const parsed = questionSchema.safeParse(item);
 		return parsed.success ? [parsed.data] : [];
 	});
+}
+
+/** The set's file, each question as it is stored. Null: there is none, or it does not read. */
+function fileOf(text: string | null) {
+	if (text === null) return null;
+	try {
+		return fileSchema.parse(JSON.parse(text));
+	} catch {
+		return null;
+	}
 }
 
 /** The set's file for `questions`. */
 export function formatQuestions(
 	questions: readonly KnowledgeQuestion[],
 ): string {
-	return `${JSON.stringify({ version: 1, questions }, null, 2)}\n`;
+	return write({ version: 1, questions });
 }
 
+const write = (file: object) => `${JSON.stringify(file, null, 2)}\n`;
+
 /**
- * The set with `query` marked: its answers replaced, or with no answers
- * left out of the set. The newest mark comes first.
+ * The set's file with `query` marked: its answers replaced, or with no
+ * answers left out of the set. The newest mark comes first. A question it
+ * cannot read stays as it is. Refuses a file it cannot read.
  */
 export function markQuestion(
-	questions: readonly KnowledgeQuestion[],
+	text: string | null,
 	mark: {
 		query: string;
 		answers: readonly string[];
 		at: number;
 		by: string | null;
 	},
-): KnowledgeQuestion[] {
+): string {
+	const file = text === null ? { version: 1, questions: [] } : fileOf(text);
+	if (file === null) {
+		throw new Refusal(
+			"conflict",
+			"Night Shift cannot read the saved questions. Update Night Shift to change them.",
+		);
+	}
 	const key = questionKey(mark.query);
-	const others = questions.filter((q) => questionKey(q.query) !== key);
+	const others = file.questions.filter((item) => {
+		const parsed = questionSchema.safeParse(item);
+		return !parsed.success || questionKey(parsed.data.query) !== key;
+	});
 	const answers = [...new Set(mark.answers.map((path) => path.trim()))].filter(
 		(path) => path !== "",
 	);
-	if (answers.length === 0) return others;
-	return [
-		{ query: mark.query.trim(), answers, markedAt: mark.at, by: mark.by },
-		...others,
-	];
+	const marked: KnowledgeQuestion = {
+		query: mark.query.trim(),
+		answers,
+		markedAt: mark.at,
+		by: mark.by,
+	};
+	return write({
+		...file,
+		questions: answers.length === 0 ? others : [marked, ...others],
+	});
 }
