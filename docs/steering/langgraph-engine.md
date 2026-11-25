@@ -781,9 +781,11 @@ their running step. The thread can sit at several interrupts
   with words for that.
 - `RunResumed` names one Agent step, and the prompt goes to its session.
   One rule picks it from the log (`waitingSession` in `read/`): the step
-  that started last of those whose sessions wait. `planReentry` and the run
+  that started last of those whose sessions wait. Of two branches that
+  failed on their own outcome, only the one that the run's end names waits
+  for a prompt. `planReentry` and the run
   page (`RunDetail.resumeStepId`) ask that rule. When no session waits, the
-  page has no field for a prompt. The other branches continue with
+  page has no field, and `resumeRun` refuses a prompt (`takesPrompt`). The other branches continue with
   "Continue where you left off.".
 
 **Crash.** `crash.test.ts` walks a fan-out too, with a crash and a stop
