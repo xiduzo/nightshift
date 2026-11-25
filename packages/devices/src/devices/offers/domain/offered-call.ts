@@ -1,5 +1,5 @@
-import type { AgentProfileSettings } from "@nightshift/flows";
-import type { WorkCall } from "../../../contract";
+import { type AgentProfileSettings, isKnowledgeId } from "@nightshift/flows";
+import type { WorkCall, WorkRequest } from "../../../contract";
 import {
 	clampToCap,
 	type DeviceOffer,
@@ -13,6 +13,8 @@ export const NO_STARTER =
 	"Night Shift does not know who started this run. Start it again to run its steps.";
 
 type Named = { name: string };
+
+type RunNamed = { id: string; projectId: string };
 
 /**
  * What the admission asks of one call of another Person's run: whether an
@@ -73,22 +75,107 @@ export const GIT_CALLS: ReadonlySet<WorkCall["kind"]> = new Set([
 	"worktreeChanges",
 ]);
 
-/** The folder a call works in, for the calls that name one. */
-export function cwdOf(call: WorkCall): string | null {
+/**
+ * The folder a call works in, or null for a call that names none. A new
+ * kind of call says here which it is. The folder is as the Walker sent
+ * it: `worksIn` says whether it is one.
+ */
+export function folderNamed(call: WorkCall): { cwd: unknown } | null {
 	switch (call.kind) {
 		case "session":
 		case "exec":
 		case "readFile":
-			return call.input.cwd;
+			return { cwd: call.input.cwd };
 		case "itemBranch":
 		case "handOff":
 		case "snapshotWorktree":
 		case "worktreeChanges":
 		case "restoreWorktree":
-			return call.cwd;
-		default:
+			return { cwd: call.cwd };
+		case "capabilities":
+		case "worktree":
+		case "runFolder":
+		case "receiveHandOff":
+		case "callTool":
+		case "decide":
+		case "request":
+		case "secret":
 			return null;
 	}
+}
+
+/** Whether `cwd` is the run's own folder, or a folder inside it, with no `..` on the way. */
+export function worksIn(folder: string | null, cwd: unknown): boolean {
+	if (folder === null || typeof cwd !== "string") return false;
+	if (cwd === folder) return true;
+	return (
+		cwd.startsWith(`${folder}/`) &&
+		!cwd.slice(folder.length).split("/").includes("..")
+	);
+}
+
+/** Whether a run's id is one name: its folders here get their names from it. */
+export function isRunId(runId: string): boolean {
+	return isKnowledgeId(runId);
+}
+
+/** The run and the project a call names, beside those of its request. */
+function idsNamed(call: WorkCall): {
+	run?: RunNamed;
+	files?: { runId: string } | undefined;
+	knowledge?: ({ projectId: string } | undefined)[];
+} {
+	switch (call.kind) {
+		case "worktree":
+		case "restoreWorktree":
+		case "runFolder":
+		case "receiveHandOff":
+			return { run: call.run };
+		case "session":
+			return {
+				files: call.input.artifacts,
+				knowledge: [call.input.knowledge, call.input.knowledgeOnly],
+			};
+		case "exec":
+			return {
+				files: call.input.artifacts,
+				knowledge: [call.input.knowledge],
+			};
+		// A step's own `run` is the request's: `serveWork` sets it.
+		case "capabilities":
+		case "itemBranch":
+		case "handOff":
+		case "snapshotWorktree":
+		case "worktreeChanges":
+		case "readFile":
+		case "callTool":
+		case "decide":
+		case "request":
+		case "secret":
+			return {};
+	}
+}
+
+/**
+ * Why a call does not work for the run and the project of its request, or
+ * null when it does: the run it adds a folder for, the run it keeps files
+ * of, the project whose knowledge it reads.
+ */
+export function foreignIds(
+	call: WorkCall,
+	{ runId, projectId }: Pick<WorkRequest, "runId" | "projectId">,
+): string | null {
+	const { run, files, knowledge = [] } = idsNamed(call);
+	if (run && (run.id !== runId || run.projectId !== projectId)) {
+		return "This device adds a folder only for the run that asks.";
+	}
+	if (
+		(files && files.runId !== runId) ||
+		knowledge.some((read) => read && read.projectId !== projectId)
+	) {
+		return "This device works only for the run that asks.";
+	}
+	return null;
 }
 
 /**

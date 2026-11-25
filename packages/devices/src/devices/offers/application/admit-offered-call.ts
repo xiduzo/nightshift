@@ -18,14 +18,17 @@ import type {
 } from "../../../contract";
 import { createOfferUse, type OfferUse, offerKey } from "../domain/offer-use";
 import {
-	cwdOf,
+	folderNamed,
+	foreignIds,
 	GIT_CALLS,
+	isRunId,
 	NEEDS_CLONE,
 	NO_STARTER,
 	offeredCallRefusal,
 	offeredSession,
 	runFoldersOf,
 	snapshotsOf,
+	worksIn,
 } from "../domain/offered-call";
 import type { OfferedSessions } from "../domain/offered-sessions";
 import {
@@ -87,6 +90,9 @@ export type AdmitOfferedCallPorts = {
  * - The call works in this computer's Clone of the project, and only in
  *   the run's own worktree. For a project without a folder (ADR 22): only
  *   in the run's own run folder here, and with no git work.
+ * - The run and the project a call names are the request's own: the run
+ *   it adds a folder for or keeps files of, the project whose knowledge
+ *   it reads.
  * - An offered session runs the profile as its owner set it, with the
  *   permission mode no wider than the Offer's cap (`offeredSession`), and
  *   waits for one of the Offer's sessions while it runs its session cap.
@@ -208,26 +214,16 @@ export function admitOfferedCall(ports: AdmitOfferedCallPorts): OfferAdmission {
 			if (refusal !== null) return refuse(refusal);
 		}
 		if (!NEEDS_CLONE.has(call.kind)) return { offers };
+		if (runId !== null && !isRunId(runId)) {
+			return refuse("That is not the id of a run.");
+		}
 		const own = await ownFolder(request);
 		if ("refusal" in own) return own;
-		if (
-			(call.kind === "worktree" ||
-				call.kind === "restoreWorktree" ||
-				call.kind === "receiveHandOff" ||
-				call.kind === "runFolder") &&
-			(call.run.id !== runId || call.run.projectId !== projectId)
-		) {
-			return refuse("This device adds a folder only for the run that asks.");
-		}
-		const cwd = cwdOf(call);
-		if (cwd !== null) {
-			const { folder } = own;
-			if (
-				folder === null ||
-				(cwd !== folder && !cwd.startsWith(`${folder}/`))
-			) {
-				return refuse("This device works only in the run's own folder.");
-			}
+		const foreign = foreignIds(call, { runId, projectId });
+		if (foreign !== null) return refuse(foreign);
+		const named = folderNamed(call);
+		if (named && !worksIn(own.folder, named.cwd)) {
+			return refuse("This device works only in the run's own folder.");
 		}
 		return { offers };
 	}
