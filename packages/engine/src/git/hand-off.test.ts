@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
-import { mkdir, symlink } from "node:fs/promises";
+import { mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
 	commitFile,
@@ -9,7 +9,7 @@ import {
 	type Sandbox,
 } from "../testing/test-support";
 import { systemGit } from "./git";
-import { branchHasOtherWork, branchInUse } from "./hand-off";
+import { branchHasOtherWork, branchInUse, notOnRemote } from "./hand-off";
 import { createRunBranches } from "./run-branches";
 import { keptRefsOf, worktreeLocation } from "./worktree-places";
 import {
@@ -64,20 +64,6 @@ describe("a hand-off of a branch the run made", () => {
 			"-m",
 			`work ${Math.random()}`,
 			...extra,
-		]);
-	const commitSubject = (cwd: string, subject: string) =>
-		mustGit(cwd, [
-			"-c",
-			"user.name=Test",
-			"-c",
-			"user.email=test@nightshift.invalid",
-			"-c",
-			"commit.gpgsign=false",
-			"commit",
-			"-q",
-			"--allow-empty",
-			"-m",
-			subject,
 		]);
 	const tip = (cwd: string, branch: string) =>
 		mustGit(cwd, ["rev-parse", `refs/heads/${branch}`]);
@@ -198,81 +184,394 @@ describe("a hand-off of a branch the run made", () => {
 		]);
 	});
 
-	describe("by git's own logs", () => {
-		afterEach(() => {
-			delete process.env.GIT_COMMITTER_DATE;
-		});
-		const at = (seconds: number) => {
-			process.env.GIT_COMMITTER_DATE = `@${1_700_000_000 + seconds} +0000`;
-		};
-		/** What the run noted on the first computer, after it handed `feat` on. */
-		const noted = async () => {
-			await pushRunBranch(copyA, own);
-			return (await createRunBranches(systemGit()).listKept(a)).get(shortId);
-		};
-
-		test("the run's: made with a checkout in its copy", async () => {
-			at(1);
-			await mustGit(copyA, ["checkout", "-q", "-b", "feat"]);
-			at(2);
-			await commit(copyA);
-			expect(await noted()).toEqual([keptRefsOf(shortId).handed("feat")]);
-		});
-
-		test("the run's: made from a commit of the run", async () => {
-			at(1);
-			await commit(copyA);
-			await mustGit(copyA, ["checkout", "-q", "-b", "feat"]);
-			expect(await noted()).toEqual([keptRefsOf(shortId).handed("feat")]);
-		});
-
-		test("not known, without logs", async () => {
-			await mustGit(a, ["config", "core.logAllRefUpdates", "false"]);
-			await mustGit(copyA, ["checkout", "-q", "-b", "feat"]);
-			await commit(copyA);
-			expect(await noted()).toBeUndefined();
-		});
-
-		test("a person's: made before the copy took it", async () => {
-			at(1);
-			await mustGit(a, ["branch", "feat", own]);
-			at(2);
+	describe("the logs git keeps in the copy", () => {
+		/** A branch of a person on the first computer, with a commit of theirs, handed on from the copy. */
+		async function theirFeat(before: () => Promise<unknown>) {
+			await mustGit(a, ["checkout", "-q", "-b", "feat"]);
+			await commit(a);
+			await mustGit(a, ["checkout", "-q", "main"]);
+			const theirs = await tip(a, "feat");
+			await before();
 			await mustGit(copyA, ["checkout", "-q", "feat"]);
 			await commit(copyA);
-			expect(await noted()).toBeUndefined();
+			await take(b, await pushRunBranch(copyA, own));
+			// The other computer leaves their commit out.
+			await mustGit(copyB, ["reset", "-q", "--hard", `${theirs}~1`]);
+			await commit(copyB);
+			const back = await pushRunBranch(copyB, own);
+			const was = await tip(a, "feat");
+			await expect(take(a, back)).rejects.toThrow(branchHasOtherWork("feat"));
+			expect(await tip(a, "feat")).toBe(was);
+		}
+		const branchLog = () => join(a, ".git", "logs", "refs", "heads", "feat");
+
+		test("are known from the first commit of the branch only", async () => {
+			await theirFeat(async () => {});
 		});
 
-		test("a person's: made while the copy did something else", async () => {
-			at(1);
-			await mustGit(a, ["branch", "feat", own]);
-			await mustGit(copyA, ["checkout", "-q", "-b", "other"]);
-			await commitSubject(copyA, "go to feat");
-			at(2);
-			await mustGit(copyA, ["checkout", "-q", "feat"]);
-			expect(await noted()).toBeUndefined();
+		test("without their first lines do not make it the run's", async () => {
+			await theirFeat(() => writeFile(branchLog(), ""));
 		});
 
-		test("a person's: a commit came to it that the copy did not make", async () => {
-			at(1);
-			await mustGit(copyA, ["checkout", "-q", "-b", "feat"]);
-			await mustGit(copyA, ["checkout", "-q", "--detach"]);
-			const theirs = await mustGit(a, [
+		test("that start later do not make it the run's", async () => {
+			await theirFeat(() => rm(branchLog()));
+		});
+	});
+
+	describe("work that an agent does on the branch it made", () => {
+		const git = (cwd: string, ...args: string[]) =>
+			mustGit(cwd, [
 				"-c",
 				"user.name=Test",
 				"-c",
 				"user.email=test@nightshift.invalid",
-				"commit-tree",
-				"-p",
-				"feat",
-				"-m",
-				"theirs",
-				"feat^{tree}",
+				"-c",
+				"commit.gpgsign=false",
+				...args,
 			]);
-			await mustGit(a, ["update-ref", "refs/heads/feat", theirs]);
-			await mustGit(copyA, ["checkout", "-q", "feat"]);
-			await commit(copyA);
-			expect(await noted()).toBeUndefined();
+		const file = async (cwd: string, name: string) => {
+			await commitFile(cwd, name);
+		};
+		/** Someone pushes to main of the remote. */
+		async function mainMoves() {
+			const other = join(sandbox.root, "other");
+			await mustGit(sandbox.root, [
+				"clone",
+				"-q",
+				join(sandbox.root, "origin.git"),
+				other,
+			]);
+			await file(other, "elsewhere.txt");
+			await git(other, "push", "-q", "origin", "main");
+		}
+		const work: Record<string, () => Promise<unknown>> = {
+			"pull --rebase": async () => {
+				await mainMoves();
+				await git(copyA, "pull", "-q", "--rebase", "origin", "main");
+			},
+			"a pull that merges": async () => {
+				await mainMoves();
+				await git(
+					copyA,
+					"pull",
+					"-q",
+					"--no-rebase",
+					"--no-edit",
+					"origin",
+					"main",
+				);
+			},
+			"reset --soft to its base, and a commit": async () => {
+				await git(copyA, "reset", "-q", "--soft", "HEAD~2");
+				await git(copyA, "commit", "-q", "-m", "one");
+			},
+			"a new name": () => git(copyA, "branch", "-m", "feat", "topic"),
+		};
+		for (const [name, does] of Object.entries(work)) {
+			test(`${name}: goes there and back, rewritten`, async () => {
+				await mustGit(copyA, ["checkout", "-q", "-b", "feat"]);
+				await file(copyA, "one.txt");
+				await file(copyA, "two.txt");
+				await does();
+				await take(b, await pushRunBranch(copyA, own));
+				await commit(copyB, "--amend");
+				const back = await pushRunBranch(copyB, own);
+				await take(a, back);
+				expect(await tip(a, back.branch)).toBe(back.commit);
+			});
+		}
+
+		/** Pulls into the branch, hands it on, and takes it back without what it pulled. */
+		async function withoutPulled(pull: () => Promise<unknown>) {
+			await mustGit(copyA, ["checkout", "-q", "-b", "feat"]);
+			await file(copyA, "one.txt");
+			const base = await tip(b, "main");
+			await pull();
+			await file(copyA, "two.txt");
+			const tipA = await tip(a, "feat");
+			await take(b, await pushRunBranch(copyA, own));
+			await git(copyB, "reset", "-q", "--hard", base);
+			await commit(copyB, "--amend");
+			const back = await pushRunBranch(copyB, own);
+			await expect(take(a, back)).rejects.toThrow(branchHasOtherWork("feat"));
+			expect(await tip(a, "feat")).toBe(tipA);
+		}
+		/** A clone of someone else, with a commit of theirs on `branch`. */
+		async function someone(branch: string) {
+			const there = join(sandbox.root, "someone");
+			const origin = join(sandbox.root, "origin.git");
+			await mustGit(sandbox.root, ["clone", "-q", origin, there]);
+			await mustGit(there, ["checkout", "-q", branch]);
+			await file(there, "theirs.txt");
+			return there;
+		}
+
+		for (const how of ["--no-rebase", "--rebase"]) {
+			test(`a commit that only a folder has stays (pull ${how})`, async () => {
+				await withoutPulled(async () => {
+					const there = await someone("main");
+					await git(copyA, "pull", "-q", how, "--no-edit", there, "main");
+				});
+			});
+
+			test(`a commit that someone put on the remote's branch stays (pull ${how})`, async () => {
+				await withoutPulled(async () => {
+					await mustGit(copyA, ["push", "-q", "origin", "feat"]);
+					const there = await someone("feat");
+					await mustGit(there, ["push", "-q", "origin", "feat"]);
+					await git(copyA, "pull", "-q", how, "--no-edit", "origin", "feat");
+				});
+			});
+		}
+
+		for (const [name, keeps] of Object.entries({
+			"names of the run": async (theirs: string) => {
+				await mustGit(a, ["branch", `${own}-keep`, theirs]);
+				await mustGit(a, ["push", "-q", "origin", `${own}-keep`]);
+			},
+			"a branch it handed on": async (theirs: string) => {
+				await mustGit(a, ["tag", "their-work", theirs]);
+				await mustGit(copyA, ["checkout", "-q", "-b", "other"]);
+				await mustGit(copyA, ["reset", "-q", "--hard", theirs]);
+				await pushRunBranch(copyA, own);
+				await mustGit(copyA, ["checkout", "-q", own]);
+				await mustGit(a, ["tag", "-d", "their-work"]);
+			},
+		})) {
+			test(`a commit that only ${name} has stays`, async () => {
+				const there = await someone("main");
+				await mustGit(a, ["fetch", "-q", there, "main"]);
+				await keeps(await mustGit(a, ["rev-parse", "FETCH_HEAD"]));
+				await withoutPulled(() =>
+					git(copyA, "pull", "-q", "--no-rebase", "--no-edit", there, "main"),
+				);
+			});
+		}
+
+		for (const gone of [false, true]) {
+			test(`from the run's own branch, with work of another computer${gone ? ", that went" : ""}`, async () => {
+				await commit(copyA);
+				await take(b, await pushRunBranch(copyA, own));
+				await commit(copyB);
+				await take(a, await pushRunBranch(copyB, own));
+				await mustGit(copyA, ["checkout", "-q", "-b", "feat"]);
+				await commit(copyA);
+				// The remote still has it.
+				if (gone) await mustGit(a, ["branch", "-D", own]);
+				else
+					await mustGit(a, ["update-ref", "-d", `refs/remotes/origin/${own}`]);
+				await take(b, await pushRunBranch(copyA, own));
+				await commit(copyB, "--amend");
+				const back = await pushRunBranch(copyB, own);
+				await take(a, back);
+				expect(await tip(a, "feat")).toBe(back.commit);
+			});
+		}
+
+		test("a commit that a tag has is kept by it", async () => {
+			const there = await someone("main");
+			await mustGit(copyA, ["checkout", "-q", "-b", "feat"]);
+			await file(copyA, "one.txt");
+			await git(copyA, "pull", "-q", "--no-rebase", "--no-edit", there, "main");
+			await mustGit(a, ["tag", "their-work", "feat^2"]);
+			await take(b, await pushRunBranch(copyA, own));
+			await commit(copyB, "--amend");
+			const back = await pushRunBranch(copyB, own);
+			await take(a, back);
+			expect(await tip(a, "feat")).toBe(back.commit);
 		});
+
+		test("a person's branch that it merged stays where it is", async () => {
+			await mustGit(a, ["checkout", "-q", "-b", "theirs"]);
+			await file(a, "theirs.txt");
+			await mustGit(a, ["checkout", "-q", "main"]);
+			const theirs = await tip(a, "theirs");
+			await mustGit(copyA, ["checkout", "-q", "-b", "feat"]);
+			await file(copyA, "one.txt");
+			await git(copyA, "pull", "-q", "--no-rebase", "--no-edit", ".", "theirs");
+			await take(b, await pushRunBranch(copyA, own));
+			await git(copyB, "reset", "-q", "--hard", "HEAD~1");
+			await take(a, await pushRunBranch(copyB, own));
+			expect(await tip(a, "theirs")).toBe(theirs);
+			// Nor does it become the run's.
+			await mustGit(copyA, ["checkout", "-q", "theirs"]);
+			await git(copyA, "pull", "-q", "--ff", ".", "feat").catch(() => {});
+			await commit(copyA);
+			const sent = await pushRunBranch(copyA, own);
+			await mustGit(copyA, [
+				"push",
+				"-q",
+				"-f",
+				"origin",
+				`${sent.commit}~1:theirs`,
+			]);
+			await mustGit(a, ["push", "-q", "-f", "origin", "main:theirs"]);
+			await expect(
+				take(a, { branch: "theirs", commit: await tip(a, "main") }),
+			).rejects.toThrow(branchHasOtherWork("theirs"));
+		});
+	});
+
+	test("work that the remote's branch does not have is not taken", async () => {
+		const sent = await handFeat();
+		const theirs = await mustGit(b, [
+			"-c",
+			"user.name=Test",
+			"-c",
+			"user.email=test@nightshift.invalid",
+			"commit-tree",
+			"-p",
+			sent.commit,
+			"-m",
+			"theirs",
+			`${sent.commit}^{tree}`,
+		]);
+		for (const branch of ["feat", own]) {
+			const before = [await refs(b), await copies(b)];
+			await expect(take(b, { branch, commit: theirs })).rejects.toThrow(
+				notOnRemote(branch),
+			);
+			expect([await refs(b), await copies(b)]).toEqual(before);
+		}
+		// What the remote's branch had before is on it too.
+		await commit(copyA);
+		await pushRunBranch(copyA, own);
+		await take(b, sent);
+	});
+
+	test("a clone that is not deep takes the work, and hands it back", async () => {
+		const shallow = join(sandbox.root, "shallow", "clone");
+		await mkdir(join(sandbox.root, "shallow"));
+		await mustGit(copyA, ["checkout", "-q", "-b", "feat"]);
+		await commit(copyA);
+		await commit(copyA);
+		await mustGit(sandbox.root, [
+			"clone",
+			"-q",
+			"--depth",
+			"1",
+			`file://${join(sandbox.root, "origin.git")}`,
+			shallow,
+		]);
+		const there = worktreeLocation(shallow, shortId).worktreePath;
+		await take(shallow, await pushRunBranch(copyA, own));
+		await commit(there, "--amend");
+		const back = await pushRunBranch(there, own);
+		await take(a, back);
+		expect(await tip(a, "feat")).toBe(back.commit);
+		await commit(copyA, "--amend");
+		const again = await pushRunBranch(copyA, own);
+		await take(shallow, again);
+		expect(await tip(shallow, "feat")).toBe(again.commit);
+	});
+
+	test("the work on no branch goes on the run's own", async () => {
+		await mustGit(copyA, ["checkout", "-q", "--detach"]);
+		await commit(copyA);
+		const sent = await pushRunBranch(copyA, own);
+		expect(sent.branch).toBe(own);
+		await take(b, sent);
+		expect(await tip(b, own)).toBe(sent.commit);
+	});
+
+	test("a hook that fails leaves no copy, and the branch as it was", async () => {
+		const sent = await handFeat();
+		await mustGit(b, ["worktree", "remove", copyB]);
+		await writeFile(
+			join(b, ".git", "hooks", "post-checkout"),
+			"#!/bin/sh\nexit 1\n",
+			{ mode: 0o755 },
+		);
+		await commit(copyA, "--amend");
+		const again = await pushRunBranch(copyA, own);
+		const before = [await refs(b), await copies(b)];
+		await expect(take(b, again)).rejects.toThrow();
+		expect([await refs(b), await copies(b)]).toEqual(before);
+		expect(existsSync(copyB)).toBe(false);
+		await rm(join(b, ".git", "hooks", "post-checkout"));
+		await take(b, again);
+		expect(await currentBranch(copyB)).toBe("feat");
+		expect(sent.commit).not.toBe(again.commit);
+	});
+
+	test("what was at the place of the copy stays", async () => {
+		const sent = await handFeat();
+		await mustGit(b, ["worktree", "remove", copyB]);
+		await writeFile(copyB, "a file\n");
+		await expect(take(b, sent)).rejects.toThrow();
+		expect(await readFile(copyB, "utf8")).toBe("a file\n");
+	});
+
+	test("a branch that a person removed there is taken again", async () => {
+		await handFeat();
+		await mustGit(copyB, ["checkout", "-q", "--detach"]);
+		await mustGit(b, ["branch", "-D", "feat"]);
+		for (let times = 0; times < 2; times++) {
+			await commit(copyA, "--amend");
+			const again = await pushRunBranch(copyA, own);
+			await take(b, again);
+			expect(await tip(b, "feat")).toBe(again.commit);
+		}
+	});
+
+	test("a copy that is gone, but that git still knows, stays known", async () => {
+		const sent = await handFeat();
+		await rm(copyB, { recursive: true });
+		const before = [await refs(b), await copies(b)];
+		await expect(take(b, sent)).rejects.toThrow();
+		expect([await refs(b), await copies(b)]).toEqual(before);
+	});
+
+	test("a branch moves together with its note", async () => {
+		await handFeat();
+		await commit(copyA, "--amend");
+		const again = await pushRunBranch(copyA, own);
+		const before = await refs(b);
+		const note = keptRefsOf(shortId).handed("feat");
+		const theirs = await tip(b, "main");
+		const racing = gitWith(async (_args, input) => {
+			if (input !== "") await mustGit(b, ["update-ref", note, theirs]);
+		});
+		await expect(
+			racing.pullRunBranch({ repoPath: b, shortId, ...again }),
+		).rejects.toThrow();
+		await mustGit(b, ["update-ref", note, await tip(b, "feat")]);
+		expect(await refs(b)).toBe(before);
+	});
+
+	test("a branch that got commits after the move is not put back", async () => {
+		for (const isNew of [true, false]) {
+			if (isNew) await mustGit(copyA, ["checkout", "-q", "-b", "feat"]);
+			else await take(b, await pushRunBranch(copyA, own));
+			await commit(copyA);
+			const sent = await pushRunBranch(copyA, own);
+			let theirs = "";
+			const fails = gitWith(async (args) => {
+				if (args[0] !== "checkout" || args[2] !== "feat" || theirs !== "")
+					return;
+				theirs = await mustGit(b, [
+					"-c",
+					"user.name=Test",
+					"-c",
+					"user.email=test@nightshift.invalid",
+					"commit-tree",
+					"-p",
+					"feat",
+					"-m",
+					"theirs",
+					"feat^{tree}",
+				]);
+				await mustGit(b, ["update-ref", "refs/heads/feat", theirs]);
+				throw new Error("no checkout");
+			});
+			await expect(
+				fails.pullRunBranch({ repoPath: b, shortId, ...sent }),
+			).rejects.toThrow("no checkout");
+			expect(await tip(b, "feat")).toBe(theirs);
+			await mustGit(b, ["worktree", "prune"]);
+			if (existsSync(copyB)) await mustGit(b, ["worktree", "remove", copyB]);
+			await mustGit(b, ["branch", "-D", "feat"]);
+		}
 	});
 
 	test("a branch there with commits of its own stays as it is", async () => {
@@ -319,6 +618,13 @@ describe("a hand-off of a branch the run made", () => {
 		await mustGit(copyB, ["checkout", "-q", "feat"]);
 		await commit(copyB);
 		const mixed = await pushRunBranch(copyB, own);
+		await mustGit(a, [
+			"push",
+			"-q",
+			"-f",
+			"origin",
+			`${again.commit}:refs/heads/feat`,
+		]);
 		await expect(
 			take(b, { branch: "feat", commit: again.commit }),
 		).rejects.toThrow(branchHasOtherWork("feat"));
@@ -379,12 +685,14 @@ describe("a hand-off of a branch the run made", () => {
 	});
 
 	/** Git as it is, with something that happens right before one command. */
-	function gitWith(before: (args: string[]) => Promise<void> | undefined) {
+	function gitWith(
+		before: (args: string[], input: string) => Promise<void> | undefined,
+	) {
 		const system = systemGit();
 		return createWorktrees({
 			...system,
 			run: async (cwd, args, options) => {
-				await before(args);
+				await before(args, options?.input ?? "");
 				return system.run(cwd, args, options);
 			},
 		});
@@ -410,9 +718,8 @@ describe("a hand-off of a branch the run made", () => {
 			]);
 			const was = await tip(b, "feat");
 			let done = false;
-			const racing = gitWith(async (args) => {
-				if (done || args[0] !== "update-ref" || args[1] !== "refs/heads/feat")
-					return;
+			const racing = gitWith(async (_args, input) => {
+				if (done || !input.startsWith("update refs/heads/feat ")) return;
 				done = true;
 				await mustGit(b, ["update-ref", "refs/heads/feat", theirs]);
 			});
@@ -435,8 +742,8 @@ describe("a hand-off of a branch the run made", () => {
 		await commit(copyA);
 		const sent = await pushRunBranch(copyA, own);
 		const theirs = await tip(b, (await currentBranch(b)) as string);
-		const racing = gitWith(async (args) => {
-			if (args[0] === "update-ref" && args[1] === "refs/heads/feat")
+		const racing = gitWith(async (_args, input) => {
+			if (input.startsWith("update refs/heads/feat "))
 				await mustGit(b, ["branch", "-f", "feat", theirs]);
 		});
 		await expect(

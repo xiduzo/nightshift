@@ -28,6 +28,8 @@ export type GitRunOptions = {
 	timeoutMs?: number;
 	/** Keeps at most this many bytes of the output, then stops the command. Default: no limit. */
 	maxOutputBytes?: number;
+	/** What the command reads. Default: nothing. */
+	input?: string;
 };
 
 /**
@@ -144,7 +146,7 @@ export async function runProcess(
 	const proc = Bun.spawn(argv, {
 		cwd,
 		env: { ...gitEnv(), ...options.env },
-		stdin: "ignore",
+		stdin: options.input === undefined ? "ignore" : Buffer.from(options.input),
 		stdout: "pipe",
 		stderr: "pipe",
 		...(options.timeoutMs ? { timeout: options.timeoutMs } : {}),

@@ -1,11 +1,13 @@
-import { mkdir, realpath, stat } from "node:fs/promises";
-import { dirname } from "node:path";
+import { lstat, mkdir, readFile, realpath, stat } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
 import { Refusal } from "@nightshift/refusal";
 import { DirtyWorktreeError } from "./dirty-worktree";
-import { type Git, gitOrThrow } from "./git";
+import { type Git, GitError, gitOrThrow } from "./git";
 import { branchName, objectId } from "./git-names";
+import { runMade } from "./run-made";
 import {
 	isRunsBranch,
+	KEPT_REFS,
 	keptRefsOf,
 	shortIdOfBranch,
 	worktreeLocation,
@@ -35,15 +37,22 @@ function changesShown(changes: readonly string[]): string {
 }
 
 /** A branch of a clone on its way to `commit`, from where it was read (null: it is new). */
-type BranchMove = { branch: string; commit: string; from: string | null };
-
-/** What git writes in the log of HEAD for a commit it made there. */
-const MADE_HERE =
-	/^(commit( \([a-z]+\))?:|rebase( -i)? \((pick|reword|edit|squash|fixup|continue)\)|cherry-pick:|revert:|merge .*: Merge made)/;
+type BranchMove = {
+	branch: string;
+	commit: string;
+	from: string | null;
+	/** The note that goes with it, from what it was, when the run knows all that is on the branch. */
+	note: { ref: string; from: string | null } | null;
+};
 
 /** The refusal of a Hand-off to a computer whose own branch of that name has other commits. */
 export function branchHasOtherWork(branch: string): string {
 	return `The branch "${branch}" on this device has commits that the run does not have. Rename that branch there, then try again.`;
+}
+
+/** The refusal of a Hand-off of work that the remote's branch does not have. */
+export function notOnRemote(branch: string): string {
+	return `The branch "${branch}" of the project's remote does not have the run's work. Try again.`;
 }
 
 /** The refusal of a Hand-off of a branch that a person has open. */
@@ -90,14 +99,18 @@ export function createHandOff(git: Git, parts: HandOffParts) {
 		const madeHere =
 			shortId !== null &&
 			!isRunsBranch(shortId, branch) &&
-			(await madeInCopy(cwd, shortId, branch));
+			(await madeInCopy(cwd, { shortId, branch, tip: commit }));
 		const refspecs = [`+${commit}:refs/heads/${branch}`];
 		// A computer that took the work on another branch may not have the run's own.
 		if (branch !== runBranch && (await branchExists(cwd, runBranch))) {
 			refspecs.push(`+refs/heads/${runBranch}:refs/heads/${runBranch}`);
 		}
 		await gitOrThrow(git, cwd, ["push", "-q", "origin", ...refspecs]);
-		if (madeHere) await noteHanded(cwd, shortId, branch, commit);
+		if (madeHere) {
+			// The work is handed on. Without the note, a later rewrite is refused.
+			const ref = keptRefsOf(shortId).handed(branch);
+			await git.run(cwd, ["update-ref", ref, commit]);
+		}
 		return { commit, branch };
 	}
 
@@ -131,98 +144,94 @@ export function createHandOff(git: Git, parts: HandOffParts) {
 		return result.exitCode === 0 ? result.stdout : null;
 	}
 
-	/** Notes that tip. */
-	async function noteHanded(
+	/** A file git keeps, or nothing. */
+	async function gitFile(cwd: string, path: string): Promise<string> {
+		const found = await git.run(cwd, ["rev-parse", "--git-path", path]);
+		if (found.exitCode !== 0) return "";
+		return readFile(resolve(cwd, found.stdout), "utf8").catch(() => "");
+	}
+
+	/** Whether the copy at `cwd` made all that is on `branch` at `tip` (`runMade`). */
+	async function madeInCopy(
 		cwd: string,
+		run: { shortId: string; branch: string; tip: string },
+	): Promise<boolean> {
+		const handed = await handedTip(cwd, run.shortId, run.branch);
+		const [branch, head, only] = await Promise.all([
+			gitFile(cwd, `logs/refs/heads/${run.branch}`),
+			gitFile(cwd, "logs/HEAD"),
+			onlyOn(cwd, run, handed),
+		]);
+		return runMade({ branch, head }, { ...run, handed, only });
+	}
+
+	/**
+	 * The commits of `branch` that nothing else has: no tag, and no branch but
+	 * the ones that runs move (their own names, and the ones they handed on).
+	 * What the run's own branch has is the run's, also from another computer.
+	 */
+	async function onlyOn(
+		cwd: string,
+		{ shortId, branch, tip }: { shortId: string; branch: string; tip: string },
+		handed: string | null,
+	): Promise<string[]> {
+		const list = async (...args: string[]) =>
+			(await gitOrThrow(git, cwd, args)).split("\n").filter(Boolean);
+		const noted = new Set(
+			(await list("for-each-ref", "--format=%(refname)", KEPT_REFS)).map(
+				(ref) => ref.slice(ref.lastIndexOf("/") + 1),
+			),
+		);
+		const names = await list(
+			"for-each-ref",
+			"--format=%(refname:lstrip=2)",
+			"refs/heads",
+		);
+		const own = worktreeLocation("", shortId).branch;
+		const handedRef = keptRefsOf("").handed;
+		const moved = [
+			branch,
+			`${worktreeLocation("", "").branch}*`,
+			...names.filter((name) =>
+				noted.has(handedRef(name).slice(handedRef(name).lastIndexOf("/") + 1)),
+			),
+		];
+		return list(
+			"rev-list",
+			"--ignore-missing",
+			tip,
+			"--not",
+			...moved.map((name) => `--exclude=${name}`),
+			"--branches",
+			...moved.map((name) => `--exclude=origin/${name}`),
+			"--remotes",
+			"--tags",
+			`refs/heads/${own}`,
+			`refs/remotes/origin/${own}`,
+			...(handed === null ? [] : [handed]),
+		);
+	}
+
+	/**
+	 * The move of a branch to `commit`. Refuses one that would leave commits
+	 * of it behind. With a note when the run knows all that is on it: the
+	 * branch is new here, or is as the run last handed it on.
+	 */
+	async function moveOf(
+		repoPath: string,
 		shortId: string,
 		branch: string,
 		commit: string,
-	): Promise<void> {
-		const ref = keptRefsOf(shortId).handed(branch);
-		const noted = await git.run(cwd, ["update-ref", ref, commit]);
-		if (noted.exitCode !== 0) {
-			// The work is handed on. A branch the run rewrites later is refused.
-			console.warn(
-				`[projects] noting the hand-off of ${branch} failed: ${noted.stderr}`,
-			);
+	): Promise<BranchMove> {
+		const from = await branchTip(repoPath, branch);
+		const move = { branch, commit, from, note: null };
+		if (isRunsBranch(shortId, branch)) return move;
+		const handed = await handedTip(repoPath, shortId, branch);
+		if (from === null || from === handed) {
+			const ref = keptRefsOf(shortId).handed(branch);
+			return { ...move, note: { ref, from: handed } };
 		}
-	}
-
-	/** What the log of a ref says, newest first: each commit it was at, when, and why. */
-	async function refLog(
-		cwd: string,
-		ref: string,
-	): Promise<{ commit: string; at: string; why: string }[]> {
-		const log = await git.run(cwd, [
-			"log",
-			"-g",
-			"--date=unix",
-			"--format=%H%x09%gd%x09%gs",
-			ref,
-			"--",
-		]);
-		if (log.exitCode !== 0) return [];
-		return log.stdout
-			.split("\n")
-			.filter(Boolean)
-			.map((line) => {
-				const [commit = "", name = "", ...why] = line.split("\t");
-				const at = name.slice(name.lastIndexOf("@{"));
-				return { commit, at, why: why.join("\t") };
-			});
-	}
-
-	/**
-	 * Whether all that is on `branch` is the run's own: the run made the
-	 * branch in its copy at `cwd`, or handed it on before, and only commits
-	 * made in that copy came to it since. Git's logs of the branch and of the
-	 * copy's HEAD say so. Without them it is not known.
-	 */
-	async function madeInCopy(
-		cwd: string,
-		shortId: string,
-		branch: string,
-	): Promise<boolean> {
-		const handed = await handedTip(cwd, shortId, branch);
-		const [entries, head] = await Promise.all([
-			refLog(cwd, `refs/heads/${branch}`),
-			refLog(cwd, "HEAD"),
-		]);
-		const made = new Set(
-			head.filter((e) => MADE_HERE.test(e.why)).map((e) => e.commit),
-		);
-		for (const entry of entries) {
-			if (entry.commit === handed) return true;
-			if (!made.has(entry.commit)) {
-				// Its first commit: the branch was made with a checkout in the copy.
-				return (
-					entry === entries.at(-1) &&
-					head.some(
-						(e) =>
-							e.at === entry.at &&
-							e.why.startsWith("checkout: ") &&
-							e.why.endsWith(` to ${branch}`),
-					)
-				);
-			}
-		}
-		return entries.length > 0;
-	}
-
-	/**
-	 * Refuses a move of a branch that would leave commits of it behind.
-	 * Returns whether the run knows all that is on the branch: the branch is
-	 * new here, or is as the run last handed it on.
-	 */
-	async function refuseLeftBehind(
-		repoPath: string,
-		shortId: string,
-		{ branch, commit, from }: BranchMove,
-	): Promise<boolean> {
-		if (isRunsBranch(shortId, branch)) return false;
-		if (from === null) return true;
-		if ((await handedTip(repoPath, shortId, branch)) === from) return true;
-		if (await isAncestor(repoPath, from, commit)) return false;
+		if (await isAncestor(repoPath, from, commit)) return move;
 		throw new Refusal("conflict", branchHasOtherWork(branch));
 	}
 
@@ -248,30 +257,51 @@ export function createHandOff(git: Git, parts: HandOffParts) {
 		}
 	}
 
-	/** Moves the branch, only when it is still where it was read. */
-	async function moveBranch(
+	/** Changes refs in one step, each only when it is still where it was read (null: it is not there). */
+	async function changeRefs(
 		cwd: string,
-		{ branch, commit, from }: BranchMove,
+		changes: readonly {
+			ref: string;
+			from: string | null;
+			to: string | null;
+		}[],
 	): Promise<void> {
-		await gitOrThrow(git, cwd, [
-			"update-ref",
-			`refs/heads/${branch}`,
-			commit,
-			from ?? "0".repeat(commit.length),
+		const args = ["update-ref", "--stdin"];
+		const none = (id: string) => "0".repeat(id.length);
+		const input = changes
+			.map(({ ref, from, to }) => {
+				const any = to ?? from ?? "";
+				return `update ${ref} ${to ?? none(any)} ${from ?? none(any)}\n`;
+			})
+			.join("");
+		const result = await git.run(cwd, args, { input });
+		if (result.exitCode !== 0) {
+			throw new GitError(args, result.exitCode, result.stderr);
+		}
+	}
+
+	/** Moves the branch, with its note. */
+	function moveBranch(
+		cwd: string,
+		{ branch, commit, from, note }: BranchMove,
+	): Promise<void> {
+		return changeRefs(cwd, [
+			{ ref: `refs/heads/${branch}`, from, to: commit },
+			...(note ? [{ ref: note.ref, from: note.from, to: commit }] : []),
 		]);
 	}
 
-	/** Moves the branch back, when nothing else moved it since. */
+	/** Moves the branch back, with its note, when nothing else moved them since. */
 	async function moveBack(
 		cwd: string,
-		{ branch, commit, from }: BranchMove,
+		{ branch, commit, from, note }: BranchMove,
 	): Promise<void> {
-		await git.run(
-			cwd,
-			from === null
-				? ["update-ref", "-d", `refs/heads/${branch}`, commit]
-				: ["update-ref", `refs/heads/${branch}`, from, commit],
-		);
+		await changeRefs(cwd, [
+			{ ref: `refs/heads/${branch}`, from: commit, to: from },
+			...(note ? [{ ref: note.ref, from: commit, to: note.from }] : []),
+		]).catch((error) => {
+			console.warn(`[projects] ${branch} was not put back: ${error}`);
+		});
 	}
 
 	/** Puts the run's worktree on the branch at its new commit. */
@@ -313,7 +343,6 @@ export function createHandOff(git: Git, parts: HandOffParts) {
 		move: BranchMove,
 	): Promise<void> {
 		await mkdir(dirname(worktreePath), { recursive: true });
-		let added = false;
 		let moved = false;
 		try {
 			await gitOrThrow(git, repoPath, [
@@ -324,7 +353,6 @@ export function createHandOff(git: Git, parts: HandOffParts) {
 				worktreePath,
 				move.commit,
 			]);
-			added = true;
 			await moveBranch(worktreePath, move);
 			moved = true;
 			await gitOrThrow(git, worktreePath, [
@@ -335,13 +363,10 @@ export function createHandOff(git: Git, parts: HandOffParts) {
 			]);
 		} catch (error) {
 			if (moved) await moveBack(repoPath, move);
-			if (added) {
-				await git.run(repoPath, [
-					"worktree",
-					"remove",
-					"--force",
-					worktreePath,
-				]);
+			// Git makes the folder before a hook of the project fails.
+			if (await lstat(worktreePath).catch(() => null)) {
+				const args = ["worktree", "remove", "--force", worktreePath];
+				await git.run(repoPath, args);
 			}
 			throw error;
 		}
@@ -372,12 +397,12 @@ export function createHandOff(git: Git, parts: HandOffParts) {
 			`+refs/heads/${branch}:refs/remotes/origin/${branch}`,
 		]);
 		const { worktreePath } = worktreeLocation(repoPath, input.shortId);
-		const move: BranchMove = {
-			branch,
-			commit: await resolveCommit(repoPath, commit),
-			from: await branchTip(repoPath, branch),
-		};
-		const known = await refuseLeftBehind(repoPath, input.shortId, move);
+		await resolveCommit(repoPath, commit);
+		const remote = `refs/remotes/origin/${branch}`;
+		if (!(await isAncestor(repoPath, commit, remote))) {
+			throw new Refusal("conflict", notOnRemote(branch));
+		}
+		const move = await moveOf(repoPath, input.shortId, branch, commit);
 		await refuseCheckedOut(repoPath, worktreePath, branch);
 		const exists = await stat(worktreePath).catch(() => null);
 		if (exists?.isDirectory()) {
@@ -393,7 +418,6 @@ export function createHandOff(git: Git, parts: HandOffParts) {
 			if (input.author)
 				await setWorktreeAuthor(input.repoPath, worktreePath, input.author);
 		}
-		if (known) await noteHanded(repoPath, input.shortId, branch, commit);
 		return { worktreePath, branch, baseRef: commit };
 	}
 
