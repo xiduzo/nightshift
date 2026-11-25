@@ -2,6 +2,40 @@ import type { StepSummary } from "../types";
 
 type Step = Pick<StepSummary, "id" | "nodeId" | "endedAt" | "scope">;
 
+/** How a step ended that a resume of its run takes up. Any other step is done. */
+const TAKEN_UP: ReadonlySet<string> = new Set([
+	"stopped",
+	"error",
+	"interrupted",
+	"fail",
+	"needs-input",
+]);
+
+/**
+ * The step a resume continues at, which gets the prompt. It is the last
+ * step that started. Parallel branches can leave it done, or no Agent:
+ * then it is the last one that a branch beside it waits with, an Agent
+ * first. `steps` are in the order they started.
+ */
+export function resumedStep<
+	T extends Pick<StepSummary, "nodeType" | "outcome" | "startedAt" | "endedAt">,
+>(steps: readonly T[]): T | undefined {
+	const last = steps.at(-1);
+	if (!last) return undefined;
+	const beside = steps.filter(
+		(step) =>
+			step.outcome !== null &&
+			TAKEN_UP.has(step.outcome) &&
+			step.endedAt !== null &&
+			step.endedAt >= last.startedAt,
+	);
+	return (
+		beside.filter((step) => step.nodeType === "agent").at(-1) ??
+		beside.at(-1) ??
+		last
+	);
+}
+
 /**
  * The step a restart starts again: the innermost step that runs. A step
  * inside a called flow starts after its caller, so the last one counts.

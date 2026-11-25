@@ -59,6 +59,7 @@ export {
 	nodeLabels,
 	type RerunStart,
 	rerunStarts,
+	resumedStep,
 	runningStep,
 	runningSteps,
 	runTime,
