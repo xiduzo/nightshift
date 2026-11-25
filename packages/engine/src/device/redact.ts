@@ -54,20 +54,74 @@ export function redactText(text: string, values: readonly string[]): string {
 	return redactor.push(text) + redactor.flush();
 }
 
-/** `value` with every secret value in `values` as `•••`, in each string it holds. */
-function redactDeep(value: unknown, values: readonly string[]): unknown {
-	if (typeof value === "string") return redactText(value, values);
-	if (Array.isArray(value))
-		return value.map((item) => redactDeep(item, values));
-	if (typeof value === "object" && value !== null) {
+/**
+ * A JSON value with every secret value in `values` as `•••`, in each
+ * string it holds. `all`: the names of its fields too. `values`: the names
+ * stay, for an object whose fields a reader knows by name.
+ */
+export function redactJson<T>(
+	value: T,
+	values: readonly string[],
+	where: "all" | "values" = "all",
+): T {
+	const hide = (item: unknown): unknown => {
+		if (typeof item === "string") return redactText(item, values);
+		if (Array.isArray(item)) return item.map(hide);
+		if (typeof item !== "object" || item === null) return item;
 		return Object.fromEntries(
-			Object.entries(value).map(([key, item]) => [
-				key,
-				redactDeep(item, values),
+			Object.entries(item).map(([key, field]) => [
+				where === "all" ? redactText(key, values) : key,
+				hide(field),
 			]),
 		);
+	};
+	// The shape stays: a string becomes a string, an object an object.
+	return hide(value) as T;
+}
+
+/**
+ * `text` with every secret value in `values` as `•••`. An object or a list
+ * written as JSON stays JSON: a number keeps its digits.
+ */
+export function redactJsonText(
+	text: string,
+	values: readonly string[],
+): string {
+	const hidden = redactText(text, values);
+	if (hidden === text) return text;
+	const before = parsed(text);
+	return before === undefined || parsed(hidden) !== undefined
+		? hidden
+		: JSON.stringify(redactJson(before, values));
+}
+
+/** The object or list a text holds as JSON, else nothing. */
+function parsed(text: string): object | undefined {
+	try {
+		const value: unknown = JSON.parse(text);
+		return typeof value === "object" && value !== null ? value : undefined;
+	} catch {
+		return undefined;
 	}
-	return value;
+}
+
+/** The same error, with the secret values in its words as `•••`. */
+function redactError(error: unknown, values: readonly string[]): unknown {
+	if (typeof error === "string") return redactText(error, values);
+	for (
+		let one = error, depth = 0;
+		one instanceof Error && depth < 8;
+		one = one.cause, depth++
+	) {
+		for (const name of ["message", "stack"] as const) {
+			const text = one[name];
+			const shown = text && redactText(text, values);
+			if (shown === text) continue;
+			// A DOMException has no setter for its message.
+			Object.defineProperty(one, name, { value: shown, configurable: true });
+		}
+	}
+	return error;
 }
 
 /**
@@ -94,7 +148,7 @@ export async function* redactSession<E extends { type: string }>(
 			if (delta !== "") yield { ...event, delta };
 		}
 	}
-	for await (const event of events) {
+	for await (const event of hidingErrors(events, values)) {
 		if (isStreamed(event)) {
 			const key = `${event.type}\u0000${event.messageId}`;
 			yield* flush(key);
@@ -108,9 +162,35 @@ export async function* redactSession<E extends { type: string }>(
 			continue;
 		}
 		yield* flush();
-		yield redactDeep(event, values) as E;
+		yield redactEvent(event, values);
 	}
 	yield* flush();
+}
+
+/** The events as they are; what the stream throws has its words hidden. */
+async function* hidingErrors<E>(
+	events: AsyncIterable<E>,
+	values: readonly string[],
+): AsyncGenerator<E> {
+	try {
+		yield* events;
+	} catch (error) {
+		throw redactError(error, values);
+	}
+}
+
+/**
+ * An event keeps its own fields, and a report the names its output schema
+ * gives. What an agent sends to a tool has no names of ours: all of it goes.
+ */
+function redactEvent<E extends { type: string }>(
+	event: E,
+	values: readonly string[],
+): E {
+	const hidden = redactJson(event, values, "values");
+	return event.type === "tool-end" && "input" in event
+		? { ...hidden, input: redactJson(event.input, values) }
+		: hidden;
 }
 
 /** An event whose words come in deltas: an agent's text or thinking. */

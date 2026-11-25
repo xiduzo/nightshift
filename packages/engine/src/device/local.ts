@@ -16,13 +16,12 @@ import {
 	type AgentHarnessName,
 	deciderNameSchema,
 	FLOW_VERSION,
-	type JsonValue,
 	PAGE_READER_ENV,
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 
 import type { ArtifactStore } from "../artifacts";
-import type { SecretUse, StepRun } from "../contract";
+import type { SecretUse } from "../contract";
 import {
 	createWorktreeSnapshots,
 	createWorktrees,
@@ -40,7 +39,7 @@ import type {
 	Harnesses,
 } from "./ports";
 import { readFolderFile } from "./read-file";
-import { redactExec, redactSession, redactText } from "./redact";
+import { stepSecrets } from "./step-secrets";
 import { callServerTool } from "./tool-call";
 import type { ToolLaunchers } from "./tool-launchers";
 import {
@@ -61,11 +60,7 @@ import {
 	type WebRequestResult,
 } from "./types";
 import { type OutgoingRequest, sendRequest } from "./web-request";
-import {
-	cliToolsInstruction,
-	NOT_ON_THIS_COMPUTER,
-	unreachableNote,
-} from "./words";
+import { cliToolsInstruction, NOT_ON_THIS_COMPUTER } from "./words";
 
 /**
  * The page reader of a step is its project's (ADR 39). The one that Night
@@ -254,34 +249,10 @@ const NO_CONNECTIONS: DeviceConnections = {
 	},
 };
 
-/** The facts of a step's use of secrets, for the Secret scope rule (`secretScopes`). */
-function useOf(run: StepRun | undefined, underOffer?: true): SecretUse {
-	return {
-		...(run ? { run } : {}),
-		...(underOffer ? { underOffer } : {}),
-	};
-}
-
 /** Whether a command's text names a CLI tool, as a word of its own. */
 function namesTool(command: string, tool: string): boolean {
 	const name = tool.replace(/[.*+?^${}()|[\]\\]/g, (char) => `\\${char}`);
 	return new RegExp(`(^|[^\\w.-])${name}($|[^\\w.-])`).test(command);
-}
-
-/**
- * Why a command does not start: secrets it names that this computer does
- * not have, and why when the Personal secrets could not be read.
- */
-function missingSecretsMessage(
-	missing: readonly string[],
-	found: Parameters<typeof unreachableNote>[0] = {},
-	subject = "The command",
-): string {
-	const [noun, isNot, it] =
-		missing.length === 1
-			? ["secret", "it is", "it"]
-			: ["secrets", "they are", "them"];
-	return `${subject} needs the ${noun} ${missing.join(", ")}, but ${isNot} not saved. Save ${it} on the Secrets page, or remove ${it} from the node.${unreachableNote(found)}`;
 }
 
 /** The secrets a request names, each once. */
@@ -380,48 +351,6 @@ function outgoing(
 	};
 }
 
-/** The result with the secret values in `values` masked: its messages, headers and body. */
-function redactRequest(
-	result: WebRequestResult,
-	values: readonly string[],
-): WebRequestResult {
-	if (values.length === 0) return result;
-	if (result.kind !== "answered") {
-		return { ...result, message: redactText(result.message, values) };
-	}
-	const { response } = result;
-	return {
-		kind: "answered",
-		response: {
-			...response,
-			statusText: redactText(response.statusText, values),
-			headers: Object.fromEntries(
-				Object.entries(response.headers).map(([name, value]) => [
-					name,
-					redactText(value, values),
-				]),
-			),
-			body: redactJson(response.body, values),
-		},
-	};
-}
-
-/** Every string of a JSON value, keys included, with the secret values masked. */
-function redactJson(value: JsonValue, values: readonly string[]): JsonValue {
-	if (typeof value === "string") return redactText(value, values);
-	if (Array.isArray(value))
-		return value.map((item) => redactJson(item, values));
-	if (typeof value === "object" && value !== null) {
-		return Object.fromEntries(
-			Object.entries(value).map(([key, item]) => [
-				redactText(key, values),
-				redactJson(item, values),
-			]),
-		);
-	}
-	return value;
-}
-
 /** The session's `saveArtifact`: copies the file and tells the agent it is kept. */
 function keepArtifact(
 	store: Pick<ArtifactStore, "save">,
@@ -507,7 +436,8 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 		} = input;
 		// Where this session happens: the Secret scope rule decides what its
 		// `${NAME}` references read (ADR 13, ADR 18).
-		const use = useOf(run, underOffer);
+		const secrets = stepSecrets(connections, run, underOffer);
+		const { use } = secrets;
 		const harness = harnesses.get(name, use);
 		if (!harness) {
 			yield {
@@ -518,10 +448,7 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 		}
 		// `${NAME}` in env values and headers reads the scopes of `use`. The
 		// values go to the harness only, never into the log.
-		const mcp = await connections.mcpServersFor(
-			input.connections ? { connections: input.connections } : {},
-			use,
-		);
+		const mcp = await secrets.servers(input.connections);
 		if (!mcp.ok) {
 			yield { type: "refused", message: mcp.message };
 			return;
@@ -601,20 +528,21 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 			});
 			const events = known ? known.events(run) : run;
 			// Every secret value the session could see comes back as `•••`.
-			const hidden = [
-				...(tools?.values ?? []),
-				...(mcp.values ?? []),
-				...(added?.values ?? []),
-				...((await harness.secretValues?.().catch((error) => {
+			secrets.add(tools?.values);
+			secrets.add(added?.values);
+			secrets.add(
+				await harness.secretValues?.().catch((error) => {
 					console.warn("The agent's secrets were not read:", error);
 					return [];
-				})) ?? []),
-				...((await deps.secretValues?.(use).catch((error) => {
+				}),
+			);
+			secrets.add(
+				await deps.secretValues?.(use).catch((error) => {
 					console.warn("The saved secrets were not read:", error);
 					return [];
-				})) ?? []),
-			];
-			yield* hidden.length > 0 ? redactSession(events, hidden) : events;
+				}),
+			);
+			yield* secrets.hideSession(events);
 		} finally {
 			await tools?.cleanup();
 			// What the step changed, and the learnings it proposed, go to the Space.
@@ -644,24 +572,25 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 	 * to the launcher only, and come back as `•••` too.
 	 */
 	async function* exec(input: ExecInput): AsyncGenerator<ExecEvent> {
-		const { secrets = [], knowledge, run, artifacts, ...command } = input;
+		const {
+			secrets: named = [],
+			knowledge,
+			run,
+			artifacts,
+			...command
+		} = input;
+		const secrets = stepSecrets(connections, run);
 		// The secrets of the CLI tools' logins go to their launchers only. A
 		// command that names one in `secrets` gets it below.
 		const scrub = [
 			...PAGE_READER_NAMES,
 			...(deps.toolLaunchers?.guarded() ?? []).filter(
-				(name) => !secrets.includes(name),
+				(name) => !named.includes(name),
 			),
 		];
-		const found =
-			secrets.length > 0
-				? await connections.secretEnv(secrets, useOf(run))
-				: { ok: true as const, env: {} };
+		const found = await secrets.env(named, "The command");
 		if (!found.ok) {
-			yield {
-				type: "refused",
-				message: missingSecretsMessage(found.missing, found),
-			};
+			yield { type: "refused", message: found.message };
 			return;
 		}
 		// The knowledge as the Space has it now, before the command reads it.
@@ -670,16 +599,13 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 		const known =
 			knowledge && deps.knowledge
 				? await deps.knowledge.forCommand(knowledge.projectId, {
-						secret: async (name) => {
-							const one = await connections.secretEnv([name], useOf(run));
-							return one.ok ? one.env[name] : undefined;
-						},
+						secret: secrets.one,
 					})
 				: null;
 		let tools: Awaited<ReturnType<ToolLaunchers["forCommand"]>> | null = null;
 		let kept: KeptFiles | null = null;
 		try {
-			tools = (await deps.toolLaunchers?.forCommand(useOf(run))) ?? null;
+			tools = (await deps.toolLaunchers?.forCommand(secrets.use)) ?? null;
 			// The files the command puts in `NS_ARTIFACTS` become artifacts of
 			// the run here, on the computer that runs it, as an agent's do.
 			kept =
@@ -701,22 +627,22 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 					.filter(Boolean)
 					.join(delimiter);
 			}
-			const hidden = [...Object.values(found.env), ...(tools?.values ?? [])];
+			secrets.add(tools?.values);
 			const events = spawnCommand({ ...command, env }, scrub);
-			for await (const event of hidden.length > 0
-				? redactExec(events, hidden)
-				: events) {
+			for await (const event of secrets.hideExec(events)) {
 				// Why the command failed, last in its output: a tool it names that
 				// could not run.
 				if (event.type === "exit" && event.exitCode !== 0) {
 					for (const { message } of leftOut) {
-						yield { type: "output", stream: "stderr", text: `${message}\n` };
+						const text = secrets.hideText(`${message}\n`);
+						yield { type: "output", stream: "stderr", text };
 					}
 				}
 				// The files it kept, before the step ends.
 				if (event.type === "exit" && kept) {
 					for (const problem of await kept.keep()) {
-						yield { type: "output", stream: "stderr", text: `${problem}\n` };
+						const text = secrets.hideText(`${problem}\n`);
+						yield { type: "output", stream: "stderr", text };
 					}
 				}
 				yield event;
@@ -774,10 +700,8 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 		exec,
 		async callTool(input): Promise<ToolResult> {
 			const { run, ...call } = input;
-			const mcp = await connections.mcpServersFor(
-				{ connections: [call.connection] },
-				useOf(run),
-			);
+			const secrets = stepSecrets(connections, run);
+			const mcp = await secrets.servers([call.connection]);
 			if (!mcp.ok) return { kind: "refused", message: mcp.message };
 			const server = mcp.servers[call.connection];
 			if (!server) {
@@ -786,7 +710,7 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 					message: `There is no connection named "${call.connection}". Add it under Agents → Tools, or pick another one.`,
 				};
 			}
-			return callServerTool(server, call);
+			return secrets.hideTool(await callServerTool(server, call));
 		},
 		/**
 		 * A web request from here. Its secrets come from the scopes of its
@@ -796,22 +720,14 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 		 */
 		async request(input): Promise<WebRequestResult> {
 			const { run, ...call } = input;
-			const names = requestSecretNames(call);
-			const found =
-				names.length > 0
-					? await connections.secretEnv(names, useOf(run))
-					: { ok: true as const, env: {} };
-			if (!found.ok) {
-				return {
-					kind: "refused",
-					message: missingSecretsMessage(found.missing, found, "The request"),
-				};
-			}
+			const secrets = stepSecrets(connections, run);
+			const found = await secrets.env(requestSecretNames(call), "The request");
+			if (!found.ok) return { kind: "refused", message: found.message };
 			const result = await sendRequest(outgoing(call, found.env), {
 				privateNetwork: deps.privateNetwork?.() ?? true,
 				...(deps.resolve ? { resolve: deps.resolve } : {}),
 			});
-			return redactRequest(result, Object.values(found.env));
+			return secrets.hideRequest(result);
 		},
 		// A file is small and local: the signal is not needed here.
 		readFile: ({ cwd, path, maxBytes }) =>
