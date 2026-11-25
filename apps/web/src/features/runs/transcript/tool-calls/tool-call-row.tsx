@@ -200,7 +200,9 @@ function ToolLine({
 						{item.hasInput ? (
 							<CodeView code={formatToolInput(item.input)} language="json" />
 						) : (
-							<p>Not received yet.</p>
+							<p>
+								{state.kind === "running" ? "Not received yet." : "Not known."}
+							</p>
 						)}
 					</section>
 					<section className="flex flex-col gap-1.5">
