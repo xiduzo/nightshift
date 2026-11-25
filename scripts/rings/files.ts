@@ -10,16 +10,10 @@ import ts from "@typescript/typescript6";
 
 import { resolveFile } from "../verticals/resolve";
 import { parse } from "../verticals/source-file";
+import { databasePortsOf, databaseSuites } from "./database-ports";
 import { assertsOutcome, readPorts } from "./decides";
 import type { Slice } from "./slices";
-import { camel, exportedFunctions, treeOf } from "./syntax";
-
-/** `ScheduleStore` is `schedule-store`, `HTTPClient` is `http-client`. */
-export const kebab = (name: string): string =>
-	name
-		.replace(/([A-Z]+)([A-Z][a-z])/g, "$1-$2")
-		.replace(/([a-z0-9])([A-Z])/g, "$1-$2")
-		.toLowerCase();
+import { camel, exportedFunctions, kebab, treeOf } from "./syntax";
 
 /** `run-status` is `RunStatus`. */
 const pascal = (name: string): string =>
@@ -262,7 +256,8 @@ export function portProblems(
 	const ports = join(slice.dir, "application", "ports.ts");
 	const out = join(slice.dir, "adapters", "out");
 	const files = tsFiles(out);
-	const problems: string[] = [];
+	const database = databasePortsOf(slice);
+	const problems = databaseSuites(root, database);
 	for (const { name: port, filledBy } of portsOf(slice)) {
 		const name = kebab(port);
 		const where = `${rel(ports)}: the port ${port}`;
@@ -302,16 +297,11 @@ export function portProblems(
 		const twin = join(out, `in-memory-${name}.ts`);
 		const test = join(out, `${name}.contract.test.ts`);
 		const twinned = existsSync(twin);
-		if (reals.length && reals.every((file) => file.startsWith("drizzle-"))) {
-			if (twinned)
-				problems.push(
-					`${rel(twin)}: ${port} is a port of the database, so it has no in-memory adapter. Its use-case tests run on ${reals[0]}, over migratedDb() of @nightshift/db/testing (ADR 44).`,
-				);
-			if (existsSync(join(out, `${name}.contract.ts`)))
-				problems.push(
-					`${rel(join(out, `${name}.contract.ts`))}: ${port} has one adapter, so it has no contract suite. Move the tests to ${reals[0]?.replace(/\.ts$/, ".test.ts")}.`,
-				);
-			problems.push(...databasePortProblems(rel, out, port, reals));
+		const adapters = database
+			.filter(({ name }) => name === port)
+			.map(({ adapter }) => adapter);
+		if (adapters.length) {
+			problems.push(...databasePortProblems(rel, out, port, adapters));
 			continue;
 		}
 		const wantsTwin = read.has(port);

@@ -35,9 +35,8 @@ import {
 	useCaseSteps,
 } from "../turbo/generators/steps";
 import { checkRings } from "./check-rings";
-import { kebab } from "./rings/files";
 import { DEFAULTS, manifest, repository, SLICE, write } from "./rings/fixture";
-import { camel } from "./rings/syntax";
+import { camel, kebab } from "./rings/syntax";
 
 const TEMPLATES = join(
 	import.meta.dir,

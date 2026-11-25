@@ -98,7 +98,11 @@
  *      adapter and `drizzle-schedule-store.test.ts`, which imports it and
  *      expects. It has no in-memory adapter and no contract suite: the
  *      use-case tests run on the real adapter, over a database in memory
- *      (ADR 44). Any other port `ScheduleStore` has:
+ *      (ADR 44). In no file of a server package is a value typed by the port
+ *      that passes to no drizzle adapter, whatever its name. A spread of the
+ *      real adapter with a member of its own passes, and so does an object
+ *      that calls the real one in each member. Any other port
+ *      `ScheduleStore` has:
  *      - `in-memory-schedule-store.ts`: the in-memory adapter, when a use
  *        case that is no forward reads the port. It imports `ScheduleStore`
  *        from `../../application/ports`, and no value of a real adapter.
@@ -154,6 +158,7 @@ import { join } from "node:path";
 import { PACKAGE_KERNEL, SERVER_PACKAGES } from "../.dependency-cruiser.mjs";
 import { MECHANISM, VERTICALS } from "./capabilities";
 import { debtOf } from "./check-time";
+import { databasePortsOf, databaseTwins } from "./rings/database-ports";
 import { decisionOffences } from "./rings/decides";
 import {
 	portProblems,
@@ -170,6 +175,7 @@ import {
 	slicesOf,
 	withSubs,
 } from "./rings/slices";
+import { walk } from "./verticals/source-file";
 
 export type Options = {
 	/** The text of `scripts/hexagon-debt.txt`. */
@@ -319,6 +325,19 @@ export async function checkRings(
 			problems.push(`scripts/hexagon-debt.txt: ${key} is in shape. Remove it.`);
 		}
 	}
+
+	problems.push(
+		...databaseTwins(
+			root,
+			slices.flatMap(withSubs).flatMap(databasePortsOf),
+			SERVER_PACKAGES.flatMap((pkg) => {
+				const files: string[] = [];
+				for (const dir of ["src", "test"])
+					walk(join(root, "packages", pkg, dir), files);
+				return files;
+			}),
+		),
+	);
 
 	const verticals = new Set(slices.map(keyOf));
 	for (const [index, line] of listed.entries()) {

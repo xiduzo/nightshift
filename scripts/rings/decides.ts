@@ -188,12 +188,24 @@ export function assertsOutcome(test: string, named?: string): boolean {
 	});
 }
 
+/** A text that names a member: `ports["db"]`, or `{ "db": rows }` of a binding. */
+function isMemberName(node: ts.Node): node is ts.StringLiteralLike {
+	const { parent } = node;
+	return (
+		ts.isStringLiteralLike(node) &&
+		((ts.isElementAccessExpression(parent) &&
+			parent.argumentExpression === node) ||
+			ts.isComputedPropertyName(parent) ||
+			(ts.isBindingElement(parent) && parent.propertyName === node))
+	);
+}
+
 /** A test names the handle of a database: `db` or `database`. */
 function namesDatabase(test: string): boolean {
 	let found = false;
 	eachNode(treeOf(test), (node) => {
-		if (ts.isIdentifier(node) && /^(?:db|database)$/.test(node.text))
-			found = true;
+		const text = ts.isIdentifier(node) || isMemberName(node) ? node.text : "";
+		if (/^(?:db|database)$/.test(text)) found = true;
 	});
 	return found;
 }

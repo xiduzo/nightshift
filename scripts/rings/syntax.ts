@@ -14,6 +14,13 @@ import { resolveFile } from "../verticals/resolve";
 export const camel = (name: string): string =>
 	name.replace(/-([a-z0-9])/g, (_, letter: string) => letter.toUpperCase());
 
+/** `ScheduleStore` is `schedule-store`, `HTTPClient` is `http-client`. */
+export const kebab = (name: string): string =>
+	name
+		.replace(/([A-Z]+)([A-Z][a-z])/g, "$1-$2")
+		.replace(/([a-z0-9])([A-Z])/g, "$1-$2")
+		.toLowerCase();
+
 const trees = new Map<string, ts.SourceFile>();
 
 /** The syntax tree of a file, parsed once. */
