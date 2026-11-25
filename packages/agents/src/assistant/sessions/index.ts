@@ -3,8 +3,5 @@
  * and what the person sees while it answers.
  */
 export type { AssistantVia } from "./application/run-report";
-export {
-	type AssistantReport,
-	AT_LIMIT,
-} from "./domain/session";
+export type { AssistantReport } from "./domain/session";
 export { type Sessions, wireSessions } from "./wire";

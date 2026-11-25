@@ -12,7 +12,7 @@ import type { AgentHarness, AgentUsage, BridgedTool } from "../../../port";
 import {
 	type AssistantReport,
 	type AssistantSessionEvent,
-	AT_LIMIT,
+	endAtLimit,
 	type SessionLimits,
 	sessionErrorMessage,
 	settleUsage,
@@ -183,7 +183,7 @@ export const runSession = (ports: SessionPorts) =>
 							};
 						}
 						if (event.limit && !report) {
-							yield { type: "error", message: AT_LIMIT, sessionId };
+							yield endAtLimit(sessionId);
 							return;
 						}
 						yield {
@@ -194,17 +194,17 @@ export const runSession = (ports: SessionPorts) =>
 						};
 						return;
 					case "error":
-						yield {
-							type: "error",
-							message: stop.signal.aborted
-								? AT_LIMIT
-								: sessionErrorMessage(
+						yield stop.signal.aborted
+							? endAtLimit(sessionId)
+							: {
+									type: "error",
+									message: sessionErrorMessage(
 										input.signal.aborted ? "aborted" : event.kind,
 										event.message,
 										event.resetAt,
 									),
-							sessionId,
-						};
+									sessionId,
+								};
 						return;
 					default:
 						break;
@@ -216,16 +216,16 @@ export const runSession = (ports: SessionPorts) =>
 				sessionId,
 			};
 		} catch (error) {
-			yield {
-				type: "error",
-				message: stop.signal.aborted
-					? AT_LIMIT
-					: input.signal.aborted
-						? "Stopped."
-						: error instanceof Error && error.message
-							? error.message
-							: "The agent stopped with an error.",
-				sessionId,
-			};
+			yield stop.signal.aborted
+				? endAtLimit(sessionId)
+				: {
+						type: "error",
+						message: input.signal.aborted
+							? "Stopped."
+							: error instanceof Error && error.message
+								? error.message
+								: "The agent stopped with an error.",
+						sessionId,
+					};
 		}
 	};

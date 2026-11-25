@@ -25,8 +25,16 @@ export type AssistantSessionEvent =
 	| { type: "text"; delta: string }
 	/** What the session has used so far: a running total. */
 	| { type: "usage"; usage: AssistantUsage }
-	/** Last, when the session failed. `sessionId` resumes it, when it has one. */
-	| { type: "error"; message: string; sessionId: string | null }
+	/**
+	 * Last, when the session failed. `sessionId` resumes it, when it has one.
+	 * `code` is `limit` when it stopped at the most one answer may use.
+	 */
+	| {
+			type: "error";
+			code?: "limit";
+			message: string;
+			sessionId: string | null;
+	  }
 	/** Last, when the session finished. */
 	| {
 			type: "end";
@@ -36,6 +44,11 @@ export type AssistantSessionEvent =
 			/** The whole answer text, as `text` streamed it. */
 			text: string;
 	  };
+
+/** The last event of a session that stopped at the limit of one answer. */
+export function endAtLimit(sessionId: string | null): AssistantSessionEvent {
+	return { type: "error", code: "limit", message: AT_LIMIT, sessionId };
+}
 
 /** Words for the person about a failed session. */
 export function sessionErrorMessage(

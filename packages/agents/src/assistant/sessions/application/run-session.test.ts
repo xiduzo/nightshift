@@ -241,7 +241,11 @@ describe("runSession", () => {
 			limits: { turns: 2 },
 		});
 		expect(turns.filter((e) => e.type === "text")).toHaveLength(3);
-		expect(turns.at(-1)).toMatchObject({ type: "error", message: AT_LIMIT });
+		expect(turns.at(-1)).toMatchObject({
+			type: "error",
+			code: "limit",
+			message: AT_LIMIT,
+		});
 		const money = await ask({
 			harness: endless((turn) => ({
 				type: "usage",
@@ -250,13 +254,34 @@ describe("runSession", () => {
 			limits: { usd: 2 },
 		});
 		expect(money.filter((e) => e.type === "usage")).toHaveLength(3);
-		expect(money.at(-1)).toMatchObject({ type: "error", message: AT_LIMIT });
+		expect(money.at(-1)).toMatchObject({
+			type: "error",
+			code: "limit",
+			message: AT_LIMIT,
+		});
+	});
+
+	test("a harness that throws when the limit stops it ends at the limit", async () => {
+		const it = harness();
+		it.run = async function* (input) {
+			for (let turn = 1; turn < 50; turn++) {
+				input.signal?.throwIfAborted();
+				yield text(`${turn}`, "x");
+			}
+		};
+		const events = await ask({ harness: it, limits: { turns: 2 } });
+		expect(events.at(-1)).toMatchObject({
+			type: "error",
+			code: "limit",
+			message: AT_LIMIT,
+		});
 	});
 
 	test("a harness that stopped at its limit: an error, unless it reported", async () => {
 		const limit: AgentEvent = { type: "finished", limit: "budget" };
 		expect((await ask({ harness: harness(limit) })).at(-1)).toEqual({
 			type: "error",
+			code: "limit",
 			message: AT_LIMIT,
 			sessionId: null,
 		});

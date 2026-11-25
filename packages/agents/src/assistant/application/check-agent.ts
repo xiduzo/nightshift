@@ -5,7 +5,7 @@ import type { AgentProfileSettings } from "@nightshift/flows";
 import type { AgentHarness } from "../../port";
 import type { AgentCheck } from "../catalog";
 import { CHECK_LIMITS, CHECK_PROMPT } from "../catalog";
-import { AT_LIMIT, type Sessions } from "../sessions";
+import type { Sessions } from "../sessions";
 
 export const checkAgent =
 	(ports: Pick<Sessions, "runSession">) =>
@@ -29,7 +29,7 @@ export const checkAgent =
 			}
 			if (event.type === "error") {
 				// An answer that came before the limit is still an answer.
-				if (event.message === AT_LIMIT && text.trim() !== "") {
+				if (event.code === "limit" && text.trim() !== "") {
 					return { answered: true };
 				}
 				return { answered: false, why: event.message };

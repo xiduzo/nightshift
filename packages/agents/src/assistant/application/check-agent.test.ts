@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test";
 import { CHECK_LIMITS, CHECK_PROMPT } from "../catalog";
-import { AT_LIMIT } from "../sessions";
 import { inMemorySessions } from "../sessions/adapters/out/in-memory-sessions";
 import { checkAgent } from "./check-agent";
 
@@ -49,10 +48,15 @@ describe("checkAgent", () => {
 	});
 
 	test("an answer that came before a limit is still an answer", async () => {
-		const limit = { type: "error", message: AT_LIMIT, sessionId: "s" } as const;
+		const limit = {
+			type: "error",
+			code: "limit",
+			message: "Any words.",
+			sessionId: "s",
+		} as const;
 		expect(await ask({ type: "text", delta: "ready" }, limit)).toEqual({
 			answered: true,
 		});
-		expect(await ask(limit)).toEqual({ answered: false, why: AT_LIMIT });
+		expect(await ask(limit)).toEqual({ answered: false, why: "Any words." });
 	});
 });
