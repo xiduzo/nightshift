@@ -48,7 +48,7 @@ mock.module("@xyflow/react", () => ({ ...xyflow, ReactFlow: ReactFlowProbe }));
 
 /** The toasts the editor showed. */
 const toasts: [string, unknown][] = [];
-const sonner = await import("sonner");
+const sonner = { ...(await import("sonner")) };
 const record =
 	(kind: string) =>
 	(message: unknown): string => {
@@ -152,6 +152,8 @@ const { FlowEditor } = await import("./flow-editor");
 // The next test file starts with an empty page and the real fetch.
 afterAll(() => {
 	cleanup();
+	// The next test file of this process gets the real toasts.
+	mock.module("sonner", () => sonner);
 	globalThis.fetch = realFetch;
 });
 
