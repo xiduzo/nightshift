@@ -65,6 +65,24 @@ describe("the folded facts", () => {
 		});
 	});
 
+	test("a wait on a step that ended counts for nothing: the run sleeps in the wait of the step that is open", () => {
+		const b = log()
+			.runStarted()
+			.stepStarted("a", "wait")
+			.waitStarted("a", { until: 400 })
+			.stepStarted("b", "wait")
+			.stepEnded("b", "interrupted")
+			// A daemon that died still wrote it.
+			.waitStarted("b", { until: 800 });
+		const state = b.state();
+		expect(state).toMatchObject({
+			status: "sleeping",
+			sleep: { stepId: "a", until: 400 },
+		});
+		expect(state.waits.map((wait) => wait.stepId)).toEqual(["a"]);
+		expect(state.steps.get("b")?.sleeps).toEqual([]);
+	});
+
 	test("the status follows the open Gates, the sleep and the end", () => {
 		const b = log().runStarted().stepStarted("g1", "gate");
 		expect(b.state().status).toBe("running");

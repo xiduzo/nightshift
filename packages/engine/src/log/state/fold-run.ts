@@ -198,6 +198,9 @@ function apply(
 			break;
 		}
 		case "WaitStarted":
+			// A wait on a step that ended is a late write of a daemon that
+			// died: nothing sleeps there.
+			if (ended(run, e.stepId)) break;
 			run.waits = [...awake(run, e.stepId), logged(e)];
 			break;
 		case "WaitEnded": {
@@ -299,6 +302,10 @@ function openGatesOf(run: Draft): OpenGateFact[] {
 	}
 	return gates;
 }
+
+/** The step has ended (its latest opening has its end). */
+const ended = (run: Draft, stepId: string | null) =>
+	stepId !== null && (run.steps.get(stepId)?.endedAt ?? null) !== null;
 
 /** The waits of every step but `stepId`. */
 const awake = (run: Draft, stepId: string | null) =>

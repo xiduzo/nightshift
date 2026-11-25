@@ -51,6 +51,8 @@ import type { Hold } from "./holds";
  *   keeps its own end: the first `StepEnded` after it. A later duplicate
  *   end changes nothing, and neither its cost, its outputs nor its
  *   variables count.
+ * - A `WaitStarted` on a step that has ended counts for nothing: it is the
+ *   late write of a daemon that died.
  * - A step sleeps from its `WaitStarted` to its `WaitEnded`, its end or its
  *   reopen. A Gate of the step waits from its `GateOpened` to the step's end
  *   or reopen. A `GateOpened` while the Gate still waits opens no second

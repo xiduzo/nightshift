@@ -197,8 +197,10 @@ export function applyStepEvent(
 		}
 		case "WaitStarted": {
 			const sleep = step.sleeps.at(-1);
-			// A wait logged again in the same sleep (a new daemon) goes on with it.
-			if (!sleep || sleep.to !== null) {
+			// A wait logged again in the same sleep (a new daemon) goes on
+			// with it. One after the step's end is the late write of a daemon
+			// that died: the step does not sleep.
+			if (step.endedAt === null && (!sleep || sleep.to !== null)) {
 				step = {
 					...step,
 					sleeps: [
