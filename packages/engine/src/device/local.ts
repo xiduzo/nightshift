@@ -17,6 +17,7 @@ import {
 	deciderNameSchema,
 	FLOW_VERSION,
 	type JsonValue,
+	PAGE_READER_ENV,
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 
@@ -65,6 +66,12 @@ import {
 	NOT_ON_THIS_COMPUTER,
 	unreachableNote,
 } from "./words";
+
+/**
+ * The page reader of a step is its project's (ADR 39). The one that Night
+ * Shift itself was started with does not reach a step.
+ */
+const PAGE_READER_NAMES: readonly string[] = Object.values(PAGE_READER_ENV);
 
 export type { Harnesses } from "./ports";
 
@@ -590,7 +597,7 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 				...(added?.config && Object.keys(added.config).length > 0
 					? { harnessConfig: added.config }
 					: {}),
-				...(guarded.length > 0 ? { scrubEnv: guarded } : {}),
+				scrubEnv: [...guarded, ...PAGE_READER_NAMES],
 			});
 			const events = known ? known.events(run) : run;
 			// Every secret value the session could see comes back as `•••`.
@@ -640,9 +647,12 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 		const { secrets = [], knowledge, run, artifacts, ...command } = input;
 		// The secrets of the CLI tools' logins go to their launchers only. A
 		// command that names one in `secrets` gets it below.
-		const scrub = (deps.toolLaunchers?.guarded() ?? []).filter(
-			(name) => !secrets.includes(name),
-		);
+		const scrub = [
+			...PAGE_READER_NAMES,
+			...(deps.toolLaunchers?.guarded() ?? []).filter(
+				(name) => !secrets.includes(name),
+			),
+		];
 		const found =
 			secrets.length > 0
 				? await connections.secretEnv(secrets, useOf(run))

@@ -9,7 +9,7 @@ import {
 	fixturePath,
 } from "@nightshift/agents/testing";
 import type { Decider, McpServerConfig } from "@nightshift/agents/types";
-import { FLOW_VERSION } from "@nightshift/flows";
+import { FLOW_VERSION, PAGE_READER_ENV } from "@nightshift/flows";
 import { createArtifactStore } from "../artifacts/store";
 import { createRunFolders } from "../run-folders/run-folders";
 import type { PersonalSecrets, ProjectSecrets } from "../secrets";
@@ -433,7 +433,7 @@ describe("session", () => {
 		expect(harness.calls[0]).toMatchObject({
 			toolsPath: "/tmp/nightshift-tools-1",
 			env: { GIT_CONFIG_COUNT: "2" },
-			scrubEnv: ["GH_WORK_TOKEN"],
+			scrubEnv: ["GH_WORK_TOKEN", "NS_READER_URL", "NS_READER_TOKEN"],
 		});
 		expect(events).toContainEqual(
 			expect.objectContaining({ type: "tool-result", content: "•••" }),
@@ -904,6 +904,60 @@ describe("exec", () => {
 		expect(
 			events.flatMap((e) => (e.type === "output" ? [e.text] : [])).join(""),
 		).toBe("none");
+	});
+
+	test("a step gets the page reader of its own project, and none that Night Shift itself was started with", async () => {
+		const names = Object.values(PAGE_READER_ENV);
+		const previous = names.map((name) => process.env[name]);
+		for (const name of names) process.env[name] = "inherited";
+		try {
+			const harness = fakeHarness();
+			const output = async (
+				d: Device,
+				more: Partial<Parameters<Device["exec"]>[0]>,
+			) =>
+				(
+					await collect(
+						d.exec({
+							command:
+								'printf "%s %s" "${NS_READER_URL-none}" "${NS_READER_TOKEN-none}"',
+							cwd: sandbox.repoPath,
+							signal: new AbortController().signal,
+							...more,
+						}),
+					)
+				)
+					.flatMap((e) => (e.type === "output" ? [e.text] : []))
+					.join("");
+			const reader = (env: Record<string, string>) =>
+				device({
+					harnesses: { "claude-code": harness },
+					knowledge: {
+						forCommand: async () => ({ env, done: async () => {} }),
+					} as never,
+				});
+			const knowledge = { projectId: "p1" } as never;
+			expect(await output(device(), {})).toBe("none none");
+			expect(await output(reader({}), { knowledge })).toBe("none none");
+			expect(
+				await output(reader({ NS_READER_URL: "own", NS_READER_TOKEN: "t" }), {
+					knowledge,
+				}),
+			).toBe("own t");
+
+			await collect(
+				device({ harnesses: { "claude-code": harness } }).session(
+					sessionInput({}),
+				),
+			);
+			expect(harness.calls[0]?.scrubEnv).toEqual(names);
+		} finally {
+			for (const [i, name] of names.entries()) {
+				const value = previous[i];
+				if (value === undefined) delete process.env[name];
+				else process.env[name] = value;
+			}
+		}
 	});
 
 	test("the files a step's command puts in NS_ARTIFACTS become artifacts of the step, and the folder goes", async () => {
