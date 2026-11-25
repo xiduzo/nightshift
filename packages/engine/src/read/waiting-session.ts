@@ -10,7 +10,8 @@ export const OUTRUN_ERROR = "Another branch reached the Join first.";
  * (`planReentry`) and the run page ask this one rule, so the person reads
  * which session gets what they type. Parallel branches can wait with a
  * session each, and one prompt goes to one of them: the one whose step
- * started last.
+ * started last. Of those that failed on their own outcome, only the one that
+ * the run's end names counts (`parkedOn`).
  */
 export function waitingSession(run: RunState): DerivedStep | null {
 	if (!run.end) return null;
@@ -50,6 +51,17 @@ export function waitingSession(run: RunState): DerivedStep | null {
 				inside(step),
 		) ?? null
 	);
+}
+
+/**
+ * Whether a session takes the prompt of a resume. A sleeping run wakes with
+ * it: then each step that sleeps must have a session.
+ */
+export function takesPrompt(run: RunState): boolean {
+	if (run.status !== "sleeping") return waitingSession(run) !== null;
+	return deriveSteps(run)
+		.filter((step) => step.endedAt === null && step.sleeps.at(-1)?.to === null)
+		.every((step) => isAgent(run, step));
 }
 
 const placeOf = (step: DerivedStep) =>

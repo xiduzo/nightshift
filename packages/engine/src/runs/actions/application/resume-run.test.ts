@@ -3,6 +3,8 @@ import type { Refusal } from "@nightshift/refusal";
 import type { RunRefusal } from "../../../run-status";
 import {
 	ADA,
+	asleep,
+	endedIn,
 	FAR,
 	inMemoryActionPorts,
 	SPACE,
@@ -25,7 +27,11 @@ function setup() {
 	return { ports, resume: resumeRun(ports) };
 }
 
-const stopped = stateOf({ status: "stopped" });
+const stopped = endedIn("agent");
+/** A run that stopped in a Command: no agent waits. */
+const inCommand = endedIn("command");
+const NO_AGENT =
+	"No agent waits for a prompt in this run now. To continue the run, remove the prompt.";
 
 describe("a resume of a run this computer walks", () => {
 	test("is a Turn of the runner, by a person, with the prompt", async () => {
@@ -65,6 +71,54 @@ describe("a resume of a run this computer walks", () => {
 		release();
 		await resume(ADA, { runId: "run-1" });
 		expect(ports.turns.taken).toHaveLength(1);
+	});
+});
+
+describe("a prompt that no agent waits for", () => {
+	test("is refused inside the Turn, and the run stays as it was", async () => {
+		const { ports, resume } = setup();
+		ports.put({ id: "run-1" }, inCommand);
+		const refused = await refusalOf(
+			resume(ADA, { runId: "run-1", prompt: "Go on." }),
+		);
+		expect((refused as RunRefusal).rule).toBe("not-now");
+		expect((refused as RunRefusal).message).toBe(NO_AGENT);
+		expect(ports.turns.taken).toEqual([]);
+		// Without a prompt, the run continues.
+		await resume(ADA, { runId: "run-1" });
+		expect(ports.turns.taken).toHaveLength(1);
+	});
+
+	test("is refused before it travels to another Device", async () => {
+		const { ports, resume } = setup();
+		ports.put({ id: "run-1", walkerId: FAR }, inCommand);
+		const refused = await refusalOf(
+			resume(ADA, { runId: "run-1", prompt: "Go on." }),
+		);
+		expect((refused as RunRefusal).message).toBe(NO_AGENT);
+		expect(ports.walkers.sent).toEqual([]);
+	});
+
+	test("that traveled as a Command: the run continues, for a refusal there reaches nobody", async () => {
+		const { ports, resume } = setup();
+		ports.put({ id: "run-1" }, inCommand);
+		await resume(
+			{ ...ADA, door: "command" },
+			{ runId: "run-1", prompt: "Go on." },
+		);
+		expect(ports.turns.taken).toHaveLength(1);
+	});
+
+	test("a sleeping run: refused when a Wait sleeps, not when an agent does", async () => {
+		const { ports, resume } = setup();
+		ports.put({ id: "waits" }, asleep("wait"));
+		ports.put({ id: "limit" }, asleep("agent"));
+		const refused = await refusalOf(
+			resume(ADA, { runId: "waits", prompt: "Go on." }),
+		);
+		expect((refused as RunRefusal).message).toBe(NO_AGENT);
+		await resume(ADA, { runId: "limit", prompt: "Go on." });
+		expect(ports.turns.taken.map((t) => t.runId)).toEqual(["limit"]);
 	});
 });
 

@@ -18,6 +18,15 @@ import {
 export const RESUME_ON_ITS_WAY =
 	"A resume of this run is already on its way to the device that runs it.";
 
+/** Throws for a prompt that no session takes: it would go to nobody. */
+export function refusePrompt(takesPrompt: boolean): void {
+	if (takesPrompt) return;
+	throw new RunRefusal(
+		"not-now",
+		"No agent waits for a prompt in this run now. To continue the run, remove the prompt.",
+	);
+}
+
 /** Throws unless the run sleeps in a Wait node that waits for the Signal `name`. */
 export function refuseSignal(
 	run: { status: RunStatus; sleep: { signal: string | null } | null },

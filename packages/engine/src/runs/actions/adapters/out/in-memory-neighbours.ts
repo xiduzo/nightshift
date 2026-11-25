@@ -1,3 +1,4 @@
+import type { FlowNodeType } from "@nightshift/flows";
 import { inMemoryAccess } from "../../../../access/adapters/out/in-memory-access";
 import {
 	runRecord,
@@ -10,7 +11,9 @@ import {
 	deriveSteps,
 	lastHarnessSession,
 	parseRunFlow,
+	takesPrompt,
 } from "../../../../read";
+import { runEvents } from "../../../../testing/run-events";
 import { inMemoryRunFacts } from "../../../walk/adapters/out/in-memory-run-facts";
 import { inMemoryTurns } from "../../../walk/adapters/out/in-memory-turns";
 import { inMemoryWalkers } from "../../../walk/adapters/out/in-memory-walkers";
@@ -29,6 +32,29 @@ export const FAR = "device-far";
 export function stateOf(fields: Partial<RunState>): RunState {
 	return { ...foldRun([]), ...fields };
 }
+
+/** A step of a node of `nodeType`. An Agent's session has a name. */
+function inStep(nodeType: FlowNodeType) {
+	const log = runEvents().runStarted();
+	log.stepStarted("s1", "n1", 1, { nodeType });
+	if (nodeType !== "agent") return log;
+	return log
+		.sessionStarted("s1", "x")
+		.push(
+			"HarnessSessionAssigned",
+			{ harnessSessionId: "h1", model: null },
+			{ stepId: "s1", sessionId: "x" },
+		);
+}
+/** The state of a run that a person stopped in a step of `nodeType`. */
+export const endedIn = (nodeType: FlowNodeType): RunState =>
+	inStep(nodeType)
+		.stepEnded("s1", "stopped")
+		.push("RunEnded", { status: "stopped", reason: null })
+		.state();
+/** The state of a run that sleeps in a step of `nodeType`. */
+export const asleep = (nodeType: FlowNodeType): RunState =>
+	inStep(nodeType).waitStarted("s1").state();
 
 /**
  * Every port of the actions in memory at once, with the pure functions of
@@ -56,6 +82,7 @@ export function inMemoryActionPorts(options: { reachable?: boolean } = {}) {
 		leases: inMemoryRunLeases(),
 		holds: createStartHolds(),
 		deriveSteps,
+		takesPrompt,
 		lastHarnessSession,
 		flowOf: parseRunFlow,
 		rerunNodeRefusal,

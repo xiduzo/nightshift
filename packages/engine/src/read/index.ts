@@ -60,4 +60,4 @@ export type {
 	StepTranscript,
 } from "./views";
 export { NIGHT_RANGES } from "./views";
-export { OUTRUN_ERROR, waitingSession } from "./waiting-session";
+export { OUTRUN_ERROR, takesPrompt, waitingSession } from "./waiting-session";

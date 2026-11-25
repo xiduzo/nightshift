@@ -1,6 +1,11 @@
 import type { Access } from "../../access";
 import { rerunNodeRefusal } from "../../graph";
-import { deriveSteps, lastHarnessSession, parseRunFlow } from "../../read";
+import {
+	deriveSteps,
+	lastHarnessSession,
+	parseRunFlow,
+	takesPrompt,
+} from "../../read";
 import type { UsageNotes } from "../../usage";
 import type { Walk } from "../walk";
 import {
@@ -65,7 +70,7 @@ export function wireActions(deps: ActionsDeps): Actions {
 	const shared = { openRun, facts, turns, walkers };
 	const cases = {
 		stopRun: stopRun(shared),
-		resumeRun: resumeRun({ ...shared, holds }),
+		resumeRun: resumeRun({ ...shared, holds, takesPrompt }),
 		restartStep: restartStep({ ...shared, holds, deriveSteps }),
 		rerunFromNode: rerunFromNode({
 			...shared,
