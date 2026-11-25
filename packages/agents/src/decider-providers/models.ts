@@ -80,7 +80,6 @@ export async function deciderModelsAt(
 function listingReason(error: unknown): "silent" | "refused" | "other" {
 	if (error instanceof AddressError) return error.reason;
 	const message = messageOf(error);
-	if (/does not answer/i.test(message)) return "silent";
 	if (/\b(401|403)\b|unauthori[sz]ed|forbidden/i.test(message))
 		return "refused";
 	return "other";

@@ -15,6 +15,7 @@ import { messageOf } from "@nightshift/refusal";
 import type { AnyTextAdapter } from "@tanstack/ai";
 import { createOllamaChat, OllamaTextModels } from "@tanstack/ai-ollama";
 import { Ollama } from "ollama";
+import { AddressError } from "./address";
 import { ChatEvaluateAdapter } from "./chat-evaluate";
 
 /** Where Ollama is: its address, and the headers of a proxy in front of it. */
@@ -73,7 +74,8 @@ const LISTING_TIMEOUT_MS = 2_000;
 
 /**
  * The models pulled on this computer (`GET /api/tags`), by name. Throws when
- * Ollama does not answer, with a message for the person.
+ * Ollama does not answer (an `AddressError` of reason `silent`), with a
+ * message for the person.
  */
 export async function ollamaModels(
 	at: OllamaAddress = OLLAMA_DEFAULT,
@@ -92,11 +94,13 @@ export async function ollamaModels(
 		return models.map((m) => m.name);
 	} catch (error) {
 		const message = messageOf(error);
-		throw new Error(
-			NOT_RUNNING.test(message) || /timed? ?out|abort/i.test(message)
-				? `Ollama does not answer ${placeOf(at)}. Start Ollama to see the models you pulled.`
-				: `Ollama did not list its models: ${message}`,
-		);
+		if (NOT_RUNNING.test(message) || /timed? ?out|abort/i.test(message)) {
+			throw new AddressError(
+				"silent",
+				`Ollama does not answer ${placeOf(at)}. Start Ollama to see the models you pulled.`,
+			);
+		}
+		throw new Error(`Ollama did not list its models: ${message}`);
 	}
 }
 
