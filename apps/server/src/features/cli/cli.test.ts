@@ -1,4 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 
 import { serveOptions } from "./cli";
 
@@ -79,5 +82,37 @@ describe("nightshift serve", () => {
 		);
 		expect(() => serveOptions(["--port"], {})).toThrow("needs a value");
 		expect(() => serveOptions(["--port", "http"], {})).toThrow("is not a port");
+		for (const port of ["https", "0", "-1", "70000", "84.5"])
+			expect(() => serveOptions(["--tls-port", port], {})).toThrow(
+				`${port} is not a port.`,
+			);
+		expect(() => serveOptions([], { NIGHTSHIFT_TLS_PORT: "https" })).toThrow(
+			"https is not a port.",
+		);
 	});
+
+	test("a bad port ends it with exit code 2 before anything starts", () => {
+		const root = mkdtempSync(join(tmpdir(), "nightshift-serve-"));
+		try {
+			const dataDir = join(root, "data");
+			const ended = Bun.spawnSync(
+				[
+					process.execPath,
+					resolve(import.meta.dir, "../../cli.ts"),
+					...["serve", "--data-dir", dataDir, "--tls-port", "https"],
+				],
+				// A daemon that starts all the same takes no real data and no port.
+				{
+					cwd: root,
+					env: { PATH: process.env.PATH, HOME: root, PORT: "9" },
+					timeout: 20_000,
+				},
+			);
+			expect(ended.stderr.toString()).toStartWith("https is not a port.\n");
+			expect(ended.exitCode).toBe(2);
+			expect(existsSync(dataDir)).toBe(false);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	}, 30_000);
 });

@@ -7,8 +7,8 @@ import {
 	type DaemonServe,
 	listeners,
 	PortTakenError,
+	portOf,
 	serveDaemon,
-	tlsPortOf,
 } from "./serve";
 
 /** A self-signed certificate for localhost, made with openssl. */
@@ -61,11 +61,14 @@ describe("where the daemon listens", () => {
 		).toEqual({ hostname: "0.0.0.0", port: 8443, tls: true });
 	});
 
-	test("NIGHTSHIFT_TLS_PORT", () => {
-		expect(tlsPortOf("8443")).toBe(8443);
-		expect(tlsPortOf(undefined)).toBeUndefined();
-		expect(tlsPortOf("")).toBeUndefined();
-		expect(tlsPortOf("https")).toBeUndefined();
+	test("a port of the environment", () => {
+		expect(portOf("8443")).toBe(8443);
+		expect(portOf(undefined)).toBeUndefined();
+		expect(portOf("")).toBeUndefined();
+		expect(portOf("https")).toBeUndefined();
+		expect(portOf("0")).toBeUndefined();
+		expect(portOf("65535")).toBe(65_535);
+		expect(portOf("65536")).toBeUndefined();
 	});
 });
 

@@ -3,7 +3,7 @@ import {
 	DESKTOP_PORT,
 	type DesktopScreen,
 	PortTakenError,
-	tlsPortOf,
+	portOf,
 } from "@nightshift/daemon";
 
 import { startWatchdog } from "../watchdog";
@@ -61,7 +61,7 @@ export async function startDaemon(desktop: DesktopScreen): Promise<Daemon> {
 	const daemon = await bootDaemon({
 		env: prepareDaemonEnv(DAEMON_URL, DAEMON_PORT),
 		port: DAEMON_PORT,
-		tlsPort: tlsPortOf(process.env.NIGHTSHIFT_TLS_PORT),
+		tlsPort: portOf(process.env.NIGHTSHIFT_TLS_PORT),
 		desktop,
 	});
 

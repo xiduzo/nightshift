@@ -124,8 +124,10 @@ export function serveDaemon(
 	return servers;
 }
 
-/** NIGHTSHIFT_TLS_PORT as a port, or undefined for the default. */
-export function tlsPortOf(value: string | undefined): number | undefined {
+/** A port as text, or undefined when it names none. */
+export function portOf(value: string | undefined): number | undefined {
 	const port = Number(value);
-	return value && Number.isInteger(port) && port > 0 ? port : undefined;
+	return value && Number.isInteger(port) && port > 0 && port <= 65_535
+		? port
+		: undefined;
 }

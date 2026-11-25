@@ -7,9 +7,9 @@ import {
 	embeddedWeb,
 	guardProcess,
 	PortTakenError,
+	portOf,
 	prepareDaemonEnv,
 	startDaemon,
-	tlsPortOf,
 	webHandler,
 } from "@nightshift/daemon";
 
@@ -137,17 +137,22 @@ export function serveOptions(
 		set.NIGHTSHIFT_HOST_ADDRESSES = addresses.join(",");
 	}
 	const merged = { ...env, ...set };
-	const port = Number(merged.PORT || DEFAULT_PORT);
-	if (!Number.isInteger(port) || port <= 0 || port > 65_535) {
-		throw new Error(`${merged.PORT} is not a port.`);
-	}
+	const asPort = (text: string) => {
+		const port = portOf(text);
+		// Checked here, so a typo stops `serve` before anything starts.
+		if (port === undefined) throw new BadArguments(`${text} is not a port.`);
+		return port;
+	};
+	const port = merged.PORT ? asPort(merged.PORT) : DEFAULT_PORT;
 	const https = (merged.NIGHTSHIFT_HOST_ADDRESSES ?? "")
 		.split(",")
 		.map((a) => a.trim())
 		.find((a) => a.startsWith("https://"));
 	return {
 		port,
-		tlsPort: tlsPortOf(merged.NIGHTSHIFT_TLS_PORT),
+		tlsPort: merged.NIGHTSHIFT_TLS_PORT
+			? asPort(merged.NIGHTSHIFT_TLS_PORT)
+			: undefined,
 		env: set,
 		url: https ? new URL(https).origin : `http://localhost:${port}`,
 		web: merged.NIGHTSHIFT_WEB_DIR?.trim() || null,

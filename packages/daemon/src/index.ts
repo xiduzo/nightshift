@@ -19,7 +19,7 @@ export {
 	directoryWeb,
 	embeddedWeb,
 	PortTakenError,
-	tlsPortOf,
+	portOf,
 	type WebFiles,
 	webHandler,
 } from "./http";
