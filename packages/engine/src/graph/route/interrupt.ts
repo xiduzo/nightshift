@@ -6,8 +6,14 @@ import {
 } from "@langchain/langgraph";
 
 import type { NodeAction, StepContext } from "../context";
-import { heldStep, holdEnded } from "../position";
-import type { Parked, Pending, ResumeValue, RunStateValues } from "../state";
+import { commitVisit, heldStep, holdEnded } from "../position";
+import type {
+	Parked,
+	Pending,
+	PendingGate,
+	ResumeValue,
+	RunStateValues,
+} from "../state";
 
 /**
  * The one interrupting graph node. Three nodes park a thread at an
@@ -82,7 +88,7 @@ export function interruptNode<K extends Pending["kind"]>(spec: {
 
 type GateSpec = Parameters<typeof interruptNode<"gate">>[0];
 
-/** The node starts over with no Gate held. */
+/** The node opens its Gate again, in a new visit. */
 export function askAgain(node: { id: string }): Command {
 	return new Command({
 		update: { pending: { [node.id]: null } },
@@ -91,10 +97,28 @@ export function askAgain(node: { id: string }): Command {
 }
 
 /**
+ * A stop ended the step of `pending` before its Gate was checkpointed: its
+ * visit is open again for the resume point. A sleep, a park or an earlier
+ * stop may have committed that visit while the step went on. The log says
+ * how the step ended, so a step that is done does not run again
+ * (`Position.done`).
+ */
+function askedInVain(node: { id: string }, pending: PendingGate): Command {
+	return new Command({
+		update: {
+			pending: { [node.id]: null },
+			...commitVisit(node, pending.visit - 1),
+		},
+		goto: node.id,
+	});
+}
+
+/**
  * The ask node of a Gate (`ask__<id>`): it waits with the Gate the node
  * opened. A stop can end the Gate's step before the Gate was checkpointed.
- * Then the node starts over: it asks again in a new visit, and an Agent that
- * asks takes its step up (the resume point).
+ * Then the node goes on from its resume point (`askedInVain`): an Agent that
+ * asks takes the step up when it has a session, each other Gate asks again
+ * in a new visit.
  */
 export function gateNode(
 	node: { id: string },
@@ -118,6 +142,6 @@ export function gateNode(
 			...(pending.deadline ? { deadline: pending.deadline } : {}),
 		}),
 		answer: spec.answer,
-		stale: { ctx, letGo: () => askAgain(node) },
+		stale: { ctx, letGo: (pending) => askedInVain(node, pending) },
 	});
 }

@@ -97,7 +97,8 @@ export type DoneStep = {
  * takes it up as uncommitted. A node commits when its step ended (`route`,
  * every park after a step), when its step sleeps (`sleep`), and after each
  * element of a Call with `each`. A Gate does not commit while it is open:
- * its answer ends the step and commits it.
+ * its answer ends the step and commits it. A Gate that a stop ended before
+ * its checkpoint opens a visit that was committed again (`gateNode`).
  */
 export function commitVisit(
 	node: NodeRef,

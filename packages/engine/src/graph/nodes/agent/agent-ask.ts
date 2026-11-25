@@ -35,7 +35,8 @@ import { answerRetryGate } from "../decide";
  *   one, and the session goes on with the resume's prompt
  *   (`RESUME_RULES.agent`). The agent asks again when it still needs input.
  * - a stop that ended the step before the Gate was checkpointed (`stale`):
- *   a resume takes the step up at the resume point, and goes on as above.
+ *   a resume takes the step up at the resume point when it has a session,
+ *   with the resume's prompt. Without one, the node starts a new visit.
  */
 export function agentAskNode(node: AgentNode, ctx: StepContext): NodeAction {
 	return gateNode(node, ctx, {

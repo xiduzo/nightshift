@@ -381,7 +381,7 @@ Each entry names its source. "Read" means found by reading and not reproduced.
   could not be read. A test now runs each sweep over such data.
 - A flaky CI test came from 14 test files that never ended their engine.
 - A stop in a short moment after an Agent asks made the first resume stop again. Now one resume
-  continues the step, with the prompt of the person.
+  continues the step, when its harness session has an id.
 - Not covered: a browser, a phone, two real daemons over a network.
 
 ### Numbers (scc, 5ff33c00b to 332649c77, before the review fixes)
