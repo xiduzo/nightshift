@@ -10,7 +10,7 @@ import type {
 import { firstDeadline, wakesNext } from "../../read";
 import type { Recorder } from "../recorders";
 import type { ResumeValue } from "../state";
-import type { ThreadState } from "./thread";
+import type { ThreadEntry, ThreadState } from "./thread";
 
 /**
  * The runner's side of a sleep (`step/sleep.ts` has the step's side).
@@ -46,18 +46,24 @@ export type WakePlan =
 	| { kind: "not-sleeping" }
 	/** A timer that fired before its time: it is set again for `until`. */
 	| { kind: "too-soon"; until: number }
-	/** The wait ends: `WaitEnded` on `step`, then `resume` into the wait node. */
-	| {
-			kind: "wake";
-			step: Pick<DerivedStep, "id">;
-			resume: ResumeValue;
-	  };
+	/** The wait ends: `WaitEnded` on `step`, then `entry` into the thread. */
+	| { kind: "wake"; step: Pick<DerivedStep, "id">; entry: ThreadEntry };
 
 /**
- * Pure: what a wake does. The run must still sleep by the log (a stop ends
- * the sleep with the thread left at its wait) and by the checkpoint (the
- * wait is the interrupt the thread sits at). A timer's wake (`early`
- * false) before the wait's time is too soon.
+ * Pure: what a wake does. The log says which steps sleep (`wakesNext`): it
+ * was written first, and a person and the timers read it. A stop or recovery
+ * ends a sleep there with the thread left at its wait. The thread says only
+ * where each task is, so the wake moves every task that the log does not
+ * hold asleep:
+ *
+ * - The step it wakes: its interrupt is answered.
+ * - An interrupt whose step the log no longer holds asleep (the daemon died
+ *   after the wake, or recovery ended the step): it is answered too.
+ * - A task with no interrupt (the daemon died before it was saved): the
+ *   drive runs it again, and its node goes on from the log.
+ *
+ * Every other sleeper keeps its wait. A timer's wake (`early` false) before
+ * the wait's time is too soon.
  *
  * `early`: a person resumed the run before its time, with `prompt` as the
  * step's follow-up. `signal`: someone sent the run that signal; the resume
@@ -72,14 +78,12 @@ export function planWake(
 	if (run.status !== "sleeping") {
 		return { kind: "not-sleeping" };
 	}
-	if (at.kind !== "interrupted") return { kind: "not-sleeping" };
+	if (at.kind === "fresh" || at.kind === "ended") {
+		return { kind: "not-sleeping" };
+	}
 	const sleeping = wakesNext(run, how.signal);
 	const step = run.steps.get(sleeping?.stepId ?? "");
-	// The checkpoint must hold the wait too.
-	const held = at.interrupts.some(
-		({ value }) => value.kind === "wait" && value.stepId === step?.id,
-	);
-	if (!sleeping || !step || !held) return { kind: "not-sleeping" };
+	if (!sleeping || !step) return { kind: "not-sleeping" };
 	const { until } = sleeping.payload;
 	if (!how.early && until !== null && now < until) {
 		return { kind: "too-soon", until };
@@ -95,7 +99,28 @@ export function planWake(
 					kind: "wake",
 					early: how.early,
 				};
-	return { kind: "wake", step, resume };
+	const asleep = new Set(run.waits.map((wait) => wait.stepId));
+	const interrupts = at.kind === "interrupted" ? at.interrupts : [];
+	const each: Record<string, ResumeValue> = {};
+	for (const { id, value } of interrupts) {
+		if (value.kind !== "wait") continue;
+		if (value.stepId === step.id) each[id] = resume;
+		else if (!asleep.has(value.stepId)) {
+			each[id] = { kind: "wake", early: false };
+		}
+	}
+	const answers = Object.values(each);
+	const [only] = answers;
+	if (!only) return { kind: "wake", step, entry: { kind: "continue" } };
+	return {
+		kind: "wake",
+		step,
+		entry: {
+			kind: "resume",
+			value: only,
+			...(interrupts.length > 1 ? { each } : {}),
+		},
+	};
 }
 
 /** What `recordWake` writes to. */

@@ -1041,9 +1041,12 @@ with the sleep and answers three things:
 The daemon side is the runner's wake Turn over the three parts of
 `graph/runner/wake.ts`:
 
-- `planWake(events, threadState, how, now)` (pure) checks that the run
-  still sleeps in the log, and that the wait is the interrupt the thread
-  sits at. It says when a timer fired before its time. It gives the resume
+- `planWake(events, threadState, how, now)` (pure). The log says which
+  steps sleep. The thread says only where each task is. So a wake moves
+  each task that the log does not hold asleep: the step it wakes, an
+  interrupt whose sleep the log ended, and a task whose interrupt was lost
+  in a crash. Every other sleeper keeps its wait. A wait node with no
+  answer goes on when the log ended its sleep (`holdEnded`). It says when a timer fired before its time. It gives the resume
   value (`{ kind: "wake" }` or `{ kind: "signal" }`).
 - `recordWake` appends `WaitEnded` (with the prompt of a person who gave
   one) and the transcript `wake` once the run holds a slot.

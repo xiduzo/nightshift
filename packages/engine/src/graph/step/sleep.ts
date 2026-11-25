@@ -325,6 +325,14 @@ export function waitNode(
 	nodeId: string,
 	ctx: Pick<StepContext, "log" | "run">,
 ): NodeAction {
+	const letGo = async (pending: PendingWait): Promise<Command> => {
+		const run = await ctx.log.state(ctx.run.id);
+		// The log woke it, and the step is open: it goes on.
+		if (run.steps.get(pending.stepId)?.endedAt === null) {
+			return new Command({ update: { pending }, goto: nodeId });
+		}
+		return stopped(pending);
+	};
 	const stopped = async (pending: PendingWait): Promise<Command> => {
 		const parked: PendingParked = {
 			kind: "parked",
@@ -373,7 +381,7 @@ export function waitNode(
 		// stopped, as a resume of a stopped sleep does.
 		stale: {
 			ctx,
-			letGo: stopped,
+			letGo,
 		},
 	});
 }

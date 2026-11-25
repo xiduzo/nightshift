@@ -30,6 +30,7 @@ import {
 	waitFor,
 } from "../../testing/test-support";
 import { DEFAULT_RESUME_PROMPT, STOP_TIME_REASON } from "../context/context";
+import { inputOf } from "../runner/thread";
 import { createSleeps, planWake, recordWake, type Wake } from "../runner/wake";
 import type { Pending, ResumeValue } from "../state/state";
 import { pendingWaitOf } from "./sleep";
@@ -104,8 +105,8 @@ function daemon(h: Harness, time: { now(): number }) {
 			plan,
 			how,
 		);
-		resumed.push(plan.resume);
-		drives.push(drive(h, new Command({ resume: plan.resume }), h.graph()));
+		if (plan.entry.kind === "resume") resumed.push(plan.entry.value);
+		drives.push(drive(h, inputOf(plan.entry), h.graph()));
 	}
 	const sleeps = createSleeps({
 		now: time.now,
@@ -347,17 +348,21 @@ describe("the sleep module: an Agent step's usage-limit wait", () => {
 		).toMatchObject({
 			kind: "wake",
 			step: { id: stepId },
-			resume: { kind: "wake", early: true },
+			entry: { kind: "resume", value: { kind: "wake", early: true } },
 		});
 		expect(
 			planWake(foldRun(events), at, { early: true, signal: "go" }, time.now()),
-		).toMatchObject({ kind: "wake", resume: { kind: "signal", name: "go" } });
+		).toMatchObject({
+			kind: "wake",
+			entry: { kind: "resume", value: { kind: "signal", name: "go" } },
+		});
 		expect(
 			planWake(foldRun(events), { kind: "fresh" }, { early: true }, 0),
 		).toEqual({
 			kind: "not-sleeping",
 		});
-		// The log says the step sleeps: the thread does not hold its wait.
+		// The log says the step sleeps: the thread does not hold its wait, so
+		// its task runs again.
 		const elsewhere = { kind: "gate", stepId: "x", nodeId: "x" } as never;
 		expect(
 			planWake(
@@ -370,7 +375,11 @@ describe("the sleep module: an Agent step's usage-limit wait", () => {
 				{ early: true },
 				time.now(),
 			),
-		).toEqual({ kind: "not-sleeping" });
+		).toEqual({
+			kind: "wake",
+			step: expect.anything(),
+			entry: { kind: "continue" },
+		});
 		// The log says the run stopped: the thread still sits at its wait.
 		expect(
 			planWake(

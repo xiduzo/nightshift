@@ -51,7 +51,7 @@ export function interruptNode<K extends Pending["kind"]>(spec: {
 		state: RunStateValues,
 		config: LangGraphRunnableConfig,
 	): Command | Promise<Command>;
-	/** A held step the log may have ended: the log to look in, and what the node does then. */
+	/** A hold the log may have ended: the log to look in, and what the node does then. */
 	stale?: {
 		ctx: Pick<StepContext, "log" | "run">;
 		letGo(

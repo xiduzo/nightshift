@@ -1,7 +1,12 @@
 import { Command, type LangGraphRunnableConfig } from "@langchain/langgraph";
 import type { CostSource } from "@nightshift/agents/pricing";
 import type { FlowNode } from "@nightshift/flows";
-import type { RunWarningKind, StepOutcome, StepOutputs } from "../../log";
+import type {
+	RunState,
+	RunWarningKind,
+	StepOutcome,
+	StepOutputs,
+} from "../../log";
 import { type Climb, climbCommand, climbNext } from "../cascade";
 import {
 	pastStopTime,
@@ -9,7 +14,7 @@ import {
 	type StepContext,
 	stepFailure,
 } from "../context";
-import type { DoneStep } from "../position";
+import { type DoneStep, positionOf } from "../position";
 import {
 	askNodeId,
 	parkFailed,
@@ -103,6 +108,7 @@ export async function runStep(
 	if (entry.kind === "done") {
 		return doneAndGo(ctx, state, node, entry, config, climb, extra);
 	}
+	if (entry.kind === "new") await endLost(ctx, node, state, runState, config);
 	const start: StepStart =
 		spec.standIn && entry.kind === "new"
 			? { kind: "new", standIn: spec.standIn }
@@ -260,6 +266,33 @@ export async function runStep(
 			return endAndGo("error", await blank("error"), slept.error, costs);
 		}
 	}
+}
+
+/**
+ * Ends the step of the node that the log still has open and no checkpoint
+ * knows, before a new visit takes its place: it slept, and the daemon died
+ * before the thread held its wait.
+ */
+async function endLost(
+	ctx: StepContext,
+	node: FlowNode,
+	state: RunStateValues,
+	runState: RunState,
+	config: LangGraphRunnableConfig,
+): Promise<void> {
+	const lost = positionOf(state, runState, scopeOf(config)).uncommitted(node);
+	if (!lost || lost.endedAt !== null) return;
+	const outcome = "interrupted";
+	await ctx.log.append({
+		type: "StepEnded",
+		runId: ctx.run.id,
+		stepId: lost.id,
+		payload: {
+			outcome,
+			outputs: ctx.kindOf(node).cutShortOutputs(lost, node, outcome),
+			error: "Night Shift stopped while this ran.",
+		},
+	});
 }
 
 /**

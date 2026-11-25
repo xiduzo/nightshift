@@ -27,6 +27,10 @@ const DRIVING: Taken = { kind: "driving" };
 const BRANCHES_WORK =
 	"Another branch of this run is still working. Answer the Gate when its step ends.";
 
+/** A resume of a sleeping run whose walk is not where the sleep is. */
+const CANNOT_WAKE =
+	"Night Shift could not wake this run. Stop the run, then resume it.";
+
 const HALTED: Taken = { kind: "halted" };
 const QUEUED: Taken = { kind: "queued" };
 const UNCHANGED: Taken = { kind: "unchanged" };
@@ -166,7 +170,13 @@ export function createTurns(
 		const runId = row.id;
 		const at = await threadOf(row).state();
 		const plan = planWake(runState, at, how, shared.now());
-		if (plan.kind === "not-sleeping") return UNCHANGED;
+		if (plan.kind === "not-sleeping") {
+			// A person asked: they hear that nothing came of it.
+			if (intent.kind === "resume" && how.by === "person") {
+				throw new RunRefusal("not-now", CANNOT_WAKE);
+			}
+			return UNCHANGED;
+		}
 		if (plan.kind === "too-soon") {
 			sleeps.schedule(runId, plan.until);
 			return UNCHANGED;
@@ -175,19 +185,7 @@ export function createTurns(
 		sleeps.forget(runId);
 		if (!reserve(runId, intent, options)) return QUEUED;
 		await recordWake({ log, bus, recorders }, runId, plan, how);
-		const each = resumeEach(at, (parked) =>
-			parked.kind === "wait" && parked.stepId === plan.step.id
-				? plan.resume
-				: null,
-		);
-		drive(
-			row,
-			inputOf({
-				kind: "resume",
-				value: plan.resume,
-				...(each ? { each } : {}),
-			}),
-		);
+		drive(row, inputOf(plan.entry));
 		return DRIVING;
 	}
 

@@ -274,14 +274,20 @@ export function heldStep(
 }
 
 /**
- * Whether the log ended the step a wait or a Gate holds: a stop ended it
- * after the hold was written. Such a hold is stale: no wake and no answer
- * comes for it.
+ * Whether the log ended what a wait or a Gate holds: a stop ended its step
+ * after the hold was written, or a wake ended the sleep before the thread
+ * saved its interrupt. Such a hold is stale: no wake and no answer comes for
+ * it.
  */
 export function holdEnded(run: RunState, pending: Pending): boolean {
 	if (pending.kind === "parked" || pending.stepId === null) return false;
 	const step = run.steps.get(pending.stepId);
-	return step !== undefined && step.endedAt !== null;
+	if (step === undefined) return false;
+	if (step.endedAt !== null) return true;
+	return (
+		pending.kind === "wait" &&
+		!run.waits.some((wait) => wait.stepId === pending.stepId)
+	);
 }
 
 /**

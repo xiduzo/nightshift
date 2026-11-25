@@ -233,8 +233,14 @@ export function firstDeadline(
  * parked. These steps stay open while the run waits or sleeps.
  */
 export function parkedSteps(run: RunState): DerivedStep[] {
-	const stepId = run.gate?.stepId ?? run.sleep?.stepId;
-	return stepId ? withEnclosing(run, stepId) : [];
+	const ids = run.gate
+		? [run.gate.stepId]
+		: run.waits.flatMap((wait) => wait.stepId ?? []);
+	const parked = new Map<string, DerivedStep>();
+	for (const id of ids) {
+		for (const step of withEnclosing(run, id)) parked.set(step.id, step);
+	}
+	return [...parked.values()];
 }
 
 /** A running step's time budget, as the log has it, and when it counts from. */

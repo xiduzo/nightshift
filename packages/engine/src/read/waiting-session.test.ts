@@ -214,6 +214,17 @@ describe("the wait that a wake ends", () => {
 		log.waitEnded("a").waitEnded("c");
 		expect(next()).toBeNull();
 	});
+
+	test("not one whose step ended or opened again, nor one of an earlier walk", () => {
+		const asleep = () =>
+			start().stepStarted("a", "a").waitStarted("a", { until: 800 });
+		const next = (log: Log) => wakesNext(log.state())?.stepId ?? null;
+		expect(next(asleep())).toBe("a");
+		expect(next(asleep().stepEnded("a", "stopped"))).toBeNull();
+		expect(next(asleep().stepReopened("a"))).toBeNull();
+		expect(next(ended(asleep(), "stopped"))).toBeNull();
+		expect(next(asleep().resumed("a"))).toBeNull();
+	});
 });
 
 /** A log with the events of `log` so far. */
