@@ -411,6 +411,20 @@ describe("why a run ended", () => {
 		expect(
 			notice("interrupted", { reason, flowUnread: "older" }),
 		).toMatchObject({ body: [reason], resumable: false });
+		const unread = runNow(
+			run({ status: "interrupted", reason, flowUnread: "older" }),
+		);
+		expect(unread.allows).toMatchObject({
+			resume: false,
+			restart: false,
+			rerun: false,
+		});
+		expect(unread.whyNot.resume).toStartWith(
+			"This run is from an older version of Night Shift.",
+		);
+		expect(
+			runNow(run({ status: "waiting", flowUnread: "older" })).allows.stop,
+		).toBe(true);
 	});
 
 	test("a flow that ended as failed is run again, not resumed", () => {

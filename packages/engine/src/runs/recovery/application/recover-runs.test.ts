@@ -25,6 +25,8 @@ const stepStarted = {
 	scope: null,
 } as EnginePayloads["StepStarted"];
 
+const UNREAD = "This run cannot continue here.";
+
 /** A run whose agent step `s1` ran when the daemon died. */
 const ran = (runId: string) =>
 	eventsOf(runId).push("RunStarted", started).push("StepStarted", stepStarted, {
@@ -57,14 +59,17 @@ afterEach(() => {
 /** Ports, and the reasons `checkResume` gives by run (none: the run continues). */
 async function setup(
 	why: Record<string, string> = {},
-	older: Record<string, string> = {},
+	unread: Record<string, "older" | "newer" | "invalid"> = {},
 ) {
 	const ports = await recoveryPorts();
 	const asked: string[] = [];
 	const recover = recoverRuns({
 		openWork: ports.openWork,
 		turns: ports.turns,
-		olderRun: async (runId) => older[runId] ?? null,
+		unread: async (runId) => {
+			const unreadWhy = unread[runId];
+			return unreadWhy ? { why: unreadWhy, reason: UNREAD } : null;
+		},
 		checkResume: async (runId) => {
 			asked.push(runId);
 			return why[runId] ?? null;
@@ -134,10 +139,10 @@ describe("recoverRuns", () => {
 	});
 
 	test("a run of an older flow ends with its waits, and the next run goes on", async () => {
-		const reason = "This run is from an older version of Night Shift.";
+		const reason = UNREAD;
 		const { ports, recover, asked } = await setup(
 			{},
-			{ ran: reason, slept: reason, ended: reason },
+			{ ran: "older", slept: "older", ended: "older" },
 		);
 		await ports.addRun("ran", ran("ran"));
 		await ports.addRun("slept", slept("slept"));
@@ -160,6 +165,21 @@ describe("recoverRuns", () => {
 		expect(ports.turns.taken.map(({ runId }) => runId)).toEqual(["new", "new"]);
 		expect(asked).toEqual(["new"]);
 	});
+
+	test.each(["newer", "invalid"] as const)(
+		"a run of a %s flow that ran ends interrupted, not failed by its limits, and one that sleeps stays",
+		async (why) => {
+			const { ports, recover } = await setup({}, { ran: why, slept: why });
+			await ports.addRun("ran", ran("ran"));
+			await ports.addRun("slept", slept("slept"));
+			ports.turns.answer({ kind: "halted" });
+			expect(await recover()).toEqual([]);
+			expect(ports.openWork.closed).toEqual([{ runId: "ran", reason: UNREAD }]);
+			expect(ports.openWork.letGone).toEqual(["ran"]);
+			expect(ports.turns.taken).toEqual([]);
+			expect(ports.turns.restored.map(({ runId }) => runId)).toEqual(["slept"]);
+		},
+	);
 
 	test("a run that ended has nothing open: recovery only restores it", async () => {
 		const { ports, recover } = await setup();

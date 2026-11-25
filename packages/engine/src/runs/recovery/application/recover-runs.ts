@@ -8,8 +8,10 @@ import type { OpenWork } from "./ports";
 export type RecoverRunsPorts = {
 	openWork: OpenWork;
 	turns: Pick<Turns, "take" | "restore">;
-	/** Why nothing can continue the run: an older Night Shift made its flow. Null: it did not. */
-	olderRun(runId: string): Promise<string | null>;
+	/** Why this version cannot continue the run: it cannot read its flows. Null: it can. */
+	unread(
+		runId: string,
+	): Promise<{ why: "older" | "newer" | "invalid"; reason: string } | null>;
 	/** Why a run does not continue on its own, or null. */
 	checkResume: ReturnType<typeof checkResume>;
 	/** The run's state from its events (`log`). */
@@ -26,8 +28,9 @@ export type RecoverRunsPorts = {
  * its timer back: a wake time in the past fires at once. Open Gates and
  * sleeping steps are facts, not lost work. A step past its time budget or
  * idle limit ends as its timer would have ended it, and that run fails.
- * A run whose flow an older Night Shift made ends interrupted with its
- * Gates and its sleeps: nothing can continue it.
+ * A run whose flow this version cannot read ends interrupted, never
+ * failed: its work did not fail. One an older Night Shift made ends with
+ * its Gates and its sleeps: nothing can continue it.
  *
  * Returns the runs that continue on their own after the grace. A run that
  * does not continue says why in its end reason, and lets go of what it
@@ -46,9 +49,10 @@ export const recoverRuns =
 			const runState = ports.fold(events);
 			const all = { kind: "interrupted", waits: true } as const;
 			if (ports.whatIsOpen(runState, all).endsRun) {
-				const older = await ports.olderRun(runId);
-				if (older !== null) {
-					await openWork.close(runId, { ...all, reason: older });
+				const unread = await ports.unread(runId);
+				const cut = { ...all, waits: unread?.why === "older" };
+				if (unread && ports.whatIsOpen(runState, cut).endsRun) {
+					await openWork.close(runId, { ...cut, reason: unread.reason });
 					await letGo(openWork, runId);
 					continue;
 				}

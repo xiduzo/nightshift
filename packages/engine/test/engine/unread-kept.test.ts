@@ -169,6 +169,14 @@ describe.each(Object.keys(UNREAD))("a run whose flow is %s", (why) => {
 				expect(existsSync(inFolder.file)).toBe(true);
 				expect(await refs()).toEqual(before);
 				expect(before.join()).toContain(kept);
+				// No action of the run frees what a cut-short one keeps.
+				if ((await later.getRun(inFolder.id)).status === "interrupted") {
+					await later.act(inFolder.id, { kind: "stop" });
+					await expect(
+						later.act(inFolder.id, { kind: "resume" }),
+					).rejects.toThrow();
+					expect((await later.getRun(inFolder.id)).status).toBe("interrupted");
+				}
 				expect(await later.listRunFiles(inFolder.id)).toMatchObject({
 					here: true,
 					cleanupAt: null,
@@ -180,6 +188,85 @@ describe.each(Object.keys(UNREAD))("a run whose flow is %s", (why) => {
 		60_000,
 	);
 });
+
+/** What a timer or a step's limit would end long after: a Gate with a deadline, a step with a time budget. */
+const gateDue = flowOf({
+	type: "decision",
+	by: "person",
+	prompt: "Go on?",
+	options: [{ name: "yes", label: "Yes" }],
+	deadline: { minutes: 60, choose: "yes" },
+});
+const napDue = flowOf({
+	type: "wait",
+	until: { kind: "duration", minutes: 60 },
+});
+const workDue = flowOf({
+	type: "command",
+	command: "sleep 30",
+	timeoutMinutes: 1,
+});
+
+describe.each(["newer", "invalid"])("time that passes a %s flow", (why) => {
+	test.each([
+		["a Gate's deadline", gateDue, "waiting", "waiting"],
+		["a wake time", napDue, "sleeping", "sleeping"],
+		["a step's time budget", workDue, "running", "interrupted"],
+	] as const)(
+		"%s ends no run",
+		async (_what, flow, status, after) => {
+			const engine = startDaemon();
+			const research = await engine.addProjectWithoutFolder({ name: "R" });
+			const left = await runWithWork(engine, research.id, flow, status);
+			for (const daemon of daemons) daemon.abort();
+			await sandbox.db
+				.update(run)
+				.set({ flow: UNREAD[why]?.(flow) ?? "" })
+				.where(eq(run.id, left.id));
+			const warn = spyOn(console, "warn").mockImplementation(() => {});
+			const woke = Promise.withResolvers<void>();
+			const error = spyOn(console, "error").mockImplementation(() =>
+				woke.resolve(),
+			);
+			try {
+				const later = await sweptLater(DAYS);
+				// The timer's Turn is refused, and says so.
+				if (after !== "interrupted") await woke.promise;
+				expect((await later.getRun(left.id)).status).toBe(after);
+				const last = await sweptLater(2 * DAYS);
+				expect((await last.getRun(left.id)).status).toBe(after);
+				expect(existsSync(left.file)).toBe(true);
+			} finally {
+				warn.mockRestore();
+				error.mockRestore();
+			}
+		},
+		60_000,
+	);
+});
+
+test("a run that calls a flow this version cannot read is not continued either", async () => {
+	const engine = startDaemon();
+	const research = await engine.addProjectWithoutFolder({ name: "R" });
+	const left = await runWithWork(engine, research.id, napDue, "sleeping");
+	for (const daemon of daemons) daemon.abort();
+	await sandbox.db
+		.update(run)
+		.set({ bodyFlows: JSON.stringify({ body: { ...gate, nodes: "?" } }) })
+		.where(eq(run.id, left.id));
+	const woke = Promise.withResolvers<void>();
+	const error = spyOn(console, "error").mockImplementation(() =>
+		woke.resolve(),
+	);
+	try {
+		const later = await sweptLater(DAYS);
+		await woke.promise;
+		expect((await later.getRun(left.id)).status).toBe("sleeping");
+		expect(existsSync(left.file)).toBe(true);
+	} finally {
+		error.mockRestore();
+	}
+}, 60_000);
 
 test("a start and every sweep leave each stored entry of another format", async () => {
 	const engine = startDaemon();

@@ -77,20 +77,34 @@ function jsonOf(text: string): unknown {
 	}
 }
 
+/** Why a run's flows do not read. */
+export type RunUnread = "older" | "newer" | "invalid";
+
 /**
- * The flow the run started from, from the run's own snapshot, to walk it.
- * Refuses a snapshot that does not read (`readFlow`).
+ * Why this version cannot walk the run: its flow, or one it calls, does
+ * not read (`readFlow`). Null: it can. `reason` is what a person reads.
  */
-export function parseRunFlow(row: Pick<RunRow, "flow">): Flow {
-	const read = readFlow(jsonOf(row.flow));
-	if (read.flow === null) throw new Refusal("invalid", CANNOT_WALK[read.why]);
-	return read.flow;
+export function runUnread(
+	row: Pick<RunRow, "flow" | "bodyFlows">,
+): { why: RunUnread; reason: string } | null {
+	const called = Object.values(jsonOf(row.bodyFlows) ?? {});
+	for (const json of [jsonOf(row.flow), ...called]) {
+		const read = readFlow(json);
+		if (read.flow === null) {
+			return { why: read.why, reason: CANNOT_WALK[read.why] };
+		}
+	}
+	return null;
 }
 
-/** Why nothing can continue a run whose flow an older Night Shift made, or null. */
-export function olderRun(row: Pick<RunRow, "flow">): string | null {
-	const read = readFlow(jsonOf(row.flow));
-	return read.flow === null && read.why === "older" ? CANNOT_WALK.older : null;
+/**
+ * The flow the run started from, from the run's own snapshot, to walk it.
+ * Refuses a run whose flows do not all read (`runUnread`).
+ */
+export function parseRunFlow(row: Pick<RunRow, "flow" | "bodyFlows">): Flow {
+	const unread = runUnread(row);
+	if (unread) throw new Refusal("invalid", unread.reason);
+	return flowSchema.parse(jsonOf(row.flow));
 }
 
 /**

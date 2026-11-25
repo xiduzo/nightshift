@@ -8,6 +8,7 @@ import type {
 	WaitEvent,
 } from "../types";
 import { actedRunStatus, type RunActing, runActions, whyNot } from "./actions";
+import { flowUnreadWords } from "./flow-unread";
 import { type RunStatusView, statusOf } from "./status";
 
 /**
@@ -114,6 +115,17 @@ type RunRead = Pick<
 > &
 	Partial<Pick<RunDetail, "commands" | "steps" | "flowUnread">>;
 
+/** The actions that read the run's flow. */
+const NEEDS_FLOW: readonly RunAction[] = ["resume", "restart", "rerun"];
+
+/** What a run of `status` allows. Nothing continues or repeats one whose flow does not read. */
+function allowedOf(run: RunRead, status: RunStatus): RunActions {
+	return {
+		...runActions(status, run.walker.thisDevice, run.result),
+		...(run.flowUnread ? { resume: false, restart: false, rerun: false } : {}),
+	};
+}
+
 /** The name of the device that walks a run, as people read it. */
 export function walkerName(walker: Pick<RunSummary["walker"], "name">): string {
 	return walker.name ?? "another device";
@@ -131,7 +143,8 @@ export function runNow(run: RunRead, live: RunLive = {}): RunNow {
 		{ status: own, result: run.result, walkedHere: here },
 		live.acting ?? null,
 	);
-	const allows = runActions(own, here, run.result);
+	const unread = flowUnreadWords(run);
+	const allows = allowedOf(run, own);
 	const actions = Object.keys(allows) as RunAction[];
 	const gate =
 		shown.status === "waiting"
@@ -143,7 +156,12 @@ export function runNow(run: RunRead, live: RunLive = {}): RunNow {
 		result: shown.result,
 		allows,
 		whyNot: Object.fromEntries(
-			actions.map((action) => [action, whyNot(action, own, here, run.result)]),
+			actions.map((action) => [
+				action,
+				unread && NEEDS_FLOW.includes(action)
+					? `${unread.title}. ${unread.body}`
+					: whyNot(action, own, here, run.result),
+			]),
 		) as Record<RunAction, string | null>,
 		gate,
 		notice: noticeOf(run, shown.status, {
@@ -238,7 +256,7 @@ function noticeOf(
 		report,
 	}: { gate: StepSummary | null; wait: RunWait | null; report: boolean },
 ): RunNotice | null {
-	const allows = runActions(status, run.walker.thisDevice, run.result);
+	const allows = allowedOf(run, status);
 	switch (status) {
 		case "waiting": {
 			if (!gate) return null;
@@ -341,15 +359,6 @@ function endedNotice(
 	status: "finished" | "failed" | "interrupted" | "stopped",
 	resume: boolean,
 ): RunNotice | null {
-	// Nothing continues a run whose flow does not read: its reason says what to do.
-	if (run.flowUnread && run.reason && status === "interrupted") {
-		return notice(
-			"interrupted",
-			["The run was interrupted"],
-			firstLine(run.reason) ?? "",
-			[run.reason],
-		);
-	}
 	const resumeHere = "Resume it to continue.";
 	const continueHere = "Resume it to continue where it stopped.";
 	switch (status) {
@@ -384,7 +393,9 @@ function endedNotice(
 				["The run was interrupted"],
 				firstLine(run.reason) ?? "Night Shift stopped during this run.",
 				[
-					`${run.reason ?? "Night Shift stopped during this run."} ${continueHere}`,
+					run.flowUnread && run.reason
+						? run.reason
+						: `${run.reason ?? "Night Shift stopped during this run."} ${continueHere}`,
 				],
 				{ resumable: resume },
 			);
