@@ -86,7 +86,7 @@ export const notificationSettingsPatchSchema = z
 		timeZone: timeZoneSchema.optional(),
 		screens: screensSchema.partial().optional(),
 		holdMinutes: notificationSettingsSchema.shape.holdMinutes.optional(),
-		/** Absent: as it was. An older phone app saves without it. */
+		/** Absent: as it was. */
 		pushUrgencies: pushUrgenciesSchema.optional(),
 	})
 	.strict();
@@ -132,7 +132,7 @@ export function applyPatch(
 
 /**
  * A Person's settings as the store kept them. The screens and the
- * urgencies may come from an older version, or be unreadable: `unknown`.
+ * urgencies are text it may not be able to read: `unknown`.
  */
 export type StoredSettings = Omit<
 	NotificationSettings,

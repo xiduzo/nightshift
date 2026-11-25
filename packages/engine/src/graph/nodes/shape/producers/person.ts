@@ -345,6 +345,7 @@ export function askEnding(
  */
 export function askAnswerNode(node: ValueNode, ctx: StepContext): NodeAction {
 	return gateNode(node, ctx, {
+		what: "question",
 		async answer(pending, answer, state, config) {
 			if (answer?.kind !== "gate" || pending.form === undefined) {
 				return askAgain(node);

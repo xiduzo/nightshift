@@ -22,7 +22,7 @@ export type NotifierFact = {
 			kind: "wait-started";
 			stepId: string;
 			reason: string;
-			/** `device-offline`: the Device's name. Null: none, or a Walker of an older version. */
+			/** `device-offline`: the Device's name. Null: none. */
 			deviceName: string | null;
 	  }
 	| { kind: "wait-ended"; stepId: string }

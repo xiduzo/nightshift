@@ -73,9 +73,9 @@ export type SpacePayloads = {
 	OfferMade: {
 		deviceId: string;
 		deviceName: string;
-		/** The profile's id; before profiles had ids, its name. */
+		/** The profile's id. */
 		profile: string;
-		/** The profile's name. Absent in an event logged before ids. */
+		/** The profile's name, where the event says it. */
 		profileName?: string;
 		permissionCap: string;
 		sessionCap: number;

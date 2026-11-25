@@ -63,7 +63,6 @@ function emptyBody(kind: WebRequestBody["kind"]): WebRequestBody {
 
 const MB = 1024 * 1024;
 
-/** A toggle item that fills its share and shows when it is on. */
 export function WebRequestFields({
 	flow,
 	node,

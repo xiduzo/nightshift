@@ -47,7 +47,7 @@ export const USAGE_LOCK =
 
 /**
  * The saved values of a Device document's `settings` map. An unknown key
- * and a value saved by an older build that no longer parses are left out.
+ * and a value that does not parse are left out.
  */
 export function savedValues(
 	entries: Iterable<[string, unknown]>,
@@ -56,7 +56,6 @@ export function savedValues(
 	for (const [key, value] of entries) {
 		if (!Object.hasOwn(DEFS, key)) continue;
 		const parsed = DEFS[key as SettingKey].schema.safeParse(value);
-		// A value saved by an older build that no longer parses is ignored.
 		if (parsed.success) out.set(key as SettingKey, parsed.data);
 	}
 	return out;

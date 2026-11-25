@@ -260,7 +260,7 @@ describe("a step that waits for a device", () => {
 		]);
 	});
 
-	test("says no stop time when the run has none, and names a device of an older Night Shift as a device", async () => {
+	test("says no stop time when the run has none, and names a device without a name as a device", async () => {
 		const n = await waiting();
 		n.ports.events.setRun("run-1", {
 			title: "Nightly triage",

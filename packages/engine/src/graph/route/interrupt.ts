@@ -106,13 +106,15 @@ export function gateNode(
 	ctx: Pick<StepContext, "log" | "run">,
 	spec: {
 		answer: GateSpec["answer"];
+		/** What opens at the node, in the error when none is. Default: a Gate. */
+		what?: "question";
 		letGo?(pending: PendingGate): Command | Promise<Command>;
 	},
 ): NodeAction {
 	return interruptNode({
 		kind: "gate",
 		nodeId: node.id,
-		missing: `No Gate is open at node "${node.id}".`,
+		missing: `No ${spec.what ?? "Gate"} is open at node "${node.id}".`,
 		value: (pending) => ({
 			kind: "gate",
 			stepId: pending.stepId,

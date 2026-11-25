@@ -54,7 +54,7 @@ describe("saveSettings", () => {
 		await expect(save({ pushUrgencies: ["soon" as "now"] })).rejects.toThrow();
 	});
 
-	test("a save without the urgencies keeps them: an older phone app sends none", async () => {
+	test("a save without the urgencies keeps them", async () => {
 		const { save, read } = await setUp();
 		await save({ pushUrgencies: ["now", "today"] });
 		const saved = await save({ holdMinutes: 5 });

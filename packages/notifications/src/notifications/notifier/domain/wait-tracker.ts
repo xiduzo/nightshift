@@ -14,7 +14,7 @@ export type StartedWait = {
 	key: string;
 	runId: string;
 	stepId: string;
-	/** The Device's name, as the Walker said it. Null: a Walker of an older version. */
+	/** The Device's name, as the Walker said it. Null: it said none. */
 	deviceName: string | null;
 };
 

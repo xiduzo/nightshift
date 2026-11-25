@@ -21,10 +21,10 @@ import type {
 } from "../domain/webhook-delivery";
 
 /**
- * The driven ports of the schedules slice. Two are its own, each with a
- * real adapter, an in-memory adapter and a contract suite in
- * `adapters/out/`: `ScheduleStore` and `ScheduleLog`. Another slice or
- * package fills the others (`@filledBy`): `createEngine` passes them to
+ * The driven ports of the schedules slice. Two are its own, with their
+ * adapters in `adapters/out/`: `ScheduleStore`, with a twin and a contract
+ * suite, and `ScheduleLog`, a port of the database. Another slice or package
+ * fills the others (`@filledBy`): `createEngine` passes them to
  * `wireSchedules`.
  */
 

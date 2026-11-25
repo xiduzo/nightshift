@@ -82,8 +82,7 @@ export function needsALookWords(turn: {
 
 /**
  * The words of a device wait: "<flow> waits for <device>", and what
- * happens next. A Device of an older version does not say its name: "a
- * device".
+ * happens next. Without a name: "a device".
  */
 export function deviceWaitWords(wait: {
 	flow: string;

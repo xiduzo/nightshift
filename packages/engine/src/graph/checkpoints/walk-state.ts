@@ -196,8 +196,8 @@ export function createRunWalks(deps: {
 
 /**
  * The run's latest checkpoint per namespace and their pending writes, as
- * JSON (the blobs in base64): what a resume elsewhere needs. Replicas of
- * older versions read this format too: keep it as it is.
+ * JSON (the blobs in base64): what a resume elsewhere needs. Another
+ * Replica reads it.
  */
 async function checkpointSnapshot(
 	db: Database,

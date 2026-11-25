@@ -98,7 +98,7 @@ describe("the device waits", () => {
 		});
 	});
 
-	test("a Walker of an older version names no Device", () => {
+	test("a wait without a Device name names no Device", () => {
 		const waits = createWaitTracker();
 		const { started } = waits.apply(SPACE, [offline("a", null)], 0);
 		expect(started[0]?.deviceName).toBeNull();
