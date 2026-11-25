@@ -451,9 +451,7 @@ for (const [path, call] of Object.entries(paths)) {
 				),
 			).toBe("served");
 			expect(
-				await outcome(
-					noFolder(offered("Do the work.", { cwd: join(runFolder, "notes") })),
-				),
+				await outcome(noFolder(offered("Do the work.", { cwd: runFolder }))),
 			).toBe("served");
 			expect(await outcome(noFolder(offered()))).toBe(
 				"This device works only in the run's own folder.",
@@ -686,9 +684,6 @@ describe("Offer admission, its owner's run", () => {
 	test("sent through the Host: served in the run's own folder", async () => {
 		expect(await serve(mine())).toBe("served");
 		expect(
-			await serve(mine({ call: exec(join(worktree, "packages", "app")) })),
-		).toBe("served");
-		expect(
 			await serve(
 				mine({ runId: null, call: { kind: "capabilities", query: {} } }),
 			),
@@ -716,7 +711,12 @@ describe("Offer admission, its owner's run", () => {
 		expect(await serve(mine({ projectId: "elsewhere" }))).toBe(
 			"This device does not have this project. Add its folder there first.",
 		);
-		for (const cwd of [sandbox.repoPath, `${worktree}-other`, "/"]) {
+		for (const cwd of [
+			sandbox.repoPath,
+			`${worktree}-other`,
+			join(worktree, "packages"),
+			"/",
+		]) {
 			expect(await serve(mine({ call: exec(cwd) }))).toBe(
 				"This device works only in the run's own folder.",
 			);
@@ -749,9 +749,13 @@ describe("Offer admission, its owner's run", () => {
 			),
 		).toBe("served");
 		expect(await serve(noFolder(exec(runFolder)))).toBe("served");
-		expect(await serve(noFolder(exec(join(runFolder, "out"))))).toBe("served");
 		expect(await serve(noFolder(readFile(runFolder)))).toBe("served");
-		for (const cwd of [worktree, `${runFolder}-other`, sandbox.dataDir]) {
+		for (const cwd of [
+			worktree,
+			`${runFolder}-other`,
+			join(runFolder, "out"),
+			sandbox.dataDir,
+		]) {
 			expect(await serve(noFolder(exec(cwd)))).toBe(
 				"This device works only in the run's own folder.",
 			);
@@ -786,12 +790,7 @@ describe("Offer admission, its owner's run", () => {
 		).toBe(
 			"This project has a folder. Its runs work in their own copy of the project.",
 		);
-		expect(ran.map((r) => r.kind)).toEqual([
-			"runFolder",
-			"exec",
-			"exec",
-			"readFile",
-		]);
+		expect(ran.map((r) => r.kind)).toEqual(["runFolder", "exec", "readFile"]);
 	});
 
 	test("walked here, it is this computer as is: no Offer is in play", async () => {

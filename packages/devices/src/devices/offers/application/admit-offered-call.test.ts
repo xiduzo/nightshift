@@ -135,24 +135,16 @@ for (const [name, personId] of Object.entries(callers)) {
 		personId === "ada" ? [...inFolder(cwd), exec({ cwd })] : inFolder(cwd);
 
 	describe(`a call of ${name}`, () => {
-		test("works in the folder of its run, and in the folders inside it", async () => {
-			for (const cwd of [
-				WORKTREE,
-				`${WORKTREE}/`,
-				`${WORKTREE}/packages/app`,
-				`${WORKTREE}/..notes/a..b/...`,
-			]) {
-				const { ask, served } = setUp();
-				const calls = allIn(cwd);
-				for (const call of calls) {
-					expect([call.kind, cwd, await ask(call, { personId })]).toEqual([
-						call.kind,
-						cwd,
-						"served",
-					]);
-				}
-				expect(served).toHaveLength(calls.length);
+		test("works in the folder of its run", async () => {
+			const { ask, served } = setUp();
+			const calls = allIn(WORKTREE);
+			for (const call of calls) {
+				expect([call.kind, await ask(call, { personId })]).toEqual([
+					call.kind,
+					"served",
+				]);
 			}
+			expect(served).toHaveLength(calls.length);
 		});
 
 		test("works in no other folder", async () => {
@@ -163,11 +155,10 @@ for (const [name, personId] of Object.entries(callers)) {
 				`${WORKTREE.toUpperCase()}/packages`,
 				"..",
 				"",
+				`${WORKTREE}/`,
+				`${WORKTREE}/packages/app`,
+				`${WORKTREE}/.`,
 				`${WORKTREE}/..`,
-				`${WORKTREE}/../other`,
-				`${WORKTREE}/a/../../../app`,
-				`${WORKTREE}/a/..`,
-				`${WORKTREE}//../..`,
 			]) {
 				const { ask, served } = setUp();
 				for (const call of allIn(cwd)) {
@@ -198,10 +189,8 @@ for (const [name, personId] of Object.entries(callers)) {
 		test("works in the run folder of a project without a folder", async () => {
 			const { ask, served } = setUp();
 			const from = { personId, projectId: "no-folder" };
+			expect(await ask(session({ cwd: RUN_FOLDER }), from)).toBe("served");
 			expect(await ask(session({ cwd: `${RUN_FOLDER}/out` }), from)).toBe(
-				"served",
-			);
-			expect(await ask(session({ cwd: `${RUN_FOLDER}/../x` }), from)).toBe(
 				OWN_FOLDER,
 			);
 			expect(served).toHaveLength(1);

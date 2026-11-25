@@ -104,14 +104,9 @@ export function folderNamed(call: WorkCall): { cwd: unknown } | null {
 	}
 }
 
-/** Whether `cwd` is the run's own folder, or a folder inside it, with no `..` on the way. */
+/** Whether `cwd` is the run's own folder. */
 export function worksIn(folder: string | null, cwd: unknown): boolean {
-	if (folder === null || typeof cwd !== "string") return false;
-	if (cwd === folder) return true;
-	return (
-		cwd.startsWith(`${folder}/`) &&
-		!cwd.slice(folder.length).split("/").includes("..")
-	);
+	return folder !== null && cwd === folder;
 }
 
 /** A run's id as its start makes it: a UUID in lower case. */
