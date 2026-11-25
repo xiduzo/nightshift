@@ -198,19 +198,22 @@ function apply(
 			break;
 		}
 		case "WaitStarted":
-			run.wait = logged(e);
+			run.waits = [...awake(run, e.stepId), logged(e)];
 			break;
 		case "WaitEnded": {
-			const ended = run.wait && run.wait.stepId === e.stepId ? run.wait : null;
+			const ended = run.waits.find((wait) => wait.stepId === e.stepId);
 			if (e.payload.early) {
 				run.earlyWakes.push({
 					...logged(e),
 					reason: ended?.payload.reason ?? null,
 				});
 			}
-			if (ended) run.wait = null;
+			run.waits = awake(run, e.stepId);
 			break;
 		}
+	}
+	if (e.type === "StepEnded" || e.type === "StepReopened") {
+		run.waits = awake(run, e.stepId);
 	}
 	if (e.sessionId) applySessionEvent(run, e, e.sessionId);
 	if (e.stepId) applyStepEvent(run, e, e.stepId, owned);
@@ -270,7 +273,7 @@ function openGatesOf(run: Draft): OpenGateFact[] {
 		if (
 			step.endedAt === null &&
 			!asking(step) &&
-			step.id !== run.wait?.stepId
+			!run.waits.some((wait) => wait.stepId === step.id)
 		) {
 			branchesWork = true;
 		}
@@ -297,9 +300,13 @@ function openGatesOf(run: Draft): OpenGateFact[] {
 	return gates;
 }
 
+/** The waits of every step but `stepId`. */
+const awake = (run: Draft, stepId: string | null) =>
+	run.waits.filter((wait) => wait.stepId !== stepId);
+
 /** The wait the run sleeps in (`RunState.sleep`), or null. */
 function sleepOf(run: Draft): SleepFact | null {
-	const { wait } = run;
+	const wait = run.waits.at(-1);
 	if (!wait?.stepId || !run.latest || run.end) return null;
 	const step = run.steps.get(wait.stepId);
 	if (!step || step.endedAt !== null) return null;
@@ -327,7 +334,7 @@ function applyRunEvent(
 		}
 	}
 	run.latest = { seq: e.seq, at: e.at };
-	run.wait = null;
+	run.waits = [];
 	if (e.type === "RunEnded") {
 		const { status, reason, result } = e.payload;
 		run.end = {

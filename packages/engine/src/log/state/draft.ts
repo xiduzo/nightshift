@@ -39,7 +39,7 @@ export function emptyState(): Draft {
 		moves: [],
 		edges: new Map(),
 		lastEdge: null,
-		wait: null,
+		waits: [],
 		variables: new Map(),
 		variableChanges: [],
 		nodeOutputs: new Map(),
@@ -72,6 +72,7 @@ export function draftOf(state: RunState): Draft {
 	return {
 		...state,
 		gates: [...state.gates],
+		waits: [...state.waits],
 		ends: [...state.ends],
 		resumes: [...state.resumes],
 		stops: [...state.stops],

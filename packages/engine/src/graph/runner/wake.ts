@@ -7,9 +7,9 @@ import type {
 	RunLog,
 	RunState,
 } from "../../log";
-import { firstDeadline } from "../../read";
+import { firstDeadline, wakesNext } from "../../read";
 import type { Recorder } from "../recorders";
-import type { Parked, ResumeValue } from "../state";
+import type { ResumeValue } from "../state";
 import type { ThreadState } from "./thread";
 
 /**
@@ -73,13 +73,17 @@ export function planWake(
 		return { kind: "not-sleeping" };
 	}
 	if (at.kind !== "interrupted") return { kind: "not-sleeping" };
-	const sleeping = sleepingBranch(run, at, how);
-	if (!sleeping) return { kind: "not-sleeping" };
-	if (!how.early && sleeping.until !== null && now < sleeping.until) {
-		return { kind: "too-soon", until: sleeping.until };
+	const sleeping = wakesNext(run, how.signal);
+	const step = run.steps.get(sleeping?.stepId ?? "");
+	// The checkpoint must hold the wait too.
+	const held = at.interrupts.some(
+		({ value }) => value.kind === "wait" && value.stepId === step?.id,
+	);
+	if (!sleeping || !step || !held) return { kind: "not-sleeping" };
+	const { until } = sleeping.payload;
+	if (!how.early && until !== null && now < until) {
+		return { kind: "too-soon", until };
 	}
-	const step = run.steps.get(sleeping.stepId);
-	if (!step) throw new Error(`Step not found: ${sleeping.stepId}`);
 	const resume: ResumeValue =
 		how.signal !== undefined
 			? {
@@ -92,38 +96,6 @@ export function planWake(
 					early: how.early,
 				};
 	return { kind: "wake", step, resume };
-}
-
-/**
- * The wait a wake ends. One wait: the one the thread sits at. Parallel
- * branches may sleep at once: a signal ends the wait for that signal, and
- * a timer or a person the one that wakes first. A wait whose step a stop
- * ended does not count.
- */
-function sleepingBranch(
-	run: RunState,
-	at: Extract<ThreadState, { kind: "interrupted" }>,
-	how: Wake,
-): Extract<Parked, { kind: "wait" }> | null {
-	const waits = at.interrupts.flatMap(({ value }) =>
-		value.kind === "wait" && run.steps.get(value.stepId)?.endedAt === null
-			? [value]
-			: [],
-	);
-	if (waits.length < 2) {
-		return at.value.kind === "wait" ? at.value : (waits[0] ?? null);
-	}
-	if (how.signal !== undefined) {
-		const forSignal = waits.find((wait) =>
-			run.steps
-				.get(wait.stepId)
-				?.sleeps.some((sleep) => sleep.signal === how.signal),
-		);
-		if (forSignal) return forSignal;
-	}
-	const first = (wait: { until: number | null }) =>
-		wait.until ?? Number.POSITIVE_INFINITY;
-	return [...waits].sort((a, b) => first(a) - first(b))[0] ?? null;
 }
 
 /** What `recordWake` writes to. */
@@ -225,8 +197,8 @@ export function createSleeps(deps: SleepDeps) {
 	 * it fires.
 	 */
 	function restore(runId: string, run: RunState): void {
-		const sleeping = run.sleep;
-		if (sleeping?.until != null) schedule(runId, sleeping.until);
+		const until = run.sleep ? wakesNext(run)?.payload.until : null;
+		if (until != null) schedule(runId, until);
 		const deadline = firstDeadline(run)?.deadline;
 		if (deadline) schedule(runId, deadline.at);
 	}

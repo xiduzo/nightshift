@@ -357,6 +357,20 @@ describe("the sleep module: an Agent step's usage-limit wait", () => {
 		).toEqual({
 			kind: "not-sleeping",
 		});
+		// The log says the step sleeps: the thread does not hold its wait.
+		const elsewhere = { kind: "gate", stepId: "x", nodeId: "x" } as never;
+		expect(
+			planWake(
+				foldRun(events),
+				{
+					kind: "interrupted",
+					value: elsewhere,
+					interrupts: [{ id: "i", value: elsewhere }],
+				},
+				{ early: true },
+				time.now(),
+			),
+		).toEqual({ kind: "not-sleeping" });
 		// The log says the run stopped: the thread still sits at its wait.
 		expect(
 			planWake(

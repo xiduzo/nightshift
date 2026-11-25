@@ -17,9 +17,9 @@ export function waitingSession(run: RunState): DerivedStep | null {
 	if (!run.end) return null;
 	const steps = deriveSteps(run);
 	if (run.end.status === "finished") {
-		// A resume opens the last step again.
+		// A resume opens the last step again, not an element that ended.
 		const last = steps.at(-1);
-		return last && isAgent(run, last) ? last : null;
+		return last && isAgent(run, last) && !inEndedItem(run, last) ? last : null;
 	}
 	const rerun = run.resumes.findLast((e) => e.payload.action === "rerun");
 	const latest = new Map<string, string>();
@@ -33,12 +33,10 @@ export function waitingSession(run: RunState): DerivedStep | null {
 		const { scope } = step;
 		if (!scope) return true;
 		const caller = run.steps.get(scope.parentStepId);
-		const item = caller?.items.findLast((i) => i.facts.id === scope.itemId);
 		return (
 			caller !== undefined &&
 			current(caller) &&
 			isCutShort(caller) &&
-			item?.open !== false &&
 			inside(caller)
 		);
 	};
@@ -48,35 +46,69 @@ export function waitingSession(run: RunState): DerivedStep | null {
 				isAgent(run, step) &&
 				current(step) &&
 				(isCutShort(step) || parkedOn(run, step)) &&
-				inside(step),
+				inside(step) &&
+				!inEndedItem(run, step),
 		) ?? null
 	);
 }
 
 /**
- * Whether a session takes the prompt of a resume. A sleeping run wakes with
- * it: then each step that sleeps must have a session.
+ * The wait that a wake ends (`planWake`). Parallel branches may sleep at
+ * once: a signal ends the wait for that signal, a timer or a person the one
+ * that wakes first.
+ */
+export function wakesNext(
+	run: RunState,
+	signal?: string,
+): RunState["waits"][number] | null {
+	const forSignal =
+		signal !== undefined
+			? run.waits.find((wait) => wait.payload.signal === signal)
+			: undefined;
+	if (forSignal) return forSignal;
+	const at = (wait: RunState["waits"][number]) =>
+		wait.payload.until ?? Number.POSITIVE_INFINITY;
+	return [...run.waits].sort((a, b) => at(a) - at(b))[0] ?? null;
+}
+
+/**
+ * Whether a session takes the prompt of a resume: that of the step a wake
+ * continues, else the one that waits.
  */
 export function takesPrompt(run: RunState): boolean {
 	if (run.status !== "sleeping") return waitingSession(run) !== null;
-	return deriveSteps(run)
-		.filter((step) => step.endedAt === null && step.sleeps.at(-1)?.to === null)
-		.every((step) => isAgent(run, step));
+	const stepId = wakesNext(run)?.stepId;
+	const step = stepId ? run.steps.get(stepId) : undefined;
+	return step !== undefined && isAgent(run, step);
 }
 
 const placeOf = (step: DerivedStep) =>
 	`${scopeKey(step.scope)}\n${step.nodeId}`;
 
-/** An Agent's step with a session to continue: its own, or after a failure the one it went on from. */
+/**
+ * An Agent's step with a session to continue: its own, or the one it went on
+ * from when its own got no name. That one counts when the checkpoint kept it:
+ * the step failed, or it slept.
+ */
 function isAgent(run: RunState, step: DerivedStep): boolean {
 	return (
 		step.nodeType === "agent" &&
 		step.sessions.some(
 			(s) =>
 				s.harnessSessionId !== null ||
-				(s.resumeSessionId !== null && parkedOn(run, step)),
+				(s.resumeSessionId !== null &&
+					(parkedOn(run, step) || step.sleeps.length > 0)),
 		)
 	);
+}
+
+/** The step is inside an element of a Call with `each`, and that element ended. */
+function inEndedItem(run: RunState, step: DerivedStep): boolean {
+	const { scope } = step;
+	const caller = scope && run.steps.get(scope.parentStepId);
+	if (!scope || !caller) return false;
+	const item = caller.items.findLast((i) => i.facts.id === scope.itemId);
+	return item?.open === false || inEndedItem(run, caller);
 }
 
 /** The walk took an edge from the step's node after the step ended. */

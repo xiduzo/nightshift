@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import type { EnginePayloads, StepOutcome } from "../log";
 import { runEvents } from "../testing/run-events";
-import { OUTRUN_ERROR, waitingSession } from "./waiting-session";
+import { OUTRUN_ERROR, waitingSession, wakesNext } from "./waiting-session";
 
 type Log = ReturnType<typeof runEvents>;
 
@@ -195,6 +195,24 @@ describe("the session that gets the prompt of a resume", () => {
 			{ stepId: "sub" },
 		);
 		expect(waits(ended(cut(log, "sub"), "stopped"))).toBeNull();
+	});
+});
+
+describe("the wait that a wake ends", () => {
+	const log = start().stepStarted("a", "a").waitStarted("a", { until: 800 });
+	log.stepStarted("b", "b").waitStarted("b", { until: 400 });
+	log.stepStarted("c", "c").waitStarted("c", { until: null, signal: "go" });
+	const next = (signal?: string) =>
+		wakesNext(log.state(), signal)?.stepId ?? null;
+
+	test("the earliest, or the one for the signal, and not one that woke", () => {
+		expect(next()).toBe("b");
+		expect(next("go")).toBe("c");
+		expect(next("other")).toBe("b");
+		log.waitEnded("b");
+		expect(next()).toBe("a");
+		log.waitEnded("a").waitEnded("c");
+		expect(next()).toBeNull();
 	});
 });
 

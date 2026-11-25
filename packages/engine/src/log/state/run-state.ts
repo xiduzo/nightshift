@@ -445,8 +445,8 @@ export type RunState = {
 	edges: ReadonlyMap<string, ScopeEdges>;
 	/** The latest edge taken in any scope. */
 	lastEdge: Logged<"EdgeTaken"> | null;
-	/** The latest `WaitStarted` of the current walk with no `WaitEnded` of its step after it. */
-	wait: Logged<"WaitStarted"> | null;
+	/** The `WaitStarted` of each step that still sleeps, oldest first: parallel branches may sleep at once. */
+	waits: readonly Logged<"WaitStarted">[];
 	/** The variables of each scope, by scope key. */
 	variables: ReadonlyMap<string, Record<string, JsonValue>>;
 	/** Every value each variable took, in every scope, oldest first. */

@@ -83,7 +83,8 @@ export function deriveLeases(run: RunState): RunLease[] {
 			: [],
 	);
 	const { sleep } = run;
-	const lease = run.wait?.payload.lease;
+	const wait = run.waits.at(-1);
+	const lease = wait?.payload.lease;
 	const step = sleep ? run.steps.get(sleep.stepId) : undefined;
 	if (sleep?.reason !== "lease" || !lease || !step) return held;
 	return [
@@ -93,7 +94,7 @@ export function deriveLeases(run: RunState): RunLease[] {
 			state: "waiting",
 			nodeId: step.nodeId,
 			section: null,
-			since: run.wait?.payload.since ?? step.startedAt,
+			since: wait?.payload.since ?? step.startedAt,
 			holder:
 				lease.holder === null
 					? null
