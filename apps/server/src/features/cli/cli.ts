@@ -74,8 +74,9 @@ Options of serve (each has an environment variable too):
   --host-address <url>     Be a Host at this https:// address. Repeat it for each
                            address, in the order other computers try them.
                            NIGHTSHIFT_HOST_ADDRESSES (comma-separated).
-  --listen <ip>            Where a Host listens. NIGHTSHIFT_LISTEN, default 0.0.0.0.
-                           Use 127.0.0.1 behind Tailscale Serve, a tunnel or a proxy.
+  --listen <address>       Where a Host listens: an IP address or a host name.
+                           NIGHTSHIFT_LISTEN, default 0.0.0.0. Use 127.0.0.1
+                           behind Tailscale Serve, a tunnel or a proxy.
   --tls-port <port>        The https:// port with NIGHTSHIFT_TLS_CERT and _KEY.
                            NIGHTSHIFT_TLS_PORT, default the port + 443.
   --web <folder>           Serve the web UI from this folder. NIGHTSHIFT_WEB_DIR.
