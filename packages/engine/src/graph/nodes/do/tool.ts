@@ -93,7 +93,8 @@ async function callTool(node: ToolNode, step: StepHandle): Promise<BodyResult> {
 			if (result.arguments) recordCall(result.arguments);
 			return { kind: "aborted", outputs: empty };
 		}
-		recordCall(result.arguments ?? rendered);
+		// A call that was not made sent no arguments: none are recorded.
+		recordCall(result.arguments ?? {});
 		step.record(null, {
 			type: "tool-called",
 			isError: true,

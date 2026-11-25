@@ -281,7 +281,7 @@ describe("the Tool node", () => {
 		});
 	});
 
-	test("a tool the connection does not have fails, naming the tools it has", async () => {
+	test("a tool the connection does not have fails, naming the tools it has; a call that was not made records no arguments", async () => {
 		const h = await start(flowOf([tool("file", "close_issue", { id: "1" })]));
 		const { parked } = await drive(h, { inputs: {} });
 		const message =
@@ -303,7 +303,7 @@ describe("the Tool node", () => {
 				type: "tool-call",
 				connection: "tracker",
 				tool: "close_issue",
-				arguments: { id: "1" },
+				arguments: {},
 			},
 			{ type: "tool-called", isError: true, text: message, data: null },
 		]);
