@@ -109,6 +109,18 @@ describe("the session that gets the prompt of a resume", () => {
 		expect(waits(ended(cut(log, "a2"), "stopped"))).toBeNull();
 	});
 
+	test("a step that opened again after its edge: a loop's later session waits", () => {
+		const log = edge(agentStep(start(), "a").stepEnded("a", "fail"), "a", "b");
+		log.stepStarted("a2", "a", 2, { nodeType: "agent" });
+		log.sessionStarted("a2", "x");
+		log.push(
+			"HarnessSessionAssigned",
+			{ harnessSessionId: "h2", model: null },
+			{ stepId: "a2", sessionId: "x" },
+		);
+		expect(waits(ended(cut(log, "a2"), "stopped"))).toBe("a2");
+	});
+
 	test("an own end after an earlier failure of the run is not that failure's", () => {
 		const log = agentStep(start(), "a").stepEnded("a", "fail");
 		ended(log, "failed", 'Node "a" ended with "fail" and no edge leaves it.');

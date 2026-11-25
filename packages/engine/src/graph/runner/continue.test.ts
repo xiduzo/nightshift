@@ -103,9 +103,9 @@ const FLOWS: Record<string, { flow: Flow; flows?: Record<string, Flow> }> = {
  * run at the Gate. `drop`: it asked, and the stop came before the Gate was
  * in the checkpoint. `work`: a stop while it works. `answer`: it asked, and
  * a person answered. `sleep`: a usage limit that a person ends early.
- * `park`: it failed.
+ * `park`: it failed. `fail`: it reported `fail`, and no edge leaves it.
  */
-type Past = "stop" | "drop" | "work" | "answer" | "sleep" | "park";
+type Past = "stop" | "drop" | "work" | "answer" | "sleep" | "park" | "fail";
 /** Before which write of the last Continue, and what comes there. */
 type Fault = { before: string; kind: "stop" | "crash" };
 
@@ -131,6 +131,8 @@ const scriptOf = (past: Past | undefined) => {
 			return usageLimitScript();
 		case "park":
 			return failingScript();
+		case "fail":
+			return reportingScript("fail", "No.");
 		default:
 			return reportingScript("needs-input", "Which one?");
 	}
@@ -319,6 +321,8 @@ const PASTS: [string, Past[]][] = [
 	["one Agent", ["drop", "drop"]],
 	["one Agent", ["sleep", "drop", "work"]],
 	["one Agent", ["park", "drop"]],
+	// The run's end names the node: `waitingSession` reads those words.
+	["one Agent", ["fail", "fail"]],
 	["one Agent", ["answer", "drop", "answer"]],
 	["a branch beside a finished one", ["stop", "drop", "work"]],
 	["a called flow", ["stop", "drop", "work"]],
