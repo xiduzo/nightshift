@@ -5,7 +5,7 @@ import { wireMembership } from "./devices";
 import type { DevicesDeps, DevicesRuntime } from "./devices-runtime";
 import { letGo, takeOver } from "./handover";
 import { createHostLinks, deviceKeyStore } from "./links";
-import { listenHostname, ownCertificate, reachFor } from "./reach";
+import { listenHostname, ownCertificate, parseListen, reachFor } from "./reach";
 import { createRelay, createWorkRelay } from "./relay";
 import { wireDevices, wireHost, wireHostExchange } from "./wire-host";
 import { wireLinks } from "./wire-links";
@@ -51,6 +51,8 @@ async function startNow(deps: DevicesDeps): Promise<DevicesRuntime> {
 	const { db, self, local } = deps;
 	// What can fail comes first: then the runtime before keeps running.
 	const reach = reachFor(deps.settings.current());
+	// Checked even when this computer is no Host: a typo stops the start.
+	const listen = parseListen(deps.env.NIGHTSHIFT_LISTEN);
 	const certificate = ownCertificate(deps.env);
 	const fingerprint = certificate?.fingerprint ?? null;
 	const devicesPage = new URL("/devices", deps.env.CORS_ORIGIN).toString();
@@ -213,7 +215,7 @@ async function startNow(deps: DevicesDeps): Promise<DevicesRuntime> {
 		personalSecrets: secrets.personalSecrets,
 		projectSecrets: secrets.projectSecrets,
 		serve: {
-			hostname: listenHostname(reach, deps.env.NIGHTSHIFT_LISTEN),
+			hostname: listenHostname(reach, listen),
 			...(certificate
 				? { tls: { cert: certificate.cert, key: certificate.key } }
 				: {}),

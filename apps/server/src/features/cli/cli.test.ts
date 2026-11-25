@@ -115,4 +115,39 @@ describe("nightshift serve", () => {
 			rmSync(root, { recursive: true, force: true });
 		}
 	}, 30_000);
+
+	test("NIGHTSHIFT_LISTEN that is not an address stops the start, and says why", () => {
+		const root = mkdtempSync(join(tmpdir(), "nightshift-serve-"));
+		try {
+			const ended = Bun.spawnSync(
+				[
+					process.execPath,
+					resolve(import.meta.dir, "../../cli.ts"),
+					// Not a Host: the value is checked all the same.
+					...["serve", "--data-dir", join(root, "data")],
+				],
+				// Where `.env.schema` is, so the daemon reads its environment.
+				{
+					cwd: resolve(import.meta.dir, "../../.."),
+					env: {
+						PATH: process.env.PATH,
+						HOME: root,
+						PORT: "9",
+						NIGHTSHIFT_KEY_STORE: "file",
+						NIGHTSHIFT_SCHEDULER: "off",
+						NIGHTSHIFT_DESKTOP_NOTIFICATIONS: "off",
+						NIGHTSHIFT_LISTEN: "127.0.0.1:3000",
+					},
+					timeout: 30_000,
+				},
+			);
+			expect(ended.stderr.toString()).toContain(
+				"127.0.0.1:3000 is not an address to listen on. Use an IP address or a host name, for example 127.0.0.1.",
+			);
+			expect(ended.stdout.toString()).not.toContain("Night Shift answers at");
+			expect(ended.exitCode).not.toBe(0);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	}, 45_000);
 });
