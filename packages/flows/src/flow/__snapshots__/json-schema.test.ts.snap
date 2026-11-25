@@ -9294,5 +9294,6 @@ exports[`published schemas a flow that is not valid gives the same schema issues
       "severity": "error",
     },
   ],
+  "why": "invalid",
 }
 `;
