@@ -6,7 +6,7 @@ import {
 } from "@langchain/langgraph";
 
 import type { NodeAction, StepContext } from "../context";
-import { commitVisit, heldStep, holdEnded } from "../position";
+import { heldStep, holdEnded } from "../position";
 import type {
 	Parked,
 	Pending,
@@ -97,28 +97,9 @@ export function askAgain(node: { id: string }): Command {
 }
 
 /**
- * A stop ended the step of `pending` before its Gate was checkpointed: its
- * visit is open again for the resume point. A sleep, a park or an earlier
- * stop may have committed that visit while the step went on. The log says
- * how the step ended, so a step that is done does not run again
- * (`Position.done`).
- */
-function askedInVain(node: { id: string }, pending: PendingGate): Command {
-	return new Command({
-		update: {
-			pending: { [node.id]: null },
-			...commitVisit(node, pending.visit - 1),
-		},
-		goto: node.id,
-	});
-}
-
-/**
  * The ask node of a Gate (`ask__<id>`): it waits with the Gate the node
  * opened. A stop can end the Gate's step before the Gate was checkpointed.
- * Then the node goes on from its resume point (`askedInVain`): an Agent that
- * asks takes the step up when it has a session, each other Gate asks again
- * in a new visit.
+ * Then the node asks again in a new visit, unless `letGo` says otherwise.
  */
 export function gateNode(
 	node: { id: string },
@@ -127,6 +108,7 @@ export function gateNode(
 		answer: GateSpec["answer"];
 		/** What opens at the node, in the error when none is. Default: a Gate. */
 		what?: "question";
+		letGo?(pending: PendingGate): Command | Promise<Command>;
 	},
 ): NodeAction {
 	return interruptNode({
@@ -142,6 +124,6 @@ export function gateNode(
 			...(pending.deadline ? { deadline: pending.deadline } : {}),
 		}),
 		answer: spec.answer,
-		stale: { ctx, letGo: (pending) => askedInVain(node, pending) },
+		stale: { ctx, letGo: spec.letGo ?? (() => askAgain(node)) },
 	});
 }

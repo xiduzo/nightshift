@@ -705,10 +705,8 @@ rule of the run position:
    the node held it, but before the checkpoint saved the hold. The resume
    continued into the ask or wait node. That node waited for an answer
    that no one could give. Now an interrupting node with no answer waiting
-   lets a stale hold go (`interruptNode`'s `stale`). A Gate opens its
-   visit again for the resume point: an Agent that asks continues its
-   session, and each other Gate asks again in a new visit. A sleep parks
-   as stopped.
+   lets a stale hold go (`interruptNode`'s `stale`). The Gate asks again
+   in a new visit, and a sleep parks as stopped.
 
 The checkpoint is still the walk's, and the log is still the read model
 (ADR "The walk reads the checkpoint; the event log is the read model").
