@@ -4,7 +4,7 @@ import { Refusal } from "@nightshift/refusal";
 import { DirtyWorktreeError } from "./dirty-worktree";
 import { type Git, GitError, gitOrThrow } from "./git";
 import { branchName, objectId } from "./git-names";
-import { runMade } from "./run-made";
+import { firstCommit, runMade, wasAt } from "./run-made";
 import {
 	isRunsBranch,
 	KEPT_REFS,
@@ -52,7 +52,7 @@ export function branchHasOtherWork(branch: string): string {
 
 /** The refusal of a Hand-off of work that the remote's branch does not have. */
 export function notOnRemote(branch: string): string {
-	return `The branch "${branch}" of the project's remote does not have the run's work. Try again.`;
+	return `The branch "${branch}" of the project's remote does not have the run's work now. Someone else may have changed it. Run the step again to hand the work on again.`;
 }
 
 /** The refusal of a Hand-off of a branch that a person has open. */
@@ -157,23 +157,34 @@ export function createHandOff(git: Git, parts: HandOffParts) {
 		run: { shortId: string; branch: string; tip: string },
 	): Promise<boolean> {
 		const handed = await handedTip(cwd, run.shortId, run.branch);
-		const [branch, head, only] = await Promise.all([
+		const [branch, head, remote] = await Promise.all([
 			gitFile(cwd, `logs/refs/heads/${run.branch}`),
 			gitFile(cwd, "logs/HEAD"),
-			onlyOn(cwd, run, handed),
+			gitFile(cwd, `logs/refs/remotes/origin/${run.branch}`),
 		]);
-		return runMade({ branch, head }, { ...run, handed, only });
+		// The commit it was made at, when it was somewhere else then.
+		const first = firstCommit(branch);
+		const bornOn =
+			first !== null &&
+			(wasAt(remote, first) ||
+				(await onlyOn(cwd, { ...run, tip: first }, [])).length === 0)
+				? first
+				: null;
+		const known = [handed, bornOn].filter((id) => id !== null);
+		const only = await onlyOn(cwd, run, known);
+		return runMade({ branch, head }, { ...run, handed, bornOn, only });
 	}
 
 	/**
 	 * The commits of `branch` that nothing else has: no tag, and no branch but
 	 * the ones that runs move (their own names, and the ones they handed on).
-	 * What the run's own branch has is the run's, also from another computer.
+	 * What the run's own branch has is the run's, also from another computer,
+	 * and so is what came before `known`.
 	 */
 	async function onlyOn(
 		cwd: string,
 		{ shortId, branch, tip }: { shortId: string; branch: string; tip: string },
-		handed: string | null,
+		known: readonly string[],
 	): Promise<string[]> {
 		const list = async (...args: string[]) =>
 			(await gitOrThrow(git, cwd, args)).split("\n").filter(Boolean);
@@ -208,7 +219,7 @@ export function createHandOff(git: Git, parts: HandOffParts) {
 			"--tags",
 			`refs/heads/${own}`,
 			`refs/remotes/origin/${own}`,
-			...(handed === null ? [] : [handed]),
+			...known,
 		);
 	}
 
@@ -397,7 +408,7 @@ export function createHandOff(git: Git, parts: HandOffParts) {
 			`+refs/heads/${branch}:refs/remotes/origin/${branch}`,
 		]);
 		const { worktreePath } = worktreeLocation(repoPath, input.shortId);
-		await resolveCommit(repoPath, commit);
+		// A commit this clone does not have is not on the branch either.
 		const remote = `refs/remotes/origin/${branch}`;
 		if (!(await isAncestor(repoPath, commit, remote))) {
 			throw new Refusal("conflict", notOnRemote(branch));

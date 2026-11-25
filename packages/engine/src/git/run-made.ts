@@ -32,11 +32,22 @@ function linesOf(log: string): LogLine[] {
 
 const isZero = (id: string) => /^0+$/.test(id);
 
+/** The commit a branch was made at, by the first line of its log, or null when that line is gone. */
+export function firstCommit(log: string): string | null {
+	const [first] = linesOf(log);
+	return first && isZero(first.old) ? first.now : null;
+}
+
+/** Whether the log of a ref says that it was at `commit` once. */
+export function wasAt(log: string, commit: string): boolean {
+	return linesOf(log).some((line) => line.now === commit);
+}
+
 /**
  * Whether all that is on a branch is the run's own, from the first commit
  * of the branch to `tip`, by git's own logs. The run made the branch: with a
- * checkout in its copy, at a commit it made there, or from a branch of its
- * names. And each move since is one that the copy made: git wrote the same
+ * checkout in its copy, at a commit it made there, from a branch of its
+ * names, or at a commit that was somewhere else then (`bornOn`). And each move since is one that the copy made: git wrote the same
  * line for the copy's HEAD, or the move is to a commit that the copy made. A
  * move that only the branch has is another person's.
  *
@@ -53,6 +64,8 @@ export function runMade(
 		branch: string;
 		tip: string;
 		handed: string | null;
+		/** Its first commit, when another branch, a tag or the remote's branch has it. */
+		bornOn: string | null;
 		/** The commits at `tip` that no branch has that the run does not move. */
 		only: readonly string[];
 	},
@@ -74,6 +87,7 @@ export function runMade(
 		at = line.old;
 		if (isZero(line.old)) {
 			return (
+				line.now === run.bornOn ||
 				made.has(line.now) ||
 				names.some((name) => isRunsBranch(run.shortId, name)) ||
 				head.some(

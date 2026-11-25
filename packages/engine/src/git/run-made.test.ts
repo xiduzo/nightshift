@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { runMade } from "./run-made";
+import { firstCommit, runMade, wasAt } from "./run-made";
 
 const ZERO = "0".repeat(40);
 /** A commit by a letter. */
@@ -21,27 +21,40 @@ const born = line("->b", "branch: Created from HEAD");
 const birth = line("b>b", "checkout: moving from nightshift/abcdef12 to feat");
 const one = line("b>c", "commit: one");
 
-const made = (
-	branch: string[],
-	head: string[],
-	run: Partial<Parameters<typeof runMade>[1]> = {},
-) =>
-	runMade(
-		{ branch: log(...branch), head: log(...head) },
-		{
-			shortId: "abcdef12",
-			branch: "feat",
-			tip: id("c"),
-			handed: null,
-			only: [],
-			...run,
-		},
-	);
+type Run = Parameters<typeof runMade>[1];
+
+const made = (branch: string[], head: string[], run: Partial<Run> = {}) =>
+	runMade({ branch: log(...branch), head: log(...head) }, {
+		shortId: "abcdef12",
+		branch: "feat",
+		tip: id("c"),
+		handed: null,
+		bornOn: null,
+		only: [],
+		...run,
+	} as Run);
 
 describe("the run's", () => {
 	test("a branch made with a checkout in the copy, and its commits", () => {
 		expect(made([born, one], [birth, one])).toBe(true);
 		expect(made([born], [birth], { tip: id("b") })).toBe(true);
+	});
+
+	test("a branch made at a commit that was somewhere else then", () => {
+		const theirs = line("->b", "branch: Created from origin/pr", THEM);
+		expect(made([theirs, one], [one], { bornOn: id("b") })).toBe(true);
+		expect(made([theirs, one], [one], { bornOn: id("c") })).toBe(false);
+		// Each move after it is still the copy's.
+		const theirsToo = line("b>d", "commit: theirs", THEM);
+		expect(
+			made(
+				[theirs, theirsToo, line("d>c", "commit: one")],
+				[line("d>c", "commit: one")],
+				{
+					bornOn: id("b"),
+				},
+			),
+		).toBe(false);
 	});
 
 	test("a branch made at a commit of the run", () => {
@@ -246,4 +259,12 @@ describe("not the run's", () => {
 			),
 		).toBe(false);
 	});
+});
+
+test("the first commit of a branch, and where a ref was", () => {
+	expect(firstCommit(log(born, one))).toBe(id("b"));
+	expect(firstCommit(log(one))).toBeNull();
+	expect(firstCommit("")).toBeNull();
+	expect(wasAt(log(born, one), id("c"))).toBe(true);
+	expect(wasAt(log(born, one), id("d"))).toBe(false);
 });
