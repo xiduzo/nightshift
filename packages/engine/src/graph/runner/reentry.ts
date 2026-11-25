@@ -32,7 +32,12 @@ import {
 } from "../position";
 import type { Parked, ResumeValue, RunStateUpdate } from "../state";
 import { sessionOf } from "../step";
-import { resumeEach, type ThreadEntry, type ThreadSnapshot } from "./thread";
+import {
+	resumeEach,
+	type ThreadEntry,
+	type ThreadSnapshot,
+	type ThreadState,
+} from "./thread";
 
 /**
  * Re-entry: the daemon side of a resume. A person or the daemon asks a run
@@ -267,6 +272,18 @@ export function planReentry(input: {
 	const update = cleared ? { update: cleared } : {};
 	const answer = (parked: Parked): ResumeValue =>
 		parked.kind === "gate" ? { kind: "reopen" } : { kind: "resume" };
+	const lost = request.by === "daemon" ? lostPark(run, thread.state) : null;
+	if (lost) {
+		// The drive parked, and the daemon died before it wrote the end: the
+		// thread parks once more, and its drive writes that end. Nothing runs,
+		// and the stop time stays: the thread keeps it too.
+		const { clearStopAt: _, ...kept } = resumed;
+		return {
+			resumed: { ...kept, nodeId: lost.nodeId, stepId: null, prompt: null },
+			entry: { kind: "continue" },
+			clearTasks: false,
+		};
+	}
 	switch (thread.state.kind) {
 		case "interrupted": {
 			// Parallel branches may sit at several: each takes its own answer.
@@ -304,6 +321,29 @@ export function planReentry(input: {
 				clearTasks: false,
 			};
 	}
+}
+
+/**
+ * The park the thread sits at whose end the log does not have: its step
+ * ended in the current walk, and since then only recovery ended the run
+ * (`interrupted`). A park whose end is written, or that a person resumed
+ * since, is not lost. Null when there is none, or the park came before
+ * its step.
+ */
+function lostPark(run: RunState, at: ThreadState): Parked | null {
+	if (at.kind !== "interrupted") return null;
+	const walk = run.walk?.seq ?? Number.POSITIVE_INFINITY;
+	return (
+		at.interrupts.find(({ value }) => {
+			if (value.kind !== "parked" || value.stepId === null) return false;
+			const end = run.steps.get(value.stepId)?.openings.at(-1)?.end;
+			if (!end || end.seq < walk) return false;
+			// Only recovery ended the run since: the end of the park is not there.
+			return run.ends.every(
+				(e) => e.seq < end.seq || e.payload.status === "interrupted",
+			);
+		})?.value ?? null
+	);
 }
 
 /** The state a resume of a thread that ended or never ran jumps in with. */

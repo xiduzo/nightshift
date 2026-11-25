@@ -412,6 +412,37 @@ describe("planReentry: a resume", () => {
 		});
 	});
 
+	test("the daemon died before the end of a park: the thread parks again, and nothing runs", () => {
+		const events = logOf(
+			runStarted(),
+			started("s1", "a", 1),
+			...session("s1", "h-a"),
+			ended("s1", "error"),
+			{
+				type: "RunEnded",
+				payload: { status: "interrupted", reason: "Night Shift stopped." },
+			},
+		);
+		const daemon = { kind: "resume", by: "daemon" } as const;
+		expect(plan(events, threadAt(parkedAt("s1", "a")), daemon)).toEqual({
+			resumed: {
+				nodeId: "a",
+				stepId: null,
+				prompt: null,
+				scope: null,
+				by: "daemon",
+				reason: DAEMON_RESUME_REASON,
+			},
+			entry: { kind: "continue" },
+			clearTasks: false,
+		});
+		// A person who resumes it asks for the step again.
+		expect(plan(events, threadAt(parkedAt("s1", "a"))).entry).toEqual({
+			kind: "resume",
+			value: { kind: "resume" },
+		});
+	});
+
 	test("a node pending without an interrupt runs again; past the stop time, the stop time clears", () => {
 		expect(plan(stoppedInB(), threadAt(PENDING)).entry).toEqual({
 			kind: "continue",

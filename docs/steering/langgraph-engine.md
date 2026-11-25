@@ -491,6 +491,10 @@ packages/engine/src/
     - Open Gates stay.
     - The daemon resumes interrupted runs itself under the same policy as
       before, now by `invoke(null)`.
+    - A drive that parked and died before its `RunEnded` parks again
+      (`lostPark` in `reentry.ts`): the daemon's resume drives the thread
+      with no answer, and that drive writes the end. The failed step does
+      not run again. A person's resume still runs it again.
 
     How the steps end deviates (below: "Recovery ends work as a stop
     does").

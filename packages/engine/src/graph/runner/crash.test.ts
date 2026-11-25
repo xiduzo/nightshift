@@ -441,6 +441,55 @@ describe("a crash at every write of a walk", () => {
 	}
 });
 
+test("the daemon dies before the end of a run that failed: the run fails as it would have, and nothing runs again", async () => {
+	const flow = flowOf([agent("build", "Build it")]);
+	/** The walk to its end, with the daemon dead before write `at`; null: no death. */
+	async function failed(at: number | null) {
+		const harness = fakeHarness(reportingScript("fail", "No."));
+		const h = await startRun(sandbox, flow, { harness });
+		const faulty = faultyThreads(at === null ? null : { at, kind: "crash" });
+		let runner = testRunner(h, {
+			openThread: faulty.open,
+			overdueSweepMs: 3_600_000,
+		});
+		try {
+			await runner.take(h.runId, {
+				kind: "start",
+				prepare: async () => ({
+					row: await getRunRow(sandbox.db, h.runId),
+					inputs: {},
+					stopAt: null,
+				}),
+			});
+			if ((await settled(runner, h, () => faulty.state.dead)) === "dead") {
+				await runner.release();
+				runner = testRunner(h, { overdueSweepMs: 3_600_000 });
+				await recover(runner, h);
+				await settled(runner, h, () => false);
+			}
+			return {
+				trace: faulty.state.trace,
+				ended: storyOf(await h.events()).ended,
+				calls: harness.calls.length,
+			};
+		} finally {
+			await runner.release();
+		}
+	}
+	const clean = await failed(null);
+	expect(clean.ended).toEqual({
+		status: "failed",
+		reason:
+			'Node "build" ended with "fail" and no edge leaves it on that outcome.',
+	});
+	const before = clean.trace.indexOf("RunEnded") + 1;
+	expect(before).toBeGreaterThan(0);
+	expect(await failed(before)).toMatchObject({
+		ended: clean.ended,
+		calls: 1,
+	});
+});
+
 const PARALLEL = [
 	{
 		name: "a crash at every write of a walk with parallel branches",
