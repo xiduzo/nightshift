@@ -56,7 +56,11 @@ export type AdmitOfferedCallPorts = {
 	roleAllows(role: string, need: Permissions): boolean;
 	projects: Pick<PeerProjects, "clonePath" | "find">;
 	runFolders: PeerContext["runFolders"];
-	worktreePath(repoPath: string, shortId: string): string;
+	/** Where a run's worktree is in a Clone, and its branch. */
+	worktreeOf(
+		repoPath: string,
+		shortId: string,
+	): { worktreePath: string; branch: string };
 	ownOffers?: () => readonly DeviceOffer[];
 	profileFor?: (id: string) => ProfileSettings | null;
 	sessions?: Pick<OfferedSessions, "relay">;
@@ -223,7 +227,11 @@ export function admitOfferedCall(ports: AdmitOfferedCallPorts): OfferAdmission {
 		if (!NEEDS_CLONE.has(call.kind)) return { offers };
 		const own = await ownFolder(request);
 		if ("refusal" in own) return own;
-		const foreign = foreignIds(call, { runId, projectId });
+		const foreign = foreignIds(call, {
+			runId,
+			projectId,
+			branch: own.branch,
+		});
 		if (foreign !== null) return refuse(foreign);
 		const named = folderNamed(call);
 		if (named && !worksIn(own.folder, named.cwd)) {
@@ -235,12 +243,15 @@ export function admitOfferedCall(ports: AdmitOfferedCallPorts): OfferAdmission {
 	/**
 	 * The one folder the run's calls may work in here: its worktree in this
 	 * computer's Clone of the project, or for a project without a folder
-	 * its run folder (ADR 22), which takes no git work. Null before the run
+	 * its run folder (ADR 22), which takes no git work. With the branch of
+	 * its worktree. Null before the run
 	 * exists. Refused without a Clone, and for a call of the other kind.
 	 */
 	async function ownFolder(
 		request: WorkRequest,
-	): Promise<{ refusal: string } | { folder: string | null }> {
+	): Promise<
+		{ refusal: string } | { folder: string | null; branch: string | null }
+	> {
 		const { spaceId, projectId, runId, call } = request;
 		const project = await ports.projects
 			.find(projectId, spaceId)
@@ -252,7 +263,10 @@ export function admitOfferedCall(ports: AdmitOfferedCallPorts): OfferAdmission {
 						"This project has no folder. Its runs work in a folder of their own, without git.",
 				};
 			}
-			return { folder: runId === null ? null : ports.runFolders.path(runId) };
+			return {
+				folder: runId === null ? null : ports.runFolders.path(runId),
+				branch: null,
+			};
 		}
 		if (call.kind === "runFolder") {
 			return {
@@ -267,10 +281,12 @@ export function admitOfferedCall(ports: AdmitOfferedCallPorts): OfferAdmission {
 					"This device does not have this project. Add its folder there first.",
 			};
 		}
-		return {
-			folder:
-				runId === null ? null : ports.worktreePath(repoPath, runId.slice(0, 8)),
-		};
+		if (runId === null) return { folder: null, branch: null };
+		const { worktreePath, branch } = ports.worktreeOf(
+			repoPath,
+			runId.slice(0, 8),
+		);
+		return { folder: worktreePath, branch };
 	}
 
 	async function* serve(

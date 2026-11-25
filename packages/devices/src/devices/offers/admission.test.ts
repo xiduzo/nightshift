@@ -670,6 +670,19 @@ describe("Offer admission, its owner's run", () => {
 	const mine = (overrides: Partial<WorkRequest> = {}) =>
 		request({ personId: ME, ...overrides });
 
+	test("a hand-off names the branch of the run's worktree", async () => {
+		const { branch } = worktreeLocation(sandbox.repoPath, RUN.slice(0, 8));
+		const handOff = (runBranch: string): WorkRequest["call"] => ({
+			kind: "handOff",
+			cwd: worktree,
+			runBranch,
+		});
+		expect(await serve(mine({ call: handOff(branch) }))).toBe("served");
+		expect(await serve(mine({ call: handOff(`${branch}-2`) }))).toBe(
+			"This device works only for the run that asks.",
+		);
+	});
+
 	test("sent through the Host: served in the run's own folder", async () => {
 		expect(await serve(mine())).toBe("served");
 		expect(

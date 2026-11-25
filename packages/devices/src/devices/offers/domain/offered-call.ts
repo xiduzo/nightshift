@@ -122,11 +122,6 @@ export function isRunId(runId: string): boolean {
 	return RUN_ID.test(runId);
 }
 
-/** The run's own branch: `nightshift/` and the short id, as its worktree has it. */
-function runBranchOf(runId: string | null): string | null {
-	return runId === null ? null : `nightshift/${runId.slice(0, 8)}`;
-}
-
 /** The run and the project a call names, beside those of its request. */
 function idsNamed(call: WorkCall): {
 	run?: RunNamed;
@@ -173,14 +168,15 @@ function idsNamed(call: WorkCall): {
  */
 export function foreignIds(
 	call: WorkCall,
-	{ runId, projectId }: Pick<WorkRequest, "runId" | "projectId">,
+	own: Pick<WorkRequest, "runId" | "projectId"> & { branch: string | null },
 ): string | null {
+	const { runId, projectId } = own;
 	const { run, branch, files, knowledge = [] } = idsNamed(call);
 	if (run && (run.id !== runId || run.projectId !== projectId)) {
 		return "This device adds a folder only for the run that asks.";
 	}
 	if (
-		(branch && branch.name !== runBranchOf(runId)) ||
+		(branch && branch.name !== own.branch) ||
 		(files && files.runId !== runId) ||
 		knowledge.some((read) => read && read.projectId !== projectId)
 	) {

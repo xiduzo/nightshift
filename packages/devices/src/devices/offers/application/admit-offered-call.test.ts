@@ -27,7 +27,10 @@ const offer = {
 };
 
 /** This computer is Ada's. It offers "coder" to Bob's Space, and notes the calls it serves. */
-function setUp(profile: object = {}) {
+function setUp(
+	profile: object = {},
+	branchOf = (shortId: string) => `nightshift/${shortId}`,
+) {
 	const served: WorkRequest[] = [];
 	const admission = admitOfferedCall({
 		selfOwnerId: async () => "ada",
@@ -45,7 +48,10 @@ function setUp(profile: object = {}) {
 			clonePath: async () => "/projects/app",
 		} as never,
 		runFolders: { path: (id: string) => `/data/run-folders/${id}` },
-		worktreePath: (repoPath, shortId) => `${repoPath}.nightshift/${shortId}`,
+		worktreeOf: (repoPath, shortId) => ({
+			worktreePath: `${repoPath}.nightshift/${shortId}`,
+			branch: branchOf(shortId),
+		}),
 		ownOffers: () => [offer],
 		profileFor: () => ({
 			harness: "claude-code",
@@ -300,6 +306,14 @@ for (const [name, personId] of Object.entries(callers)) {
 			expect(await ask(handOff("nightshift/abcdef12"), { personId })).toBe(
 				"served",
 			);
+			// Its worktree says which branch that is.
+			const renamed = setUp({}, (shortId) => `work/${shortId}`);
+			expect(await renamed.ask(handOff("work/abcdef12"), { personId })).toBe(
+				"served",
+			);
+			expect(
+				await renamed.ask(handOff("nightshift/abcdef12"), { personId }),
+			).toBe(OWN_IDS);
 		});
 
 		test("keeps files and reads knowledge for its own run and project", async () => {

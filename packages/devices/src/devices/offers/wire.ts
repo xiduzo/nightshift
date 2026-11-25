@@ -349,8 +349,7 @@ export function wireOffers(ground: { now?: () => number } = {}) {
 				roleAllows,
 				projects: deps.projects,
 				runFolders: deps.runFolders,
-				worktreePath: (repoPath, shortId) =>
-					worktreeLocation(repoPath, shortId).worktreePath,
+				worktreeOf: worktreeLocation,
 				...(deps.ownOffers ? { ownOffers: deps.ownOffers } : {}),
 				...(deps.profileFor ? { profileFor: deps.profileFor } : {}),
 				...(deps.sessions ? { sessions: deps.sessions } : {}),
