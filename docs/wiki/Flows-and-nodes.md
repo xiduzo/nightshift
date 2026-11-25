@@ -150,6 +150,8 @@ For scripts:
 
 A Tool node calls one tool of an MCP server, with typed arguments. No model is in the loop. Add the MCP server first as a [connection](Agents-and-profiles.md#connections).
 
+Values the connection reads as `${NAME}` show as `•••`, so write plain values, such as a web address, straight into it.
+
 The node takes the shape of the tool's answer from the MCP server, marked as inferred. See [Data shapes](#data-shapes).
 
 ### Decision
