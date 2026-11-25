@@ -1,8 +1,14 @@
 import { HostUnreachableError, OtherVersionError } from "@nightshift/engine";
-import { type OtherVersion, otherVersion } from "@nightshift/refusal";
+import type { OtherVersion } from "@nightshift/refusal";
 import { now as timeNow } from "@nightshift/time";
 import { ORPCError } from "@orpc/client";
-import type { HostClient, HostHello } from "../contract";
+import {
+	type HostClient,
+	type HostHello,
+	helloSaidBy,
+	hostHelloSchema,
+	hostVersionOf,
+} from "../contract";
 import { type Backoff, backoff, pause } from "./backoff";
 import {
 	type DocumentChannel,
@@ -12,7 +18,6 @@ import {
 } from "./document-channel";
 import {
 	type CallOptions,
-	fromHost,
 	hostCall,
 	NotPairedError,
 	translated,
@@ -37,6 +42,9 @@ import type { LinkStatus } from "./types";
  *   that doubles up to `maxBackoffMs`.
  * - A Host that refuses the key (its owner removed this computer's
  *   access) ends the link for good: `revoked`.
+ * - An address may be another's now (a sign-in page of a network, another
+ *   app, another Host). Only an answer that names the link's own Host
+ *   counts. Any other one is as no answer: it tries the next address.
  * - A Host of another version makes the link wait for an update:
  *   `outdated` (ADR 45). Nothing goes over it, the key and the rows stay,
  *   and it asks again every `maxBackoffMs`.
@@ -179,11 +187,16 @@ export async function firstAnswering<T>(
 	throw last;
 }
 
-/** The Host answered a hello or a heartbeat, and refused the key. The link's own reading of the wire. */
+/**
+ * The Host answered a hello or a heartbeat, and refused the key. The link's
+ * own reading of the wire. A Host refuses without data (`hostContract`). A
+ * page that asks to sign in has its body there: it is not the Host's.
+ */
 export function isRefusal(error: unknown): boolean {
 	return (
 		error instanceof ORPCError &&
-		(error.code === "UNAUTHORIZED" || error.code === "FORBIDDEN")
+		(error.code === "UNAUTHORIZED" || error.code === "FORBIDDEN") &&
+		error.data === undefined
 	);
 }
 
@@ -381,27 +394,36 @@ export function httpsLink(options: HttpsLinkOptions): Link {
 
 	/**
 	 * The Host's answer to a hello or a heartbeat. Throws `OtherVersionError`
-	 * for a Host that refuses this computer's version, and for one whose
-	 * answer says another: the link uses nothing of it.
+	 * when the link's own Host refuses this computer's version, and when its
+	 * answer says another: the link uses nothing of it. An answer that is not
+	 * the link's own Host's, or does not fit, is as no answer.
 	 */
 	async function said(
 		ask: (options: { signal: AbortSignal }) => Promise<HostHello>,
 	): Promise<HostHello> {
-		let hello: HostHello;
+		let answer: unknown;
 		try {
-			hello = await ask({
+			answer = await ask({
 				signal: AbortSignal.any([
 					stop.signal,
 					AbortSignal.timeout(answerTimeoutMs),
 				]),
 			});
 		} catch (error) {
-			const read = fromHost(error);
-			throw read instanceof OtherVersionError ? read : error;
+			const refused =
+				error instanceof ORPCError && error.code === "HOST_UNREACHABLE"
+					? hostVersionOf(error.data)
+					: null;
+			throw refused?.hostId === link.hostId
+				? new OtherVersionError(refused.host)
+				: error;
 		}
-		const host = otherVersion(hello.version);
-		if (host) throw new OtherVersionError(host);
-		return hello;
+		const said = helloSaidBy(answer);
+		if (said?.hostId !== link.hostId) {
+			throw new Error(`Another than ${link.name} answered.`);
+		}
+		if (said.host) throw new OtherVersionError(said.host);
+		return hostHelloSchema.parse(answer);
 	}
 
 	async function answer(address: string): Promise<HostHello> {

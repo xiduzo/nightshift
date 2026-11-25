@@ -89,8 +89,10 @@ const KIND_OF_CODE: Record<string, RefusalKind> = {
 export function fromHost(error: unknown): unknown {
 	if (!(error instanceof ORPCError)) return error;
 	if (error.code === "HOST_UNREACHABLE") {
-		const host = hostVersionOf(error.data);
-		return host ? new OtherVersionError(host) : new HostUnreachableError();
+		const refused = hostVersionOf(error.data);
+		return refused
+			? new OtherVersionError(refused.host)
+			: new HostUnreachableError();
 	}
 	if (error.code === "NOT_FOUND" || error.status === 404) {
 		return new OlderHostError({ cause: error });

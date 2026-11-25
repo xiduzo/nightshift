@@ -11,6 +11,7 @@ export type { Caller } from "./caller";
 export { type HostClient, hostContract } from "./host-contract";
 export {
 	type HostHello,
+	hostHelloSchema,
 	type ListedSpace,
 	type PairingRedeemed,
 	type PairingStart,
@@ -58,6 +59,7 @@ export {
 export {
 	deviceVersionOf,
 	documentToken,
+	helloSaidBy,
 	hostVersionOf,
 	keyOfDocumentToken,
 	VERSION_HEADER,

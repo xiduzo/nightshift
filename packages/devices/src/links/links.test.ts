@@ -136,7 +136,7 @@ test("a Host of another version: the key, the access and the link stay, and the 
 					hello: async () => {
 						throw new ORPCError("HOST_UNREACHABLE", {
 							status: 503,
-							data: { device: "older" },
+							data: { device: "older", hostId: "host-a" },
 						});
 					},
 				},

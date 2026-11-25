@@ -21,7 +21,7 @@ import {
  * would have one number.
  */
 const SHAPES: Record<string, string> = {
-	1: "2a36cd042c9413bc",
+	1: "ec50ffde4588e926",
 };
 
 /** A schema as plain data, with its keys in order. Null: the procedure has none. */
@@ -137,9 +137,23 @@ describe("the version a Device says", () => {
 	});
 
 	test("a refusal of it says how the Host compares, and no other data does", () => {
-		expect(hostVersionOf({ device: "older" })).toBe("newer");
-		expect(hostVersionOf({ device: "newer" })).toBe("older");
-		for (const data of [undefined, null, {}, { device: "x" }, "older"]) {
+		const hostId = "h";
+		expect(hostVersionOf({ device: "older", hostId })).toEqual({
+			hostId,
+			host: "newer",
+		});
+		expect(hostVersionOf({ device: "newer", hostId })).toEqual({
+			hostId,
+			host: "older",
+		});
+		for (const data of [
+			undefined,
+			null,
+			{},
+			{ device: "x", hostId },
+			{ device: "older" },
+			"older",
+		]) {
 			expect(hostVersionOf(data)).toBeNull();
 		}
 	});

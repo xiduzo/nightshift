@@ -54,7 +54,7 @@ export type HostDeps = {
 	now?: () => number;
 };
 
-const keyedCallCodes: KeyedCallCodes = {
+const keyedCallCodes = (hostId: string): KeyedCallCodes => ({
 	unauthorized: (words) => {
 		throw new ORPCError("UNAUTHORIZED", { message: words });
 	},
@@ -65,10 +65,10 @@ const keyedCallCodes: KeyedCallCodes = {
 		throw new ORPCError("HOST_UNREACHABLE", {
 			status: 503,
 			message: deviceVersionWords(device),
-			data: { device },
+			data: { device, hostId },
 		});
 	},
-};
+});
 
 /**
  * This computer as a Host: pairing, Device keys, presence, and the
@@ -137,7 +137,7 @@ export function wireHost(deps: HostDeps) {
 				settings,
 				spaces,
 				roles,
-				codes: keyedCallCodes,
+				codes: keyedCallCodes(deps.self.id),
 				versions,
 			})({ key, need, version }),
 		/** How the version of a Device's last call compares with this Host's. Null: the same, or it did not call. */

@@ -23,13 +23,15 @@ refusal but HOST_UNREACHABLE stops. Builds from before this check read it too.
 3. **The Host checks it once, after the key.** `admitKeyedCall` first checks the key, its
    permission, "Be a Host" and the pairing. A caller without access gets the same answers as
    before, and nothing about the version. The check comes before the input is read.
-4. **The refusal is HOST_UNREACHABLE (503)**, with `{ device: "older" | "newer" }` beside it.
+4. **The refusal is HOST_UNREACHABLE (503)**, with `{ device: "older" | "newer", hostId }` beside it.
    Every build reads that code as a Host that it cannot reach now. It is never CONFLICT: a
    lease call that reads CONFLICT fails the step.
 5. **The Device waits.** Its link is `outdated`: no stream, no document and no call goes over
    it. The key, the rows and the Clones stay. It asks again every minute, and at once when a
    call or a document is refused. It is not a leave, and nothing is paused. A Host from before
    the number answers the hello without one: the Device uses nothing of that answer.
+   Only an answer that names the link's own Host counts. Any other answer (a sign-in page of a
+   network, another Host at that address) is as no answer.
 6. **The words live once**, beside the number. The Device's pages say which side to update. The
    Host's Devices page says it too, because an older Device shows only "Offline".
 7. **Pairing has no check.** It has no key. A Device that pairs with a Host of another version

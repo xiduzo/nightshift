@@ -66,7 +66,10 @@ describe("a Device of another version", () => {
 				expect(error, path).toMatchObject({
 					code: "HOST_UNREACHABLE",
 					status: 503,
-					data: { device: said === 0 ? "older" : "newer" },
+					data: {
+						device: said === 0 ? "older" : "newer",
+						hostId: host.hostId,
+					},
 				});
 			}
 			// It is not online, and its access is as it was.

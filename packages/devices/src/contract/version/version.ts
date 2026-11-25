@@ -30,18 +30,44 @@ function numberOf(value: string | null): number | null {
 }
 
 /**
- * Beside a HOST_UNREACHABLE: the Host has another version, and `device` is
- * how the Device's version compares with the Host's.
+ * Beside a HOST_UNREACHABLE: the Host `hostId` has another version, and
+ * `device` is how the Device's version compares with the Host's.
  */
 export const versionRefusalSchema = z.object({
 	device: z.enum(["older", "newer"]),
+	hostId: z.string(),
 });
 
-/** How the version of the Host compares with this Device's, from a refusal's data. Null: not a refusal of the version. */
-export function hostVersionOf(data: unknown): OtherVersion | null {
+/**
+ * Who refused the version, and how the version of that Host compares with
+ * this Device's, from a refusal's data. Null: not a refusal of the version.
+ */
+export function hostVersionOf(
+	data: unknown,
+): { hostId: string; host: OtherVersion } | null {
 	const refusal = versionRefusalSchema.safeParse(data);
 	if (!refusal.success) return null;
-	return refusal.data.device === "older" ? "newer" : "older";
+	const { device, hostId } = refusal.data;
+	return { hostId, host: device === "older" ? "newer" : "older" };
+}
+
+/** What a Device reads of a hello before it knows that the version is the same. */
+const saidSchema = z.object({
+	host: z.object({ id: z.string() }),
+	version: z.unknown().optional(),
+});
+
+/**
+ * The Host that gave an answer to a hello, and how its version compares
+ * with this Device's (null: the same). The answer of another version may
+ * have another shape: only these two are read. Null: not a Host's answer.
+ */
+export function helloSaidBy(
+	answer: unknown,
+): { hostId: string; host: OtherVersion | null } | null {
+	const said = saidSchema.safeParse(answer);
+	if (!said.success) return null;
+	return { hostId: said.data.host.id, host: otherVersion(said.data.version) };
 }
 
 /** The token of the document channel: the Device key, and this Device's version after it. */

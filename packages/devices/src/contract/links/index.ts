@@ -2,6 +2,7 @@
 
 export {
 	type HostHello,
+	hostHelloSchema,
 	type ListedSpace,
 	type PairingRedeemed,
 	type PairingStart,

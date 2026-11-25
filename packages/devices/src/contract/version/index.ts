@@ -3,6 +3,7 @@
 export {
 	deviceVersionOf,
 	documentToken,
+	helloSaidBy,
 	hostVersionOf,
 	keyOfDocumentToken,
 	VERSION_HEADER,

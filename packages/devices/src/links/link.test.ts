@@ -206,8 +206,11 @@ describe("httpsLink", () => {
 	});
 
 	/** A Host that refuses the version of the Device, as its router does. */
-	const refusesVersion = (device: "older" | "newer") =>
-		new ORPCError("HOST_UNREACHABLE", { status: 503, data: { device } });
+	const refusesVersion = (device: "older" | "newer", hostId = "host-a") =>
+		new ORPCError("HOST_UNREACHABLE", {
+			status: 503,
+			data: { device, hostId },
+		});
 
 	for (const [what, answer, host] of [
 		[
@@ -231,6 +234,15 @@ describe("httpsLink", () => {
 		[
 			"a Host takes the call and says a newer version",
 			async () => ({ ...hello([]), version: PROTOCOL_VERSION + 1 }),
+			"newer",
+		],
+		[
+			"a Host whose answer has another shape says its id and a newer version",
+			async () =>
+				({
+					host: { id: "host-a" },
+					version: PROTOCOL_VERSION + 1,
+				}) as unknown as HostHello,
 			"newer",
 		],
 	] as const) {
@@ -297,6 +309,142 @@ describe("httpsLink", () => {
 				expect(revoked).toBe(0);
 			} finally {
 				await link.close();
+			}
+		});
+	}
+
+	for (const [what, answer] of [
+		["a page", async () => "<html>Sign in</html>"],
+		["nothing", async () => undefined],
+		["an empty object", async () => ({})],
+		["a version alone", async () => ({ version: PROTOCOL_VERSION + 1 })],
+		[
+			"another Host of this version",
+			async () => ({ ...hello([]), host: { ...hello([]).host, id: "host-z" } }),
+		],
+		[
+			"another Host of another version",
+			async () => ({
+				...hello([]),
+				host: { ...hello([]).host, id: "host-z" },
+				version: PROTOCOL_VERSION + 1,
+			}),
+		],
+		[
+			"another Host that refuses the version",
+			() => Promise.reject(refusesVersion("older", "host-z")),
+		],
+		[
+			"a refusal of the version that names no Host",
+			() =>
+				Promise.reject(
+					new ORPCError("HOST_UNREACHABLE", {
+						status: 503,
+						data: { device: "older" },
+					}),
+				),
+		],
+		[
+			"this Host, with an answer that does not fit",
+			async () => ({ ...hello([]), spaces: undefined }),
+		],
+	] as [string, () => Promise<unknown>][]) {
+		test(`${what} at an address is not this Host: the link tries the next address`, async () => {
+			const host = fakeHost({
+				"https://studio.local": answer as () => Promise<HostHello>,
+				"https://studio.tail.ts.net": async () => hello([]),
+			});
+			let revoked = 0;
+			const states: LinkState["status"][] = [];
+			const link = httpsLink({
+				link: LINK,
+				key: "nsd_key",
+				deviceId: "device-b",
+				clientFor: host.clientFor,
+				heartbeatMs: 60_000,
+				onRevoked: () => revoked++,
+				onState: (state) => states.push(state.status),
+			});
+			try {
+				await until(() => link.state().status === "online");
+				expect(link.state().address).toBe("https://studio.tail.ts.net");
+				expect(states).toEqual(["online"]);
+				expect(revoked).toBe(0);
+			} finally {
+				await link.close();
+			}
+		});
+	}
+
+	test("an answer of another at the address the link is on ends that period: the link looks again", async () => {
+		let portal = false;
+		const host = fakeHost({
+			"https://studio.local": async () =>
+				portal ? ({ json: {} } as unknown as HostHello) : hello([]),
+			"https://studio.tail.ts.net": async () => hello([]),
+		});
+		const states: string[] = [];
+		const link = httpsLink({
+			link: LINK,
+			key: "nsd_key",
+			clientFor: host.clientFor,
+			heartbeatMs: 5,
+			firstBackoffMs: 5,
+			onState: (s) => states.push(`${s.status} ${s.address}`),
+		});
+		try {
+			await until(() => link.state().address === "https://studio.local");
+			portal = true;
+			await until(() => link.state().address === "https://studio.tail.ts.net");
+			expect(states).toEqual([
+				"online https://studio.local",
+				"offline null",
+				"online https://studio.tail.ts.net",
+			]);
+		} finally {
+			await link.close();
+		}
+	});
+
+	for (const [what, status, body] of [
+		["a page of a portal", 200, "<html>Sign in</html>"],
+		["the answer of another app", 200, '{"json":{}}'],
+		["a page that asks to sign in", 401, "<html>Sign in</html>"],
+		["a page that refuses", 403, "<html>Blocked</html>"],
+		["the refusal of another app", 403, '{"message":"no"}'],
+		["a page of a gateway", 503, "<html>Bad gateway</html>"],
+		["a redirect", 302, ""],
+	] as const) {
+		test(`over HTTP, ${what} (${status}) is as offline: no refusal, no version`, async () => {
+			const server = Bun.serve({
+				hostname: "127.0.0.1",
+				port: 0,
+				fetch: () =>
+					new Response(body, {
+						status,
+						headers: {
+							"content-type": body.startsWith("{")
+								? "application/json"
+								: "text/html",
+							...(status === 302 ? { location: "https://x.invalid/" } : {}),
+						},
+					}),
+			});
+			let revoked = 0;
+			const states: LinkState["status"][] = [];
+			const link = httpsLink({
+				link: { ...LINK, addresses: [`http://127.0.0.1:${server.port}`] },
+				key: "nsd_key",
+				onRevoked: () => revoked++,
+				onState: (state) => states.push(state.status),
+			});
+			try {
+				await until(() => states.length > 0);
+				expect(states).toEqual(["offline"]);
+				expect(revoked).toBe(0);
+			} finally {
+				await link.close();
+				server.stop(true);
 			}
 		});
 	}
