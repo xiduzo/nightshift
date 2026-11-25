@@ -1,4 +1,4 @@
-import { type AgentProfileSettings, isKnowledgeId } from "@nightshift/flows";
+import type { AgentProfileSettings } from "@nightshift/flows";
 import type { WorkCall, WorkRequest } from "../../../contract";
 import { type OfferedInput, offeredInput } from "./call-input";
 import {
@@ -114,9 +114,12 @@ export function worksIn(folder: string | null, cwd: unknown): boolean {
 	);
 }
 
-/** Whether a run's id is one name: its folders here get their names from it. */
+/** A run's id as its start makes it: a UUID in lower case. */
+const RUN_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/** Whether this is the id of a run: its folders here get their names from it. */
 export function isRunId(runId: string): boolean {
-	return isKnowledgeId(runId);
+	return RUN_ID.test(runId);
 }
 
 /** The run's own branch: `nightshift/` and the short id, as its worktree has it. */

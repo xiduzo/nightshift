@@ -91,6 +91,7 @@ export type AdmitOfferedCallPorts = {
  * - The call works in this computer's Clone of the project, and only in
  *   the run's own worktree. For a project without a folder (ADR 22): only
  *   in the run's own run folder here, and with no git work.
+ * - The run has an id as its start makes it (`isRunId`).
  * - The run and the project a call names are the request's own: the run
  *   it adds a folder for or keeps files of, the project whose knowledge
  *   it reads.
@@ -189,6 +190,9 @@ export function admitOfferedCall(ports: AdmitOfferedCallPorts): OfferAdmission {
 		const { spaceId, projectId, personId, runId, call } = request;
 		const refuse = (refusal: string) => ({ refusal });
 		if (!personId) return refuse(NO_STARTER);
+		if (runId !== null && !isRunId(runId)) {
+			return refuse("That is not the id of a run.");
+		}
 		const owner = await ownerVia(spaceId, via);
 		if (owner === undefined) {
 			return refuse(
@@ -215,9 +219,6 @@ export function admitOfferedCall(ports: AdmitOfferedCallPorts): OfferAdmission {
 			if (refusal !== null) return refuse(refusal);
 		}
 		if (!NEEDS_CLONE.has(call.kind)) return { offers };
-		if (runId !== null && !isRunId(runId)) {
-			return refuse("That is not the id of a run.");
-		}
 		const own = await ownFolder(request);
 		if ("refusal" in own) return own;
 		const foreign = foreignIds(call, { runId, projectId });

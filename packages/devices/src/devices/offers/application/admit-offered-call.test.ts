@@ -196,7 +196,19 @@ for (const [name, personId] of Object.entries(callers)) {
 
 		test("names its run by one plain id", async () => {
 			const { ask, served } = setUp();
-			for (const runId of ["../other", "abcdef12/../x", "a/b", ".."]) {
+			for (const runId of [
+				"../other",
+				"abcdef12/../x",
+				"a/b",
+				"..",
+				"abcdef12",
+				RUN.toUpperCase(),
+				RUN.slice(0, -1),
+				`${RUN}0`,
+				`x${RUN}`,
+				`${RUN}\n`,
+				RUN.replaceAll("-", ""),
+			]) {
 				for (const call of [
 					{ kind: "worktree", run: { id: runId, projectId: "app" } },
 					{
@@ -205,6 +217,7 @@ for (const [name, personId] of Object.entries(callers)) {
 						branch: "b",
 						commit: "c",
 					},
+					{ kind: "decide", input: { decider: "x", prompt: "", labels: [] } },
 					session({ cwd: `/projects/app.nightshift/${runId.slice(0, 8)}` }),
 				] as WorkCall[]) {
 					expect([runId, await ask(call, { personId, runId })]).toEqual([
