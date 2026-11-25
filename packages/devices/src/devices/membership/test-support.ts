@@ -6,7 +6,7 @@ import { migratedDb } from "@nightshift/db/testing";
 import { HostUnreachableError, NIGHT_SHIFT } from "@nightshift/engine";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
-import { NotPairedError } from "../../links";
+import { isNotPaired } from "../../links";
 import { drizzleMembershipRecord } from "./adapters/out/drizzle-membership-record";
 import { fsDatabaseCopy } from "./adapters/out/fs-database-copy";
 import { inMemoryHome } from "./adapters/out/in-memory-home";
@@ -87,7 +87,7 @@ export function membershipOver(deps: MembershipTestDeps): HomeMembership {
 			nightShift: NIGHT_SHIFT,
 			isHostUnreachable: (error) => error instanceof HostUnreachableError,
 		},
-		isNotPaired: (error) => error instanceof NotPairedError,
+		isNotPaired,
 	});
 }
 

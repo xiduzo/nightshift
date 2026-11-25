@@ -12,6 +12,7 @@
 
 export {
 	type ArchiveRef,
+	askedHostOf,
 	type Caller,
 	deviceVersionOf,
 	type FollowWant,

@@ -9,6 +9,7 @@ import {
 	type HostClient,
 	hostContract,
 	hostVersionOf,
+	keyRefusalSchema,
 	refusalDataSchema,
 } from "../contract";
 
@@ -60,10 +61,27 @@ export const HOST_TOO_SLOW =
 
 /** The Host no longer knows this computer's Device key: a refusal that says to pair this computer again. */
 export class NotPairedError extends Refusal {
-	constructor(options?: ErrorOptions) {
+	/** `hostId`: the Host that refused, as it named itself. Null: it named none. */
+	constructor(
+		readonly hostId: string | null,
+		options?: ErrorOptions,
+	) {
 		super("conflict", NOT_PAIRED, options);
 		this.name = "NotPairedError";
 	}
+}
+
+/** A call on the Host `hostId` failed because it no longer knows the key, and it said so itself. */
+export function isNotPaired(error: unknown, hostId: string): boolean {
+	return error instanceof NotPairedError && error.hostId === hostId;
+}
+
+/** The Host that refused the key with `error`, as it named itself. Null: no refusal of the key, or it names no Host. */
+export function refusingHost(error: unknown): string | null {
+	if (!(error instanceof ORPCError)) return null;
+	if (error.code !== "UNAUTHORIZED" && error.code !== "FORBIDDEN") return null;
+	const named = keyRefusalSchema.safeParse(error.data);
+	return named.success ? named.data.hostId : null;
 }
 
 /** How one call on the Host may end besides its answer. */
@@ -103,7 +121,7 @@ export function fromHost(error: unknown): unknown {
 			? data.data.kind
 			: KIND_OF_CODE[error.code];
 	if (error.code === "UNAUTHORIZED" || kind === "signed-out") {
-		return new NotPairedError({ cause: error });
+		return new NotPairedError(refusingHost(error), { cause: error });
 	}
 	if (kind) return new Refusal(kind, error.message, { cause: error });
 	return new Error(`The Host answered ${error.code}.`, { cause: error });

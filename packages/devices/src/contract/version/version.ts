@@ -25,6 +25,14 @@ export function deviceVersionOf(headers: Headers): number | null {
 	return numberOf(headers.get(VERSION_HEADER));
 }
 
+/** The header of every call of a Device with a key: the id of the Host it means. */
+export const HOST_HEADER = "x-nightshift-host";
+
+/** The Host a call means, as it says. Null: it says none. */
+export function askedHostOf(headers: Headers): string | null {
+	return headers.get(HOST_HEADER);
+}
+
 function numberOf(value: string | null): number | null {
 	return value !== null && /^\d{1,9}$/.test(value) ? Number(value) : null;
 }

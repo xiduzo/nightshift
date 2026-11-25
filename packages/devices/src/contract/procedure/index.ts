@@ -7,6 +7,7 @@ export {
 	deviceId,
 	deviceName,
 	type HostProcedureMeta,
+	keyRefusalSchema,
 	machineFingerprintSchema,
 	NOT_A_HOST,
 	procedure,

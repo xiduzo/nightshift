@@ -3,7 +3,7 @@
 export { backoff, pause } from "./backoff";
 export { tellClones } from "./clones";
 export type { OpenDocumentChannel, SyncedDocument } from "./document-channel";
-export { type CallOptions, NotPairedError } from "./from-host";
+export { type CallOptions, isNotPaired } from "./from-host";
 export {
 	createHostLinks,
 	type DeviceKeyStore,

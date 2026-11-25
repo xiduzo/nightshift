@@ -93,7 +93,9 @@ test("a Host that refuses the key: what follows goes on when one step of it fail
 			({
 				link: {
 					hello: async () => {
-						throw new ORPCError("UNAUTHORIZED");
+						throw new ORPCError("UNAUTHORIZED", {
+							data: { hostId: "host-a" },
+						});
 					},
 				},
 			}) as unknown as HostClient,

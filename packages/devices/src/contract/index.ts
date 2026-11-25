@@ -39,6 +39,7 @@ export { OFFLINE_AFTER_MS } from "./presence";
 export {
 	type HostProcedureMeta,
 	hostAnswer,
+	keyRefusalSchema,
 	NOT_A_HOST,
 	ODD_HOST_ANSWER,
 	refusalDataSchema,
@@ -66,8 +67,10 @@ export {
 	syncBatchSchema,
 } from "./sync";
 export {
+	askedHostOf,
 	deviceVersionOf,
 	documentToken,
+	HOST_HEADER,
 	helloSaidBy,
 	hostVersionOf,
 	keyOfDocumentToken,

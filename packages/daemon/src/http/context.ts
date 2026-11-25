@@ -9,7 +9,7 @@ import {
 	wireAccess,
 	wireLogin,
 } from "@nightshift/auth";
-import { deviceVersionOf } from "@nightshift/devices";
+import { askedHostOf, deviceVersionOf } from "@nightshift/devices";
 import type { Context as HonoContext } from "hono";
 
 import { fromThisComputer } from "./this-computer";
@@ -107,6 +107,7 @@ export function requestContexts(services: HttpServices): RequestContexts {
 					: await access(context),
 				deviceKey,
 				deviceVersion: deviceVersionOf(context.req.raw.headers),
+				askedHost: askedHostOf(context.req.raw.headers),
 				fromThisComputer: !signedOut && isLocal(context),
 				requireTwoFactor: hostPolicy.requireTwoFactor,
 				setLogin: (personId, input) => login.setLogin({ personId, input }),

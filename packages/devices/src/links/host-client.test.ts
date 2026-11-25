@@ -8,6 +8,7 @@ type Received = {
 	path: string;
 	encoding: string | null;
 	version: string | null;
+	host: string | null;
 	body: string;
 };
 
@@ -31,6 +32,7 @@ function host() {
 				path: new URL(request.url).pathname,
 				encoding,
 				version: request.headers.get("x-nightshift-version"),
+				host: request.headers.get("x-nightshift-host"),
 				body: (encoding === "gzip"
 					? gunzipSync(raw)
 					: Buffer.from(raw)
@@ -56,11 +58,18 @@ describe("a Device's calls to its Host", () => {
 		expect(JSON.parse(received[0]?.body ?? "{}").json.content).toBe(large);
 	});
 
-	test("say this Device's version, with a key and without one", async () => {
+	test("say this Device's version, and the Host they mean when they know it", async () => {
 		const { url, received } = host();
 		await hostClient(url, { key: "k" }).link.hello();
 		await hostClient(url).link.hello();
+		await hostClient(url, { key: "k", hostId: "host-a" })
+			.sync.stream({
+				cursors: {},
+			} as never)
+			.catch(() => {});
+		expect(received.map((r) => r.host)).toEqual([null, null, "host-a"]);
 		expect(received.map((r) => r.version)).toEqual([
+			String(PROTOCOL_VERSION),
 			String(PROTOCOL_VERSION),
 			String(PROTOCOL_VERSION),
 		]);

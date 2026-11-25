@@ -35,8 +35,8 @@ export type HomeMembershipDeps = MergeDeps &
 		keys: Pick<DeviceKeyStore, "delete">;
 		/** The copies of the Person's other Devices, which only the home Host gives. */
 		copies: DeviceCopiesPort;
-		/** Whether a leave call failed because the Host no longer knows this computer. */
-		isNotPaired(error: unknown): boolean;
+		/** Whether a leave call failed because the Host `hostId` no longer knows this computer, and said so itself. */
+		isNotPaired(error: unknown, hostId: string): boolean;
 		/** How long the merge on join waits for the Host's list. Default 30 s. */
 		listedWaitMs?: number;
 		/** How long a step waits for the store of the keys. Default 5 s. */
@@ -339,13 +339,13 @@ async function attempted(
 /** Asks the Host to remove this computer's access. False: it did not. */
 async function tell(
 	link: Link | undefined,
-	isNotPaired: (error: unknown) => boolean,
+	isNotPaired: HomeMembershipDeps["isNotPaired"],
 ): Promise<boolean> {
 	if (!link) return false;
 	try {
 		await link.call((client) => client.link.leave());
 		return true;
 	} catch (error) {
-		return isNotPaired(error);
+		return isNotPaired(error, link.hostId);
 	}
 }

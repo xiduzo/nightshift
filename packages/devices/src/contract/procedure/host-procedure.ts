@@ -20,6 +20,9 @@ export type HostProcedureMeta = { key?: DeviceKeyPermission };
 export const NOT_A_HOST =
 	"This computer does not accept devices. Turn on Be a Host on its Devices page.";
 
+/** Ids that become Device ids on the Host. */
+export const deviceId = z.string().regex(/^[\w-]{1,64}$/);
+
 /**
  * The kind of a refusal a Host sends as a BAD_REQUEST (`Refusal.kind`).
  * A call that does not fit its input schema has none: the Device reads it
@@ -39,17 +42,24 @@ export const refusalDataSchema = exact<{ kind: RefusalKind }>()(
 );
 
 /**
+ * Beside a refusal of the Device key: the Host that refuses. A Host says it
+ * only to a call that asks for that Host by its id (`HOST_HEADER`).
+ */
+export const keyRefusalSchema = z.object({ hostId: deviceId });
+
+/**
  * How a Host refuses a call. UNAUTHORIZED: the Device has no access here
  * (pair it again). FORBIDDEN: it may not do this. CONFLICT: not yet, try
  * again later. BAD_REQUEST: a refusal written for people, with its kind
  * (`refusalDataSchema`). HOST_UNREACHABLE: the Host of a Space this Host
  * does not keep cannot be reached now, or this Host has another version
  * than the Device (`versionRefusalSchema`, ADR 45). A FORBIDDEN or an
- * UNAUTHORIZED never means the version: it ends the link for good.
+ * UNAUTHORIZED never means the version. One that names the link's own Host
+ * (`keyRefusalSchema`), to a hello or a heartbeat, ends the link for good.
  */
 export const procedure = oc.$meta<HostProcedureMeta>({}).errors({
-	UNAUTHORIZED: { status: 401 },
-	FORBIDDEN: { status: 403 },
+	UNAUTHORIZED: { status: 401, data: keyRefusalSchema.optional() },
+	FORBIDDEN: { status: 403, data: keyRefusalSchema.optional() },
 	CONFLICT: { status: 409 },
 	BAD_REQUEST: { status: 400, data: refusalDataSchema.optional() },
 	HOST_UNREACHABLE: { status: 503, data: versionRefusalSchema.optional() },
@@ -61,8 +71,6 @@ export const archive = procedure.meta({ key: "archive" });
 /** The work relay. */
 export const relay = procedure.meta({ key: "relay" });
 
-/** Ids that become Device ids on the Host. */
-export const deviceId = z.string().regex(/^[\w-]{1,64}$/);
 /** A SHA-256 in hex: never the hardware id itself (ADR 20). */
 export const machineFingerprintSchema = z.string().regex(/^[0-9a-f]{64}$/);
 export const deviceName = z.string().trim().min(1).max(64);

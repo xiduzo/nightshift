@@ -19,7 +19,11 @@ let version: number;
 beforeEach(async () => {
 	version = PROTOCOL_VERSION;
 	a = await createSandbox();
-	host = await hostInMemory(a, { deviceVersion: () => version });
+	host = await hostInMemory(a, {
+		deviceVersion: () => version,
+		// A Device from before the number says no Host either.
+		askedHost: () => null,
+	});
 	key = await host.join("device-b", "B");
 });
 

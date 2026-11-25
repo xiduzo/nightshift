@@ -13,7 +13,12 @@ import type { HostClient, HostHello } from "../contract";
 import { memoryDocuments, partialHostClient } from "../testing";
 import { NotPairedError } from "./from-host";
 import type { HostLink } from "./host-links";
-import { firstAnswering, httpsLink, type LinkState } from "./link";
+import {
+	firstAnswering,
+	httpsLink,
+	KeyRefusedError,
+	type LinkState,
+} from "./link";
 
 /**
  * The Link's own logic, over fake Hosts: no network. The fake Hosts
@@ -46,6 +51,9 @@ const hello = (addresses: string[]): HostHello => ({
 	spaces: [],
 	hostAdmin: true,
 });
+
+/** The own Host's refusal of the key. */
+const REFUSED = new ORPCError("UNAUTHORIZED", { data: { hostId: "host-a" } });
 
 const unreachable = () => Promise.reject(new TypeError("Unable to connect."));
 
@@ -87,9 +95,9 @@ describe("firstAnswering", () => {
 		await expect(
 			firstAnswering(["a", "b"], async (address) => {
 				tried.push(address);
-				throw new ORPCError("UNAUTHORIZED");
+				throw new KeyRefusedError();
 			}),
-		).rejects.toBeInstanceOf(ORPCError);
+		).rejects.toBeInstanceOf(KeyRefusedError);
 		expect(tried).toEqual(["a"]);
 	});
 
@@ -182,9 +190,7 @@ describe("httpsLink", () => {
 		let refuse = false;
 		const host = fakeHost({
 			"https://studio.local": () =>
-				refuse
-					? Promise.reject(new ORPCError("UNAUTHORIZED"))
-					: Promise.resolve(hello([])),
+				refuse ? Promise.reject(REFUSED) : Promise.resolve(hello([])),
 		});
 		let revoked = 0;
 		const link = httpsLink({
@@ -622,9 +628,7 @@ describe("httpsLink", () => {
 		let refuse = false;
 		const host = fakeHost({
 			"https://studio.local": () =>
-				refuse
-					? Promise.reject(new ORPCError("UNAUTHORIZED"))
-					: Promise.resolve(hello([])),
+				refuse ? Promise.reject(REFUSED) : Promise.resolve(hello([])),
 		});
 		const link = httpsLink({
 			link: LINK,
@@ -711,9 +715,7 @@ describe("httpsLink", () => {
 			let refuse = false;
 			const host = fakeHost({
 				"https://studio.local": () =>
-					refuse
-						? Promise.reject(new ORPCError("UNAUTHORIZED"))
-						: Promise.resolve(hello([])),
+					refuse ? Promise.reject(REFUSED) : Promise.resolve(hello([])),
 			});
 			const link = httpsLink({
 				link: LINK,

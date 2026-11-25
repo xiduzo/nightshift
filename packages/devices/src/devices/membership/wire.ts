@@ -15,7 +15,7 @@ import {
 	type DeviceKeyStore,
 	type DeviceLinks,
 	type HostLinks,
-	NotPairedError,
+	isNotPaired,
 } from "../../links";
 import type { PeerEngine } from "../../wire-peers-engine";
 import { startKeepFinishing } from "./adapters/in/keep-finishing";
@@ -126,7 +126,7 @@ export function wireMembership(
 		wait,
 		ids,
 		engineKernel,
-		isNotPaired: (error) => error instanceof NotPairedError,
+		isNotPaired,
 	});
 	const finishing = new AbortController();
 	startKeepFinishing(membership.keepFinishing, finishing.signal);

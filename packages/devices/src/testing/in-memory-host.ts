@@ -76,6 +76,8 @@ export function inMemoryHost(deps: {
 	 * (`admitEvery`).
 	 */
 	admit?: Devices["admit"];
+	/** The Host the Devices mean, read on every call. Default: they say none. */
+	askedHost?(): string | null;
 	/** The version the Devices say, read on every call. Default: this one's. */
 	deviceVersion?(): number;
 	/** `link.hello` and `link.heartbeat`: the Host's answer for the key (`Host.hello`). */
@@ -117,6 +119,7 @@ export function inMemoryHost(deps: {
 			context: (): HostPeerContext => ({
 				deviceKey: read(),
 				deviceVersion: deps.deviceVersion?.() ?? PROTOCOL_VERSION,
+				askedHost: deps.askedHost?.() ?? null,
 				exchange: deps.exchange,
 				devices: {
 					admit: deps.admit ?? admitEvery(),

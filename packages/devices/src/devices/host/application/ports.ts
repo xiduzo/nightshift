@@ -93,7 +93,8 @@ export type SpaceRoles = {
 
 /**
  * The codes a Device reads for a keyed call that this Host does not take.
- * FORBIDDEN and UNAUTHORIZED only ever mean the key. `otherVersion` is the
+ * FORBIDDEN and UNAUTHORIZED only ever mean the key. They name this Host to
+ * a call that means it, and to no other. `otherVersion` is the
  * code of a Host that cannot be reached now: the Device keeps its key, and
  * what it has waits (ADR 45).
  * @filledBy devices/wire

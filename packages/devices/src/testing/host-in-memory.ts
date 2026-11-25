@@ -90,6 +90,8 @@ export type HostReplicaOptions = Partial<
 > & {
 	/** How A's calls reach its paired Devices. Default: they reach none. */
 	hostWork?: WorkRelay;
+	/** The Host the Devices mean, read on every call. Default: this one. */
+	askedHost?: () => string | null;
 	/** The version the Devices say, read on every call. Default: this one's. */
 	deviceVersion?: () => number;
 };
@@ -173,6 +175,7 @@ export async function hostInMemory(
 	const memory = inMemoryHost({
 		exchange: hostExchange,
 		...(options.deviceVersion ? { deviceVersion: options.deviceVersion } : {}),
+		askedHost: options.askedHost ?? (() => hostId),
 		admit: asHost.admit,
 		hello: asHost.hello,
 		revoke: asHost.revoke,
@@ -205,7 +208,7 @@ export async function hostInMemory(
 		hostId,
 		personId,
 		hello: asHost.hello,
-		caller: (key) => asHost.admit(key, "sync", PROTOCOL_VERSION),
+		caller: (key) => asHost.admit(key, "sync", PROTOCOL_VERSION, hostId),
 		token,
 		async join(deviceId, name) {
 			await host.devices.join({

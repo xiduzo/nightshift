@@ -399,6 +399,7 @@ function recording(
 		fromThisComputer: given.fromThisComputer ?? false,
 		deviceKey,
 		deviceVersion: null,
+		askedHost: null,
 		requireTwoFactor: false,
 		setLogin: recorder(["setLogin"], record) as Context["setLogin"],
 		hasLogin: recorder(["hasLogin"], record, {

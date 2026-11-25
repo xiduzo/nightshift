@@ -9,6 +9,7 @@ import { secretRequestSchema, workRequestSchema } from "../work";
 import {
 	deviceVersionOf,
 	documentToken,
+	HOST_HEADER,
 	hostVersionOf,
 	keyOfDocumentToken,
 	VERSION_HEADER,
@@ -21,7 +22,7 @@ import {
  * would have one number.
  */
 const SHAPES: Record<string, string> = {
-	1: "393798cd345db0fb",
+	1: "d063c69fb6dba609",
 };
 
 /** A schema as plain data, with its keys in order. Null: the procedure has none. */
@@ -73,7 +74,7 @@ function shape(): unknown {
 		work: described(workRequestSchema),
 		secret: described(secretRequestSchema),
 		refusal: described(refusalDataSchema),
-		header: VERSION_HEADER,
+		headers: [VERSION_HEADER, HOST_HEADER],
 		token: documentToken("key").replace(String(PROTOCOL_VERSION), "N"),
 	};
 }

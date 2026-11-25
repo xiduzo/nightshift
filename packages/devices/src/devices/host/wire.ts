@@ -54,12 +54,15 @@ export type HostDeps = {
 	now?: () => number;
 };
 
-const keyedCallCodes = (hostId: string): KeyedCallCodes => ({
+const keyedCallCodes = (
+	hostId: string,
+	named: { hostId: string } | null,
+): KeyedCallCodes => ({
 	unauthorized: (words) => {
-		throw new ORPCError("UNAUTHORIZED", { message: words });
+		throw refusal("UNAUTHORIZED", words, named);
 	},
 	forbidden: (words) => {
-		throw new ORPCError("FORBIDDEN", { message: words });
+		throw refusal("FORBIDDEN", words, named);
 	},
 	otherVersion: (device) => {
 		throw new ORPCError("HOST_UNREACHABLE", {
@@ -69,6 +72,12 @@ const keyedCallCodes = (hostId: string): KeyedCallCodes => ({
 		});
 	},
 });
+
+const refusal = (
+	code: "UNAUTHORIZED" | "FORBIDDEN",
+	message: string,
+	named: { hostId: string } | null,
+) => new ORPCError(code, { message, ...(named ? { data: named } : {}) });
 
 /**
  * This computer as a Host: pairing, Device keys, presence, and the
@@ -131,13 +140,19 @@ export function wireHost(deps: HostDeps) {
 			key: DeviceKeyAccess | null,
 			need: DeviceKeyPermission | undefined,
 			version: number | null,
+			askedHost: string | null,
 		) =>
 			admitKeyedCall({
 				registry: deps.registry,
 				settings,
 				spaces,
 				roles,
-				codes: keyedCallCodes(deps.self.id),
+				codes: keyedCallCodes(
+					deps.self.id,
+					// Its own id, and only to a call that means this Host: a Host
+					// tells no one else which Host it is.
+					askedHost === deps.self.id ? { hostId: deps.self.id } : null,
+				),
 				versions,
 			})({ key, need, version }),
 		/** How the version of a Device's last call compares with this Host's. Null: the same, or it did not call. */

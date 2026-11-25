@@ -39,6 +39,8 @@ export type HostPeerContext = {
 	deviceKey: DeviceKeyAccess | null;
 	/** The version the call says (`VERSION_HEADER`). Null: none. */
 	deviceVersion: number | null;
+	/** The id of the Host the call means (`HOST_HEADER`). Null: none. */
+	askedHost: string | null;
 	/** This computer as the Host of run history. */
 	exchange: HostExchange;
 	/** This computer as a Host: the admission of a keyed call, pairing, and the answer to a link. */
@@ -76,6 +78,7 @@ const keyed = peer.use(async ({ context, procedure, next }) => {
 		context.deviceKey,
 		procedure["~orpc"].meta.key,
 		context.deviceVersion,
+		context.askedHost,
 	);
 	return next({ context: { caller } });
 });

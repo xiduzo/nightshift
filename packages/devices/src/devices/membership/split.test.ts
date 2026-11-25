@@ -34,6 +34,7 @@ import * as Y from "yjs";
 import type { HostClient } from "../../contract";
 import { createDeviceExchange } from "../../exchange";
 import { createHostLinks, type Link } from "../../links";
+import { fromHost } from "../../links/from-host";
 import { httpsLink } from "../../links/link";
 import { type PairedReplicas, pairedReplicas } from "../../testing";
 import { pausedHere } from "../../wire-peers-paused";
@@ -119,7 +120,11 @@ function linkToA(
 	const memory: HostClient = paired.memory.client(paired.key);
 	const gate = (): void => {
 		if (options.down?.()) throw new TypeError("fetch failed");
-		if (options.refuse?.()) throw new ORPCError("UNAUTHORIZED");
+		if (options.refuse?.()) {
+			throw new ORPCError("UNAUTHORIZED", {
+				data: { hostId: paired.hostId },
+			});
+		}
 	};
 	const client: HostClient = {
 		...memory,
@@ -1484,6 +1489,28 @@ describe("nightshift leave", () => {
 		expect(result).toMatchObject({ told: false, split: { state: "done" } });
 		expect(await accessOnA()).toBeNull();
 	});
+
+	for (const [who, told, named] of [
+		["the Host it leaves", true, () => ({ hostId: paired.hostId })],
+		["another Host", false, () => ({ hostId: "host-c" })],
+		["no Host", false, () => undefined],
+	] as const) {
+		test(`a leave that a refusal of ${who} answers is ${told ? "told" : "not told"}, and B leaves`, async () => {
+			await mergedIntoA();
+			const { link } = linkToA({ push: false });
+			await ready(link);
+			const refusing: Link = {
+				...link,
+				call: () =>
+					Promise.reject(
+						fromHost(new ORPCError("UNAUTHORIZED", { data: named() })),
+					),
+			};
+			const { result, deleted } = await leave(refusing);
+			expect(result).toMatchObject({ told, split: { state: "done" } });
+			expect(deleted).toEqual([paired.hostId]);
+		});
+	}
 
 	test("an older Host without leave: B leaves on its own", async () => {
 		await mergedIntoA();

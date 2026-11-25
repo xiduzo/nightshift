@@ -32,12 +32,20 @@ refusal but HOST_UNREACHABLE stops. Builds from before this check read it too.
    the number answers the hello without one: the Device uses nothing of that answer.
    Only an answer that names the link's own Host counts. Any other answer (a sign-in page of a
    network, another Host at that address) is as no answer.
+   A refusal of the key counts by the same rule (point 9).
 6. **The words live once**, beside the number. The Device's pages say which side to update. The
    Host's Devices page says it too, because an older Device shows only "Offline".
 7. **Pairing has no check.** It has no key. A Device that pairs with a Host of another version
    gets its key, and its link then says what to update.
 8. **The apps compare the same number.** `account.status` answers it to a Person who may use
    this Night Shift. A page says to reload, a phone to update.
+9. **A link ends only on its own Host's refusal.** A Device says which Host it means with every
+   call that has a key, in the header `x-nightshift-host`. A Host that refuses the key
+   (UNAUTHORIZED or FORBIDDEN) puts `{ hostId }` beside it when that header is its own id. It
+   compares the whole id and sends its own. Every other caller gets the refusal without data.
+   A refusal that names another Host, or none, never ends a link and never removes a key. A
+   refused leave counts as told only when the Host that is left refuses it. This protects
+   against a mistaken address. It is not a proof of identity.
 
 ## The number cannot be forgotten
 

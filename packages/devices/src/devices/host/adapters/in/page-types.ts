@@ -126,7 +126,8 @@ export type Devices = {
 	 * Admits a keyed call once: the key, when there is one that holds
 	 * `need` (the procedure's meta), of a Device paired here with access,
 	 * as its Person's own, on a computer that is a Host now, and of the
-	 * same version. The Caller is
+	 * same version. A refusal of the key names this Host to a call that
+	 * means it (`askedHost`). The Caller is
 	 * what every keyed procedure's implementation then takes
 	 * (`host/adapters/in/readable.ts`).
 	 */
@@ -134,6 +135,7 @@ export type Devices = {
 		key: DeviceKeyAccess | null,
 		need: DeviceKeyPermission | undefined,
 		version: number | null,
+		askedHost: string | null,
 	): Promise<Caller>;
 	/** A paired Device's link answered. */
 	hello(key: DeviceKeyAccess): Promise<HostHello>;

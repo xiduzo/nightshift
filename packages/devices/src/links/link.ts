@@ -21,6 +21,7 @@ import {
 	type CallOptions,
 	hostCall,
 	NotPairedError,
+	refusingHost,
 	translated,
 } from "./from-host";
 import { hostClient } from "./host-client";
@@ -45,7 +46,8 @@ import type { LinkStatus } from "./types";
  *   access) ends the link for good: `revoked`.
  * - An address may be another's now (a sign-in page of a network, another
  *   app, another Host). Only an answer that names the link's own Host
- *   counts. Any other one is as no answer: it tries the next address.
+ *   counts, a refusal too. Any other one is as no answer: it tries the
+ *   next address.
  * - A Host of another version makes the link wait for an update:
  *   `outdated` (ADR 45). Nothing goes over it, the key and the rows stay,
  *   and it asks again every `maxBackoffMs`.
@@ -181,24 +183,24 @@ export async function firstAnswering<T>(
 		try {
 			return { address, value: await call(address) };
 		} catch (error) {
-			if (isRefusal(error) || error instanceof OtherVersionError) throw error;
+			if (
+				error instanceof KeyRefusedError ||
+				error instanceof OtherVersionError
+			) {
+				throw error;
+			}
 			last = error;
 		}
 	}
 	throw last;
 }
 
-/**
- * The Host answered a hello or a heartbeat, and refused the key. The link's
- * own reading of the wire. A Host refuses without data (`hostContract`). A
- * page that asks to sign in has its body there: it is not the Host's.
- */
-export function isRefusal(error: unknown): boolean {
-	return (
-		error instanceof ORPCError &&
-		(error.code === "UNAUTHORIZED" || error.code === "FORBIDDEN") &&
-		error.data === undefined
-	);
+/** The link's own Host refused the key on a hello or a heartbeat, and named itself. */
+export class KeyRefusedError extends Error {
+	constructor(options?: ErrorOptions) {
+		super("The Host refused the key of this computer.", options);
+		this.name = "KeyRefusedError";
+	}
 }
 
 /** The Host answered a call so that the link asks it now: it no longer knows the key, or has another version. */
@@ -240,7 +242,11 @@ export function httpsLink(options: HttpsLinkOptions): Link {
 	const clientFor =
 		options.clientFor ??
 		((address: string) =>
-			hostClient(address, { key, certificate: link.certificate }));
+			hostClient(address, {
+				key,
+				hostId: link.hostId,
+				certificate: link.certificate,
+			}));
 
 	let addresses = [...link.addresses];
 	let state: LinkState = {
@@ -394,10 +400,11 @@ export function httpsLink(options: HttpsLinkOptions): Link {
 	}
 
 	/**
-	 * The Host's answer to a hello or a heartbeat. Throws `OtherVersionError`
-	 * when the link's own Host refuses this computer's version, and when its
-	 * answer says another: the link uses nothing of it. An answer that is not
-	 * the link's own Host's, or does not fit, is as no answer.
+	 * The Host's answer to a hello or a heartbeat. Throws `KeyRefusedError`
+	 * when the link's own Host refuses the key. Throws `OtherVersionError`
+	 * when it refuses this computer's version, and when its answer says
+	 * another: the link uses nothing of it. An answer or a refusal that is
+	 * not the link's own Host's, or does not fit, is as no answer.
 	 */
 	async function said(
 		ask: (options: { signal: AbortSignal }) => Promise<HostHello>,
@@ -411,6 +418,9 @@ export function httpsLink(options: HttpsLinkOptions): Link {
 				]),
 			});
 		} catch (error) {
+			if (refusingHost(error) === link.hostId) {
+				throw new KeyRefusedError({ cause: error });
+			}
 			const refused =
 				error instanceof ORPCError && error.code === "HOST_UNREACHABLE"
 					? hostVersionOf(error.data)
@@ -475,7 +485,7 @@ export function httpsLink(options: HttpsLinkOptions): Link {
 				goOffline();
 				stopDocuments();
 				if (stop.signal.aborted) break;
-				if (isRefusal(error)) {
+				if (error instanceof KeyRefusedError) {
 					setState("revoked", null);
 					endWaits(`${link.name} no longer knows this computer.`);
 					options.onRevoked?.();

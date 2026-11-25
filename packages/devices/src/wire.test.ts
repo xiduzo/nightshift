@@ -360,6 +360,7 @@ describe("the devices runtime across a reload", () => {
 			},
 			"relay",
 			PROTOCOL_VERSION,
+			null,
 		);
 		const taking = new AbortController();
 		const deliveries = second.hostExchange

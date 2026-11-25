@@ -53,6 +53,8 @@ export type Context = Services & {
 	deviceKey: DeviceKeyAccess | null;
 	/** The version a Device says with its call (ADR 45). Null: none. */
 	deviceVersion: number | null;
+	/** The id of the Host a Device means with its call (ADR 45). Null: none. */
+	askedHost: string | null;
 	/** The Host requires two-factor sign-in for sessions from other computers. */
 	requireTwoFactor: boolean;
 	/** Sets a Person's email and password (`@nightshift/auth/login`). */

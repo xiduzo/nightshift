@@ -128,6 +128,7 @@ export function testContext(fields: TestContextFields = {}): Context {
 		fromThisComputer: fields.fromThisComputer ?? false,
 		deviceKey: fields.deviceKey ?? null,
 		deviceVersion: fields.deviceVersion ?? null,
+		askedHost: fields.askedHost ?? null,
 		requireTwoFactor: fields.requireTwoFactor ?? false,
 		setLogin:
 			fields.setLogin ??
