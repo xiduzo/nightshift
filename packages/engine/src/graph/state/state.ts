@@ -94,13 +94,10 @@ const pendingWaitSchema = z.object({
 	streak: z.object({ count: z.number(), since: z.number() }),
 	/**
 	 * What a policy wait continues after the wake: the harness session the
-	 * log assigned (null while the harness named none, or for a decider) and
-	 * the follow-up prompt (a person's on an early wake, else the default).
+	 * log assigned (null while the harness named none, or for a decider).
 	 * Null for a Wait node: its step continues nothing.
 	 */
-	session: z
-		.object({ harnessSessionId: z.string().nullable(), prompt: z.string() })
-		.nullable(),
+	session: z.object({ harnessSessionId: z.string().nullable() }).nullable(),
 	/** A Wait node on a signal: the signal that ended the wait, set by the wait node on a signal resume. */
 	signal: z.string().optional(),
 	/** What came with that signal: the webhook event (`{ body, headers }`) that sent it. */
@@ -112,8 +109,8 @@ const pendingParkedSchema = z.object({
 	nodeId: z.string(),
 	visit: z.number(),
 	harnessSessionId: z.string().nullable(),
-	/** The resume prompt. Null until a person resumed. */
-	prompt: z.string().nullable(),
+	/** How often the step was opened when its node took the park up (`takenUp`). Absent until then. */
+	openings: z.number().optional(),
 	status: z.enum(["failed", "stopped"]),
 	/** The run's end reason, as `RunEnded` records it. */
 	reason: z.string().nullable(),
@@ -483,8 +480,8 @@ export type Parked =
  * - `signal`: someone sent the run a signal; a Wait node on it ends `done`.
  */
 export type ResumeValue =
-	| { kind: "wake"; early: boolean; prompt?: string }
-	| { kind: "resume"; prompt?: string }
+	| { kind: "wake"; early: boolean }
+	| { kind: "resume" }
 	| { kind: "reopen" }
 	| {
 			kind: "gate";

@@ -22,7 +22,7 @@ import {
 } from "../../log";
 import { arrive, openRound, outrun, placeOf } from "../branches";
 import type { NodeAction, StepContext, StopService } from "../context";
-import { commitVisit, type DoneStep } from "../position";
+import { commitVisit, type DoneStep, takenUp } from "../position";
 import type { PendingParked, RunStateUpdate, RunStateValues } from "../state";
 import { interruptNode } from "./interrupt";
 
@@ -85,7 +85,6 @@ export function parkCommand(input: {
 		nodeId: node.id,
 		visit: step?.visit ?? 0,
 		harnessSessionId: step?.harnessSessionId ?? null,
-		prompt: null,
 		status: input.status,
 		reason: input.reason,
 		endReason: provedEndReason({
@@ -456,10 +455,13 @@ function arrivalAt(
 /**
  * The park node of every flow node (`interruptNode`). It interrupts with the
  * parked step (the runner appends `RunEnded`), after nothing else (design
- * rule 4). A resume jumps back to the node with `pending.prompt` set; the
- * node reopens the parked step when it can, else starts a new visit.
+ * rule 4). A resume jumps back to the node, which reopens the parked step
+ * when it can, else starts a new visit (`takenUp`).
  */
-export function parkNode(node: FlowNode): NodeAction {
+export function parkNode(
+	node: FlowNode,
+	ctx: Pick<StepContext, "log" | "run">,
+): NodeAction {
 	return interruptNode({
 		kind: "parked",
 		nodeId: node.id,
@@ -475,13 +477,10 @@ export function parkNode(node: FlowNode): NodeAction {
 				: {}),
 			...(pending.atStopTime ? { atStopTime: true } : {}),
 		}),
-		answer: (pending, answer) => {
-			const prompt =
-				answer && "prompt" in answer && answer.prompt !== undefined
-					? answer.prompt
-					: null;
+		answer: async (pending) => {
+			const run = await ctx.log.state(ctx.run.id);
 			return new Command({
-				update: { pending: { ...pending, prompt } },
+				update: { pending: takenUp(run, pending) },
 				goto: node.id,
 			});
 		},

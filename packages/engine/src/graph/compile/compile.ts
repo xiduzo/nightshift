@@ -81,7 +81,7 @@ export function compileFlow(flow: Flow, ctx: StepContext) {
 				: made,
 			{ ends: [...ends, ...own] },
 		);
-		graph.addNode(park, parkNode(node), { ends: [node.id] });
+		graph.addNode(park, parkNode(node, ctx), { ends: [node.id] });
 	}
 	if ((flow.variables ?? []).length > 0) {
 		graph.addNode(VARIABLES_NODE, variablesNode(flow, ctx), {

@@ -6,7 +6,7 @@ import {
 } from "@langchain/langgraph";
 
 import type { NodeAction, StepContext } from "../context";
-import { heldStep, holdEnded } from "../position";
+import { commitVisit, heldStep, holdEnded } from "../position";
 import type {
 	Parked,
 	Pending,
@@ -34,8 +34,8 @@ import type {
  * log after the node held it, and before the hold was checkpointed (the
  * run position, `holdEnded`). No answer comes for it, so with no answer
  * waiting the node lets the step go (`letGo`) instead of waiting forever:
- * the Gate asks again, a sleep parks as stopped. An answer that waits is
- * taken as always.
+ * a Gate opens its visit again (`openAgain`), a sleep parks as stopped. An
+ * answer that waits is taken as always.
  */
 export function interruptNode<K extends Pending["kind"]>(spec: {
 	kind: K;
@@ -97,9 +97,30 @@ export function askAgain(node: { id: string }): Command {
 }
 
 /**
+ * The visit of a Gate that a stop closed is open again, and the node goes
+ * on from its resume point. A sleep, a park or an earlier stop may have
+ * committed that visit while its step went on. The log says how the step
+ * ended, so a step that is done does not run again (`Position.done`).
+ */
+export function openAgain(
+	node: { id: string },
+	pending: Pick<PendingGate, "visit">,
+): Command {
+	return new Command({
+		update: {
+			pending: { [node.id]: null },
+			...commitVisit(node, pending.visit - 1),
+		},
+		goto: node.id,
+	});
+}
+
+/**
  * The ask node of a Gate (`ask__<id>`): it waits with the Gate the node
  * opened. A stop can end the Gate's step before the Gate was checkpointed.
- * Then the node asks again in a new visit, unless `letGo` says otherwise.
+ * Then the node goes on from its resume point (`openAgain`): an Agent that
+ * asks takes the step up when it has a session, each other Gate asks again
+ * in a new visit.
  */
 export function gateNode(
 	node: { id: string },
@@ -108,7 +129,6 @@ export function gateNode(
 		answer: GateSpec["answer"];
 		/** What opens at the node, in the error when none is. Default: a Gate. */
 		what?: "question";
-		letGo?(pending: PendingGate): Command | Promise<Command>;
 	},
 ): NodeAction {
 	return interruptNode({
@@ -124,6 +144,6 @@ export function gateNode(
 			...(pending.deadline ? { deadline: pending.deadline } : {}),
 		}),
 		answer: spec.answer,
-		stale: { ctx, letGo: spec.letGo ?? (() => askAgain(node)) },
+		stale: { ctx, letGo: (pending) => openAgain(node, pending) },
 	});
 }

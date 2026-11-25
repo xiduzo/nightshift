@@ -18,7 +18,6 @@ import {
 	startRun,
 } from "../../../testing/graph";
 import { createSandbox, type Sandbox } from "../../../testing/test-support";
-import { DEFAULT_RESUME_PROMPT } from "../../context/context";
 
 /**
  * The Decision node on the compiled graph, driven by scripted deciders with
@@ -347,7 +346,7 @@ describe("the Decision node", () => {
 			stepId,
 			nodeId: "decide",
 			visit: 1,
-			session: { harnessSessionId: null, prompt: DEFAULT_RESUME_PROMPT },
+			session: { harnessSessionId: null },
 			reason: "usage-limit",
 		});
 		expect(await h.types()).toEqual([

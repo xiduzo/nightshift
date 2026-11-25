@@ -2,14 +2,9 @@ import { Command, type LangGraphRunnableConfig } from "@langchain/langgraph";
 import type { FlowNode, WaitUntil } from "@nightshift/flows";
 
 import type { LeaseWait, PolicyWaitReason } from "../../log";
-import {
-	DEFAULT_RESUME_PROMPT,
-	type NodeAction,
-	type StepContext,
-	stopAtOf,
-} from "../context";
+import { type NodeAction, type StepContext, stopAtOf } from "../context";
 import { planWait, type WaitStreak } from "../policy";
-import { commitVisit, heldStep } from "../position";
+import { commitVisit, heldStep, takenUp } from "../position";
 import { interruptNode, waitNodeId } from "../route";
 import type {
 	Pending,
@@ -35,7 +30,7 @@ import type { OpenStep } from "./step-handle";
  *    the node's wait node.
  * 2. `waitNode(nodeId)`: the interrupting graph node (`wait__<id>`, design
  *    rule 8). It carries the sleep to the runner and answers a `wake` (the
- *    step continues with its prompt), a `signal` (the Wait node reads
+ *    step continues), a `signal` (the Wait node reads
  *    `pending.signal`) and a `resume` (the run was stopped while it slept:
  *    the step parks as stopped and the node reopens or restarts it).
  * 3. The daemon side, for the runner (`runner/wake.ts`). `planWake`
@@ -298,7 +293,6 @@ export async function sleep(
 			request.kind === "policy"
 				? {
 						harnessSessionId: request.harnessSessionId,
-						prompt: DEFAULT_RESUME_PROMPT,
 					}
 				: null,
 	};
@@ -317,8 +311,8 @@ export async function sleep(
  * runner schedules the wake timer from it) and, on the resume, jumps back
  * to the node:
  *
- * - a `wake` continues the step with its prompt (the wake's, else the
- *   pending one); the node continues the same step and harness session;
+ * - a `wake` continues the step: the node continues the same step and
+ *   harness session;
  * - a `signal` (someone sent the run a signal) continues the step with the
  *   signal's name in `pending.signal`; a Wait node on it ends `done`;
  * - a `resume` (the run was stopped while it slept, and a person resumed
@@ -331,18 +325,21 @@ export function waitNode(
 	nodeId: string,
 	ctx: Pick<StepContext, "log" | "run">,
 ): NodeAction {
-	const stopped = (pending: PendingWait, prompt: string | null): Command => {
+	const stopped = async (pending: PendingWait): Promise<Command> => {
 		const parked: PendingParked = {
 			kind: "parked",
 			stepId: pending.stepId,
 			nodeId,
 			visit: pending.visit,
 			harnessSessionId: pending.session?.harnessSessionId ?? null,
-			prompt,
 			status: "stopped",
 			reason: null,
 		};
-		return new Command({ update: { pending: parked }, goto: nodeId });
+		const run = await ctx.log.state(ctx.run.id);
+		return new Command({
+			update: { pending: takenUp(run, parked) },
+			goto: nodeId,
+		});
 	};
 	return interruptNode({
 		kind: "wait",
@@ -357,9 +354,7 @@ export function waitNode(
 			message: pending.message,
 		}),
 		answer(pending, answer) {
-			if (answer?.kind === "resume") {
-				return stopped(pending, answer.prompt ?? null);
-			}
+			if (answer?.kind === "resume") return stopped(pending);
 			if (answer?.kind === "signal") {
 				return new Command({
 					update: {
@@ -372,22 +367,13 @@ export function waitNode(
 					goto: nodeId,
 				});
 			}
-			const session =
-				pending.session &&
-				answer?.kind === "wake" &&
-				answer.prompt !== undefined
-					? { ...pending.session, prompt: answer.prompt }
-					: pending.session;
-			return new Command({
-				update: { pending: { ...pending, session } },
-				goto: nodeId,
-			});
+			return new Command({ update: { pending }, goto: nodeId });
 		},
 		// A stop ended the step before the sleep was checkpointed: it parks as
 		// stopped, as a resume of a stopped sleep does.
 		stale: {
 			ctx,
-			letGo: (pending) => stopped(pending, null),
+			letGo: stopped,
 		},
 	});
 }

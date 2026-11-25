@@ -10,6 +10,7 @@ import { countVisits, deriveSteps } from "../../read";
 import {
 	heldOf,
 	type Pending,
+	type PendingParked,
 	type PositionState,
 	type RunStateUpdate,
 	type RunStateValues,
@@ -97,7 +98,8 @@ export type DoneStep = {
  * takes it up as uncommitted. A node commits when its step ended (`route`,
  * every park after a step), when its step sleeps (`sleep`), and after each
  * element of a Call with `each`. A Gate does not commit while it is open:
- * its answer ends the step and commits it.
+ * its answer ends the step and commits it. A Gate that a stop closed opens
+ * a visit that was committed again (`openAgain`).
  */
 export function commitVisit(
 	node: NodeRef,
@@ -115,7 +117,11 @@ export type Held = {
 
 /** Where a run is in one scope, for one node at a time. */
 export type Position = {
-	/** The step a wait, a park or a Gate holds for `node`, when it is that node's. */
+	/**
+	 * The step a wait, a park or a Gate holds for `node`, when it is that
+	 * node's. Not a park that a later visit followed: that visit started in
+	 * the log, and the checkpoint never committed it.
+	 */
 	held(node: NodeRef): Held | null;
 	/** True while `node` loops over elements: a Call with `each` mid-loop. */
 	looping(node: NodeRef): boolean;
@@ -131,8 +137,10 @@ export type Position = {
 	 * The step of `node` that is done though the checkpoint holds it open
 	 * or never committed it: it ended on its own (`isCutShort` is false)
 	 * after the last commit. The step the checkpoint names is its held
-	 * wait, its loop, or its uncommitted step. Not a parked step: the
-	 * checkpoint saw that end. Not the last step of a run that finished: a
+	 * wait, its loop, its uncommitted step, a Gate that a person answered, or
+	 * a park that the node took up again since (`takenUp`). Any other parked
+	 * step is not done: the checkpoint saw that end. Nor is the last step of
+	 * a run that finished: a
 	 * resume reopens that one on purpose (`takeBackVisit`).
 	 */
 	done(node: NodeRef): DoneStep | null;
@@ -168,22 +176,41 @@ export function positionOf(
 		if (logged <= (state.visits?.[node.id] ?? 0)) return null;
 		return latest(node);
 	};
+	/** The node's hold, unless a later visit followed its park. */
+	const holdOf = (node: NodeRef): Pending | null => {
+		const pending = heldStep(state, node.id);
+		if (pending?.kind !== "parked") return pending;
+		const later = uncommitted(node);
+		return later && later.id !== pending.stepId ? null : pending;
+	};
+	/** The step whose own end, when it has one, the checkpoint did not see. */
+	const unseen = (node: NodeRef): DerivedStep | null => {
+		const pending = holdOf(node);
+		if (!pending) return looping(node) ? latest(node) : uncommitted(node);
+		const step = byId(pending.stepId);
+		switch (pending.kind) {
+			case "wait":
+				return step;
+			case "gate":
+				return pending.answer === undefined ? null : step;
+			case "parked":
+				return step &&
+					pending.openings !== undefined &&
+					step.openings.length > pending.openings
+					? step
+					: null;
+		}
+	};
 	return {
 		held(node) {
-			const pending = heldStep(state, node.id);
+			const pending = holdOf(node);
 			return pending ? { pending, step: byId(pending.stepId) } : null;
 		},
 		looping,
 		latest,
 		uncommitted,
 		done(node) {
-			const pending = heldStep(state, node.id);
-			if (pending && pending.kind !== "wait") return null;
-			const step = pending
-				? byId(pending.stepId)
-				: looping(node)
-					? latest(node)
-					: uncommitted(node);
+			const step = unseen(node);
 			if (!step || step.endedAt === null || isCutShort(step)) return null;
 			return doneAfter(run, step, key);
 		},
@@ -264,6 +291,16 @@ export function holdEnded(run: RunState, pending: Pending): boolean {
 	if (pending.kind === "parked" || pending.stepId === null) return false;
 	const step = run.steps.get(pending.stepId);
 	return step !== undefined && step.endedAt !== null;
+}
+
+/**
+ * A park that its node takes up: how often the log had its step opened by
+ * then. A later opening's own end is one the checkpoint did not see
+ * (`Position.done`).
+ */
+export function takenUp(run: RunState, pending: PendingParked): PendingParked {
+	const step = pending.stepId ? run.steps.get(pending.stepId) : undefined;
+	return { ...pending, openings: step?.openings.length ?? 0 };
 }
 
 /** The front of the walk: its last step, and the edge the walk took after that step started. */

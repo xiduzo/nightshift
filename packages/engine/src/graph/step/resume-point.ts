@@ -4,6 +4,7 @@ import { DEFAULT_RESUME_PROMPT, type ResumeRules } from "../context";
 
 import { type DoneStep, isCutShort, positionOf } from "../position";
 import type { PositionState } from "../state";
+import { resumePrompt } from "./resume-prompt";
 import { pendingWaitOf } from "./sleep";
 import type { StepStart } from "./step-handle";
 
@@ -48,17 +49,13 @@ import type { StepStart } from "./step-handle";
  * 1. `pending` is this node's wait that ended (the runner appended
  *    `WaitEnded`): the step it names continues when it is still open, and
  *    is reopened when recovery ended it meanwhile (the daemon died after the
- *    wake). The prompt is the latest `RunResumed` for the step, else the
- *    wait's own follow-up.
+ *    wake).
  * 1b. `pending` is this node's Gate that a person answered (an Agent that
  *    asks, `PendingGate.answer`): the step it names is reopened, so the
  *    Gate closes in the log, and its harness session goes on with the
- *    answer. The answer goes once: when the step was reopened since or
- *    ended (the daemon died after the answer), the prompt is the latest
- *    `RunResumed` for the step, else "Continue where you left off.".
+ *    answer. The answer goes once: the reopen that closes the Gate takes it.
  * 2. `pending` is this node's parked step and a person resumed: the step is
  *    taken up (reopened) when the rules say so (`parked`), else a new visit.
- *    The prompt is the resume's, else "Continue where you left off.".
  * 3. The node loops over elements (`loops`, Call with `each`): the latest
  *    step of the node in this scope continues (open) or is reopened (ended).
  * 4. The log has a step of this node in this scope that the checkpoint
@@ -67,7 +64,9 @@ import type { StepStart } from "./step-handle";
  *    visit.
  * 5. Else a new visit.
  *
- * A step is "open" while `endedAt` is null. The prompt and the harness
+ * A step is "open" while `endedAt` is null. The prompt of a step that is
+ * taken up is what its session was told and did not get yet
+ * (`resume-prompt.ts`), whatever the way in. The prompt and the harness
  * session are set only for a step that has a harness session to continue:
  * a Call or a Decision step has none, so its `StepReopened` carries
  * `prompt: null`, as before.
@@ -124,22 +123,17 @@ export function resumePoint(
 		const own = held.step;
 		if (!own) return { kind: "new" };
 		const session = sleeping.session?.harnessSessionId ?? sessionOf(own);
-		const prompt = sleeping.session?.prompt ?? DEFAULT_RESUME_PROMPT;
-		return takeUp(own, session, {
-			continued: prompt,
-			reopened: resumePromptOf(runState, own) ?? prompt,
-		});
+		return takeUp(runState, own, session);
 	}
 
 	if (held?.pending.kind === "gate" && held.pending.answer !== undefined) {
 		const own = held.step;
 		if (!own) return { kind: "new" };
 		return reopen(
+			runState,
 			own,
 			sessionOf(own),
-			gateAsked(own)
-				? held.pending.answer
-				: (resumePromptOf(runState, own) ?? DEFAULT_RESUME_PROMPT),
+			own.gate ? held.pending.answer : undefined,
 		);
 	}
 
@@ -147,22 +141,21 @@ export function resumePoint(
 		const { pending, step: own } = held;
 		if (!own) return { kind: "new" };
 		const session = pending.harnessSessionId ?? sessionOf(own);
-		const prompt = pending.prompt ?? DEFAULT_RESUME_PROMPT;
 		switch (rules.parked) {
 			case "new":
 				return { kind: "new" };
 			case "with-session":
-				return session ? reopen(own, session, prompt) : { kind: "new" };
+				return session ? reopen(runState, own, session) : { kind: "new" };
 			case "cut-short":
 				return isCutShort(own)
-					? takeUp(own, session, { continued: prompt, reopened: prompt })
+					? takeUp(runState, own, session)
 					: { kind: "new" };
 		}
 	}
 
 	if (rules.loop && at.looping(node)) {
 		const latest = at.latest(node);
-		if (latest) return takeUpFromLog(runState, latest);
+		if (latest) return takeUp(runState, latest, sessionOf(latest));
 	}
 
 	const crashed = at.uncommitted(node);
@@ -171,16 +164,10 @@ export function resumePoint(
 		case "new":
 			return { kind: "new" };
 		case "take-up":
-			return takeUpFromLog(runState, crashed);
+			return takeUp(runState, crashed, sessionOf(crashed));
 		case "with-session": {
 			const session = sessionOf(crashed);
-			return session
-				? reopen(
-						crashed,
-						session,
-						resumePromptOf(runState, crashed) ?? DEFAULT_RESUME_PROMPT,
-					)
-				: { kind: "new" };
+			return session ? reopen(runState, crashed, session) : { kind: "new" };
 		}
 		case "asked-gate":
 			return gateAsked(crashed)
@@ -214,35 +201,30 @@ export function entryOf(point: StepEntry): StepStart {
 
 /** An existing step: continued while open, reopened once ended. */
 function takeUp(
+	runState: RunState,
 	step: DerivedStep,
 	session: string | null,
-	prompts: { continued: string; reopened: string },
 ): ResumePoint {
-	if (step.endedAt !== null) return reopen(step, session, prompts.reopened);
+	if (step.endedAt !== null) return reopen(runState, step, session);
 	return {
 		kind: "continue",
 		step,
 		harnessSessionId: session,
-		prompt: session ? prompts.continued : null,
+		prompt: session ? resumePrompt(runState, step) : null,
 	};
 }
 
-/** `takeUp` for a step the log alone points at: its prompt is the latest resume's. */
-function takeUpFromLog(runState: RunState, step: DerivedStep): ResumePoint {
-	const prompt = resumePromptOf(runState, step) ?? DEFAULT_RESUME_PROMPT;
-	return takeUp(step, sessionOf(step), { continued: prompt, reopened: prompt });
-}
-
 function reopen(
+	runState: RunState,
 	step: DerivedStep,
 	session: string | null,
-	prompt: string,
+	answer?: string,
 ): ResumePoint {
 	return {
 		kind: "reopen",
 		step,
 		harnessSessionId: session,
-		prompt: session ? prompt : null,
+		prompt: session ? resumePrompt(runState, step, answer) : null,
 	};
 }
 
@@ -260,17 +242,6 @@ export function sessionOf(step: DerivedStep | undefined): string | null {
 	return (
 		step?.sessions.findLast((s) => s.harnessSessionId)?.harnessSessionId ?? null
 	);
-}
-
-/** The prompt the latest `RunResumed` for this step carries, if any. */
-export function resumePromptOf(
-	runState: RunState,
-	step: DerivedStep,
-): string | null {
-	const resumed = runState.resumes.findLast(
-		(e) => e.seq > step.startSeq && e.payload.stepId === step.id,
-	);
-	return resumed ? resumed.payload.prompt : null;
 }
 
 /**

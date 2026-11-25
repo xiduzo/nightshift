@@ -248,7 +248,7 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. The language of a method o
 | report | End a Session with a Step Report. | Slice 2 |
 | stop | Abort the running Step and end the Run as stopped. | Slice 1 |
 | park | Hold a Thread at an Interrupt: a Wait, a Gate, or a Step that failed or was stopped. | LangGraph |
-| resume | Continue a stopped, failed, or interrupted Run at its last Node. A finished Run reopens its last Step, and a sleeping Run wakes now. A person resumes, or the daemon after a restart. The Thread answers its Interrupt, or runs the Node the daemon left pending again. | Slice 1 |
+| resume | Continue a stopped, failed, or interrupted Run at its last Node. A finished Run reopens its last Step, and a sleeping Run wakes now. A person resumes, or the daemon after a restart. The Thread answers its Interrupt, or runs the Node the daemon left pending again. A prompt goes once, to the Session of one Agent Step: the latest one that waits. | Slice 1 |
 | restart | Stop the running Step and resume it at once, in one action ("Restart step" in the Stop menu). For a Step that looks stuck. An Agent Step continues its Session with a follow-up prompt. Only on the Walker. | Restart |
 | run again | Walk a Run that is not going (failed, stopped, interrupted or finished) again from a Node of its own Flow, with a new Visit of it ("Run again from here" on a Step). The Steps after it follow as the Flow routes. Inputs, Outputs and Edge counts carry over. An Agent Node continues that Step's Session with a follow-up prompt, or starts fresh with its own prompt. Only on the Walker. | Restart |
 | cut short | End a Step before its work is done: a person stops the Run or restarts the Step, the Step runs past its time budget or idle limit, or the daemon stops while it runs. The open Sessions end first, then the open Steps from the inside out (a Step inside a Subflow before the Subflow), each with the Outputs of its Node kind and the outcome `stopped`, `error` or `interrupted`. When the daemon stops, an open Gate and a sleeping Step stay open. | Open work |
@@ -293,7 +293,7 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. The language of a method o
 | RunTakenOver | A person copied or shared the take-over command of the Run's last Session, on that Session's Step. The Run goes on as it was. |
 | GateOpened | A Gate put its question in the Needs-you inbox. |
 | WaitStarted | A Step began a Wait: why, until when (none for a Signal with no timeout), and which Signal. |
-| WaitEnded | The Wait is over: the timer, a person, a Signal, or the daemon when a Device or a lease is back. `by` says who ended it early without a Signal. |
+| WaitEnded | The Wait is over: the timer, a person, a Signal, or the daemon when a Device or a lease is back. `by` says who ended it early without a Signal. `prompt` is what that person told the Step's Session. |
 | RunEnded | The Run finished or failed, with the reason. After an End Node, also its result and its line. |
 | RunWarned | A Warning about the Run, with the Step it is about. |
 | Scored | A Score of the Run: a Gate's answer, a person's useful answer, a pull request's fate, or a name a Command, Agent or Value Node wrote, on its Step after its StepEnded. |

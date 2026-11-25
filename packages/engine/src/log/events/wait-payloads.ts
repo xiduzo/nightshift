@@ -149,7 +149,13 @@ export type WaitPayloads = {
 	 * the run, a signal arrived, or Night Shift looked again (a Device came
 	 * back, a lease went); `signal` when one arrived. `by`: who ended it
 	 * early without a signal. Absent in older logs, on a signal and on a
-	 * timer.
+	 * timer. `prompt`: what that person told the step's session. Absent when
+	 * they told it nothing.
 	 */
-	WaitEnded: { early: boolean; signal?: string; by?: ResumedBy };
+	WaitEnded: {
+		early: boolean;
+		signal?: string;
+		by?: ResumedBy;
+		prompt?: string;
+	};
 };

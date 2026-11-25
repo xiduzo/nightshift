@@ -299,7 +299,13 @@ export function applyStepEvent(
 					...step,
 					openings: [
 						...step.openings,
-						{ kind: "reopen", seq: e.seq, at: e.at, end: null },
+						{
+							kind: "reopen",
+							seq: e.seq,
+							at: e.at,
+							prompt: e.payload.prompt,
+							end: null,
+						},
 					],
 					// A Gate the step asked is closed: an Agent goes on with the answer.
 					gate: null,
@@ -431,6 +437,7 @@ function startStep(
 		kind: "start",
 		seq: e.seq,
 		at: e.at,
+		prompt: null,
 		end: null,
 	};
 	if (!known) {

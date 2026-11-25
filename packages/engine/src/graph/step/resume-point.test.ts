@@ -136,19 +136,17 @@ const waitPending = (
 	until: 2_000,
 	message: "Waits.",
 	streak: { count: 1, since: 1_000 },
-	session: { harnessSessionId, prompt: "Carry on." },
+	session: { harnessSessionId },
 });
 const parkedPending = (
 	stepId: string | null,
 	harnessSessionId: string | null,
-	prompt: string | null = null,
 ): Pending => ({
 	kind: "parked",
 	stepId,
 	nodeId: NODE.id,
 	visit: 1,
 	harnessSessionId,
-	prompt,
 	status: "stopped",
 	reason: null,
 });
@@ -225,42 +223,17 @@ describe("resumePoint", () => {
 	});
 
 	describe("after a wake (pending wait)", () => {
-		test("the step is still open: it continues, with its harness session and the wait's prompt", () => {
+		test("the step is still open: it continues, with its harness session", () => {
 			const events = logOf(started("s1"), ...session("s1", "h1"));
 			const point: Point = {
 				kind: "continue",
 				stepId: "s1",
 				harnessSessionId: "h1",
-				prompt: "Carry on.",
+				prompt: DEFAULT_RESUME_PROMPT,
 			};
 			expectTable(
 				{ state: stateOf({ pending: waitPending("s1", "h1") }), events },
 				all(point),
-			);
-		});
-
-		test("a held wait without a continuation (an old checkpoint): the step continues the session in its log", () => {
-			const { session: _, ...flat } = waitPending("s1", null) as Extract<
-				Pending,
-				{ kind: "wait" }
-			>;
-			const old = {
-				...flat,
-				harnessSessionId: "h1",
-				prompt: "Carry on.",
-				resetAt: 1_500,
-			} as unknown as Pending;
-			expectTable(
-				{
-					state: stateOf({ pending: old }),
-					events: logOf(started("s1"), ...session("s1", "h1")),
-				},
-				all({
-					kind: "continue",
-					stepId: "s1",
-					harnessSessionId: "h1",
-					prompt: DEFAULT_RESUME_PROMPT,
-				}),
 			);
 		});
 
@@ -277,7 +250,7 @@ describe("resumePoint", () => {
 			);
 		});
 
-		test("recovery ended the step after the wake: it is reopened, with the daemon's resume prompt over the wait's", () => {
+		test("recovery ended the step after the wake: it is reopened, with the daemon's resume prompt", () => {
 			const events = logOf(
 				started("s1"),
 				...session("s1", "h1"),
@@ -295,7 +268,7 @@ describe("resumePoint", () => {
 			);
 		});
 
-		test("recovery ended the step, no resume for it: the wait's prompt; no session: a reopen without a prompt", () => {
+		test("recovery ended the step, no resume for it: the default prompt; no session: a reopen without a prompt", () => {
 			const withSession = logOf(
 				started("s1"),
 				...session("s1", "h1"),
@@ -310,7 +283,7 @@ describe("resumePoint", () => {
 					kind: "reopen",
 					stepId: "s1",
 					harnessSessionId: "h1",
-					prompt: "Carry on.",
+					prompt: DEFAULT_RESUME_PROMPT,
 				}),
 			);
 			const noSession = logOf(started("s1"), ended("s1", "interrupted"));
@@ -368,11 +341,12 @@ describe("resumePoint", () => {
 				started("s1"),
 				...session("s1", "h1"),
 				ended("s1", "stopped"),
+				resumed("s1", "Finish it."),
 			);
 			expectTable(
 				{
 					state: stateOf({
-						pending: parkedPending("s1", "h1", "Finish it."),
+						pending: parkedPending("s1", "h1"),
 						visits: { [NODE.id]: 1 },
 					}),
 					events,
@@ -734,7 +708,12 @@ describe("resumePoint", () => {
 				started("s1"),
 				...session("s1", "h1"),
 				gateOpened("s1"),
-				{ type: "StepReopened", stepId: "s1", payload: { prompt: "x" } },
+				{
+					type: "StepReopened",
+					stepId: "s1",
+					payload: { prompt: "Use Postgres." },
+				},
+				...session("s1", "h1"),
 				ended("s1", "interrupted"),
 				resumed("s1", "Night Shift restarted."),
 			);
@@ -745,6 +724,25 @@ describe("resumePoint", () => {
 					stepId: "s1",
 					harnessSessionId: "h1",
 					prompt: "Night Shift restarted.",
+				}),
+			);
+		});
+
+		test("a stop came before the reopen that takes the answer: the answer, then what the person told it", () => {
+			const events = logOf(
+				started("s1"),
+				...session("s1", "h1"),
+				gateOpened("s1"),
+				ended("s1", "stopped"),
+				resumed("s1", "And add a test."),
+			);
+			expectTable(
+				{ state: stateOf({ pending: answered("s1") }), events },
+				all({
+					kind: "reopen",
+					stepId: "s1",
+					harnessSessionId: "h1",
+					prompt: "Use Postgres.\n\nAnd add a test.",
 				}),
 			);
 		});
@@ -761,9 +759,10 @@ describe("resumePoint", () => {
 			started("s1"),
 			...session("s1", "h1"),
 			ended("s1", "stopped"),
+			resumed("s1", "Go on."),
 		);
 		const state = stateOf({
-			pending: parkedPending("s1", "h1", "Go on."),
+			pending: parkedPending("s1", "h1"),
 			visits: { [NODE.id]: 1 },
 		});
 		expect(

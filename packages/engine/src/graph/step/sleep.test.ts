@@ -186,10 +186,7 @@ describe("the sleep module: an Agent step's usage-limit wait", () => {
 			message:
 				"Usage limit: You've hit your limit. The step continues a minute after the reset.",
 			streak: { count: 1, since: time.now() },
-			session: {
-				harnessSessionId: "fake-session-1",
-				prompt: DEFAULT_RESUME_PROMPT,
-			},
+			session: { harnessSessionId: "fake-session-1" },
 		});
 		expect(foldRun(await h.events()).status).toBe("sleeping");
 
@@ -243,12 +240,10 @@ describe("the sleep module: an Agent step's usage-limit wait", () => {
 		const d = daemon(h, time);
 		time.advance(1);
 		await d.wake({ early: true, prompt: "Hurry up.", by: "person" });
-		expect(d.resumed).toEqual([
-			{ kind: "wake", early: true, prompt: "Hurry up." },
-		]);
+		expect(d.resumed).toEqual([{ kind: "wake", early: true }]);
 		// Who woke it is logged: a person's early wake counts as Needed you.
 		expect(payloads(await h.events(), "WaitEnded")).toEqual([
-			{ early: true, by: "person" },
+			{ early: true, by: "person", prompt: "Hurry up." },
 		]);
 		await d.driven();
 		expect(payloads(await h.events(), "SessionStarted")[1]).toMatchObject({
@@ -352,7 +347,7 @@ describe("the sleep module: an Agent step's usage-limit wait", () => {
 		).toMatchObject({
 			kind: "wake",
 			step: { id: stepId },
-			resume: { kind: "wake", early: true, prompt: "Now." },
+			resume: { kind: "wake", early: true },
 		});
 		expect(
 			planWake(foldRun(events), at, { early: true, signal: "go" }, time.now()),
@@ -416,7 +411,7 @@ describe("the sleep module: an Agent step's usage-limit wait", () => {
 		expect(d.resumed).toEqual([]);
 		const resumed = await drive(
 			h,
-			new Command({ resume: { kind: "resume", prompt: "Go on." } }),
+			new Command({ resume: { kind: "resume" } }),
 			h.graph(),
 		);
 		expect(resumed.state.ended).toMatchObject({ status: "finished" });
@@ -721,7 +716,6 @@ describe("pendingWaitOf: the one reader of a pending wait", () => {
 				nodeId: "n",
 				visit: 0,
 				harnessSessionId: null,
-				prompt: null,
 				status: "stopped",
 				reason: null,
 			}),

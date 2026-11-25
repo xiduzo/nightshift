@@ -90,7 +90,6 @@ export function planWake(
 			: {
 					kind: "wake",
 					early: how.early,
-					...(how.prompt !== undefined ? { prompt: how.prompt } : {}),
 				};
 	return { kind: "wake", step, resume };
 }
@@ -156,7 +155,12 @@ export async function recordWake(
 		type: "WaitEnded",
 		runId,
 		stepId: step.id,
-		payload: { early: how.early, ...signal, ...by },
+		payload: {
+			early: how.early,
+			...signal,
+			...by,
+			...(how.prompt !== undefined ? { prompt: how.prompt } : {}),
+		},
 	});
 	const recorder = await deps.recorders.open(runId, step.id);
 	try {

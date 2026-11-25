@@ -87,24 +87,21 @@ const settled = (h: Harness, runner: Runner) =>
 async function expectStopped(h: Harness) {
 	const state = foldRun(await h.events());
 	expect(state.status).toBe("stopped");
+	expect((await h.events()).at(-1)?.type).toBe("RunEnded");
 	expect(state.gate).toBeNull();
 	expect(deriveSteps(state).map((s) => [s.nodeId, s.outcome])).toEqual([
 		["worker", "stopped"],
 	]);
 }
 
-/** Resumes the run until it goes on from its stop. A resume may find the Gate gone and stop again. */
-async function resumeUntilDone(h: Harness, runner: Runner) {
-	for (let resumes = 0; (await statusOf(h)) === "stopped"; resumes++) {
-		if (resumes === 2) throw new Error("The run did not go on.");
-		await expectStopped(h);
-		await runner.take(h.runId, {
-			kind: "resume",
-			by: "person",
-			prompt: "Use Postgres.",
-		});
-		await settled(h, runner);
-	}
+/** Resumes the run once, with the person's prompt, until it is done. */
+async function resumeOnce(h: Harness, runner: Runner) {
+	await runner.take(h.runId, {
+		kind: "resume",
+		by: "person",
+		prompt: "Use Postgres.",
+	});
+	expect(await settled(h, runner)).toBe("finished");
 }
 
 describe("an Agent's Gate that a stop ended before its checkpoint", () => {
@@ -115,9 +112,9 @@ describe("an Agent's Gate that a stop ended before its checkpoint", () => {
 			expect(harness.calls).toHaveLength(1);
 		});
 
-		test(`before ${write}: a resume continues the step and its session with the person's prompt`, async () => {
+		test(`before ${write}: one resume continues the step and its session with the person's prompt`, async () => {
 			const { h, runner, harness } = await stoppedBefore(write);
-			await resumeUntilDone(h, runner);
+			await resumeOnce(h, runner);
 			const state = foldRun(await h.events());
 			expect(state.status).toBe("finished");
 			expect(deriveSteps(state).map((s) => [s.nodeId, s.outcome])).toEqual([
@@ -127,6 +124,8 @@ describe("an Agent's Gate that a stop ended before its checkpoint", () => {
 				["Build it", undefined],
 				["Use Postgres.", "fake-session-1"],
 			]);
+			expect(payloads(await h.events(), "GateOpened")).toHaveLength(1);
+			expect(payloads(await h.events(), "RunResumed")).toHaveLength(1);
 		});
 
 		test(`before ${write}: after a restart the run stays stopped until a person resumes it`, async () => {
@@ -136,7 +135,7 @@ describe("an Agent's Gate that a stop ended before its checkpoint", () => {
 			restarted.restore(h.runId, foldRun(await h.events()));
 			expect(restarted.isActive(h.runId)).toBe(false);
 			await expectStopped(h);
-			await resumeUntilDone(h, restarted);
+			await resumeOnce(h, restarted);
 			expect(await statusOf(h)).toBe("finished");
 			expect(harness.calls.at(-1)).toMatchObject({
 				prompt: "Use Postgres.",

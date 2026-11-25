@@ -166,6 +166,8 @@ export type StepOpening = {
 	kind: "start" | "reopen";
 	seq: number;
 	at: number;
+	/** What the reopen tells the step's session. Null for a start, and without a session. */
+	prompt: string | null;
 	/** The first `StepEnded` after this opening. Null while it is open. */
 	end: StepEnd | null;
 };

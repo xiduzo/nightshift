@@ -12,4 +12,5 @@ export {
 	positionOf,
 	reenteredNode,
 	takeBackVisit,
+	takenUp,
 } from "./run-position";

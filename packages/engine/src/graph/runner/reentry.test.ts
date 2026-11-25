@@ -273,6 +273,7 @@ function threadAt(
 		values: {},
 		hasCheckpoint: state.kind !== "fresh",
 		hasTasks: state.kind === "interrupted" || state.kind === "pending",
+		open: state.kind === "pending" ? state.next : [],
 		...over,
 	};
 }
@@ -322,7 +323,7 @@ const plan = (
 ) => planReentry({ flow: FLOW, run: foldRun(events), thread, request, now });
 
 describe("planReentry: a resume", () => {
-	test("at a parked step: the interrupt gets the resume prompt, and RunResumed names the step's session", () => {
+	test("at a parked step: the interrupt is answered, and RunResumed names the step's session and the prompt", () => {
 		const events = stoppedInB();
 		expect(plan(events, threadAt(parkedAt("s2")))).toEqual({
 			resumed: {
@@ -334,7 +335,7 @@ describe("planReentry: a resume", () => {
 			},
 			entry: {
 				kind: "resume",
-				value: { kind: "resume", prompt: DEFAULT_RESUME_PROMPT },
+				value: { kind: "resume" },
 			},
 			clearTasks: false,
 		});
@@ -346,7 +347,7 @@ describe("planReentry: a resume", () => {
 		expect(withPrompt.resumed.prompt).toBe("Fix the test.");
 		expect(withPrompt.entry).toEqual({
 			kind: "resume",
-			value: { kind: "resume", prompt: "Fix the test." },
+			value: { kind: "resume" },
 		});
 	});
 
@@ -390,7 +391,7 @@ describe("planReentry: a resume", () => {
 		});
 		expect(daemon.entry).toEqual({
 			kind: "resume",
-			value: { kind: "resume", prompt: DAEMON_RESUME_PROMPT },
+			value: { kind: "resume" },
 		});
 	});
 
@@ -461,6 +462,110 @@ describe("planReentry: a resume", () => {
 		const planned = plan(events, threadAt(FRESH));
 		expect(planned.resumed).toMatchObject({ nodeId: "w", stepId: "w1", scope });
 		expect(planned.entry).toMatchObject({ kind: "goto", nodeId: "caller" });
+	});
+
+	describe("the one session that gets the prompt", () => {
+		const scope: Scope = { parentStepId: "c1", itemId: null };
+		const pending = (...next: string[]) => threadAt({ kind: "pending", next });
+		/** `caller` runs an Agent `w` that a stop ended, beside `b`, which passed. */
+		const beside = (callEnd: "stopped" | "pass") =>
+			logOf(
+				runStarted(),
+				started("c1", "caller", 1, null, "call"),
+				started("w1", "w", 1, scope),
+				...session("w1", "h-w"),
+				started("b1", "b", 1),
+				...session("b1", "h-b"),
+				ended("b1", "pass"),
+				ended("w1", "stopped"),
+				ended("c1", callEnd),
+				runEnded("stopped"),
+			);
+
+		test("a task inside a called flow: the Agent there, not the later step that is done", () => {
+			expect(
+				plan(beside("stopped"), pending("caller", "b")).resumed,
+			).toMatchObject({ nodeId: "w", stepId: "w1", scope });
+		});
+
+		test("a task that is done: none of its sessions goes on", () => {
+			expect(
+				plan(beside("pass"), pending("caller", "b")).resumed.stepId,
+			).toBeNull();
+		});
+
+		test("a step that parked on its own end opens again; a Gate's step that a person ended does not", () => {
+			const events = logOf(
+				runStarted(),
+				started("s2", "b", 1),
+				...session("s2", "h-b"),
+				ended("s2", "pass"),
+				runEnded("stopped"),
+			);
+			expect(plan(events, threadAt(parkedAt("s2"))).resumed.stepId).toBe("s2");
+			expect(plan(events, threadAt(gateAt("s2"))).resumed.stepId).toBeNull();
+		});
+
+		test("a branch that parked with no session: its node, not the later step of another branch", () => {
+			const node = (id: string, type: string) => ({ id, type });
+			const flow = {
+				version: FLOW_VERSION,
+				start: "a",
+				nodes: [
+					node("a", "command"),
+					node("b", "command"),
+					node("c", "command"),
+					{ ...node("j", "join"), wait: "all" },
+				],
+				edges: [
+					["a", "b"],
+					["a", "c"],
+					["b", "j"],
+					["c", "j"],
+				].map(([from, to]) => ({
+					id: `${from}${to}`,
+					from,
+					to,
+					outcome: "pass",
+				})),
+			} as unknown as typeof FLOW;
+			const events = logOf(
+				runStarted(),
+				started("b1", "b", 1, null, "decision"),
+				started("c1", "c", 1, null, "decision"),
+				ended("c1", "pass"),
+				ended("b1", "error"),
+				runEnded("failed"),
+			);
+			const planned = planReentry({
+				flow,
+				run: foldRun(events),
+				thread: threadAt(parkedAt("b1")),
+				request: BY_PERSON,
+				now: 0,
+			});
+			expect(planned.resumed).toMatchObject({ nodeId: "b", stepId: null });
+		});
+
+		test("a step that went on with an earlier session, and whose own got no name", () => {
+			const events = logOf(
+				runStarted(),
+				started("s2", "b", 1),
+				{
+					type: "SessionStarted",
+					stepId: "s2",
+					sessionId: "x",
+					payload: {
+						prompt: "Go",
+						resumeSessionId: "h-a",
+						harness: "claude-code",
+					},
+				},
+				ended("s2", "error"),
+				runEnded("failed"),
+			);
+			expect(plan(events, threadAt(parkedAt("s2"))).resumed.stepId).toBe("s2");
+		});
 	});
 
 	test("no step yet: the flow's start", () => {

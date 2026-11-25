@@ -510,7 +510,6 @@ describe("the Agent node", () => {
 			nodeId: "worker",
 			visit: 3,
 			harnessSessionId: "fake-session-3",
-			prompt: null,
 			status: "failed",
 		});
 	});
@@ -660,7 +659,6 @@ describe("the Agent node", () => {
 			streak: { count: 1, since: expect.any(Number) },
 			session: {
 				harnessSessionId: "fake-session-1",
-				prompt: DEFAULT_RESUME_PROMPT,
 			},
 		});
 		expect(first.state.ended).toBeNull();
@@ -776,7 +774,13 @@ describe("the Agent node", () => {
 			payloads(await h.events(), "SessionStarted").map((p) => p.prompt),
 		).toEqual(["Work on worker: "]);
 
-		await resume(h, { kind: "wake", early: true, prompt: "Go on." });
+		await h.log.append({
+			type: "WaitEnded",
+			runId: h.runId,
+			stepId: deriveSteps(foldRun(await h.events()))[0]?.id as string,
+			payload: { early: true, by: "person", prompt: "Go on." },
+		});
+		await resume(h, { kind: "wake", early: true });
 		expect(harness.calls[1]?.prompt).toBe("Go on.");
 		expect(asked).toHaveLength(1);
 	});
@@ -860,7 +864,12 @@ describe("the Agent node", () => {
 
 		// The person resumes: the same step and harness session go on.
 		options.signal = new AbortController().signal;
-		const third = await resume(h, { kind: "resume", prompt: "go on" });
+		await h.log.append({
+			type: "RunResumed",
+			runId: h.runId,
+			payload: { nodeId: "worker", stepId, prompt: "go on", by: "person" },
+		});
+		const third = await resume(h, { kind: "resume" });
 		expect(third.parked).toEqual([]);
 		expect(third.state.ended?.status).toBe("finished");
 		expect(harness.calls).toHaveLength(2);
@@ -916,10 +925,7 @@ describe("the Agent node", () => {
 				by: "person",
 			},
 		});
-		const second = await resume(h, {
-			kind: "resume",
-			prompt: "Also add tests",
-		});
+		const second = await resume(h, { kind: "resume" });
 		expect(second.parked).toEqual([]);
 		expect(second.state.ended?.status).toBe("finished");
 		expect(second.state.visits).toEqual({ worker: 1 });
@@ -992,10 +998,7 @@ describe("the Agent node", () => {
 				by: "person",
 			},
 		});
-		const second = await resume(h, {
-			kind: "resume",
-			prompt: "Also add tests",
-		});
+		const second = await resume(h, { kind: "resume" });
 		expect(second.state.ended?.status).toBe("finished");
 		const own = harness.calls[0]?.prompt ?? "";
 		expect(

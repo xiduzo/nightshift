@@ -7,7 +7,7 @@ import type {
 } from "../../log/events/events";
 import type { Scope } from "../../log/events/step/step-payloads";
 import { deriveSteps } from "../../read/run-views";
-import type { Pending, RunStateValues } from "../state/state";
+import type { Pending, PendingParked, RunStateValues } from "../state/state";
 import {
 	commitVisit,
 	frontOf,
@@ -19,6 +19,7 @@ import {
 	positionOf,
 	reenteredNode,
 	takeBackVisit,
+	takenUp,
 } from "./run-position";
 
 /**
@@ -76,6 +77,11 @@ const ended = (stepId: string, outcome = "pass"): Ev => ({
 	type: "StepEnded",
 	stepId,
 	payload: { outcome, outputs: { outcome }, error: null },
+});
+const reopened = (stepId: string): Ev => ({
+	type: "StepReopened",
+	stepId,
+	payload: { prompt: null },
 });
 const runEnded = (status: "finished" | "stopped" | "interrupted"): Ev => ({
 	type: "RunEnded",
@@ -163,7 +169,6 @@ describe("the step a node holds", () => {
 		nodeId: "a",
 		visit: 1,
 		harnessSessionId: null,
-		prompt: null,
 		status: "stopped",
 		reason: null,
 	};
@@ -181,7 +186,11 @@ describe("the step a node holds", () => {
 
 	test("a park before the step started holds no step", () => {
 		const before = { ...parked, stepId: null };
-		const at = positionOf(stateOf({ pending: before }), foldRun(events), null);
+		const at = positionOf(
+			stateOf({ pending: before, visits: { a: 1 } }),
+			foldRun(events),
+			null,
+		);
 		expect(at.held(A)).toEqual({ pending: before, step: null });
 	});
 
@@ -320,19 +329,68 @@ describe("a step that is done: it ended on its own, and the commit after it neve
 	});
 
 	test("a parked step's end is the checkpoint's own: not done", () => {
-		const parked: Pending = {
+		const parked: PendingParked = {
 			kind: "parked",
 			stepId: "s1",
 			nodeId: "a",
 			visit: 1,
 			harnessSessionId: null,
-			prompt: null,
 			status: "failed",
 			reason: null,
 		};
+		const log = [started("s1", "a"), ended("s1", "fail")];
+		const visits = { a: 1 };
+		expect(doneAt({ pending: parked, visits }, ...log)).toBeNull();
+		// The node took the park up and opened the step again: its next end is not the checkpoint's.
+		const run = foldRun(logOf(...log));
+		const pending = takenUp(run, parked);
+		expect(doneAt({ pending, visits }, ...log)).toBeNull();
+		const again = [...log, reopened("s1")];
+		expect(doneAt({ pending, visits }, ...again)).toBeNull();
 		expect(
-			doneAt({ pending: parked }, started("s1", "a"), ended("s1", "fail")),
+			doneAt({ pending, visits }, ...again, ended("s1", "stopped")),
 		).toBeNull();
+		expect(
+			doneAt({ pending, visits }, ...again, ended("s1"))?.ended.outcome,
+		).toBe("pass");
+	});
+
+	test("a visit that followed a park is not the park's: done when it ended on its own", () => {
+		const pending: PendingParked = {
+			kind: "parked",
+			stepId: "s1",
+			nodeId: "a",
+			visit: 1,
+			harnessSessionId: null,
+			status: "failed",
+			reason: null,
+		};
+		const state = { pending, visits: { a: 1 } };
+		const log = [started("s1", "a"), ended("s1", "error")];
+		const at = (...more: Ev[]) =>
+			positionOf(stateOf(state), foldRun(logOf(...log, ...more)), null);
+		expect(at().held(A)?.step?.id).toBe("s1");
+		expect(at(started("s2", "a", 2)).held(A)).toBeNull();
+		expect(at(started("s2", "a", 2)).uncommitted(A)?.id).toBe("s2");
+		expect(at(started("s2", "a", 2), ended("s2")).done(A)?.step.id).toBe("s2");
+	});
+
+	test("an answered Gate's step is done when it ended on its own after the answer", () => {
+		const pending: Pending = {
+			kind: "gate",
+			stepId: "s1",
+			nodeId: "a",
+			visit: 1,
+			question: "Which one?",
+			choices: [],
+		};
+		const log = [started("s1", "a"), ended("s1")];
+		const visits = { a: 1 };
+		expect(doneAt({ pending, visits }, ...log)).toBeNull();
+		expect(
+			doneAt({ pending: { ...pending, answer: "B." }, visits }, ...log)?.step
+				.id,
+		).toBe("s1");
 	});
 
 	test("isDone asks the same of any step the log has", () => {

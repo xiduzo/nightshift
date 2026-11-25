@@ -11,7 +11,6 @@ export {
 	RESUME_RULES,
 	rerunEntryOf,
 	resumePoint,
-	resumePromptOf,
 	type StepEntry,
 	sessionOf,
 } from "./resume-point";

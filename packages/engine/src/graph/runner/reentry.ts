@@ -1,5 +1,6 @@
 import type { Flow } from "@nightshift/flows";
 import {
+	type DerivedStep,
 	type EnginePayloads,
 	type ResumedBy,
 	type RunState,
@@ -30,14 +31,10 @@ import {
 	reenteredNode,
 	takeBackVisit,
 } from "../position";
+import { askNodeId, parkNodeId, waitNodeId } from "../route";
 import type { Parked, ResumeValue, RunStateUpdate } from "../state";
 import { sessionOf } from "../step";
-import {
-	resumeEach,
-	type ThreadEntry,
-	type ThreadSnapshot,
-	type ThreadState,
-} from "./thread";
+import { resumeEach, type ThreadEntry, type ThreadSnapshot } from "./thread";
 
 /**
  * Re-entry: the daemon side of a resume. A person or the daemon asks a run
@@ -85,7 +82,7 @@ export function reentryUpdate(
 	};
 }
 
-/** What `RunResumed` records (`resumeTarget`). */
+/** What `RunResumed` records (`targetOf`). */
 export type ResumeTarget = {
 	nodeId: string;
 	/** The Agent step whose harness session the resume continues, else null. */
@@ -104,7 +101,6 @@ export type ResumeTarget = {
  * when the run never started a step.
  */
 export function resumeTarget(run: RunState): ResumeTarget | null {
-	const steps = deriveSteps(run);
 	const { last, movedOn } = latestFront(run);
 	let nodeId: string;
 	let stepId: string | null = null;
@@ -126,42 +122,111 @@ export function resumeTarget(run: RunState): ResumeTarget | null {
 	} else {
 		return null;
 	}
-	const byId = new Map(steps.map((s) => [s.id, s]));
-	let topNodeId = nodeId;
-	for (let at = scope; at; ) {
-		const caller = byId.get(at.parentStepId);
-		if (!caller) break;
-		topNodeId = caller.nodeId;
-		at = caller.scope;
-	}
+	const topNodeId = callersOf(run, scope).at(-1)?.nodeId ?? nodeId;
 	return { nodeId, stepId, scope, topNodeId };
 }
 
 /**
- * What `RunResumed` records when a step on a branch parked the run: that
- * step, not the last step of the log, which may be another branch's. Null
- * when the thread is not parked on a branch of the run's own flow.
+ * What `RunResumed` records: the Agent step that gets the prompt. Parallel
+ * branches can wait with a session each, and one prompt goes to one of
+ * them: the one whose step started last, which the run page names. The
+ * others go on with "Continue where you left off.". Without a session that
+ * waits: the node of a branch that parked, else `resumeTarget`.
  */
-function branchTarget(
+function targetOf(
 	flow: Flow,
 	run: RunState,
-	state: ThreadState,
+	thread: ThreadSnapshot,
 ): ResumeTarget | null {
-	if (state.kind !== "interrupted") return null;
-	const parked = state.interrupts.find(
-		({ value }) => value.kind === "parked" && placeOf(flow, value.nodeId),
-	)?.value;
-	if (parked?.kind !== "parked") return null;
-	const found = parked.stepId ? run.steps.get(parked.stepId) : undefined;
-	const step = found && !found.scope ? found : undefined;
-	const continued =
-		step?.nodeType === "agent" && sessionOf(step) !== null ? step : null;
-	return {
-		nodeId: parked.nodeId,
-		stepId: continued?.id ?? null,
-		scope: null,
-		topNodeId: parked.nodeId,
-	};
+	const [step] = waitingSessions(flow, run, thread).sort(
+		(a, b) => b.startSeq - a.startSeq,
+	);
+	if (step) {
+		const topNodeId = callersOf(run, step.scope).at(-1)?.nodeId ?? step.nodeId;
+		return {
+			nodeId: step.nodeId,
+			stepId: step.id,
+			scope: step.scope,
+			topNodeId,
+		};
+	}
+	if (thread.state.kind === "interrupted") {
+		const parked = thread.state.interrupts.find(
+			({ value }) => value.kind === "parked" && placeOf(flow, value.nodeId),
+		)?.value;
+		if (parked) {
+			const { nodeId } = parked;
+			return { nodeId, stepId: null, scope: null, topNodeId: nodeId };
+		}
+	}
+	return resumeTarget(run);
+}
+
+/**
+ * The Agent steps whose sessions go on when the thread does: the step of
+ * each interrupt, and the step that each other task takes up (inside a
+ * Call: the last Agent step there). A step that is done has no session
+ * that goes on.
+ */
+function waitingSessions(
+	flow: Flow,
+	run: RunState,
+	thread: ThreadSnapshot,
+): DerivedStep[] {
+	const waiting: DerivedStep[] = [];
+	if (thread.state.kind === "interrupted") {
+		for (const { value } of thread.state.interrupts) {
+			const step = value.stepId ? run.steps.get(value.stepId) : undefined;
+			if (step?.nodeType !== "agent") continue;
+			// The session of the step before counts when its own got no name yet.
+			const session =
+				sessionOf(step) ?? step.sessions.findLast((s) => s.resumeSessionId);
+			// The checkpoint saw the end of a parked step: it opens again.
+			if (session && (value.kind === "parked" || !isDone(run, step))) {
+				waiting.push(step);
+			}
+		}
+	}
+	const at = positionOf(thread.values, run, null);
+	for (const name of thread.open) {
+		const node = flow.nodes.find(
+			({ id }) =>
+				name === id ||
+				name === parkNodeId(id) ||
+				name === waitNodeId(id) ||
+				name === askNodeId(id),
+		);
+		if (!node || at.done(node)) continue;
+		const held = at.held(node);
+		const taken = held
+			? held.step
+			: at.looping(node)
+				? at.latest(node)
+				: at.uncommitted(node);
+		if (!taken) continue;
+		const inside = deriveSteps(run).findLast(
+			(step) =>
+				(step.id === taken.id ||
+					callersOf(run, step.scope).some((c) => c.id === taken.id)) &&
+				step.nodeType === "agent" &&
+				sessionOf(step) !== null &&
+				!isDone(run, step),
+		);
+		if (inside) waiting.push(inside);
+	}
+	return waiting;
+}
+
+/** The Call steps around `scope`, from the inside out. */
+function callersOf(run: RunState, scope: Scope | null): DerivedStep[] {
+	const callers: DerivedStep[] = [];
+	for (let at = scope; at; ) {
+		const caller = run.steps.get(at.parentStepId);
+		if (!caller) break;
+		callers.push(caller);
+		at = caller.scope;
+	}
+	return callers;
 }
 
 /** The follow-up prompt of an Agent session that the daemon continues after a restart. */
@@ -212,7 +277,7 @@ export function rerunNodeRefusal(flow: Flow, nodeId: string): string | null {
  * A resume continues where the thread is (design rule 9):
  *
  * - at a wait or a parked step: the interrupt is answered with
- *   `{ kind: "resume", prompt }`; at a Gate (the run stopped there) with
+ *   `{ kind: "resume" }`; at a Gate (the run stopped there) with
  *   `{ kind: "reopen" }`, and the Gate asks again;
  * - a node pending without an interrupt (the daemon died, or the engine
  *   failed, while it ran): that node runs again (rule 5);
@@ -251,13 +316,12 @@ export function planReentry(input: {
 	if (request.kind === "rerun") {
 		return planRerun(flow, run, thread, request, clearStopAt, cleared);
 	}
-	const target = branchTarget(flow, run, thread.state) ??
-		resumeTarget(run) ?? {
-			nodeId: flow.start,
-			stepId: null,
-			scope: null,
-			topNodeId: flow.start,
-		};
+	const target = targetOf(flow, run, thread) ?? {
+		nodeId: flow.start,
+		stepId: null,
+		scope: null,
+		topNodeId: flow.start,
+	};
 	const prompt =
 		request.prompt ??
 		(request.by === "daemon" ? DAEMON_RESUME_PROMPT : DEFAULT_RESUME_PROMPT);
@@ -273,7 +337,7 @@ export function planReentry(input: {
 	};
 	const update = cleared ? { update: cleared } : {};
 	const answer = (parked: Parked): ResumeValue =>
-		parked.kind === "gate" ? { kind: "reopen" } : { kind: "resume", prompt };
+		parked.kind === "gate" ? { kind: "reopen" } : { kind: "resume" };
 	switch (thread.state.kind) {
 		case "interrupted": {
 			// Parallel branches may sit at several: each takes its own answer.

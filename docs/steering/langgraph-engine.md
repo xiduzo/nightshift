@@ -155,6 +155,8 @@ packages/engine/src/
                            decides how a node re-enters (new, continue,
                            reopen, done) from the run position, per kind
                            rules (RESUME_RULES); rerunEntryOf, sessionOf.
+    step/resume-prompt.ts  What the session of a step was told and did not
+                           get yet, from the log (resumePrompt).
     runner/reentry.ts      The re-entry planner (below), the daemon side of
                            the same question: planReentry() says what
                            RunResumed records and how the thread moves for a
@@ -431,7 +433,7 @@ packages/engine/src/
       `sleep` through `runner.restore`.
    6. A wake is a Turn (`runner.take(runId, { kind: "wake", ... })`):
       `WaitEnded`, the transcript `wake`, then
-      `Command({ resume: { kind: "wake", early, prompt } })`.
+      `Command({ resume: { kind: "wake", early } })`.
    7. The Agent node re-enters with `pending` and continues the session.
 
    A Wait node sleeps the same way with its own `until`
@@ -450,7 +452,7 @@ packages/engine/src/
 9. **Resume mapping** (`act` with `kind: "resume"`). The engine appends
    `RunResumed` before each of these:
    - Stopped or failed: the thread is parked, so
-     `resume: { kind: "resume", prompt }`.
+     `resume: { kind: "resume" }`.
    - Interrupted (the daemon died): the last checkpoint is before the
      node, so `invoke(null)` re-runs it (rule 5).
    - Sleeping: wake early.
@@ -705,8 +707,17 @@ rule of the run position:
    the node held it, but before the checkpoint saved the hold. The resume
    continued into the ask or wait node. That node waited for an answer
    that no one could give. Now an interrupting node with no answer waiting
-   lets a stale hold go (`interruptNode`'s `stale`). The Gate asks again
-   in a new visit, and a sleep parks as stopped.
+   lets a stale hold go (`interruptNode`'s `stale`). A Gate opens its
+   visit again for the resume point (`openAgain`). An Agent that asks
+   continues its session, and each other Gate asks again in a new visit.
+   A sleep parks as stopped.
+5. **A step that a resume took up can be done too.** The daemon died, or a
+   stop came, after that step ended and before the commit. The checkpoint
+   still held the park, so the node ran again. Now the hold says how often
+   the step was opened when its node took the park up (`takenUp`). A later
+   opening that ended on its own is done. A new visit that followed the
+   park replaces the hold. An answered Gate's step that ended on its own is
+   done.
 
 The checkpoint is still the walk's, and the log is still the read model
 (ADR "The walk reads the checkpoint; the event log is the read model").
@@ -768,7 +779,12 @@ their running step. The thread can sit at several interrupts
   branch waits.
 - An answer to a Gate while another branch's step still runs is refused,
   with words for that.
-- `RunResumed` names the parked branch's node (`branchTarget`).
+- `RunResumed` names one Agent step, and the prompt goes to its session.
+  It is the step that started last of those that wait (`targetOf` in
+  `reentry.ts`): the step of an interrupt, or the one that a pending task
+  takes up. The run page names the same step (`resumedStep` in
+  `packages/client`). The other branches continue with "Continue where you
+  left off.".
 
 **Crash.** `crash.test.ts` walks a fan-out too, with a crash and a stop
 before every write. A fan-out whose commit was lost continues from the
@@ -808,17 +824,31 @@ The rule, in this order:
 
 1. `pending` is this node's wait that ended. The step continues while it
    is open in the log. It is reopened when recovery ended it after the
-   wake. The prompt is the latest `RunResumed` for the step, else the
-   wait's own follow-up.
+   wake.
 2. `pending` is this node's parked step, and a person resumed. The step is
-   taken up when the kind's `parked` rule says so, else a new visit. The
-   prompt is the resume's, else "Continue where you left off.".
+   taken up when the kind's `parked` rule says so, else a new visit.
 3. The node loops over elements (`loops`). Its latest step in this scope
    continues (open) or is reopened (ended).
 4. The log has a step of this node in this scope that the checkpoint never
    saw (`Position.uncommitted`, rule 5). The step is taken up when the
    kind's `crashed` rule says so, else a new visit.
 5. Else a new visit.
+
+The prompt of a step that is taken up is what its session was told and did
+not get yet. One module owns that (`graph/step/resume-prompt.ts`), and it
+reads the log only:
+
+- Told: a `RunResumed` that names the step, the `WaitEnded` of a person who
+  woke it, and the answer at its Gate. A `StepReopened` carries all of it
+  so far. What a person said in two resumes goes as one prompt, in order.
+- Got: a session of the step that the harness named
+  (`HarnessSessionAssigned`). A harness names its session before its first
+  turn.
+- The log cannot tell whether a session with no name got its prompt. After
+  a crash or a harness failure the prompt goes again (at-least-once). After
+  a person's stop it does not (at-most-once): the run page shows it as
+  sent.
+- Else "Continue where you left off.".
 
 The prompt and the harness session are set only for a step with a harness
 session to continue. So a Subflow or Decision step reopens with
@@ -865,8 +895,10 @@ when no drive holds it.
 
 The planner reads the helpers of the node side:
 
-- `resumeTarget`: the node, and the Agent step whose harness session the
-  resume continues (`sessionOf`). None for a step that is done.
+- `targetOf`: the node, and the Agent step whose harness session gets the
+  prompt, from the thread and the log. With no session that waits, and for
+  a thread that ended or never ran, `resumeTarget` says it from the log.
+  None for a step that is done.
 - `reentryUpdate`: the seed state of a thread with no checkpoint.
 
 The run position says where the run is: `reenteredNode` (the last
@@ -1001,8 +1033,7 @@ The module:
 `waitNode(nodeId)` is the one wait node (`interruptNode`). It interrupts
 with the sleep and answers three things:
 
-- a `wake`: the step continues, with the wake's prompt when a person gave
-  one
+- a `wake`: the step continues
 - a `signal`: `pending.signal` is set, and the Wait node reads it
 - a `resume`: the run was stopped while it slept. The step is parked as
   stopped, and the node reopens or restarts it.
@@ -1014,8 +1045,8 @@ The daemon side is the runner's wake Turn over the three parts of
   still sleeps in the log, and that the wait is the interrupt the thread
   sits at. It says when a timer fired before its time. It gives the resume
   value (`{ kind: "wake" }` or `{ kind: "signal" }`).
-- `recordWake` appends `WaitEnded` and the transcript `wake` once the run
-  holds a slot.
+- `recordWake` appends `WaitEnded` (with the prompt of a person who gave
+  one) and the transcript `wake` once the run holds a slot.
 - `createSleeps(deps)`, one per runner, holds the timers.
   `schedule(runId, until)` sets one. A timer that fires gives the run to
   the runner's wake Turn. `restore(runId, runState)` sets the timer from
