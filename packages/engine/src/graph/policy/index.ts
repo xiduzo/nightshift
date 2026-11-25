@@ -2,4 +2,4 @@
 
 export { budgetPassed, guardMessage, runBudget, turnLimit } from "./budget";
 export { planWait, resolvePolicy, type WaitStreak } from "./policy";
-export { canonicalJson, sessionGuards } from "./session-guards";
+export { sessionGuards } from "./session-guards";

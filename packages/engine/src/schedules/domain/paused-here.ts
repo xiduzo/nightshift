@@ -1,5 +1,5 @@
 import type { Schedule } from "@nightshift/flows";
-import { isRecord } from "@nightshift/flows";
+import { stableJson } from "@nightshift/flows";
 
 /**
  * The schedules that a leave of a Host paused on this computer only. The
@@ -43,7 +43,7 @@ export function savedHere(
 		// A save of the list gives a schedule the clock of its saver.
 		if (was.timeZone === undefined) {
 			const { timeZone: _clock, ...rest } = kept;
-			if (canonical(rest) === canonical(was)) return was;
+			if (stableJson(rest) === stableJson(was)) return was;
 		}
 		return kept;
 	});
@@ -55,15 +55,4 @@ export function pausedForm(schedule: Schedule): Schedule {
 	if (!schedule.enabled) return schedule;
 	const { person: _person, ...rest } = schedule;
 	return { ...rest, enabled: false };
-}
-
-/** A value as text: the same for the same fields in another order. */
-function canonical(value: unknown): string {
-	return JSON.stringify(value, (_key, field) =>
-		isRecord(field)
-			? Object.fromEntries(
-					Object.entries(field).sort(([a], [b]) => (a < b ? -1 : 1)),
-				)
-			: field,
-	);
 }

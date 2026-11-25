@@ -8,6 +8,7 @@ import {
 	renderTemplate,
 	renderValue,
 	type SinceLastRunNode,
+	stableJson,
 	type TemplateContext,
 	watchesValue,
 } from "@nightshift/flows";
@@ -20,7 +21,6 @@ import {
 	PLAIN_KIND,
 	type StepContext,
 } from "../../context";
-import { canonicalJson } from "../../policy";
 import {
 	type BodyEnd,
 	RESUME_RULES,
@@ -251,7 +251,7 @@ function keyOf(
 			`Item ${index + 1} of the list of "${node.id}" has no ${node.key ?? "value"}. Check the key of the node, or the list.`,
 		);
 	}
-	const text = typeof value === "string" ? value : canonicalJson(value);
+	const text = typeof value === "string" ? value : stableJson(value);
 	return text.length > MAX_KEY ? `sha256:${hashOf(text)}` : text;
 }
 
@@ -268,7 +268,7 @@ async function seeValue(
 	}
 	const first = remembered.size === 0;
 	const previous = remembered.get("")?.value ?? null;
-	const differs = first || canonicalJson(previous) !== canonicalJson(current);
+	const differs = first || stableJson(previous) !== stableJson(current);
 	let outcome: Outcome;
 	if (first) {
 		outcome = node.firstRun === "same" ? "same" : "new";
@@ -318,10 +318,10 @@ function valueAt(
 	return value;
 }
 
-/** A short hash of a value's canonical JSON: two equal values give one hash. */
+/** A short hash of a value's stable JSON: two equal values give one hash. */
 function hashOf(value: unknown): string {
 	return createHash("sha256")
-		.update(canonicalJson(value))
+		.update(stableJson(value))
 		.digest("base64url")
 		.slice(0, 22);
 }

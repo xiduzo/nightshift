@@ -1,20 +1,9 @@
-import { FLOW_VERSION, isRecord } from "@nightshift/flows";
+import { FLOW_VERSION, stableJson } from "@nightshift/flows";
 import { z } from "zod";
 
 /** The same JSON, whatever the order of the keys. */
 export function same(a: unknown, b: unknown): boolean {
 	return stableJson(a) === stableJson(b);
-}
-
-/** The JSON of a value with the keys of each object sorted. */
-export function stableJson(value: unknown): string {
-	return JSON.stringify(value, (_key, inner: unknown) =>
-		isRecord(inner)
-			? Object.fromEntries(
-					Object.entries(inner).sort(([a], [b]) => (a < b ? -1 : 1)),
-				)
-			: inner,
-	);
 }
 
 /** A format next to this Night Shift's. Only a `current` flow is read and changed. */
@@ -32,8 +21,6 @@ export function formatOf(version: number): FlowFormat {
  * it. `infer`: Night Shift kept the
  * shape of a run's data on a node that had no output schema (`keepShapes`),
  * or the type of a value on a flow output that had none (`keepOutputTypes`).
- * An older Night Shift does not read an `infer` revision: it leaves it out
- * of the list.
  */
 export const revisionKinds = [
 	"save",

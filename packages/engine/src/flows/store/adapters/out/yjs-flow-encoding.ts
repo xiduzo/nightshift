@@ -3,6 +3,7 @@ import {
 	type Flow,
 	type FlowSources,
 	flowNameSchema,
+	stableJson,
 	suffixedName,
 } from "@nightshift/flows";
 import * as Y from "yjs";
@@ -13,7 +14,6 @@ import {
 	formatOf,
 	readableRevision,
 	same,
-	stableJson,
 } from "../../domain/flow-json";
 
 /**

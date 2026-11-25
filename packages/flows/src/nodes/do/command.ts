@@ -132,7 +132,7 @@ export const commandNodeSchema = z.object({
 	 *
 	 * `$NS_ARTIFACTS` names a new, empty folder: the files the command puts
 	 * there stay with the run as artifacts of the step, as an agent's
-	 * `save_artifact` files do. A Device of an older Night Shift gives none.
+	 * `save_artifact` files do.
 	 */
 	command: z.string().min(1),
 	/**

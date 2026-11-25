@@ -1,4 +1,5 @@
 import type { AgentEvent } from "@nightshift/agents/types";
+import { stableJson } from "@nightshift/flows";
 
 /**
  * The guards of one harness session that read its events: the turn limit
@@ -66,7 +67,7 @@ export function sessionGuards(options: {
 					replyOver = true;
 					return null;
 				case "tool-end": {
-					const call = `${event.name}\u0000${canonicalJson(event.input)}`;
+					const call = `${event.name}\u0000${stableJson(event.input)}`;
 					repeats = call === lastCall ? repeats + 1 : 1;
 					lastCall = call;
 					return repeats >= LOOP_REPEATS
@@ -78,19 +79,4 @@ export function sessionGuards(options: {
 			}
 		},
 	};
-}
-
-/** JSON with the keys of every object sorted: two equal inputs give one text. */
-export function canonicalJson(value: unknown): string {
-	return JSON.stringify(sorted(value)) ?? "undefined";
-}
-
-function sorted(value: unknown): unknown {
-	if (Array.isArray(value)) return value.map(sorted);
-	if (value === null || typeof value !== "object") return value;
-	return Object.fromEntries(
-		Object.keys(value)
-			.sort()
-			.map((key) => [key, sorted((value as Record<string, unknown>)[key])]),
-	);
 }

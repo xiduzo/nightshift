@@ -164,7 +164,7 @@ export const scheduleSchema = z.object({
 	/**
 	 * Paused tonight: no cron time before this moment (epoch ms) starts a
 	 * run. Night Shift writes it on Pause tonight and clears it on resume.
-	 * A time in the past means nothing. An older Night Shift ignores it.
+	 * A time in the past means nothing.
 	 */
 	pausedUntil: z.number().int().positive().optional(),
 	/**
