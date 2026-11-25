@@ -3,6 +3,7 @@ import { dirname } from "node:path";
 import { Refusal } from "@nightshift/refusal";
 
 import { type Git, gitOrThrow, systemGit } from "./git";
+import { branchName, objectId, revision } from "./git-names";
 import {
 	BASE_FETCH_TIMEOUT_MS,
 	type Branches,
@@ -395,6 +396,7 @@ export function createWorktrees(git: Git) {
 
 	/** `name`, or `name-2`, `name-3`, … when a branch of that name exists. */
 	async function freeBranchName(cwd: string, name: string): Promise<string> {
+		branchName(name);
 		if (!(await branchExists(cwd, name))) return name;
 		for (let n = 2; ; n++) {
 			const candidate = `${name}-${n}`;
@@ -412,14 +414,20 @@ export function createWorktrees(git: Git) {
 		base: string,
 	): Promise<void> {
 		await refuseDirty(cwd);
-		await gitOrThrow(git, cwd, ["checkout", "-q", "-b", branch, base]);
+		await gitOrThrow(git, cwd, [
+			"checkout",
+			"-q",
+			"-b",
+			branchName(branch),
+			revision(base),
+		]);
 	}
 
 	/** Checks out an existing branch. Refuses a worktree with uncommitted changes. */
 	async function checkoutBranch(cwd: string, branch: string): Promise<void> {
 		if ((await currentBranch(cwd)) === branch) return;
 		await refuseDirty(cwd);
-		await gitOrThrow(git, cwd, ["checkout", "-q", branch]);
+		await gitOrThrow(git, cwd, ["checkout", "-q", branchName(branch)]);
 	}
 
 	async function refuseDirty(cwd: string): Promise<void> {
@@ -445,6 +453,7 @@ export function createWorktrees(git: Git) {
 		cwd: string,
 		runBranch: string,
 	): Promise<{ commit: string; branch: string }> {
+		branchName(runBranch);
 		const changes = await uncommittedChanges(cwd);
 		if (changes.length > 0) {
 			throw new DirtyWorktreeError(
@@ -473,7 +482,9 @@ export function createWorktrees(git: Git) {
 		commit: string;
 		author?: { name: string; email: string };
 	}): Promise<{ worktreePath: string; branch: string; baseRef: string }> {
-		const { repoPath, branch, commit } = input;
+		const { repoPath } = input;
+		const branch = branchName(input.branch);
+		const commit = objectId(input.commit);
 		await gitOrThrow(git, repoPath, [
 			"fetch",
 			"-q",

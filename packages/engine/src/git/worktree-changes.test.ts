@@ -312,3 +312,19 @@ describe("splitPatch", () => {
 		]);
 	});
 });
+
+describe("the snapshots a call names", () => {
+	test("are ids of git objects", async () => {
+		const tree = await snapshotTree(repo);
+		const others = ["--stat", "HEAD", "", [tree]];
+		for (const other of others) {
+			await expect(treeChanges(repo, other as string, tree)).rejects.toThrow(
+				"not the id of a git object",
+			);
+			await expect(treeChanges(repo, tree, other as string)).rejects.toThrow(
+				"not the id of a git object",
+			);
+		}
+		expect(await treeChanges(repo, tree, tree)).toEqual({ tree, files: [] });
+	});
+});

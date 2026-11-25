@@ -22,6 +22,8 @@ import {
 	currentBranch,
 	freeBranchName,
 	listBranches,
+	pullRunBranch,
+	pushRunBranch,
 	resolveRepoTopLevel,
 	restoreWorktree,
 	uncommittedChanges,
@@ -484,5 +486,101 @@ describe("restoreWorktree", () => {
 		expect((await restore())?.from).toBe("base");
 		expect(await mustGit(gone.worktreePath, ["rev-parse", "HEAD"])).toBe(base);
 		expect(await currentBranch(gone.worktreePath)).toBe(gone.branch);
+	});
+});
+
+describe("the names a call gives git", () => {
+	let head: string;
+	let copy: string;
+	const shortId = "abcdef12";
+	beforeEach(async () => {
+		const origin = join(sandbox.root, "origin.git");
+		await mustGit(sandbox.root, ["init", "-q", "--bare", origin]);
+		await mustGit(sandbox.repoPath, ["remote", "add", "origin", origin]);
+		const made = await createWorktree({ repoPath: sandbox.repoPath, shortId });
+		copy = made.worktreePath;
+		head = made.baseRef;
+		await mustGit(copy, ["push", "-q", "origin", made.branch]);
+	});
+	const refs = () =>
+		mustGit(sandbox.repoPath, [
+			"for-each-ref",
+			"--format=%(objectname) %(refname)",
+		]);
+
+	test("an item's branch starts at a revision, and has a branch's name", async () => {
+		const before = await refs();
+		for (const base of ["-f", "--track", "-q", "", ["main"]]) {
+			await expect(
+				createAndCheckoutBranch(copy, "nightshift/abcdef12-1", base as string),
+			).rejects.toThrow("not a branch or a commit");
+		}
+		for (const name of ["-f", "a:b", ["b"]]) {
+			await expect(
+				createAndCheckoutBranch(copy, name as string, head),
+			).rejects.toThrow("not the name of a branch");
+			await expect(freeBranchName(copy, name as string)).rejects.toThrow(
+				"not the name of a branch",
+			);
+			await expect(checkoutBranch(copy, name as string)).rejects.toThrow(
+				"not the name of a branch",
+			);
+		}
+		expect(await refs()).toBe(before);
+		await createAndCheckoutBranch(copy, "nightshift/abcdef12-1", "HEAD");
+		expect(await currentBranch(copy)).toBe("nightshift/abcdef12-1");
+	});
+
+	test("a hand-off names one branch, and its commit by its id", async () => {
+		const before = await refs();
+		for (const name of ["", "x:refs/heads/y", "-f", "*"]) {
+			await expect(pushRunBranch(copy, name)).rejects.toThrow(
+				"not the name of a branch",
+			);
+			await expect(
+				pullRunBranch({
+					repoPath: sandbox.repoPath,
+					shortId,
+					branch: name,
+					commit: head,
+				}),
+			).rejects.toThrow("not the name of a branch");
+		}
+		for (const commit of ["-f", "--track", "HEAD", ""]) {
+			await expect(
+				pullRunBranch({
+					repoPath: sandbox.repoPath,
+					shortId,
+					branch: "nightshift/abcdef12",
+					commit,
+				}),
+			).rejects.toThrow("not the id of a git object");
+		}
+		expect(await refs()).toBe(before);
+		const sent = await pushRunBranch(copy, "nightshift/abcdef12");
+		expect(sent).toEqual({ commit: head, branch: "nightshift/abcdef12" });
+		expect(
+			await pullRunBranch({ repoPath: sandbox.repoPath, shortId, ...sent }),
+		).toEqual({ worktreePath: copy, branch: sent.branch, baseRef: head });
+	});
+
+	test("a run's base and its author are what they say", async () => {
+		for (const baseRef of ["--all", "-f", "--since=yesterday", "--git-dir"]) {
+			await expect(
+				createWorktree({
+					repoPath: sandbox.repoPath,
+					shortId: "bbbbbbbb",
+					baseRef,
+				}),
+			).rejects.toThrow("does not exist in this project");
+		}
+		const named = await createWorktree({
+			repoPath: sandbox.repoPath,
+			shortId: "cccccccc",
+			author: { name: "--unset", email: "--global" },
+		});
+		expect(
+			await mustGit(named.worktreePath, ["config", "--get", "user.name"]),
+		).toBe("--unset");
 	});
 });

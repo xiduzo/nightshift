@@ -4,6 +4,7 @@ import { basename, join, resolve } from "node:path";
 
 import type { WorktreeChanges, WorktreeFileChange } from "../log";
 import { type Git, GitError, type GitRunOptions, gitOrThrow } from "./git";
+import { objectId } from "./git-names";
 
 /**
  * What a step changed in a worktree, over the git port: a snapshot of every
@@ -173,6 +174,8 @@ export function createWorktreeSnapshots(
 		from: string,
 		to: string,
 	): Promise<WorktreeChanges> {
+		objectId(from);
+		objectId(to);
 		if (from === to) return { tree: to, files: [] };
 		const tree = ["diff-tree", "-r", "-z", "-M", "--no-commit-id"];
 		const [statuses, counts] = await Promise.all([
