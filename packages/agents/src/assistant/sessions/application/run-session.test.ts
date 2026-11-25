@@ -220,6 +220,28 @@ describe("runSession", () => {
 		expect(events.at(-1)).toMatchObject({ message: "Stopped." });
 	});
 
+	test("a person who stops a harness that throws reads Stopped, also with a limit", async () => {
+		const stop = new AbortController();
+		const throws = harness();
+		throws.run = async function* (input) {
+			yield session;
+			yield text("1", "x");
+			stop.abort();
+			input.signal?.throwIfAborted();
+			yield text("2", "y");
+		};
+		const events = await ask({
+			harness: throws,
+			limits: { turns: 5, usd: 5 },
+			signal: stop.signal,
+		});
+		expect(events.at(-1)).toEqual({
+			type: "error",
+			message: "Stopped.",
+			sessionId: "s-1",
+		});
+	});
+
 	/** A harness that does not know limits: it ends when its signal fires. */
 	const endless = (event: (turn: number) => AgentEvent) => {
 		const it = harness();
