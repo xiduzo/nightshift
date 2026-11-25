@@ -19,7 +19,8 @@ import { runMutations } from "../queries";
 
 /**
  * Continues a stopped, failed or interrupted run. A prompt goes to the
- * session of `sessionStep`. When no session waits, there is nothing to type.
+ * session of `sessionStep`. When no session waits, there is nothing to type,
+ * and a text that is there already stays for the person to copy.
  */
 export function ResumeComposer({
 	runId,
@@ -50,7 +51,7 @@ export function ResumeComposer({
 		if (resumeRun.isPending) return;
 		resumeRun.mutate({
 			runId,
-			prompt: (sessionStep && prompt.trim()) || undefined,
+			prompt: prompt.trim() || undefined,
 		});
 	};
 
@@ -89,16 +90,20 @@ export function ResumeComposer({
 				submit();
 			}}
 		>
-			{sessionStep ? (
+			{sessionStep || prompt !== "" ? (
 				<>
 					<label
 						htmlFor={`${id}-prompt`}
 						className="text-xs leading-relaxed text-muted-foreground"
 					>
 						<span className="font-medium text-foreground">
-							Follow-up prompt (optional).
+							{sessionStep
+								? "Follow-up prompt (optional)."
+								: "No agent waits for a prompt now."}
 						</span>{" "}
-						{where}
+						{sessionStep
+							? where
+							: "Copy your text if you need it. Remove it to continue the run."}
 					</label>
 					<InputGroup className="bg-background">
 						<InputGroupTextarea
