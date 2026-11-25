@@ -1,6 +1,6 @@
 import type { OwnDevice } from "@nightshift/engine";
 import type { DeviceRegistry } from "../../registry";
-import { ownerIn } from "../domain/acts-for";
+
 import {
 	fromCopies,
 	fromHost,
@@ -20,12 +20,12 @@ import type {
 export type ListOwnDevicesPorts = {
 	here: Pick<ThisComputer, "device" | "walkerId" | "ownProfiles">;
 	spaces: Spaces;
-	people: Pick<SpacePeople, "personInSpace" | "keptByHomeHost">;
-	registry: Pick<DeviceRegistry, "selfOwnerId" | "list">;
+	people: Pick<SpacePeople, "personInSpace" | "ownerIn" | "keptByHomeHost">;
+	registry: Pick<DeviceRegistry, "list">;
 	projects: SpaceProjects;
 	copies: DeviceCopies;
 	host: HostDevices;
-	others: Pick<OtherDevices, "relay">;
+	others: Pick<OtherDevices, "online">;
 };
 
 /** Lists a Person's own Devices for a project of a Space: this computer first, then their others, each with whether it is online and has a Clone. */
@@ -35,7 +35,7 @@ export function listOwnDevices(ports: ListOwnDevicesPorts) {
 	/** The copies that count for a Person in a Space: only in a Space of the home Host, and only for this computer's own Person there. */
 	async function copiesFor(spaceId: string, personId: string) {
 		if (!(await people.keptByHomeHost(spaceId))) return [];
-		const owner = await ownerIn(ports, spaceId);
+		const owner = await people.ownerIn(spaceId);
 		return owner === personId ? copies.list() : [];
 	}
 
@@ -78,7 +78,7 @@ export function listOwnDevices(ports: ListOwnDevicesPorts) {
 				deviceId: d.id,
 				name: d.name,
 				thisDevice: false,
-				online: await ports.others.relay.online(d.id, spaceId),
+				online: await ports.others.online(d.id, spaceId),
 				hasClone: has(d.id),
 				...(d.dev ? { dev: true } : {}),
 				...(known ? { profiles: known } : {}),

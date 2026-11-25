@@ -73,27 +73,25 @@ const NO_PROFILES: Pick<PeerProfiles, "here" | "lastKnown"> = {
 /** What a computer alone gives Placement beside its own facts. */
 const ALONE: Pick<
 	Parameters<typeof wirePlacement>[0],
-	| "work"
-	| "relay"
-	| "copies"
-	| "isHost"
-	| "ownProfiles"
-	| "offersHere"
-	| "mayUseOffers"
+	"work" | "relay" | "copies" | "mayUseOffers"
 > = {
 	work: null,
 	relay: null,
 	copies: { list: async () => [], kept: async () => null },
-	isHost: () => false,
-	ownProfiles: () => null,
-	offersHere: async () => [],
 	mayUseOffers: async () => false,
 };
 
 /** This computer, as its owner's runs reach it. */
 function here(deviceId: string) {
 	const device = testDevice({ harnesses: {} }, deviceId);
-	return { device, deviceFor: () => device };
+	return {
+		device,
+		walkerId: async () => deviceId,
+		deviceFor: () => device,
+		isHost: () => false,
+		ownProfiles: () => null,
+		offersHere: async () => [],
+	};
 }
 
 /** No project here: a module that reads only the plan never asks. */
@@ -240,11 +238,12 @@ const A_PROFILES = [
 /** A's engine. Without `internals`, it fires no schedules. */
 function peerEngine(
 	internals?: Parameters<typeof createPeerEngine>[1],
-	options: Pick<
+	given: Pick<
 		Parameters<typeof withPeers>[0],
 		"ownOffers" | "mayUseOffers" | "deviceId"
-	> = {},
+	> & { work?: null } = {},
 ): PeerEngine {
+	const { work: noWork, ...options } = given;
 	lifetime = new AbortController();
 	return createPeerEngine(
 		withPeers({
@@ -257,7 +256,7 @@ function peerEngine(
 				name === "everywhere" || name === "here_only" ? PROFILE : null,
 			ownProfiles: () => A_PROFILES,
 			spaceDocuments: documents,
-			work,
+			...(noWork === null ? {} : { work }),
 		}),
 		{ ...internals, signal: lifetime.signal },
 	);
@@ -509,6 +508,19 @@ describe("a run placed on another Device", () => {
 	test("the project is removed without a Clone here", async () => {
 		await space().removeProject(projectId);
 		expect(await space().listProjects()).toEqual([]);
+	});
+
+	test("on a computer that reaches no other Device, the start is refused", async () => {
+		lifetime.abort();
+		engine = peerEngine(undefined, { work: null });
+		await expect(
+			space().startRun({
+				projectId,
+				flow: flow([command("where", "pwd")]),
+				startedBy: personId,
+				deviceId: B,
+			}),
+		).rejects.toThrow("That device cannot take runs from this computer.");
 	});
 
 	test("refusals name the Device: what it lacks, not the starter's, no Clone", async () => {
@@ -1413,8 +1425,7 @@ describe("the owner's other Devices in a Space of the home Host", () => {
 		});
 		const placement = wirePlacement({
 			db: b.db,
-			...here(b.deviceId),
-			walkerId: async () => b.deviceId,
+			here: here(b.deviceId),
 			profiles: NO_PROFILES,
 			...ALONE,
 			registry: {
@@ -1544,8 +1555,7 @@ describe("a Device of the plan, by id", () => {
 	const placementOfA = () =>
 		wirePlacement({
 			db: a.db,
-			...here(a.deviceId),
-			walkerId: async () => a.deviceId,
+			here: here(a.deviceId),
 			profiles: NO_PROFILES,
 			...ALONE,
 			registry: {
@@ -1587,8 +1597,7 @@ describe("a run with no starter", () => {
 	test("sends nothing to another Device: its calls there are refused here", async () => {
 		const placement = wirePlacement({
 			db: a.db,
-			...here(a.deviceId),
-			walkerId: async () => a.deviceId,
+			here: here(a.deviceId),
 			profiles: NO_PROFILES,
 			...ALONE,
 			registry: {
@@ -1738,6 +1747,8 @@ describe("a run in the Personal of another Person whose home Host this is", () =
 	/** This computer's Offers, as its Device document keeps them. */
 	let offered: DeviceOffer[];
 	let adaProject: string;
+	/** Ada's role in her Space uses Offers. */
+	let mayUse: boolean;
 	/** The name of this computer's owner: the Host admin. */
 	let adminName: string;
 
@@ -1774,10 +1785,11 @@ describe("a run in the Personal of another Person whose home Host this is", () =
 		// The Host's engine, with its own Offers.
 		lifetime.abort();
 		offered = [];
+		mayUse = true;
 		engine = peerEngine(undefined, {
 			deviceId: a.deviceId,
 			ownOffers: () => offered,
-			mayUseOffers: async () => true,
+			mayUseOffers: async () => mayUse,
 		});
 		// Ada's project, with a Clone on the Host.
 		adaProject = (
@@ -1859,6 +1871,14 @@ describe("a run in the Personal of another Person whose home Host this is", () =
 			["work", "pass"],
 		]);
 		expect(run.device.id).toBe(a.deviceId);
+	});
+
+	test("a role that does not use Offers is refused, with an Offer too", async () => {
+		await offer();
+		mayUse = false;
+		await expect(start()).rejects.toThrow(
+			"your role in this Space does not let you use what others offer.",
+		);
 	});
 
 	test("withdrawn, the next run is refused again with the same words", async () => {

@@ -8,6 +8,7 @@ import type {
 } from "@nightshift/engine";
 import type { DeviceCopy } from "@nightshift/engine/settings";
 import { FLOW_VERSION, type Flow } from "@nightshift/flows";
+import { Refusal } from "@nightshift/refusal";
 import { asDate } from "@nightshift/time";
 import type { WorkFor, WorkRelay } from "../../../../contract";
 import { remoteDevice } from "../../../../work";
@@ -147,8 +148,8 @@ export const placedRun = (
 /** The ports of placement in memory, typed by them. `calls` names each call, in order. */
 export function inMemoryPlacement(world: PlacementWorld = {}) {
 	const calls: string[] = [];
-	/** The Devices reached over a relay: which relay, and for which run. */
-	const reached: { id: string; relay: WorkRelay; forRun: WorkFor }[] = [];
+	/** The Devices a run reached, and whether it has a starter. */
+	const reached: { id: string; forRun: WorkFor; starter: boolean }[] = [];
 	const planned: {
 		devices: PlanDevices;
 		personId: string | null;
@@ -163,10 +164,8 @@ export function inMemoryPlacement(world: PlacementWorld = {}) {
 		return value;
 	};
 
-	const relay: WorkRelay = {
-		async *call() {},
-		online: (id) => said("online", online.has(id)),
-	};
+	/** A work relay that no test sends a call over. */
+	const relay: WorkRelay = { async *call() {}, online: () => false };
 	const runAt = {
 		spaceId: SPACE,
 		projectId: PROJECT,
@@ -199,32 +198,34 @@ export function inMemoryPlacement(world: PlacementWorld = {}) {
 		hostOf: async () => said("hostOf", world.hosted ? HOST : null),
 		open: async () =>
 			said("open", {
-				offers: new Map(
+				offers: () =>
 					offering.flatMap(([deviceId, profiles]) =>
-						profiles.map((name) => [
-							`${deviceId}/${name}`,
-							{
-								deviceId,
-								deviceName: `published ${deviceId}`,
-								profile: `p-${name}`,
-								profileName: name,
-								permissionCap: "auto",
-								sessionCap: 1,
-								offeredAt: 1,
-								by: null,
-							},
-						]),
+						profiles.map((name) => ({
+							deviceId,
+							deviceName: `published ${deviceId}`,
+							profile: `p-${name}`,
+							profileName: name,
+							permissionCap: "auto" as const,
+							sessionCap: 1,
+							offeredAt: 1,
+							by: null,
+						})),
 					),
-				),
 				deviceName: (id: string) => world.deviceNames?.[id] ?? null,
 			}),
 	};
 	const people: SpacePeople = {
 		personInSpace: async (_space, id) =>
 			said("personInSpace", (id !== null && world.known?.[id]) || id),
+		ownerIn: async () => {
+			calls.push("selfOwnerId");
+			return said(
+				"personInSpace",
+				(selfOwner !== null && world.known?.[selfOwner]) || selfOwner,
+			);
+		},
 		personalSpaceIdBySlug: async () => world.personal ?? null,
-		personNames: async (ids) =>
-			new Map(ids.map((id) => [id, world.names?.[id] ?? id])),
+		personName: async (id) => world.names?.[id] ?? id,
 		keptByHomeHost: async () =>
 			said("keptByHomeHost", world.keptByHome ?? true),
 		mayUseOffers: async () => said("mayUseOffers", world.mayUse ?? false),
@@ -271,15 +272,19 @@ export function inMemoryPlacement(world: PlacementWorld = {}) {
 		list: (project) => said("host", listing.list(project)),
 	};
 	const others: OtherDevices = {
-		relay,
 		reaches: world.reaches ?? true,
-		over(over, at, forRun) {
-			reached.push({ id: at.id, relay: over, forRun });
-			return remoteDevice(over, at, forRun);
+		online: (id) => said("online", online.has(id)),
+		at(at, forRun) {
+			reached.push({ id: at.id, forRun, starter: true });
+			return remoteDevice(relay, at, forRun);
+		},
+		withoutStarter(at, forRun) {
+			reached.push({ id: at.id, forRun, starter: false });
+			return remoteDevice(relay, at, forRun);
 		},
 	};
 	const planner: RunPlanner = {
-		unreachable: "unreachable",
+		unreachable: () => new Refusal("invalid", "unreachable"),
 		profileFor: () => null,
 		lastKnown: async () =>
 			new Map([
@@ -328,7 +333,7 @@ export function inMemoryPlacement(world: PlacementWorld = {}) {
 		others,
 		planner,
 	};
-	return { ports, calls, reached, planned, relay };
+	return { ports, calls, reached, planned };
 }
 
 /** The nodes of a flow on this computer, for another Person's run. */

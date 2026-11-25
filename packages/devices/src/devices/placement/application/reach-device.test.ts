@@ -8,7 +8,7 @@ import {
 	SPACE,
 	WALKER,
 } from "../adapters/out/in-memory-neighbours";
-import { NO_STARTER_RELAY } from "../domain/no-relay";
+
 import { reachDevice } from "./reach-device";
 
 test("this computer, by either of its ids, is the Device as the run reaches it", () => {
@@ -21,13 +21,13 @@ test("this computer, by either of its ids, is the Device as the run reaches it",
 	expect(reached).toEqual([]);
 });
 
-test("another Device is reached over the work relay, for the Person of the plan", () => {
-	const { ports, reached, relay } = inMemoryPlacement();
+test("another Device is reached for the Person of the plan", () => {
+	const { ports, reached } = inMemoryPlacement();
 	expect(reachDevice(ports)("laptop", placedRun()).id).toBe("laptop");
 	expect(reached).toEqual([
 		{
 			id: "laptop",
-			relay,
+			starter: true,
 			forRun: {
 				spaceId: SPACE,
 				projectId: PROJECT,
@@ -41,7 +41,7 @@ test("another Device is reached over the work relay, for the Person of the plan"
 test("a run with no starter reaches no other Device", () => {
 	const { ports, reached } = inMemoryPlacement();
 	reachDevice(ports)("laptop", placedRun({ personId: null }));
-	expect(reached[0]?.relay).toBe(NO_STARTER_RELAY);
+	expect(reached).toMatchObject([{ id: "laptop", starter: false }]);
 });
 
 test("another Device has the name asked, else the plan's, else a plain one", () => {

@@ -123,7 +123,7 @@ describe("this computer in a plan", () => {
 });
 
 describe("another Device, in a Space kept here", () => {
-	test("is one of the Person's, reached over the work relay", async () => {
+	test("is one of the Person's, reached for them", async () => {
 		const run = await plan({ paired: [LAPTOP], clones: ["laptop"] });
 		const at = await run.devices.byId("laptop");
 		expect(at).toMatchObject({
@@ -137,7 +137,7 @@ describe("another Device, in a Space kept here", () => {
 		expect(run.reached).toEqual([
 			{
 				id: "laptop",
-				relay: run.relay,
+				starter: true,
 				forRun: {
 					spaceId: SPACE,
 					projectId: PROJECT,
@@ -174,20 +174,51 @@ describe("another Device, in a Space kept here", () => {
 		).rejects.toThrow("Laptop is not your device.");
 	});
 
-	test("is the owner's, for a run of nobody on a computer that gets its owner now", async () => {
-		const { registry } = inMemoryPlacement({ paired: [LAPTOP] }).ports;
+	/** A plan of nobody, on a computer whose owner is known from the second read on. */
+	const ownerAppears = (world: PlacementWorld) => {
+		const { people } = inMemoryPlacement(world).ports;
 		let reads = 0;
-		const run = await plan({ paired: [LAPTOP], mayUse: true }, null, {
+		return plan(world, null, {
 			ports: {
-				registry: {
-					...registry,
-					selfOwnerId: async () => (reads++ === 0 ? null : OWNER),
+				people: {
+					...people,
+					ownerIn: async () => (reads++ === 0 ? null : OWNER),
 				},
 			},
 		});
+	};
+
+	test("takes a run of nobody through its Offers when it is another Person's", async () => {
+		const paired = [THEIRS];
+		const none = await ownerAppears({ paired });
+		await expect(none.devices.byId("theirs")).rejects.toThrow(
+			"Theirs is not your device. It offers nothing to this Space.",
+		);
+		const offering = { theirs: ["coder"] };
+		const run = await ownerAppears({ paired, offering, mayUse: true });
+		expect((await run.devices.byId("theirs"))?.offered).toMatchObject({
+			mayUse: true,
+			offers: [{ profileName: "coder" }],
+		});
+	});
+
+	test("is the owner's, for a run of nobody on a computer that gets its owner now", async () => {
+		const run = await ownerAppears({ paired: [LAPTOP] });
 		expect(run.personId).toBeNull();
 		expect(await run.devices.byId("laptop")).toMatchObject({ id: "laptop" });
 		expect(run.reached[0]?.forRun.personId).toBe(OWNER);
+	});
+
+	test("counts only its own Offers", async () => {
+		const offering = { elsewhere: ["writer"], theirs: ["coder"] };
+		const names = async (world: PlacementWorld) =>
+			(await byId(world, "theirs"))?.offered?.offers.map((o) => o.profileName);
+		expect(await names({ paired: [THEIRS], offering })).toEqual(["coder"]);
+		const devices = [listedDevice("theirs", { offers: ["coder"] })];
+		expect(await names({ hosted: { devices }, offering })).toEqual(["coder"]);
+		await expect(
+			byId({ paired: [THEIRS], offering: { elsewhere: ["coder"] } }, "theirs"),
+		).rejects.toThrow("It offers nothing to this Space.");
 	});
 
 	test("is refused when it left the list since", async () => {
@@ -277,6 +308,13 @@ describe("what the walk asks of the Devices", () => {
 		expect(await devices.deviceName?.("nowhere")).toBeNull();
 	});
 
+	test("a Device the Host lists with no Offers is another Person's", async () => {
+		const devices = [listedDevice("theirs", { offers: [] })];
+		await expect(byId({ hosted: { devices } }, "theirs")).rejects.toThrow(
+			"theirs is not your device. It offers nothing to this Space.",
+		);
+	});
+
 	test("the last resorts, the Device of the latest run first", async () => {
 		const { devices } = await plan(
 			{
@@ -311,9 +349,11 @@ describe("a refusal of another Person's run on this computer", () => {
 		await expect(refusal({ names })).rejects.toThrow(
 			"The Host This computer belongs to Olivia.",
 		);
-		await expect(refusal({ selfOwner: null })).rejects.toThrow(
-			"The Host This computer belongs to another person.",
-		);
+		for (const world of [{ selfOwner: null }, { names: { [OWNER]: "" } }]) {
+			await expect(refusal(world)).rejects.toThrow(
+				"The Host This computer belongs to another person.",
+			);
+		}
 	});
 
 	test("does not outside that Personal, in a Space another Host keeps, or on another Device", async () => {
@@ -327,6 +367,14 @@ describe("a refusal of another Person's run on this computer", () => {
 		await expect(refusal({}, { offered })).rejects.toThrow(
 			"your role in this Space does not let you use",
 		);
+	});
+
+	test("checks every group of nodes, also after one that passes", async () => {
+		const groups: PlacementWorld["groups"] = (devices) => {
+			const [group] = offeredGroup()(devices);
+			return group ? [{ ...group, nodes: [] }, group] : [];
+		};
+		await expect(plan({ groups }, GUEST)).rejects.toThrow(NOTHING);
 	});
 
 	test("says which nodes an offered Device does not take", async () => {

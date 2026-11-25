@@ -1,3 +1,5 @@
+import { listedThroughOffers } from "./through-offers";
+
 /**
  * A Person's own Devices beside this computer, from what this computer
  * knows: the Devices paired with it, the list of the Space's Host, or the
@@ -32,7 +34,7 @@ export function fromHost<
 		.map((d) => {
 			const profiles =
 				d.profiles ??
-				(d.offers === undefined ? copyOf.get(d.deviceId)?.profiles : undefined);
+				(listedThroughOffers(d) ? undefined : copyOf.get(d.deviceId)?.profiles);
 			return {
 				...d,
 				thisDevice: false,

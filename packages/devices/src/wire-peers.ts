@@ -166,8 +166,15 @@ export function createPeers(
 	/** Where a run's steps run: its plan at start, read while it walks (`placement.ts`). */
 	const placement = wirePlacement({
 		db,
-		device,
-		walkerId: context.walkerId,
+		here: {
+			device,
+			walkerId: context.walkerId,
+			// Another Person's run here uses this computer through its Offers.
+			deviceFor: admission.deviceFor,
+			offersHere: admission.inForce,
+			ownProfiles: () => options.ownProfiles?.() ?? null,
+			isHost: () => options.isHost?.() ?? false,
+		},
 		registry,
 		documents,
 		hostSpaces,
@@ -176,15 +183,10 @@ export function createPeers(
 		flows: context.flows,
 		work: work ?? null,
 		relay: relay ?? null,
-		// Another Person's run here uses this computer through its Offers.
-		deviceFor: admission.deviceFor,
-		offersHere: admission.inForce,
-		ownProfiles: () => options.ownProfiles?.() ?? null,
 		copies: {
 			list: async () => options.copies?.list() ?? [],
 			kept: context.keptDevice,
 		},
-		isHost: () => options.isHost?.() ?? false,
 		mayUseOffers: (spaceId, personId) =>
 			options.mayUseOffers?.(spaceId, personId) ?? Promise.resolve(false),
 	});

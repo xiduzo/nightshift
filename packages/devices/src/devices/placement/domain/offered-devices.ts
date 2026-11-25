@@ -1,4 +1,4 @@
-import { throughOffers } from "./acts-for";
+import { throughOffers } from "./through-offers";
 
 /** The Devices that other Persons offer to a Space. */
 

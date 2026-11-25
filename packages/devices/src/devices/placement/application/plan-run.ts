@@ -6,14 +6,11 @@ import type {
 	PlannedRun,
 } from "@nightshift/engine";
 import { Refusal } from "@nightshift/refusal";
-import {
-	hostOffersNothing,
-	offerRefusal,
-	offersNothing,
-	spaceOffers,
-} from "../../offers";
-import { nameOf, ownerIn, runsFor, throughOffers } from "../domain/acts-for";
+import { hostOffersNothing, offerRefusal, offersNothing } from "../../offers";
+import type { DeviceRegistry } from "../../registry";
+
 import { hasProject, lastResort } from "../domain/takes-work";
+import { listedThroughOffers, throughOffers } from "../domain/through-offers";
 import { type ListRunDevicesPorts, listRunDevices } from "./list-run-devices";
 import type {
 	OtherDevices,
@@ -24,8 +21,9 @@ import type {
 
 export type PlanRunPorts = ListRunDevicesPorts & {
 	here: Pick<ThisComputer, "isHost">;
+	registry: Pick<DeviceRegistry, "selfOwnerId">;
 	people: Pick<SpacePeople, "personalSpaceIdBySlug" | "mayUseOffers">;
-	others: Pick<OtherDevices, "reaches" | "over">;
+	others: Pick<OtherDevices, "reaches" | "at">;
 	planner: RunPlanner;
 };
 
@@ -46,20 +44,33 @@ export function planRun(ports: PlanRunPorts) {
 		if (personId === null || !at.offered.mayUse) return null;
 		if ((await spaces.hostOf(spaceId)) !== null) return null;
 		if ((await people.personalSpaceIdBySlug(personId)) !== spaceId) return null;
-		const name = await nameOf(people.personNames, await registry.selfOwnerId());
-		return hostOffersNothing(here.device.name, name ?? "another person");
+		const owner = await registry.selfOwnerId();
+		const name = owner && (await people.personName(owner));
+		return hostOffersNothing(here.device.name, name || "another person");
+	}
+
+	/**
+	 * The Person a run acts for: its starter, else this computer's owner (a
+	 * schedule that names no Person fires here for them), as the Host of the
+	 * Space knows them. A schedule names its Person that way already.
+	 */
+	async function runsFor(
+		{ start: { startedBy }, scheduled }: PlanInput,
+		spaceId: string,
+	): Promise<string | null> {
+		if (scheduled && startedBy) return startedBy;
+		return startedBy === undefined
+			? people.ownerIn(spaceId)
+			: people.personInSpace(spaceId, startedBy);
 	}
 
 	return async (input: PlanInput): Promise<PlannedRun> => {
 		const { start, project, runId } = input;
 		const { spaceId } = project;
-		const personId = await runsFor(ports, spaceId, {
-			startedBy: start.startedBy,
-			scheduled: input.scheduled,
-		});
+		const personId = await runsFor(input, spaceId);
 		const remoteHost = await spaces.hostOf(spaceId);
 		const hostId = remoteHost ?? (here.isHost() ? await here.walkerId() : null);
-		const owner = await ownerIn(ports, spaceId);
+		const owner = await people.ownerIn(spaceId);
 		// A run without a starter uses this computer's owner's Devices.
 		const userId = personId ?? owner;
 
@@ -82,7 +93,9 @@ export function planRun(ports: PlanRunPorts) {
 			id: string,
 			name: string,
 		): Promise<OfferedPlacement> {
-			const offers = spaceOffers(await spaces.open(spaceId), id);
+			const offers = (await spaces.open(spaceId))
+				.offers()
+				.filter((o) => o.deviceId === id);
 			// The Device refuses even its folder to another Person without an Offer.
 			if (offers.length === 0) {
 				throw new Refusal("conflict", offersNothing(name));
@@ -95,7 +108,7 @@ export function planRun(ports: PlanRunPorts) {
 			const found = await find(id);
 			const paired = await registry.get(id);
 			if (!paired || paired.revokedAt !== null || !others.reaches) {
-				throw new Refusal("invalid", planner.unreachable);
+				throw planner.unreachable();
 			}
 			if (userId === null) {
 				throw new Refusal(
@@ -124,7 +137,9 @@ export function planRun(ports: PlanRunPorts) {
 					"That device is not one of your devices on the Host of this Space.",
 				);
 			}
-			const offered = found.offers ? await offersOf(id, found.name) : undefined;
+			const offered = listedThroughOffers(found)
+				? await offersOf(id, found.name)
+				: undefined;
 			return { found, offered, userId };
 		}
 
@@ -137,8 +152,7 @@ export function planRun(ports: PlanRunPorts) {
 			return {
 				...(at.offered ? { offered: at.offered } : {}),
 				...(online ? {} : { offline: true }),
-				device: others.over(
-					others.relay,
+				device: others.at(
 					{ id, name },
 					{ spaceId, projectId: project.id, personId: at.userId, runId },
 				),

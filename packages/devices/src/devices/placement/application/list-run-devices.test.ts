@@ -79,6 +79,16 @@ describe("the Devices that offer a profile", () => {
 		]);
 	});
 
+	test("do not count as the Person's own when the Host lists them, also with no Offers", async () => {
+		const devices = [
+			listedDevice("laptop"),
+			listedDevice("theirs", { offers: [] }),
+		];
+		expect(
+			(await list({ hosted: { devices } }, OWNER, true)).map((d) => d.deviceId),
+		).toEqual([WALKER, "laptop"]);
+	});
+
 	test("come once when the Host lists them too", async () => {
 		const devices = await list({
 			offering: { laptop: ["coder"] },

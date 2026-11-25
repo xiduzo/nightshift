@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { hostVersionWords } from "@nightshift/refusal";
 import { OlderHostError } from "../../../contract";
 import { inMemoryFilesPorts } from "../adapters/out/in-memory-neighbours";
 import { readKnowledgeFile } from "./read-knowledge-file";
@@ -79,6 +80,6 @@ describe("readKnowledgeFile", () => {
 			"Night Shift cannot get this file now. Try again when the computer that keeps this Space is online.",
 		);
 		ports.archive.failWith = new OlderHostError();
-		await expect(read()).rejects.toThrow(new OlderHostError().message);
+		await expect(read()).rejects.toThrow(hostVersionWords("older"));
 	});
 });

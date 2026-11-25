@@ -7,9 +7,11 @@ import {
 	planNodes,
 	UNREACHABLE_DEVICE,
 } from "@nightshift/engine";
+import { Refusal } from "@nightshift/refusal";
 import type { HostRelay, WorkRelay } from "../../contract";
 import { type HostSpaces, keptByHomeHost, personInSpace } from "../../links";
 import { remoteDevice } from "../../work";
+import { spaceOffers } from "../offers";
 import type { DeviceRegistry } from "../registry";
 import { relayHostDevices } from "./adapters/out/relay-host-devices";
 import { findMoveTarget } from "./application/find-move-target";
@@ -22,10 +24,11 @@ import type {
 	ThisComputer,
 } from "./application/ports";
 import { reachDevice } from "./application/reach-device";
-import { UNREACHABLE } from "./domain/no-relay";
+import { NO_STARTER_RELAY, UNREACHABLE } from "./domain/no-relay";
 
 /** What the composition gives placement. */
-export type PlacementDeps = ThisComputer & {
+export type PlacementDeps = {
+	here: ThisComputer;
 	db: Database;
 	registry: Pick<DeviceRegistry, "selfOwnerId" | "list" | "get">;
 	documents: Pick<PeerContext["documents"], "open">;
@@ -46,16 +49,17 @@ export type PlacementDeps = ThisComputer & {
  * Person's Devices a run may use.
  */
 export function wirePlacement(deps: PlacementDeps): Peers["placement"] {
-	const { db, documents, hostSpaces, profiles, work } = deps;
+	const { db, documents, hostSpaces, profiles, registry } = deps;
+	const work = deps.work ?? UNREACHABLE;
 	const spaces = wireSpaces({ db });
-	const ports: PlanRunPorts & { here: ThisComputer } = {
-		here: deps,
+	const ports: PlanRunPorts & Parameters<typeof reachDevice>[0] = {
+		here: deps.here,
 		spaces: {
 			hostOf: (spaceId) => hostSpaces.hostOf(spaceId),
 			open: async (spaceId) => {
 				const document = await documents.open(spaceId);
 				return {
-					offers: document.offers,
+					offers: () => spaceOffers(document),
 					deviceName: (id) => deviceNameIn(document, id),
 				};
 			},
@@ -63,24 +67,29 @@ export function wirePlacement(deps: PlacementDeps): Peers["placement"] {
 		people: {
 			personInSpace: (spaceId, personId) =>
 				personInSpace(db, spaceId, personId),
+			ownerIn: async (spaceId) =>
+				personInSpace(db, spaceId, await registry.selfOwnerId()),
 			personalSpaceIdBySlug: (personId) =>
 				spaces.personal.findPersonalSpaceBySlug({ personId }),
-			personNames: (ids) => spaces.members.listPersonNames({ ids }),
+			personName: async (id) =>
+				(await spaces.members.listPersonNames({ ids: [id] })).get(id) ?? null,
 			keptByHomeHost: (spaceId) => keptByHomeHost(db, spaceId),
 			mayUseOffers: deps.mayUseOffers,
 		},
-		registry: deps.registry,
+		registry,
 		projects: deps.projects,
 		copies: deps.copies,
 		host: relayHostDevices(deps.relay),
 		others: {
-			relay: work ?? UNREACHABLE,
-			reaches: work !== null,
-			over: (relay, device, forRun) => remoteDevice(relay, device, forRun),
+			reaches: deps.work !== null,
+			online: (id, spaceId) => work.online(id, spaceId),
+			at: (device, forRun) => remoteDevice(work, device, forRun),
+			withoutStarter: (device, forRun) =>
+				remoteDevice(NO_STARTER_RELAY, device, forRun),
 		},
 		planner: {
 			planNodes,
-			unreachable: UNREACHABLE_DEVICE,
+			unreachable: () => new Refusal("invalid", UNREACHABLE_DEVICE),
 			profileFor: profiles.here,
 			lastKnown: profiles.lastKnown,
 			flows: deps.flows,

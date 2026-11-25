@@ -9,8 +9,9 @@ import type {
 	PlannedRun,
 } from "@nightshift/engine";
 import type { DeviceCopy } from "@nightshift/engine/settings";
-import type { WorkFor, WorkRelay } from "../../../contract";
-import type { DeviceOffer } from "../../offers";
+import type { Refusal } from "@nightshift/refusal";
+import type { WorkFor } from "../../../contract";
+import type { DeviceOffer, spaceOffers } from "../../offers";
 
 /**
  * The driven ports of placement. Neighbour ports are `@filledBy`; the
@@ -43,9 +44,9 @@ export type ThisComputer = {
 export type Spaces = {
 	/** The Host that keeps the Space, or null for a Space of this Replica's own. */
 	hostOf(spaceId: string): Promise<string | null>;
-	/** The Offers its document lists (`spaceOffers` reads them), and the names it has of Devices. */
+	/** The Offers its document lists, every Device's, and the names it has of Devices. */
 	open(spaceId: string): Promise<{
-		offers: { values(): Iterable<unknown> };
+		offers(): ReturnType<typeof spaceOffers>;
 		deviceName(deviceId: string): string | null;
 	}>;
 };
@@ -60,8 +61,11 @@ export type SpacePeople = {
 		spaceId: string,
 		personId: P,
 	): Promise<string | P>;
+	/** The Person who owns this computer, as the Space's Host knows them. */
+	ownerIn(spaceId: string): Promise<string | null>;
 	personalSpaceIdBySlug(personId: string): Promise<string | null>;
-	personNames(ids: readonly string[]): Promise<Map<string, string>>;
+	/** A Person's name, or null when it is not known. It may be empty. */
+	personName(personId: string): Promise<string | null>;
 	keptByHomeHost(spaceId: string): Promise<boolean>;
 	/** The Person's role in the Space uses Offers. */
 	mayUseOffers(spaceId: string, personId: string): Promise<boolean>;
@@ -96,18 +100,18 @@ export type HostDevices = {
 };
 
 /**
- * The way to the other Devices: the work relay, and a Device over one.
+ * The way to the other Devices.
  * @filledBy devices/wire
  */
 export type OtherDevices = {
-	relay: WorkRelay;
 	/** False on a computer that reaches no other Device. */
 	reaches: boolean;
-	over(
-		relay: WorkRelay,
-		device: { id: string; name: string },
-		forRun: WorkFor,
-	): Device;
+	/** Whether a Device takes work now, for a run of that Space. */
+	online(deviceId: string, spaceId: string): boolean | Promise<boolean>;
+	/** A Device as a run reaches it. */
+	at(device: { id: string; name: string }, forRun: WorkFor): Device;
+	/** A Device that nothing is sent to: it refuses each call of a run with no starter. */
+	withoutStarter(device: { id: string; name: string }, forRun: WorkFor): Device;
 };
 
 /**
@@ -123,6 +127,6 @@ export type RunPlanner = Required<
 		personId: string | null,
 		byPerson: boolean,
 	): Promise<PlannedRun>;
-	/** The words for a Device this computer cannot reach. */
-	unreachable: string;
+	/** The refusal of a Device this computer cannot reach: the engine's, so a plan says it in one way. */
+	unreachable(): Refusal;
 };

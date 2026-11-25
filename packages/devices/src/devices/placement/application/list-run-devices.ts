@@ -1,19 +1,20 @@
 import type { OwnDevice } from "@nightshift/engine";
-import { spaceOffers } from "../../offers";
+
 import type { DeviceRegistry } from "../../registry";
-import { nameOf, ownerIn, throughOffers } from "../domain/acts-for";
+
 import {
 	offered,
 	offeringDevices,
 	standsOffered,
 } from "../domain/offered-devices";
 import { projectOn } from "../domain/takes-work";
+import { listedThroughOffers, throughOffers } from "../domain/through-offers";
 import { type ListOwnDevicesPorts, listOwnDevices } from "./list-own-devices";
 import type { SpacePeople, ThisComputer } from "./ports";
 
 export type ListRunDevicesPorts = ListOwnDevicesPorts & {
 	here: Pick<ThisComputer, "offersHere">;
-	people: Pick<SpacePeople, "personNames">;
+	people: Pick<SpacePeople, "personName">;
 	registry: Pick<DeviceRegistry, "get">;
 };
 
@@ -38,14 +39,14 @@ export function listRunDevices(ports: ListRunDevicesPorts) {
 			...own.map((d) => d.deviceId),
 		]);
 		const others: OwnDevice[] = [];
-		for (const device of offeringDevices(spaceOffers(document), known)) {
+		for (const device of offeringDevices(document.offers(), known)) {
 			const paired = await registry.get(device.deviceId);
 			if (!standsOffered(paired, personId)) continue;
 			others.push({
 				...device,
 				name: paired?.name ?? device.name,
 				thisDevice: false,
-				online: await ports.others.relay.online(device.deviceId, spaceId),
+				online: await ports.others.online(device.deviceId, spaceId),
 				hasClone: has(device.deviceId),
 			});
 		}
@@ -59,11 +60,11 @@ export function listRunDevices(ports: ListRunDevicesPorts) {
 		personId: string,
 	): Promise<OwnDevice> {
 		// In a Host's Space, this computer's Person is the one who asks here.
-		const owner = await ownerIn(ports, spaceId);
+		const owner = await people.ownerIn(spaceId);
 		const asking = await people.personInSpace(spaceId, personId);
 		if (!throughOffers(asking, owner)) return self;
 		const offers = await here.offersHere(spaceId);
-		const ownerName = await nameOf(people.personNames, owner);
+		const ownerName = owner && (await people.personName(owner));
 		return {
 			...self,
 			...offered(offers),
@@ -84,6 +85,6 @@ export function listRunDevices(ports: ListRunDevicesPorts) {
 			...rest,
 			...(await offering(spaceId, personId, projectId, own)),
 		];
-		return ownOnly ? all.filter((d) => d.offers === undefined) : all;
+		return ownOnly ? all.filter((d) => !listedThroughOffers(d)) : all;
 	};
 }

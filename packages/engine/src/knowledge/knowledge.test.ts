@@ -13,6 +13,7 @@ import type { AgentEvent } from "@nightshift/agents/types";
 import { event, project } from "@nightshift/db/schema";
 import { REVIEW_LEARNINGS_KIT } from "@nightshift/flows";
 import { kitCommand } from "@nightshift/flows/testing";
+import { hostVersionWords } from "@nightshift/refusal";
 import { eq } from "drizzle-orm";
 import { applyUpdate, encodeStateAsUpdate } from "yjs";
 import type { ArchiveHost } from "../archive";
@@ -388,7 +389,7 @@ describe("a Host of an older version", () => {
 		);
 		await expect(
 			b.knowledge.read("p1", "wiki/Home.md", { maxBytes: 1024 }),
-		).rejects.toThrow(new OlderHostError().message);
+		).rejects.toThrow(hostVersionWords("older"));
 	});
 });
 
