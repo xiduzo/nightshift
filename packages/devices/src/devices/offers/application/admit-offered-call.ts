@@ -16,6 +16,7 @@ import type {
 	WorkReply,
 	WorkRequest,
 } from "../../../contract";
+import { declaredCall } from "../domain/call-input";
 import { createOfferUse, type OfferUse, offerKey } from "../domain/offer-use";
 import {
 	folderNamed,
@@ -286,7 +287,11 @@ export function admitOfferedCall(ports: AdmitOfferedCallPorts): OfferAdmission {
 				call.kind !== "session" ||
 				!("offered" in call.input)
 			) {
-				yield* ports.serve(device, request, signal);
+				yield* ports.serve(
+					device,
+					{ ...request, call: declaredCall(call) },
+					signal,
+				);
 				return;
 			}
 			// Another Person's session: this computer's own profile, its caps.

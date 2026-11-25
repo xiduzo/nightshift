@@ -64,7 +64,9 @@ export type PermissionMode = (typeof PERMISSION_ORDER)[number];
 
 /** Whether `mode` is no wider than `cap`. */
 export function withinCap(mode: PermissionMode, cap: PermissionMode): boolean {
-	return PERMISSION_ORDER.indexOf(mode) <= PERMISSION_ORDER.indexOf(cap);
+	const at = PERMISSION_ORDER.indexOf(mode);
+	// A mode that is none of them is wider than any cap.
+	return at !== -1 && at <= PERMISSION_ORDER.indexOf(cap);
 }
 
 /** `mode`, narrowed to `cap` when it is wider. */

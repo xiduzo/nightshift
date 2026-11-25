@@ -22,7 +22,7 @@ const offer = {
 };
 
 /** This computer is Ada's. It offers "coder" to Bob's Space, and notes the calls it serves. */
-function setUp() {
+function setUp(profile: object = {}) {
 	const served: WorkRequest[] = [];
 	const admission = admitOfferedCall({
 		selfOwnerId: async () => "ada",
@@ -48,6 +48,7 @@ function setUp() {
 			permissionMode: "acceptEdits",
 			clis: [],
 			connections: [],
+			...profile,
 		}),
 		serve: async function* (_device, request) {
 			served.push(request);
@@ -307,5 +308,150 @@ test("a session under an Offer runs with its own folder and ids as they came", a
 	expect(served[0]?.call).toMatchObject({
 		kind: "session",
 		input: { cwd: WORKTREE, artifacts, knowledge: { projectId: "app" } },
+	});
+});
+
+/** Fields that no call declares, and those of a profile. */
+const undeclared = {
+	mcpServers: { x: { command: "x" } },
+	addDirs: ["/"],
+	toolsPath: "/bin",
+	harnessConfig: { a: "b" },
+	instructions: "x",
+	env: { A: "b" },
+	tools: [],
+	scrubEnv: [],
+	readOnly: false,
+	another: 1,
+};
+/** What the Walker decides of a session. */
+const step = {
+	cwd: WORKTREE,
+	prompt: "Do the work.",
+	resumeSessionId: "session-1",
+	stepReport: { outcomes: [{ name: "done" }] },
+	artifacts: { runId: RUN, stepId: "step-1" },
+	files: [{ name: "a.txt", mediaType: "text/plain", content: "" }],
+	knowledge: { projectId: "app" },
+	knowledgeOnly: { projectId: "app", folders: [] },
+	maxTurns: 3,
+	maxBudgetUsd: 1.5,
+};
+const inputOf = (request?: WorkRequest) =>
+	(request?.call as { input?: unknown } | undefined)?.input;
+
+describe("the input of a call", () => {
+	test("under an Offer is the Walker's step and the owner's profile", async () => {
+		const { ask, served } = setUp();
+		const call = session({
+			...step,
+			...undeclared,
+			harness: "codex",
+			model: "another",
+			permissionMode: "bypassPermissions",
+			effort: "high",
+			clis: ["gh"],
+			connections: ["github"],
+		});
+		expect(await ask(call)).toBe("served");
+		expect(inputOf(served[0])).toEqual({
+			...step,
+			underOffer: true,
+			harness: "claude-code",
+			model: "sonnet",
+			permissionMode: "acceptEdits",
+		});
+	});
+
+	test("under an Offer has no field the Walker left out", async () => {
+		const { ask, served } = setUp();
+		await ask(session());
+		expect(Object.keys(inputOf(served[0]) ?? {}).sort()).toEqual([
+			"cwd",
+			"harness",
+			"model",
+			"permissionMode",
+			"prompt",
+			"underOffer",
+		]);
+	});
+
+	test("under an Offer keeps what the owner's profile sets", async () => {
+		const { ask, served } = setUp({
+			effort: "low",
+			clis: ["jq"],
+			connections: ["linear"],
+		});
+		await ask(session({ effort: "high", clis: ["gh"], connections: ["x"] }));
+		expect(inputOf(served[0])).toMatchObject({
+			effort: "low",
+			clis: ["jq"],
+			connections: ["linear"],
+		});
+	});
+
+	test("under an Offer runs a mode that is known, within the cap", async () => {
+		for (const [asked, runs] of [
+			["plan", "plan"],
+			["bypassPermissions", "acceptEdits"],
+			["another", "acceptEdits"],
+		]) {
+			const { ask, served } = setUp();
+			await ask(
+				session({ offered: { profile: "coder", permissionMode: asked } }),
+			);
+			expect(inputOf(served[0])).toMatchObject({ permissionMode: runs });
+		}
+	});
+
+	test("of its owner's run is every field the call declares", async () => {
+		const part = [{ text: "x" }];
+		const declared: [string, object][] = [
+			[
+				"session",
+				{
+					...step,
+					harness: "codex",
+					model: "gpt",
+					permissionMode: "auto",
+					effort: "high",
+					clis: ["gh"],
+					connections: ["github"],
+					underOffer: true,
+				},
+			],
+			[
+				"exec",
+				{
+					command: "true",
+					cwd: WORKTREE,
+					env: { A: "b" },
+					secrets: ["KEY"],
+					outputFile: true,
+					knowledge: { projectId: "app" },
+					artifacts: { runId: RUN, stepId: "step-1" },
+					pid: true,
+				},
+			],
+			["callTool", { connection: "github", tool: "x", arguments: { a: 1 } }],
+			[
+				"request",
+				{
+					method: "GET",
+					url: part,
+					query: [{ name: "q", value: part }],
+					headers: [{ name: "h", value: part }],
+					body: { kind: "text", contentType: "text/plain", text: part },
+					timeoutMs: 1,
+					maxBytes: 1,
+				},
+			],
+		];
+		for (const [kind, input] of declared) {
+			const { ask, served } = setUp();
+			const call = { kind, input: { ...undeclared, ...input } } as never;
+			expect(await ask(call, { personId: "ada" })).toBe("served");
+			expect(inputOf(served[0])).toEqual(input);
+		}
 	});
 });

@@ -1,11 +1,11 @@
 import { type AgentProfileSettings, isKnowledgeId } from "@nightshift/flows";
 import type { WorkCall, WorkRequest } from "../../../contract";
+import { type OfferedInput, offeredInput } from "./call-input";
 import {
 	clampToCap,
 	type DeviceOffer,
 	offerFor,
 	offersNothingOr,
-	type PermissionMode,
 } from "./offers";
 
 /** The refusal of a call whose run names no starter. */
@@ -223,22 +223,23 @@ export function offeredCallRefusal(
  * An offered session as this computer runs it: its profile as its owner
  * set it (harness, model, effort, CLI tools, connections), and the
  * permission mode the node asks for, else the profile's, never wider than
- * the Offer's cap.
+ * the Offer's cap. From the Walker it takes only what the step declares
+ * (`OFFERED_FIELDS`).
  */
-export function offeredSession<
-	T extends { offered: { permissionMode?: PermissionMode } },
->(input: T, profile: AgentProfileSettings, cap: DeviceOffer["permissionCap"]) {
-	const { offered, ...rest } = input;
+export function offeredSession(
+	input: OfferedInput,
+	profile: AgentProfileSettings,
+	cap: DeviceOffer["permissionCap"],
+) {
 	return {
-		...rest,
+		...offeredInput(input),
 		// Another Person's step: the engine's Secret scope rule reads it
-		// (ADR 13, decision 5). Set after the spread, so no Walker can take
-		// it off.
-		underOffer: true,
+		// (ADR 13, decision 5).
+		underOffer: true as const,
 		harness: profile.harness,
 		model: profile.model,
 		permissionMode: clampToCap(
-			offered.permissionMode ?? profile.permissionMode,
+			input.offered.permissionMode ?? profile.permissionMode,
 			cap,
 		),
 		...(profile.effort !== undefined ? { effort: profile.effort } : {}),
