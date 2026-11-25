@@ -119,9 +119,15 @@ export function isRunId(runId: string): boolean {
 	return isKnowledgeId(runId);
 }
 
+/** The run's own branch: `nightshift/` and the short id, as its worktree has it. */
+function runBranchOf(runId: string | null): string | null {
+	return runId === null ? null : `nightshift/${runId.slice(0, 8)}`;
+}
+
 /** The run and the project a call names, beside those of its request. */
 function idsNamed(call: WorkCall): {
 	run?: RunNamed;
+	branch?: { name: string };
 	files?: { runId: string } | undefined;
 	knowledge?: ({ projectId: string } | undefined)[];
 } {
@@ -131,6 +137,8 @@ function idsNamed(call: WorkCall): {
 		case "runFolder":
 		case "receiveHandOff":
 			return { run: call.run };
+		case "handOff":
+			return { branch: { name: call.runBranch } };
 		case "session":
 			return {
 				files: call.input.artifacts,
@@ -144,7 +152,6 @@ function idsNamed(call: WorkCall): {
 		// A step's own `run` is the request's: `serveWork` sets it.
 		case "capabilities":
 		case "itemBranch":
-		case "handOff":
 		case "snapshotWorktree":
 		case "worktreeChanges":
 		case "readFile":
@@ -158,18 +165,19 @@ function idsNamed(call: WorkCall): {
 
 /**
  * Why a call does not work for the run and the project of its request, or
- * null when it does: the run it adds a folder for, the run it keeps files
- * of, the project whose knowledge it reads.
+ * null when it does: the run it adds a folder for, the run whose branch it
+ * hands on, the run it keeps files of, the project whose knowledge it reads.
  */
 export function foreignIds(
 	call: WorkCall,
 	{ runId, projectId }: Pick<WorkRequest, "runId" | "projectId">,
 ): string | null {
-	const { run, files, knowledge = [] } = idsNamed(call);
+	const { run, branch, files, knowledge = [] } = idsNamed(call);
 	if (run && (run.id !== runId || run.projectId !== projectId)) {
 		return "This device adds a folder only for the run that asks.";
 	}
 	if (
+		(branch && branch.name !== runBranchOf(runId)) ||
 		(files && files.runId !== runId) ||
 		knowledge.some((read) => read && read.projectId !== projectId)
 	) {

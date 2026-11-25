@@ -252,6 +252,33 @@ for (const [name, personId] of Object.entries(callers)) {
 			expect(served).toEqual([]);
 		});
 
+		test("hands on the branch of its own run", async () => {
+			const { ask, served } = setUp();
+			const handOff = (runBranch: string): WorkCall => ({
+				kind: "handOff",
+				cwd: WORKTREE,
+				runBranch,
+			});
+			for (const branch of [
+				"main",
+				"nightshift/abcdef13",
+				"nightshift/abcdef12-1-item",
+				`nightshift/${RUN}`,
+				"",
+				null as never,
+				undefined as never,
+			]) {
+				expect([branch, await ask(handOff(branch), { personId })]).toEqual([
+					branch,
+					OWN_IDS,
+				]);
+			}
+			expect(served).toEqual([]);
+			expect(await ask(handOff("nightshift/abcdef12"), { personId })).toBe(
+				"served",
+			);
+		});
+
 		test("keeps files and reads knowledge for its own run and project", async () => {
 			const own = {
 				artifacts: { runId: RUN, stepId: "step-1" },
