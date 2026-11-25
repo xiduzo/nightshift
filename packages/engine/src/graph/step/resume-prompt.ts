@@ -11,45 +11,52 @@ import { DEFAULT_RESUME_PROMPT } from "../context";
  * closes the Gate). A `StepReopened` carries all of it so far. What was
  * told twice before the session got it goes as one prompt, in order.
  *
- * Got: a session of the step that the harness named
- * (`HarnessSessionAssigned`). A harness names its session before its first
- * turn. The log cannot tell whether a session with no name got its prompt.
- * When the daemon died there or the harness failed, the prompt goes again
- * (at-least-once): nobody is there to say it again, and no turn acted on
- * it. When a person stopped the run there, it does not go again
- * (at-most-once): the run page shows it as sent, and the person who
- * continues can say it again.
+ * Got: a session of the step started after it. That session may have no
+ * name (`HarnessSessionAssigned`): a crash or a stop came first, and the log
+ * cannot tell whether the harness got the prompt. A harness names its
+ * session before its first turn, so no turn acted on it. Then one kind goes
+ * again (at-least-once): a resume of a step at rest, whose session had ended
+ * on its own (it asked, failed or hit a limit). All else goes once
+ * (at-most-once): an answer, a wake, and a resume of a step that a stop or a
+ * crash cut short at work.
  */
 export function resumePrompt(
 	run: RunState,
 	step: DerivedStep,
 	answer?: string,
 ): string {
-	const got = step.sessions.findLast(
-		(s) => s.harnessSessionId !== null || s.ending?.outcome === "stopped",
-	);
+	const started = step.sessions.at(-1)?.startSeq ?? -1;
+	const named =
+		step.sessions.findLast((s) => s.harnessSessionId !== null)?.startSeq ?? -1;
 	const reopened = step.openings.findLast(
-		(o) => o.prompt !== null && o.seq > (got?.startSeq ?? -1),
+		(o) => o.prompt !== null && o.seq > started,
 	);
-	const since = reopened?.seq ?? got?.startSeq ?? -1;
 	const told: { seq: number; prompt: string }[] = [];
 	for (const { seq, payload } of run.resumes) {
+		const { stepId, prompt, action } = payload;
 		// A run again tells a new visit (`rerunEntryOf`), not this step.
-		if (payload.stepId !== step.id || payload.action === "rerun") continue;
-		if (payload.prompt !== null) told.push({ seq, prompt: payload.prompt });
+		if (stepId !== step.id || action === "rerun" || prompt === null) continue;
+		if (seq > (atRest(step, seq) ? named : started)) told.push({ seq, prompt });
 	}
 	for (const { seq, stepId, payload } of run.earlyWakes) {
 		if (stepId !== step.id || payload.prompt === undefined) continue;
-		told.push({ seq, prompt: payload.prompt });
+		if (seq > started) told.push({ seq, prompt: payload.prompt });
 	}
 	const prompts = new Set([
 		...(reopened?.prompt ? [reopened.prompt] : []),
 		...(answer ? [answer] : []),
 		...told
-			.filter(({ seq }) => seq > since)
+			.filter(({ seq }) => seq > (reopened?.seq ?? -1))
 			.sort((a, b) => a.seq - b.seq)
 			.map(({ prompt }) => prompt),
 	]);
 	prompts.delete(DEFAULT_RESUME_PROMPT);
 	return [...prompts].join("\n\n") || DEFAULT_RESUME_PROMPT;
+}
+
+/** Whether the step's session had ended on its own at `seq`: nothing cut it short at work. */
+function atRest(step: DerivedStep, seq: number): boolean {
+	const session = step.sessions.findLast((s) => s.startSeq < seq);
+	const outcome = session?.ending?.outcome;
+	return outcome === "finished" || outcome === "failed";
 }

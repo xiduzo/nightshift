@@ -358,8 +358,7 @@ const FAULTS: [Fault, (P: string) => string[]][] = [
 	[stop("checkpoint"), (P) => [P + AND]],
 	[stop("StepReopened"), (P) => [P + AND]],
 	[stop("SessionStarted"), (P) => [P + AND]],
-	// The person sees it as sent, and it does not go again.
-	[stop("HarnessSessionAssigned"), (P) => [P, "And this."]],
+	[stop("HarnessSessionAssigned"), (P) => [P, P + AND]],
 ];
 for (const [fault, expected] of FAULTS) {
 	for (const past of [["stop"], ["park", "drop"]] as Past[][]) {

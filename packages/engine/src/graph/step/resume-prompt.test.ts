@@ -19,9 +19,9 @@ const session = (log: Log, id: string) => {
 		{ stepId: "s1", sessionId: id },
 	);
 };
-/** A session the harness did not name, and how it ended. */
-const unnamed = (log: Log, outcome: "stopped" | "interrupted" | "failed") =>
-	log.sessionStarted("s1", "nameless").push(
+type Outcome = "finished" | "stopped" | "interrupted" | "failed";
+const end = (log: Log, id: string, outcome: Outcome) =>
+	log.push(
 		"SessionEnded",
 		{
 			outcome,
@@ -31,8 +31,13 @@ const unnamed = (log: Log, outcome: "stopped" | "interrupted" | "failed") =>
 			costUsd: null,
 			resetAt: null,
 		},
-		{ stepId: "s1", sessionId: "nameless" },
+		{ stepId: "s1", sessionId: id },
 	);
+/** `worked`, and its session ended on its own: the step is at rest. */
+const asked = () => end(worked(), "first", "finished");
+/** A session the harness did not name, and how it ended. */
+const unnamed = (log: Log, outcome: Outcome) =>
+	end(log.sessionStarted("s1", "nameless"), "nameless", outcome);
 const told = (log: Log, prompt: string, stepId = "s1") =>
 	log.resumed("worker", stepId, { prompt, by: "person" });
 const reopened = (log: Log, prompt: string) =>
@@ -95,13 +100,34 @@ describe("what a session was told and did not get yet", () => {
 		expect(promptOf(log)).toBe("Postgres.\n\nHurry.");
 	});
 
-	test("a session with no name: again after a crash or a failure, not after a person's stop", () => {
-		const opened = () => reopened(told(worked(), "First."), "First.");
+	test("a session with no name: a resume of a step at rest goes again", () => {
+		const opened = () => reopened(told(asked(), "First."), "First.");
 		expect(promptOf(opened().sessionStarted("s1", "open"))).toBe("First.");
-		expect(promptOf(unnamed(opened(), "interrupted"))).toBe("First.");
-		expect(promptOf(unnamed(opened(), "failed"))).toBe("First.");
-		const stopped = unnamed(opened(), "stopped");
-		expect(promptOf(stopped)).toBe(DEFAULT_RESUME_PROMPT);
-		expect(promptOf(told(stopped, "Second."))).toBe("Second.");
+		for (const outcome of ["interrupted", "failed", "stopped"] as const) {
+			expect(promptOf(unnamed(opened(), outcome))).toBe("First.");
+		}
+		const failed = end(worked(), "first", "failed");
+		expect(
+			promptOf(unnamed(reopened(told(failed, "First."), "First."), "stopped")),
+		).toBe("First.");
+		const stopped = told(unnamed(opened(), "stopped"), "Second.");
+		expect(promptOf(stopped)).toBe("First.\n\nSecond.");
+	});
+
+	test("a session with no name: an answer, a wake, and a resume of work cut short do not go again", () => {
+		const cut = end(worked(), "first", "stopped");
+		expect(promptOf(unnamed(told(cut, "First."), "interrupted"))).toBe(
+			DEFAULT_RESUME_PROMPT,
+		);
+		const woken = asked().push(
+			"WaitEnded",
+			{ early: true, by: "person", prompt: "Now." },
+			{ stepId: "s1" },
+		);
+		expect(promptOf(unnamed(woken, "interrupted"))).toBe(DEFAULT_RESUME_PROMPT);
+		const answered = reopened(asked().gateOpened("s1"), "Postgres.");
+		expect(promptOf(unnamed(answered, "interrupted"))).toBe(
+			DEFAULT_RESUME_PROMPT,
+		);
 	});
 });

@@ -41,7 +41,7 @@ A run of a project without a folder starts in an empty folder of its own. See [T
 ## Stop and resume
 
 - **Stop now** stops the run at once. **Stop after this step** lets the current step finish first.
-- **Resume** continues a stopped, failed, or interrupted run at its last step. You can resume it from any computer of its Space. When agents wait on several branches, your prompt goes to the agent that the run page names.
+- **Resume** continues a stopped, failed, or interrupted run at its last step. You can resume it from any computer of its Space. Your prompt goes to the agent that the run page names. When no agent waits, there is no field for a prompt.
 - **Run again from here** on a step runs the flow again from that step.
 - **Take over** copies the command that continues the agent's work in a terminal, on the computer of the run. On the phone, you share the command.
 

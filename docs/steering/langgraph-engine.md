@@ -161,7 +161,7 @@ packages/engine/src/
                            the same question: planReentry() says what
                            RunResumed records and how the thread moves for a
                            resume, a restart or a rerun, pure; with
-                           resumeTarget and reentryUpdate.
+                           reentryUpdate.
     step/sleep.ts          The sleep module (below): sleep() plans a wait
                            (the policy's, or a Wait node's own) and persists
                            it; waitNode(nodeId) is the one wait node;
@@ -780,11 +780,11 @@ their running step. The thread can sit at several interrupts
 - An answer to a Gate while another branch's step still runs is refused,
   with words for that.
 - `RunResumed` names one Agent step, and the prompt goes to its session.
-  It is the step that started last of those that wait (`targetOf` in
-  `reentry.ts`): the step of an interrupt, or the one that a pending task
-  takes up. The run page names the same step (`resumedStep` in
-  `packages/client`). The other branches continue with "Continue where you
-  left off.".
+  One rule picks it from the log (`waitingSession` in `read/`): the step
+  that started last of those whose sessions wait. `planReentry` and the run
+  page (`RunDetail.resumeStepId`) ask that rule. When no session waits, the
+  page has no field for a prompt. The other branches continue with
+  "Continue where you left off.".
 
 **Crash.** `crash.test.ts` walks a fan-out too, with a crash and a stop
 before every write. A fan-out whose commit was lost continues from the
@@ -841,13 +841,13 @@ reads the log only:
 - Told: a `RunResumed` that names the step, the `WaitEnded` of a person who
   woke it, and the answer at its Gate. A `StepReopened` carries all of it
   so far. What a person said in two resumes goes as one prompt, in order.
-- Got: a session of the step that the harness named
-  (`HarnessSessionAssigned`). A harness names its session before its first
-  turn.
-- The log cannot tell whether a session with no name got its prompt. After
-  a crash or a harness failure the prompt goes again (at-least-once). After
-  a person's stop it does not (at-most-once): the run page shows it as
-  sent.
+- Got: a session of the step started after it. The harness names its
+  session (`HarnessSessionAssigned`) before its first turn. The log cannot
+  tell whether a session with no name got its prompt.
+- Then a resume of a step at rest goes again (at-least-once). At rest: its
+  session had ended on its own, because it asked, failed or hit a limit.
+- All else goes once (at-most-once): an answer, a wake, and a resume of a
+  step that a stop or a crash cut short at work.
 - Else "Continue where you left off.".
 
 The prompt and the harness session are set only for a step with a harness
@@ -895,10 +895,8 @@ when no drive holds it.
 
 The planner reads the helpers of the node side:
 
-- `targetOf`: the node, and the Agent step whose harness session gets the
-  prompt, from the thread and the log. With no session that waits, and for
-  a thread that ended or never ran, `resumeTarget` says it from the log.
-  None for a step that is done.
+- `waitingSession` (`read/`): the Agent step whose harness session gets the
+  prompt. Without one, `resumeTarget` gives the node.
 - `reentryUpdate`: the seed state of a thread with no checkpoint.
 
 The run position says where the run is: `reenteredNode` (the last
