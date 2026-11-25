@@ -20,7 +20,13 @@ import {
 	type Taken,
 	type TakeOptions,
 } from "./turn";
-import { type createSleeps, planWake, recordWake, type Wake } from "./wake";
+import {
+	type createSleeps,
+	holdsGate,
+	planWake,
+	recordWake,
+	type Wake,
+} from "./wake";
 
 const DRIVING: Taken = { kind: "driving" };
 /** An answer to a Gate on one branch while another branch's step still runs. */
@@ -30,6 +36,10 @@ const BRANCHES_WORK =
 /** A resume of a sleeping run whose walk is not where the sleep is. */
 const CANNOT_WAKE =
 	"Night Shift could not wake this run. Stop the run, then resume it.";
+
+/** An answer to a Gate whose answer the thread holds already. */
+const ANSWERED =
+	"This Gate has its answer. The run goes on with it when the steps beside it wake.";
 
 const HALTED: Taken = { kind: "halted" };
 const QUEUED: Taken = { kind: "queued" };
@@ -97,6 +107,18 @@ export function createTurns(
 		if (flow && branchPlaces(flow).size > 0) {
 			throw new RunRefusal("not-now", BRANCHES_WORK);
 		}
+		// The thread holds this Gate's answer already: its step goes on
+		// once the sleepers beside it woke. A second answer would go to
+		// one of them.
+		const at = await threadOf(row).state();
+		if (
+			at.kind === "interrupted" &&
+			!at.interrupts.some(
+				({ value }) => value.kind === "gate" && value.stepId === intent.stepId,
+			)
+		) {
+			throw new RunRefusal("gate-closed", ANSWERED);
+		}
 		if (!reserve(row.id, intent, options)) return QUEUED;
 		// The Gate's deadline, if it has one, no longer applies.
 		sleeps.forget(row.id);
@@ -112,7 +134,7 @@ export function createTurns(
 			...(via ? { via } : {}),
 		};
 		// Parallel branches may hold several Gates: the answer goes to its own.
-		const each = resumeEach(await threadOf(row).state(), (parked) =>
+		const each = resumeEach(at, (parked) =>
 			parked.kind === "gate" && parked.stepId === intent.stepId ? value : null,
 		);
 		drive(row, inputOf({ kind: "resume", value, ...(each ? { each } : {}) }));
@@ -346,8 +368,14 @@ export function createTurns(
 			case "answer":
 				return answerTurn(row, intent, options);
 			case "wake":
-				// The timer of a Gate's deadline: the run waits, it does not sleep.
-				if (!intent.early && runState.status === "waiting") {
+				// The timer of a Gate's deadline: the run waits, it does not
+				// sleep. A Gate whose answer the thread holds waits no more: the
+				// timer is a sleeper's beside it (`planWake`).
+				if (
+					!intent.early &&
+					runState.status === "waiting" &&
+					holdsGate(await threadOf(row).state())
+				) {
 					return deadlineTurn(row, runState, options);
 				}
 				return wakeTurn(row, runState, intent, intent, options);

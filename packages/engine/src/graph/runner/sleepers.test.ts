@@ -191,8 +191,8 @@ async function walk(name: keyof typeof SHAPES, crash: number) {
 
 /** Each shape, its first write in a sleep, and the number of its writes. The last one is `RunEnded`. */
 const WALKS = [
-	["two Agents", 16, 51],
-	["an Agent and a Wait", 11, 45],
+	["two Agents", 16, 50],
+	["an Agent and a Wait", 11, 44],
 	["one Agent", 4, 22],
 ] as const;
 for (const [name, from, total] of WALKS) {
@@ -219,6 +219,57 @@ for (const [name, from, total] of WALKS) {
 		{ timeout: 60_000 },
 	);
 }
+
+test("a Gate beside a sleeper: the answer goes on when the sleeper wakes, and a second answer is refused", async () => {
+	let now = T0;
+	const harness = fakeHarness((input) =>
+		input.resumeSessionId
+			? reportingScript("pass", "Done.")
+			: input.prompt === "Do a" && now < (RESET.a as number)
+				? usageLimitScript((RESET.a as number) - 1000)
+				: reportingScript("needs-input", "Which one?"),
+	);
+	const h = await startRun(
+		sandbox,
+		beside(agent("b", "Do b", { ask: "person" }), "pass"),
+		{ harness, now: () => now },
+	);
+	const runner = testRunner(h, { overdueSweepMs: 3_600_000 });
+	const state = async () => foldRun(await h.events());
+	const still = () => waitFor(() => !runner.isActive(h.runId));
+	try {
+		await runner.take(h.runId, {
+			kind: "start",
+			prepare: async () => ({
+				row: await getRunRow(sandbox.db, h.runId),
+				inputs: {},
+				stopAt: null,
+			}),
+		});
+		const gate = await waitFor(async () => (await state()).gate ?? false);
+		await still();
+		const answer = () =>
+			runner.take(h.runId, {
+				kind: "answer",
+				stepId: gate.stepId,
+				choice: "answer",
+				note: "The red one.",
+			});
+		await answer();
+		await still();
+		// The Agent goes on with the answer in the super-step after it, which
+		// comes once the sleeper beside it woke.
+		await expect(answer()).rejects.toThrow("This Gate has its answer.");
+		now = RESET.a as number;
+		await runner.take(h.runId, { kind: "wake", early: false });
+		await waitFor(async () => (await state()).status === "finished");
+		expect(
+			harness.calls.filter((call) => call.prompt === "The red one."),
+		).toHaveLength(1);
+	} finally {
+		await runner.release();
+	}
+});
 
 test("recovery keeps every sleeper", () => {
 	const open = openWork(both().state(), { kind: "interrupted" });

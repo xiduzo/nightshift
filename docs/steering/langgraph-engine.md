@@ -814,7 +814,11 @@ once).
 Two branches may each hold a Gate or an Agent's ask at once, and each
 answer goes to its own step. An Agent's ask closes in the log when its
 step reopens, in the super-step after the answer. So while another
-branch still waits, the answered ask looks open.
+branch still waits, the answered ask looks open. The thread lists no interrupt
+for an answered task (`ThreadState`). So a second answer is refused, and
+the timer of a sleeper beside the answered ask wakes the run, though the
+log still reads `waiting`. The Agent goes on with the answer when that
+sleeper wakes: a super-step ends only when all its tasks end.
 
 ## The resume point (`graph/step/resume-point.ts`)
 

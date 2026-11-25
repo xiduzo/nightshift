@@ -73,8 +73,8 @@ export type ThreadState =
 	/**
 	 * The thread sits at an interrupt: a wait, a Gate, or a parked step.
 	 * Parallel branches can sit at several (`interrupts`, `value` is the
-	 * first). A branch already answered may still be listed until the
-	 * super-step ends: a resume aims at an interrupt by its step.
+	 * first). A branch already answered is not listed: its super-step waits
+	 * for the others, and it goes on with them.
 	 */
 	| { kind: "interrupted"; value: Parked; interrupts: Interrupt[] }
 	/**
@@ -215,8 +215,10 @@ function stateOf(
 	values: Partial<RunStateValues>,
 	hasCheckpoint: boolean,
 ): ThreadState {
+	// A task that has its result took its answer: its super-step waits only
+	// for the other tasks.
 	const interrupts = snapshot.tasks
-		.flatMap((task) => task.interrupts)
+		.flatMap((task) => (task.result === undefined ? task.interrupts : []))
 		.filter((i) => i.value !== undefined && i.id !== undefined)
 		.map((i) => ({ id: i.id as string, value: i.value as Parked }));
 	const [interrupt] = interrupts;

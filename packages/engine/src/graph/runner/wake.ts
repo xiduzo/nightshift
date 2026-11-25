@@ -75,12 +75,7 @@ export function planWake(
 	how: Wake,
 	now: number,
 ): WakePlan {
-	if (run.status !== "sleeping") {
-		return { kind: "not-sleeping" };
-	}
-	if (at.kind === "fresh" || at.kind === "ended") {
-		return { kind: "not-sleeping" };
-	}
+	if (!asleepIn(run, at)) return { kind: "not-sleeping" };
 	const sleeping = wakesNext(run, how.signal);
 	const step = run.steps.get(sleeping?.stepId ?? "");
 	if (!sleeping || !step) return { kind: "not-sleeping" };
@@ -121,6 +116,27 @@ export function planWake(
 			...(interrupts.length > 1 ? { each } : {}),
 		},
 	};
+}
+
+/**
+ * Whether the run sleeps for a wake: the log says it sleeps, or it says a
+ * Gate waits while the thread holds the Gate's answer already. An Agent's
+ * Gate closes in the log only when its step goes on, in the super-step
+ * after the answer, and that super-step comes only once the sleepers beside
+ * it woke. So the log still reads "waiting" while the run sleeps.
+ */
+function asleepIn(run: RunState, at: ThreadState): boolean {
+	if (at.kind === "fresh" || at.kind === "ended") return false;
+	if (run.status === "sleeping") return true;
+	return run.status === "waiting" && run.waits.length > 0 && !holdsGate(at);
+}
+
+/** Whether the thread sits at a Gate that waits for its answer. */
+export function holdsGate(at: ThreadState): boolean {
+	return (
+		at.kind === "interrupted" &&
+		at.interrupts.some(({ value }) => value.kind === "gate")
+	);
 }
 
 /** What `recordWake` writes to. */
