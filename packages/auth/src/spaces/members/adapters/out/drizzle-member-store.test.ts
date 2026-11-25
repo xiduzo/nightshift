@@ -74,6 +74,17 @@ describe("MemberStore over drizzle", () => {
 		]);
 	});
 
+	test("a membership is of its Person: another Member's is not read", async () => {
+		await under.seed.membership({
+			id: "m-ada",
+			spaceId: "platform",
+			personId: "ada",
+			role: "owner",
+			createdAt: 1,
+		});
+		expect(await under.memberStore.membershipOf("platform", "bo")).toBeNull();
+	});
+
 	test("adds a membership, gives it a role, removes it", async () => {
 		await under.memberStore.add({
 			id: "m-1",

@@ -141,6 +141,13 @@ describe("TargetStore over drizzle", () => {
 		expect(await store.remove("ada", "t1")).toBeNull();
 	});
 
+	test("removing one target leaves the Person's others", async () => {
+		await store.upsert(target("t1", "ada"));
+		await store.upsert(target("t2", "ada"));
+		expect((await store.remove("ada", "t1"))?.id).toBe("t1");
+		expect((await store.of("ada")).map((t) => t.id)).toEqual(["t2"]);
+	});
+
 	test("forgets these targets", async () => {
 		await store.upsert(target("t1", "ada"));
 		await store.upsert(target("t2", "ada"));

@@ -184,12 +184,14 @@ describe("DeviceStore over drizzle", () => {
 		expect(await store.homePersons()).toEqual([ada]);
 	});
 
-	test("forget removes a paired row, never this computer's", async () => {
+	test("forget removes one paired row, never this computer's", async () => {
 		await store.addSelf({ id: "self-1", name: "s", platform: "linux" });
 		await under.run(store.joinRows(pairing));
+		await under.run(store.joinRows({ ...pairing, id: "d-second" }));
 		await store.forget(pairing.id, under.engine);
 		await store.forget("self-1", under.engine);
 		expect(await store.paired(pairing.id)).toBeNull();
+		expect(await store.paired("d-second")).not.toBeNull();
 		expect(await store.selfId()).toBe("self-1");
 	});
 

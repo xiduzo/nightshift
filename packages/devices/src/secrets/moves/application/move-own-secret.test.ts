@@ -52,6 +52,22 @@ describe("moveOwnSecret", () => {
 		expect(p.own.moved).toEqual([["move", "A_TOKEN", "personal"]]);
 	});
 
+	test("serves a secret call, and no call of another kind", async () => {
+		const p = inMemoryMovesPorts();
+		p.calls.setHome({ hostId: "host-1", personId: "person-ada" });
+		const secret = secretCall("person-ada");
+		const other = {
+			...secret,
+			call: { ...secret.call, kind: "exec" },
+		} as unknown as WorkRequest;
+		expect(
+			await repliesOf(moveOwnSecret(p)({ request: other, hostId: "host-1" })),
+		).toEqual([
+			{ kind: "error", message: "This device cannot move its secrets." },
+		]);
+		expect(p.own.moved).toEqual([]);
+	});
+
 	test("the keychain copy stays when the save in the new scope fails", async () => {
 		const p = inMemoryMovesPorts();
 		p.calls.setHome({ hostId: "host-1", personId: "person-ada" });

@@ -24,6 +24,7 @@ describe("PersonalSecretStore over drizzle", () => {
 	test("gives the values of the names asked, and the owner's only", async () => {
 		const { personalSecretStore: store } = await make(() => 1);
 		await store.set("person-ada", "A_TOKEN", "value-a", null);
+		await store.set("person-ada", "C_TOKEN", "value-c", null);
 		await store.set("person-bob", "B_TOKEN", "value-b", null);
 		expect(
 			await store.values("person-ada", ["A_TOKEN", "B_TOKEN", "A_TOKEN"]),

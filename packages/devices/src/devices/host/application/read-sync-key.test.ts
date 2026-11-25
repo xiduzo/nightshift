@@ -35,4 +35,31 @@ describe("readSyncKey", () => {
 		p.settings.enabled = false;
 		expect(await readSyncKey(p)(documentToken("tok"))).toBeNull();
 	});
+
+	test("a key counts while its Device has access here", async () => {
+		const p = inMemoryHostPorts();
+		p.keys.access.set("tok:sync", {
+			keyId: "k",
+			deviceId: "laptop",
+			personId: "ada",
+			permissions: { sync: ["pull"] },
+		});
+		const read = () => readSyncKey(p)(documentToken("tok"));
+		// Not paired here.
+		expect(await read()).toBeNull();
+		const paired = {
+			id: "laptop",
+			name: "laptop",
+			platform: "test",
+			ownerId: "ada",
+			homeHost: null,
+			lastSeenAt: null,
+			online: true,
+			pairedAt: 0,
+		};
+		p.registry.put({ ...paired, revokedAt: null });
+		expect(await read()).toMatchObject({ deviceId: "laptop", home: false });
+		p.registry.put({ ...paired, revokedAt: 5 });
+		expect(await read()).toBeNull();
+	});
 });

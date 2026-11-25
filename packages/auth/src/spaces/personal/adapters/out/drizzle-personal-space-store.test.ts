@@ -69,6 +69,37 @@ describe("PersonalSpaceStore over drizzle", () => {
 		expect(await store.membershipId("shared", ADA)).toBe("m-shared");
 	});
 
+	test("a personal Space and a membership are of their Person only", async () => {
+		await under.seed.person({ id: "bo", name: "Bo", email: "b@x.org" });
+		await store.create(personal);
+		expect(await store.personalSpaceId("bo")).toBeNull();
+		expect(await store.membershipId("mine", "bo")).toBeNull();
+	});
+
+	test("splitting takes only the Person who leaves out of the Host's Space", async () => {
+		await under.seed.person({ id: "bo", name: "Bo", email: "b@x.org" });
+		await store.create(personal);
+		await under.seed.membership({
+			id: "m-bo",
+			spaceId: "mine",
+			personId: "bo",
+			role: "member",
+		});
+		await under.run(
+			store.splitRows({
+				personId: ADA,
+				from: "mine",
+				to: "new",
+				name: "Personal",
+				slug: "personal-ada-new",
+				membershipId: "m-new",
+				fromName: "Personal on Host",
+			}),
+		);
+		expect(await store.membershipId("mine", "bo")).toBe("m-bo");
+		expect(await store.membershipId("mine", ADA)).toBeNull();
+	});
+
 	for (const member of [true, false]) {
 		test(`adopting makes the Host's Space the personal one${member ? "" : ", also without a membership of it"}`, async () => {
 			await store.create(personal);

@@ -95,6 +95,33 @@ describe("openRequest", () => {
 		).rejects.toThrow("Sign in to use Night Shift.");
 	});
 
+	test("without a session, no Member change reaches the organizations", async () => {
+		const ports = inMemoryAccessPorts();
+		const asked: string[] = [];
+		const record = (what: string) => async () => {
+			asked.push(what);
+			throw new Error(what);
+		};
+		const access = await openRequest({
+			...ports,
+			organizations: {
+				...ports.organizations,
+				invite: record("invite"),
+				setRole: record("setRole"),
+				remove: record("remove"),
+			},
+		})({ headers: new Headers(), local: null, policy: OPEN_HOST });
+		for (const change of [
+			() => access.members.invite("a@example.com", "member"),
+			() => access.members.setRole("m-1", "admin"),
+			() => access.members.remove("m-1"),
+		]) {
+			await expect(change()).rejects.toThrow("Sign in to use Night Shift.");
+		}
+		expect(asked).toEqual([]);
+		expect(await access.can({ run: ["start"] })).toBe(false);
+	});
+
 	test("a Space made through the request gets a slug of its name, and the memberships are read again", async () => {
 		const ports = inMemoryAccessPorts();
 		const access = await openRequest(ports)({
