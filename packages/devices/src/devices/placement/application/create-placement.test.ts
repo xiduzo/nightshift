@@ -70,6 +70,17 @@ function placementWith(
 	);
 	const online = new Set(given.online ?? paired.map((d) => d.id));
 	const planned: { devices: PlanDevices; personId: string | null }[] = [];
+	/** The calls of the ports, in order. */
+	const calls: string[] = [];
+	const said = <A extends unknown[], R>(
+		name: string,
+		call: (...args: A) => R,
+	) => {
+		return (...args: A): R => {
+			calls.push(name);
+			return call(...args);
+		};
+	};
 	const offers = new Map(
 		(given.offering ?? []).map((deviceId) => [
 			deviceId,
@@ -87,37 +98,50 @@ function placementWith(
 	);
 	const placement = createPlacement({
 		device: { id: SELF, name: "This computer" },
-		walkerId: async () => WALKER,
+		walkerId: said("walkerId", async () => WALKER),
 		registry: {
-			selfOwnerId: async () => OWNER,
-			list: async (person: string) =>
+			selfOwnerId: said("selfOwnerId", async () => OWNER),
+			list: said("list", async (person: string) =>
 				paired.filter((d) => d.ownerId === person),
-			get: async (id: string) => paired.find((d) => d.id === id) ?? null,
+			),
+			get: said(
+				"get",
+				async (id: string) => paired.find((d) => d.id === id) ?? null,
+			),
 		},
-		documents: { open: async () => ({ offers }) },
-		hostSpaces: { hostOf: async () => (given.hosted ? HOST : null) },
+		documents: { open: said("open", async () => ({ offers })) },
+		hostSpaces: {
+			hostOf: said("hostOf", async () => (given.hosted ? HOST : null)),
+		},
 		spacePeople: {
 			...inMemorySpacePeople({
 				personalId: given.personal ?? null,
 				keptByHome: true,
 			}),
-			personInSpace: async (_space: string, id: string | null) =>
-				(id && given.known?.[id]) ?? id,
+			personInSpace: said(
+				"personInSpace",
+				async (_space: string, id: string | null) =>
+					(id && given.known?.[id]) ?? id,
+			),
+			keptByHomeHost: said("keptByHomeHost", async () => true),
 		},
 		projects: {
-			find: async () => ({ folder: true, repoPath: "/repo" }),
-			clones: async () =>
+			find: said("find", async () => ({ folder: true, repoPath: "/repo" })),
+			clones: said("clones", async () =>
 				[...paired.map((d) => d.id), ...(given.offering ?? [])].map(
 					(deviceId) => ({ deviceId }),
 				),
+			),
 		},
 		profiles: { here: () => null, lastKnown: async () => null },
-		keptDevice: async () => null,
+		keptDevice: said("keptDevice", async () => null),
 		flows: async () => ({}),
 		...(given.work === false
 			? {}
-			: { work: { online: (id: string) => online.has(id) } }),
-		...(given.hosted ? { relay: { devices: given.hosted } } : {}),
+			: { work: { online: said("online", (id: string) => online.has(id)) } }),
+		...(given.hosted
+			? { relay: { devices: said("devices", given.hosted) } }
+			: {}),
 		...(given.copyName !== undefined
 			? {
 					copies: inMemoryDeviceCopies([
@@ -130,11 +154,12 @@ function placementWith(
 				}
 			: {}),
 		isHost: () => given.isHost ?? false,
-		offersHere: async () =>
+		offersHere: said("offersHere", async () =>
 			given.offersHere
 				? [{ profile: "p-coder", profileName: "coder", permissionCap: "auto" }]
 				: [],
-		mayUseOffers: async () => given.mayUse ?? false,
+		),
+		mayUseOffers: said("mayUseOffers", async () => given.mayUse ?? false),
 		engineFns: {
 			planNodes: async (
 				_start: unknown,
@@ -153,6 +178,7 @@ function placementWith(
 	const list = (person = OWNER) => placement.devicesFor(SPACE, person, PROJECT);
 	return {
 		placement,
+		calls,
 		planned,
 		list,
 		ids: async (person?: string) => (await list(person)).map((d) => d.deviceId),
@@ -431,5 +457,67 @@ describe("a Device of the plan, and a move", () => {
 			name: "Laptop",
 		});
 		expect(await placement.moveTo(run, actor, WALKER)).toBeNull();
+	});
+});
+
+describe("the calls of the ports", () => {
+	const listKept = [
+		...["find", "walkerId", "hostOf", "clones", "list"],
+		...["keptDevice", "online"],
+		...["selfOwnerId", "personInSpace", "personInSpace"],
+		...["find", "open", "clones", "walkerId", "get", "online"],
+	];
+	const listHosted = [
+		...["find", "walkerId", "hostOf", "keptByHomeHost"],
+		...["selfOwnerId", "personInSpace", "devices"],
+		...["selfOwnerId", "personInSpace", "personInSpace"],
+		...["find", "open", "clones", "walkerId"],
+	];
+
+	test("of a list of the Devices in a Space kept here", async () => {
+		const run = placementWith({
+			paired: [LAPTOP, THEIRS],
+			offering: ["theirs"],
+		});
+		await run.list();
+		expect(run.calls).toEqual(listKept);
+	});
+
+	test("of a list of the Devices in a Space a Host keeps", async () => {
+		const run = placementWith({
+			copyName: "Laptop",
+			hosted: async () => [listed("laptop")],
+		});
+		await run.list();
+		expect(run.calls).toEqual(listHosted);
+	});
+
+	test("of a plan ask the Host for its list once, and only when a Device is asked for", async () => {
+		const run = placementWith({
+			copyName: "Laptop",
+			hosted: async () => [listed("laptop")],
+		});
+		const { devices } = await run.plan();
+		expect(run.calls).toEqual([
+			...["personInSpace", "hostOf", "selfOwnerId", "personInSpace", "hostOf"],
+		]);
+		run.calls.length = 0;
+		await devices.profilesOf?.("laptop");
+		expect(run.calls).toEqual(listHosted);
+		await devices.profilesOf?.("laptop");
+		await devices.lastResort?.();
+		expect(run.calls).toEqual(listHosted);
+	});
+
+	test("of the walk of a plan ask the Host for its list once, at the same time too", async () => {
+		const run = placementWith({
+			copyName: "Laptop",
+			hosted: async () => [listed("laptop"), listed("other")],
+		});
+		const { devices } = await run.plan();
+		run.calls.length = 0;
+		await Promise.all([devices.byId("laptop"), devices.nodeDevice("other")]);
+		await devices.nodeDevice("laptop");
+		expect(run.calls.filter((call) => call === "devices")).toHaveLength(1);
 	});
 });
