@@ -345,6 +345,15 @@ describe("httpsLink", () => {
 				),
 		],
 		[
+			"another refusal of this Host",
+			() =>
+				Promise.reject(
+					new ORPCError("CONFLICT", {
+						data: { device: "older", hostId: "host-a" },
+					}),
+				),
+		],
+		[
 			"this Host, with an answer that does not fit",
 			async () => ({ ...hello([]), spaces: undefined }),
 		],

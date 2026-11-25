@@ -6,6 +6,7 @@ import {
 	type HostClient,
 	type HostHello,
 	helloSaidBy,
+	hostAnswer,
 	hostHelloSchema,
 	hostVersionOf,
 } from "../contract";
@@ -423,7 +424,7 @@ export function httpsLink(options: HttpsLinkOptions): Link {
 			throw new Error(`Another than ${link.name} answered.`);
 		}
 		if (said.host) throw new OtherVersionError(said.host);
-		return hostHelloSchema.parse(answer);
+		return hostAnswer(hostHelloSchema, answer);
 	}
 
 	async function answer(address: string): Promise<HostHello> {

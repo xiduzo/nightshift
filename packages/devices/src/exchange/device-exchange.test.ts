@@ -546,6 +546,48 @@ describe("the Device's exchange with its Host", () => {
 		expect(await eventsOf(b, run.id)).toEqual(await eventsOf(a, run.id));
 	});
 
+	for (const [what, change] of [
+		["row", (e: object) => ({ ...e, at: "soon" })],
+		["cursor", null],
+	] as const) {
+		test(`a batch with a ${what} that does not fit is not stored, and the stream starts again`, async () => {
+			const run = await paired.host
+				.space(a.spaceId, NIGHT_SHIFT)
+				.startRun({ projectId, flow: gateFlow });
+			await untilStatus(paired.host, run.id, "waiting");
+			await paired.projectOnDevice(projectId);
+
+			const client = paired.memory.client(paired.key);
+			let streams = 0;
+			online(
+				withSync(client, {
+					stream: (async (input: never, options: never) => {
+						streams++;
+						const batches = await client.sync.stream(input, options);
+						return (async function* () {
+							for await (const batch of batches) {
+								yield change
+									? {
+											...batch,
+											rows: {
+												...batch.rows,
+												events: batch.rows.events.map(change),
+											},
+										}
+									: { ...batch, cursors: { s: { w: "last" } } };
+							}
+						})();
+					}) as never,
+				}),
+			);
+			await waitFor(() => streams >= 2, { label: "a stream again" });
+			expect(await paired.device.exchange.cursorsWith(paired.hostId)).toEqual(
+				{},
+			);
+			expect(await statusOn(paired.device, run.id)).toBeNull();
+		});
+	}
+
 	test("a Gate answered on A travels to B as a Command; B applies it and the run finishes on both", async () => {
 		const run = await walkOnB(gateFlow);
 		online();

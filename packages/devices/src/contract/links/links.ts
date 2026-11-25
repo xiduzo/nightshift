@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { deviceId } from "../procedure";
 
 /** What a Device and its Host say over its Link, and how pairing goes. */
 
@@ -14,7 +15,8 @@ export type ListedSpace = z.infer<typeof listedSpaceSchema>;
 
 /** The Host, as a Device knows it. */
 const hostSchema = z.object({
-	id: z.string(),
+	/** Its own Device id. */
+	id: deviceId,
 	name: z.string(),
 	addresses: z.array(z.string()),
 });
@@ -61,14 +63,14 @@ export const pairingRedeemedSchema = z.union([
 	z.object({ status: z.enum(["pending", "slow-down", "denied", "expired"]) }),
 	z.object({
 		status: z.literal("joined"),
-		key: z.string(),
-		personId: z.string(),
+		key: z.string().min(1),
+		personId: z.string().min(1),
 		host: hostSchema,
 		/**
 		 * The Device the Host joined it as: another id than it asked for when
 		 * this computer already has a Device there (ADR 20).
 		 */
-		deviceId: z.string(),
+		deviceId,
 		/**
 		 * The last event count of that Device on this Host. The install goes
 		 * on after it, so no new event of it has the number of an old one.

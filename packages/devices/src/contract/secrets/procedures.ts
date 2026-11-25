@@ -9,6 +9,7 @@ import {
 	secretMoveSchema,
 	spaceRefSchema,
 	stepRunSchema,
+	takenSecretSchema,
 } from "./secrets";
 
 /** The procedures of `hostContract.secrets`. */
@@ -106,7 +107,7 @@ export const projectSecretProcedures = {
 				"Gives a Device the value of a project secret to move it to another scope.",
 		})
 		.input(projectRefSchema.extend({ name: secretNameSchema }))
-		.output(described(z.string().nullable())),
+		.output(described(takenSecretSchema)),
 };
 
 /** The procedures of `hostContract.spaceSecrets`. */
@@ -137,5 +138,5 @@ export const spaceSecretProcedures = {
 				"Gives a Device the value of a Space secret to move it to another scope.",
 		})
 		.input(spaceRefSchema.extend({ name: secretNameSchema }))
-		.output(described(z.string().nullable())),
+		.output(described(takenSecretSchema)),
 };

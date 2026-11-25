@@ -4,7 +4,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { implement } from "@orpc/server";
 import { RPCHandler } from "@orpc/server/fetch";
-import { hostContract, type PairingRedeemed } from "../contract";
+import {
+	hostContract,
+	ODD_HOST_ANSWER,
+	type PairingRedeemed,
+} from "../contract";
 import { isLocalHost } from "./dev-link";
 import type { DeviceKeyStore, HostLink, HostLinks } from "./host-links";
 import { hostPage, joinHost } from "./join";
@@ -119,7 +123,7 @@ describe("joining a Host", () => {
  * its first answer to the poll is `joined`. It keeps what the joining
  * Device asked for.
  */
-function pairingHost(joined: Joined) {
+function pairingHost(joined: Joined, start: object = {}) {
 	const asked: { home?: boolean; machine?: string }[] = [];
 	const host = implement(hostContract);
 	const handler = new RPCHandler({
@@ -137,6 +141,7 @@ function pairingHost(joined: Joined) {
 					expiresIn: 600,
 					interval: 0,
 					fingerprint: null,
+					...start,
 				};
 			}),
 			redeem: host.pairing.redeem.handler(() => joined),
@@ -261,10 +266,19 @@ describe("one computer is one Device", () => {
 	const FINGERPRINT = "a".repeat(64);
 
 	/** Joins with this computer's fingerprint, and keeps what happens to the keys and the Device. */
-	async function joinWithIdentity(url: string, role: "home" | "guest") {
-		const keys: Record<string, string> = {};
-		const adopted: [string, number][] = [];
-		const started: string[] = [];
+	type Kept = {
+		keys: Record<string, string>;
+		adopted: [string, number][];
+		started: string[];
+		saved: string[];
+	};
+
+	async function joinWithIdentity(
+		url: string,
+		role: "home" | "guest",
+		kept: Kept = { keys: {}, adopted: [], started: [], saved: [] },
+	) {
+		const { keys, adopted, started, saved } = kept;
 		const storeOf = (deviceId: string): DeviceKeyStore => ({
 			kind: "file",
 			get: async () => null,
@@ -279,7 +293,10 @@ describe("one computer is one Device", () => {
 				self: { id: "device-b", name: "laptop", platform: "darwin" },
 				links: {
 					home: async () => null,
-					save: async (link) => ({ ...link, createdAt: 0, revokedAt: null }),
+					save: async (link) => {
+						saved.push(link.hostId);
+						return { ...link, createdAt: 0, revokedAt: null };
+					},
 				},
 				keys: storeOf("device-b"),
 				started: (link: HostLink) => {
@@ -331,12 +348,69 @@ describe("one computer is one Device", () => {
 		}
 	});
 
-	test("a Host of an older version says no Device id: the install stays as it is", async () => {
+	test("a Host that says this install's own Device id: the install stays as it is", async () => {
 		const host = pairingHost(joinedAnswer);
 		try {
 			const { adopted, started } = await joinWithIdentity(host.url, "home");
 			expect(adopted).toEqual([]);
 			expect(started).toEqual(["host-a"]);
+		} finally {
+			host.server.stop(true);
+		}
+	});
+
+	for (const [what, odd] of [
+		["no Device id", { deviceId: undefined }],
+		["an empty Device id", { deviceId: "" }],
+		["a Device id that is no id", { deviceId: "../first" }],
+		["no event count", { deviceId: "first", walkerSeq: undefined }],
+		["an event count that is no count", { deviceId: "first", walkerSeq: -1 }],
+		["no key", { key: undefined }],
+		["an empty key", { key: "" }],
+		["no Person", { personId: null }],
+		["no Host", { host: undefined }],
+		["a Host id that is no id", { host: { ...joinedAnswer.host, id: "a/b" } }],
+		[
+			"addresses that are no addresses",
+			{ host: { ...joinedAnswer.host, addresses: [1] } },
+		],
+		["an unknown status", { status: "done" }],
+	] as [string, object][]) {
+		test(`an answer with ${what} is refused, and nothing is kept`, async () => {
+			const host = pairingHost({ ...joinedAnswer, ...odd } as Joined);
+			const kept = { keys: {}, adopted: [], started: [], saved: [] };
+			try {
+				const joined = joinWithIdentity(host.url, "home", kept);
+				await expect(joined).rejects.toMatchObject({
+					name: "Refusal",
+					message: ODD_HOST_ANSWER,
+				});
+				expect(kept).toEqual({ keys: {}, adopted: [], started: [], saved: [] });
+			} finally {
+				host.server.stop(true);
+			}
+		});
+	}
+
+	test("a guest Host that gives another Device is refused, and nothing is kept", async () => {
+		const host = pairingHost({ ...joinedAnswer, deviceId: "first" });
+		const kept = { keys: {}, adopted: [], started: [], saved: [] };
+		try {
+			await expect(
+				joinWithIdentity(host.url, "guest", kept),
+			).rejects.toMatchObject({ message: ODD_HOST_ANSWER });
+			expect(kept).toEqual({ keys: {}, adopted: [], started: [], saved: [] });
+		} finally {
+			host.server.stop(true);
+		}
+	});
+
+	test("a start of a pairing that does not fit is refused", async () => {
+		const host = pairingHost(joinedAnswer, { deviceCode: undefined });
+		try {
+			await expect(joinSteps(host.url, "home")).rejects.toMatchObject({
+				message: ODD_HOST_ANSWER,
+			});
 		} finally {
 			host.server.stop(true);
 		}

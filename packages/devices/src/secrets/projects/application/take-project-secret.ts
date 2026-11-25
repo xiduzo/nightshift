@@ -1,3 +1,4 @@
+import { hostAnswer, takenSecretSchema } from "../../../contract";
 import type { HostCalls } from "../../calls";
 import type { ProjectSecretStore } from "../../kept";
 import {
@@ -60,13 +61,15 @@ export const takeProjectSecret =
 					] ?? null
 				);
 			},
-			(hostId) =>
-				ports.calls.ask(
-					hostId,
-					(client) => client.projectSecrets.take({ ...at, name: request.name }),
-					{
-						deadlineMs: ports.deadlineMs,
-					},
+			async (hostId) =>
+				hostAnswer(
+					takenSecretSchema,
+					await ports.calls.ask(
+						hostId,
+						(client) =>
+							client.projectSecrets.take({ ...at, name: request.name }),
+						{ deadlineMs: ports.deadlineMs },
+					),
 				),
 		);
 	};

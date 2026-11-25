@@ -16,37 +16,45 @@ export {
 	type PairingRedeemed,
 	type PairingStart,
 	type PhoneView,
+	pairingRedeemedSchema,
+	pairingStartSchema,
 	phoneSchema,
 } from "./links";
 export { type OfferCaps, offerCapsSchema, offerRefSchema } from "./offers";
-export type {
-	ElsewhereProject,
-	LeaveResult,
-	MergePending,
-	MergePreview,
-	MergeProjectView,
-	MergeResult,
-	MergeState,
-	PersonalMerge,
-	PersonalMergeInput,
-	SplitResult,
-	SplitState,
+export {
+	type ElsewhereProject,
+	type LeaveResult,
+	type MergePending,
+	type MergePreview,
+	type MergeProjectView,
+	type MergeResult,
+	type MergeState,
+	type PersonalMerge,
+	type PersonalMergeInput,
+	personalMergeSchema,
+	type SplitResult,
+	type SplitState,
 } from "./personal";
 export { OFFLINE_AFTER_MS } from "./presence";
 export {
 	type HostProcedureMeta,
+	hostAnswer,
 	NOT_A_HOST,
+	ODD_HOST_ANSWER,
 	refusalDataSchema,
 } from "./procedure";
 export type { HostRelay, InStep } from "./relay";
-export type {
-	PersonalSecretName,
-	ProjectSecretName,
-	SecretMove,
+export {
+	type PersonalSecretName,
+	type ProjectSecretName,
+	type SecretMove,
+	takenSecretSchema,
 } from "./secrets";
 export {
 	ANSWER_COSTS_MAX,
 	type AnswerCostsBatch,
+	addedProjectSchema,
+	answerCostsBatchSchema,
 	type CommandBatch,
 	type FollowWant,
 	type PendingBatch,
@@ -55,6 +63,7 @@ export {
 	type RunRows,
 	type SyncBatch,
 	type SyncCursors,
+	syncBatchSchema,
 } from "./sync";
 export {
 	deviceVersionOf,

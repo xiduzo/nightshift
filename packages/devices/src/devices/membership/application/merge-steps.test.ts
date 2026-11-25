@@ -162,6 +162,23 @@ describe("the ask of the Host", () => {
 		expect(world.plans).toEqual([]);
 	});
 
+	for (const odd of [
+		undefined,
+		{ ...answers({ p1: "p1" })(), projectMap: { p1: 1 } },
+		{ ...answers({ p1: "p1" })(), personMap: undefined },
+	]) {
+		test(`an answer that does not fit moves nothing: ${JSON.stringify(odd)}`, async () => {
+			const { world, steps, state } = await setUp();
+			world.answer = () => odd as never;
+
+			await expect(steps.start({})).rejects.toThrow(
+				"an answer that this computer cannot read",
+			);
+			expect(await state()).toBe("planned");
+			expect(world.plans).toEqual([]);
+		});
+	}
+
 	test("without a copy of the database, nothing starts", async () => {
 		const { deps, world } = await setUp();
 		const steps = mergeSteps({

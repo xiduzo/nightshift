@@ -19,6 +19,9 @@ export const projectSecretNameSchema = z.object({
 });
 export type ProjectSecretName = z.infer<typeof projectSecretNameSchema>;
 
+/** The value of a secret a Host gives for a move. Null: none of that name. */
+export const takenSecretSchema = z.string().nullable();
+
 /** A Project, by its Space: what every Project secret call names. */
 export const projectRefSchema = z.object({
 	spaceId: z.string().min(1),

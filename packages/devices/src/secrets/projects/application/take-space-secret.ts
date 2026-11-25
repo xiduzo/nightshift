@@ -1,3 +1,4 @@
+import { hostAnswer, takenSecretSchema } from "../../../contract";
 import type { HostCalls } from "../../calls";
 import type { SpaceSecretStore } from "../../kept";
 import { atKeeper, spaceAccess } from "../domain/project-secrets";
@@ -51,13 +52,15 @@ export const takeSpaceSecret =
 					] ?? null
 				);
 			},
-			(hostId) =>
-				ports.calls.ask(
-					hostId,
-					(client) => client.spaceSecrets.take({ spaceId, name: request.name }),
-					{
-						deadlineMs: ports.deadlineMs,
-					},
+			async (hostId) =>
+				hostAnswer(
+					takenSecretSchema,
+					await ports.calls.ask(
+						hostId,
+						(client) =>
+							client.spaceSecrets.take({ spaceId, name: request.name }),
+						{ deadlineMs: ports.deadlineMs },
+					),
 				),
 		);
 	};

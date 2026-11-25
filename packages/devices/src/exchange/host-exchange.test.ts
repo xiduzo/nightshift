@@ -957,6 +957,33 @@ describe("what Night Shift's agents cost", () => {
 		).toEqual(["answer-01"]);
 	});
 
+	test("an answer that does not fit is not stored: the loop ends, and the link starts it again", async () => {
+		const stored: unknown[] = [];
+		const loop = shareAnswerCosts({
+			spaces: async () => ["space-1"],
+			costs: {
+				unsent: async () => [],
+				cursors: async () => ({}),
+				ingest: async (rows) => void stored.push(rows),
+				sent: async (keys) => void stored.push(keys),
+			},
+			now: () => 1,
+		});
+		for (const odd of [
+			undefined,
+			{ taken: [], rows: [{ key: "x" }], more: false },
+			{ taken: [1], rows: [], more: false },
+		]) {
+			await expect(
+				loop(
+					{ sync: { answerCosts: async () => odd } } as never,
+					new AbortController().signal,
+				),
+			).rejects.toThrow("an answer that this computer cannot read");
+		}
+		expect(stored).toEqual([]);
+	});
+
 	test("a Device's loop gives its own answers and takes the others', and a second turn changes nothing", async () => {
 		const device = await createSandbox();
 		try {

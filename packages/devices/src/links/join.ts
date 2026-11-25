@@ -1,6 +1,12 @@
 import { isHostAddress, isLoopbackHost } from "@nightshift/engine/settings";
 import { Refusal } from "@nightshift/refusal";
 import { now } from "@nightshift/time";
+import {
+	hostAnswer,
+	ODD_HOST_ANSWER,
+	pairingRedeemedSchema,
+	pairingStartSchema,
+} from "../contract";
 import { hostCertificate } from "../reach";
 import { pause } from "./backoff";
 import { DEV_STAYS_LOCAL, isLocalAddress } from "./dev-link";
@@ -72,7 +78,7 @@ export async function* joinHost(
 	const pinned = certificate && !certificate.trusted ? certificate : null;
 	const host = hostClient(address, { certificate: pinned?.pem ?? null });
 
-	const code = await host.pairing
+	const started = await host.pairing
 		.start(
 			{
 				deviceId: deps.self.id,
@@ -89,6 +95,7 @@ export async function* joinHost(
 		.catch((error: unknown) => {
 			throw certificateError(error) ?? error;
 		});
+	const code = hostAnswer(pairingStartSchema, started);
 	yield {
 		kind: "code",
 		userCode: code.userCode,
@@ -103,14 +110,17 @@ export async function* joinHost(
 	while (true) {
 		await sleep(interval, signal);
 		if (signal?.aborted) throw new Error("The pairing was stopped.");
-		const answer = await host.pairing.redeem(
-			{
-				deviceCode: code.deviceCode,
-				deviceId: deps.self.id,
-				home: input.role === "home",
-				address,
-			},
-			{ signal },
+		const answer = hostAnswer(
+			pairingRedeemedSchema,
+			await host.pairing.redeem(
+				{
+					deviceCode: code.deviceCode,
+					deviceId: deps.self.id,
+					home: input.role === "home",
+					address,
+				},
+				{ signal },
+			),
 		);
 		switch (answer.status) {
 			case "pending":
@@ -126,6 +136,11 @@ export async function* joinHost(
 					"The code expired. Run the pairing again.",
 				);
 			case "joined": {
+				// A guest Host never hears which computer this is: it has no other
+				// Device to give back.
+				if (input.role === "guest" && answer.deviceId !== deps.self.id) {
+					throw new Refusal("unavailable", ODD_HOST_ANSWER);
+				}
 				// Another Device than this install: its key goes under that Device.
 				const adopted =
 					deps.identity && answer.deviceId !== deps.self.id

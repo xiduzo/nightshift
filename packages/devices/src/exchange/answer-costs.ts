@@ -1,5 +1,10 @@
 import type { SharedAnswerCosts } from "@nightshift/engine";
-import { ANSWER_COSTS_MAX, type HostClient } from "../contract";
+import {
+	ANSWER_COSTS_MAX,
+	answerCostsBatchSchema,
+	type HostClient,
+	hostAnswer,
+} from "../contract";
 import { pause } from "../links";
 
 /**
@@ -32,9 +37,12 @@ export function shareAnswerCosts(deps: {
 			let more = spaces.length > 0;
 			while (more && !signal.aborted) {
 				const rows = await costs.unsent(spaces, ANSWER_COSTS_MAX);
-				const answer = await client.sync.answerCosts(
-					{ rows, cursors: await costs.cursors(spaces) },
-					{ signal },
+				const answer = hostAnswer(
+					answerCostsBatchSchema,
+					await client.sync.answerCosts(
+						{ rows, cursors: await costs.cursors(spaces) },
+						{ signal },
+					),
 				);
 				const now = deps.now();
 				await costs.ingest(answer.rows, now);

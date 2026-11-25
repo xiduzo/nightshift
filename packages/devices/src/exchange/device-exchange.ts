@@ -1,6 +1,12 @@
 import { createHash } from "node:crypto";
 import { documentName, type Engine } from "@nightshift/engine";
-import type { HostClient, RunCommand, RunRows } from "../contract";
+import {
+	type HostClient,
+	hostAnswer,
+	type RunCommand,
+	type RunRows,
+	syncBatchSchema,
+} from "../contract";
 import type { HostSpaces, Link } from "../links";
 import { isEmpty, MissingProjectError, mergeCursors } from "./rows";
 import type { RunHistoryExchange } from "./run-history";
@@ -229,7 +235,8 @@ export function createDeviceExchange(deps: {
 				{ cursors: await exchange.cursorsWith(hostId) },
 				{ signal },
 			);
-			for await (const batch of stream) {
+			for await (const sent of stream) {
+				const batch = hostAnswer(syncBatchSchema, sent);
 				pumps.set(batch.follows);
 				if (!isEmpty(batch.rows)) {
 					await ingestWhenReady(batch.rows, link, signal);

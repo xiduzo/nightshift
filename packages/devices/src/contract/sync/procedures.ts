@@ -41,6 +41,9 @@ const leaseAnswerSchema = z.discriminatedUnion("kind", [
 	}),
 ]);
 
+/** Where a Host put the Project a Device asked it to add. */
+export const addedProjectSchema = z.object({ projectId: z.string().min(1) });
+
 /** A run start, as a Device asks its Host for its Person: the Host walks it (ADR 17 says where its steps run). */
 const runStartInput = startRunInputSchema.and(
 	z.object({ spaceId: z.string().min(1) }),
@@ -206,7 +209,7 @@ export const syncProcedures = {
 					.regex(/^[^\s/:@]+\/\S+$/),
 			}),
 		)
-		.output(described(z.object({ projectId: z.string() }))),
+		.output(described(addedProjectSchema)),
 	/**
 	 * A Person on the Device adds a Project without a folder to a Space
 	 * here (ADR 22): this Host defines it. Each call adds another
@@ -223,7 +226,7 @@ export const syncProcedures = {
 				name: z.string().trim().min(1).max(200),
 			}),
 		)
-		.output(described(z.object({ projectId: z.string() }))),
+		.output(described(addedProjectSchema)),
 	/** The Device has a Clone of a Project of a Space here. */
 	addClone: sync
 		.route({

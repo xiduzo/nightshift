@@ -7,7 +7,13 @@ import {
 } from "@nightshift/engine";
 import { Refusal } from "@nightshift/refusal";
 import { now } from "@nightshift/time";
-import type { HostClient, HostRelay, InStep } from "../contract";
+import {
+	addedProjectSchema,
+	type HostClient,
+	type HostRelay,
+	hostAnswer,
+	type InStep,
+} from "../contract";
 import type { PendingOnHosts, RunCommands } from "../exchange";
 import type { DeviceLinks, HostSpaces } from "../links";
 import { createSpaceRoutes } from "./route";
@@ -116,15 +122,21 @@ export function createRelay(deps: {
 
 		async addProject({ spaceId, name, remote }) {
 			// The Host adds it in the name of the key's Person.
-			return onHost(spaceId, (client) =>
-				client.sync.addProject({ spaceId, name, remote }),
+			return hostAnswer(
+				addedProjectSchema,
+				await onHost(spaceId, (client) =>
+					client.sync.addProject({ spaceId, name, remote }),
+				),
 			);
 		},
 
 		async addWithoutFolder({ spaceId, name }) {
 			// The Host adds it in the name of the key's Person.
-			return onHost(spaceId, (client) =>
-				client.sync.addWithoutFolder({ spaceId, name }),
+			return hostAnswer(
+				addedProjectSchema,
+				await onHost(spaceId, (client) =>
+					client.sync.addWithoutFolder({ spaceId, name }),
+				),
 			);
 		},
 

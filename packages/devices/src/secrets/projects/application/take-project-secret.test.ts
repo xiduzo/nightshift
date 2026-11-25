@@ -18,6 +18,21 @@ describe("takeProjectSecret", () => {
 		expect(p.calls.asked).toEqual([]);
 	});
 
+	test("a Host's answer that is no value is refused", async () => {
+		const p = await projectsPorts();
+		p.spaces.hosts.set("space-1", "host-1");
+		p.calls.addHost("host-1", {
+			projectSecrets: { take: async () => ({ value: "x" }) },
+		});
+		await expect(
+			takeProjectSecret(p)({
+				project: at,
+				name: "A_TOKEN",
+				personId: "person-ada",
+			}),
+		).rejects.toThrow("an answer that this computer cannot read");
+	});
+
 	test("here, a viewer is refused in the role's words", async () => {
 		const p = await projectsPorts();
 		p.members.join("person-bob", "space-1", "viewer");

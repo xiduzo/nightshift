@@ -10,4 +10,5 @@ export {
 	type ProjectSecretName,
 	type SecretMove,
 	secretMoveSchema,
+	takenSecretSchema,
 } from "./secrets";

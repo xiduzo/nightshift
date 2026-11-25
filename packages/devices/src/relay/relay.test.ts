@@ -302,6 +302,31 @@ function actions(relay: ReturnType<typeof createRelay>, spaceId: string) {
 	};
 }
 
+describe("the answer of a Host that adds a Project", () => {
+	for (const odd of [undefined, {}, { projectId: "" }, { projectId: 1 }]) {
+		test(`that does not fit is refused: ${JSON.stringify(odd)}`, async () => {
+			const host = fakeHost();
+			const add = async () => odd as never;
+			const { relay } = relayWith({
+				...host,
+				client: {
+					...host.client,
+					sync: { ...host.client.sync, addProject: add, addWithoutFolder: add },
+				} as HostClient,
+			});
+			const at = { spaceId: "space-team", name: "app" };
+			for (const added of [
+				() => relay.addProject({ ...at, remote: "github.com/a/b" }),
+				() => relay.addWithoutFolder(at),
+			]) {
+				await expect(added()).rejects.toThrow(
+					"an answer that this computer cannot read",
+				);
+			}
+		});
+	}
+});
+
 describe("the Space route", () => {
 	const host = fakeHost();
 	const routes = createSpaceRoutes({

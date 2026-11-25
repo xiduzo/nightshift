@@ -21,7 +21,7 @@ import {
  * would have one number.
  */
 const SHAPES: Record<string, string> = {
-	1: "ec50ffde4588e926",
+	1: "393798cd345db0fb",
 };
 
 /** A schema as plain data, with its keys in order. Null: the procedure has none. */

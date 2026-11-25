@@ -7,13 +7,15 @@ import type {
 import type { Schedule } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { now as timeNow } from "@nightshift/time";
-import type {
-	PersonalMerge as HostAnswer,
-	MergePending,
-	MergePreview,
-	MergeProjectView,
-	MergeResult,
-	MergeState,
+import {
+	type PersonalMerge as HostAnswer,
+	hostAnswer,
+	type MergePending,
+	type MergePreview,
+	type MergeProjectView,
+	type MergeResult,
+	type MergeState,
+	personalMergeSchema,
 } from "../../../contract";
 import type { RunHistoryExchange } from "../../../exchange";
 import type { DeviceLinks, HostLinks, HostSpaces, Link } from "../../../links";
@@ -207,7 +209,7 @@ export function mergeSteps(deps: MergeDeps & { record: MembershipRecord }) {
 	): Promise<HostAnswer> {
 		const projects = await engine.projects.ofSpace(from);
 		try {
-			return await link.call((client) =>
+			const answer = await link.call((client) =>
 				client.sync.mergePersonal({
 					personId: deps.ownerId,
 					projects: projects.map((p) => ({
@@ -223,6 +225,7 @@ export function mergeSteps(deps: MergeDeps & { record: MembershipRecord }) {
 					dryRun,
 				}),
 			);
+			return hostAnswer(personalMergeSchema, answer);
 		} catch (error) {
 			if (deps.engineKernel.isHostUnreachable(error)) {
 				throw new Refusal("unavailable", MERGE_WORDS.offline, {
