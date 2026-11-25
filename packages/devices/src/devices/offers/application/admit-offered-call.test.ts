@@ -153,6 +153,8 @@ for (const [name, personId] of Object.entries(callers)) {
 			for (const cwd of [
 				"/projects/app",
 				`${WORKTREE}-other`,
+				WORKTREE.toUpperCase(),
+				`${WORKTREE.toUpperCase()}/packages`,
 				"..",
 				"",
 				`${WORKTREE}/..`,
@@ -250,6 +252,9 @@ for (const [name, personId] of Object.entries(callers)) {
 			const { ask, served } = setUp();
 			for (const run of [
 				{ id: "another-run", projectId: "app" },
+				// The whole id, not its short form.
+				{ id: "abcdef12-0000-0000-0000-000000000001", projectId: "app" },
+				{ id: "abcdef12", projectId: "app" },
 				{ id: RUN, projectId: "another" },
 			]) {
 				for (const call of [
