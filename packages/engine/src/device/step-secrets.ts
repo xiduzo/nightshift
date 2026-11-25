@@ -1,4 +1,5 @@
 import type { McpServerConfig } from "@nightshift/agents/types";
+import type { JsonValue } from "@nightshift/flows";
 import type { SecretUse, StepRun } from "../contract";
 import type { DeviceConnectionsPort } from "./ports";
 import {
@@ -128,15 +129,26 @@ function hiddenTool(result: ToolResult, values: readonly string[]): ToolResult {
 		return {
 			...result,
 			message: redactText(result.message, values),
-			arguments: redactJson(result.arguments, values),
+			arguments: result.arguments && hiddenFields(result.arguments, values),
 		};
 	}
 	return {
 		...result,
-		arguments: redactJson(result.arguments, values),
+		arguments: hiddenFields(result.arguments, values) ?? {},
 		text: redactJsonText(result.text, values),
-		structuredContent: redactJson(result.structuredContent, values),
+		structuredContent:
+			result.structuredContent &&
+			hiddenFields(result.structuredContent, values),
 	};
+}
+
+/** An object with the values masked; nothing when it is a value as a whole. */
+function hiddenFields<T extends object>(
+	fields: T,
+	values: readonly string[],
+): T | null {
+	const hidden = redactJson(fields, values);
+	return typeof hidden === "object" ? (hidden as T) : null;
 }
 
 /** A request's result with the values masked: its messages, headers and body. */
@@ -154,8 +166,11 @@ function hiddenRequest(
 			...response,
 			statusText: redactText(response.statusText, values),
 			// A header keeps its name: the step reads it by that.
-			headers: redactJson(response.headers, values, "values"),
-			body: redactJson(response.body, values),
+			headers: redactJson(response.headers, values, "values") as Record<
+				string,
+				string
+			>,
+			body: redactJson(response.body, values) as JsonValue,
 		},
 	};
 }

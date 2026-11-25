@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from "node:util";
 import type { ExecEvent } from "./types";
 
 /** What a secret value becomes in a command's output, as in an exported run. */
@@ -56,18 +57,29 @@ export function redactText(text: string, values: readonly string[]): string {
 
 /**
  * A JSON value with every secret value in `values` as `•••`, in each
- * string it holds. `all`: the names of its fields too. `values`: the names
- * stay, for an object whose fields a reader knows by name.
+ * string it holds. A value that is itself a JSON document goes as a whole,
+ * also where it is written as data. A number stays. `all`: the names of
+ * the fields go too. `values`: the names stay, for an object whose fields
+ * a reader knows by name.
  */
-export function redactJson<T>(
-	value: T,
+export function redactJson(
+	value: unknown,
 	values: readonly string[],
 	where: "all" | "values" = "all",
-): T {
+): unknown {
+	const documents = values.flatMap((text) => {
+		const document = jsonIn(text);
+		return typeof document === "object" && Object.keys(document).length > 0
+			? [document]
+			: [];
+	});
 	const hide = (item: unknown): unknown => {
 		if (typeof item === "string") return redactText(item, values);
-		if (Array.isArray(item)) return item.map(hide);
 		if (typeof item !== "object" || item === null) return item;
+		if (documents.some((document) => isDeepStrictEqual(document, item))) {
+			return SECRET_MASK;
+		}
+		if (Array.isArray(item)) return item.map(hide);
 		return Object.fromEntries(
 			Object.entries(item).map(([key, field]) => [
 				where === "all" ? redactText(key, values) : key,
@@ -75,53 +87,122 @@ export function redactJson<T>(
 			]),
 		);
 	};
-	// The shape stays: a string becomes a string, an object an object.
-	return hide(value) as T;
+	return hide(value);
 }
 
 /**
- * `text` with every secret value in `values` as `•••`. An object or a list
- * written as JSON stays JSON: a number keeps its digits.
+ * `text` with every secret value in `values` as `•••`, for a reader that
+ * takes it as JSON when it is JSON. Text that is no object, list or string
+ * as JSON, so also JSON that is not valid, is hidden as plain text. Plain
+ * hiding is also enough when the JSON then reads as the hidden data does:
+ * the text keeps its layout. Else the text is the hidden data, written
+ * again: without its layout, and each number as JavaScript reads it, so a
+ * very big integer loses digits (as it does in `data`). A value that is
+ * itself a number, or a word of JSON, then stays where it is a number or a
+ * word. A value that runs over several parts of the JSON still goes.
  */
 export function redactJsonText(
 	text: string,
 	values: readonly string[],
 ): string {
-	const hidden = redactText(text, values);
-	if (hidden === text) return text;
-	const before = parsed(text);
-	return before === undefined || parsed(hidden) !== undefined
-		? hidden
-		: JSON.stringify(redactJson(before, values));
+	const plain = redactText(text, values);
+	const data = jsonIn(text);
+	if (data === undefined) return plain;
+	const hidden = redactJson(data, values);
+	const read = jsonIn(plain);
+	if (read !== undefined && isDeepStrictEqual(read, hidden)) return plain;
+	return redactText(
+		JSON.stringify(hidden),
+		values.filter((value) => !isLiteral(value)),
+	);
 }
 
-/** The object or list a text holds as JSON, else nothing. */
-function parsed(text: string): object | undefined {
+/** The object, list or string a text holds as JSON, else nothing. */
+function jsonIn(text: string): object | string | undefined {
 	try {
 		const value: unknown = JSON.parse(text);
-		return typeof value === "object" && value !== null ? value : undefined;
+		return (typeof value === "object" && value !== null) ||
+			typeof value === "string"
+			? value
+			: undefined;
 	} catch {
 		return undefined;
 	}
 }
 
-/** The same error, with the secret values in its words as `•••`. */
-function redactError(error: unknown, values: readonly string[]): unknown {
+/** Whether a value can be (a part of) a number or a word of JSON. */
+function isLiteral(value: string): boolean {
+	return (
+		/^[-+.\deE]+$/.test(value) ||
+		["true", "false", "null"].some((word) => word.includes(value))
+	);
+}
+
+/**
+ * What a stream threw, with the secret values in it as `•••`: the words,
+ * the cause, the errors and the own fields of an error. It stays the same
+ * error. One that cannot change becomes a new one of its class.
+ */
+function redactError(
+	error: unknown,
+	values: readonly string[],
+	seen = new Set<unknown>(),
+): unknown {
 	if (typeof error === "string") return redactText(error, values);
-	for (
-		let one = error, depth = 0;
-		one instanceof Error && depth < 8;
-		one = one.cause, depth++
-	) {
-		for (const name of ["message", "stack"] as const) {
-			const text = one[name];
-			const shown = text && redactText(text, values);
-			if (shown === text) continue;
-			// A DOMException has no setter for its message.
-			Object.defineProperty(one, name, { value: shown, configurable: true });
+	if (typeof error !== "object" || error === null || seen.has(error)) {
+		return error;
+	}
+	seen.add(error);
+	const inside = (value: unknown) => redactError(value, values, seen);
+	if (Array.isArray(error)) return error.map(inside);
+	if (!(error instanceof Error)) {
+		// A plain object. Another class (a Response, a Buffer) stays.
+		return Object.getPrototypeOf(error) === Object.prototype
+			? redactJsonFields(error, values, inside)
+			: error;
+	}
+	const changed: [string, unknown][] = [];
+	for (const name of new Set([
+		...Object.getOwnPropertyNames(error),
+		"message",
+		"stack",
+		"name",
+	])) {
+		const was: unknown = Reflect.get(error, name);
+		const now = inside(was);
+		if (!isDeepStrictEqual(now, was)) changed.push([name, now]);
+	}
+	const put = (target: object) =>
+		// A DOMException has no setter for its message.
+		changed.every(([name, value]) =>
+			Reflect.defineProperty(target, name, { value, configurable: true }),
+		);
+	if (put(error)) return error;
+	const copy = Object.setPrototypeOf(
+		new Error(),
+		Object.getPrototypeOf(error),
+	) as Error;
+	for (const name of ["message", "stack", "name", "cause"]) {
+		if (!changed.some(([one]) => one === name) && Object.hasOwn(error, name)) {
+			changed.push([name, Reflect.get(error, name)]);
 		}
 	}
-	return error;
+	put(copy);
+	return copy;
+}
+
+/** A plain object with its names hidden, and each field as `inside` gives it. */
+function redactJsonFields(
+	value: object,
+	values: readonly string[],
+	inside: (field: unknown) => unknown,
+): object {
+	return Object.fromEntries(
+		Object.entries(value).map(([key, field]) => [
+			redactText(key, values),
+			inside(field),
+		]),
+	);
 }
 
 /**
@@ -187,7 +268,8 @@ function redactEvent<E extends { type: string }>(
 	event: E,
 	values: readonly string[],
 ): E {
-	const hidden = redactJson(event, values, "values");
+	// The events of a session are objects: they stay so.
+	const hidden = redactJson(event, values, "values") as E;
 	return event.type === "tool-end" && "input" in event
 		? { ...hidden, input: redactJson(event.input, values) }
 		: hidden;
@@ -241,7 +323,7 @@ export async function* redactExec(
 						: redactText(event.spawnError, values),
 				...(event.output === undefined
 					? {}
-					: { output: redactText(event.output, values) }),
+					: { output: hiddenOutput(event.output, values) }),
 			};
 			return;
 		} else {
@@ -249,4 +331,9 @@ export async function* redactExec(
 		}
 	}
 	yield* flush();
+}
+
+/** A command's data, which its step reads as JSON. A number with the digits of a value goes too. */
+function hiddenOutput(output: string, values: readonly string[]): string {
+	return redactText(redactJsonText(output, values), values);
 }

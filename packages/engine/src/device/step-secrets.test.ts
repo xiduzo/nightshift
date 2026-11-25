@@ -1,11 +1,13 @@
 import {
 	afterAll,
 	afterEach,
+	beforeAll,
 	beforeEach,
 	describe,
 	expect,
 	test,
 } from "bun:test";
+import { type AddressInfo, createServer } from "node:net";
 import { harnessFacts } from "@nightshift/agents/harness-facts";
 import type { AgentEvent } from "@nightshift/agents/types";
 import type { JsonValue } from "@nightshift/flows";
@@ -229,6 +231,32 @@ const request = (
 		signal: signal(),
 	});
 
+/** A result, with the JSON of its text or output read back as a step reads it. */
+function decoded(result: unknown): unknown {
+	const { text, output } = (Array.isArray(result) ? result.at(-1) : result) as {
+		text?: string;
+		output?: string;
+	};
+	return JSON.parse(text ?? output ?? "");
+}
+
+/** Answers with the value in the status text. */
+const statusServer = createServer((socket) => {
+	socket.once("data", () =>
+		socket.end(`HTTP/1.1 200 is ${VALUE}\r\ncontent-length: 0\r\n\r\n`),
+	);
+});
+let statusPort = 0;
+beforeAll(async () => {
+	await new Promise<void>((resolve) =>
+		statusServer.listen(0, "127.0.0.1", resolve),
+	);
+	statusPort = (statusServer.address() as AddressInfo).port;
+});
+afterAll(() => {
+	statusServer.close();
+});
+
 /** The cells of the rule: what a job gives back, and that it holds the mask in place of the value. */
 const CELLS: Record<string, Record<string, () => Promise<unknown>>> = {
 	session: {
@@ -269,6 +297,53 @@ const CELLS: Record<string, Record<string, () => Promise<unknown>>> = {
 			}).catch(() => {});
 			return error.message;
 		},
+		"a value in what a thrown error holds": async () => {
+			const thrown = Object.assign(
+				new AggregateError([new Error(`one ${VALUE}`)], "many", {
+					cause: new Error("why", { cause: `deep ${VALUE}` }),
+				}),
+				{ stderr: `out ${VALUE}`, data: { [VALUE]: [VALUE] } },
+			);
+			thrown.name = `Name ${VALUE}`;
+			const caught = (await session([], {
+				end: () => {
+					throw thrown;
+				},
+			}).catch((error) => error)) as typeof thrown;
+			expect(caught).toBe(thrown);
+			expect((caught.cause as Error).cause).toBe(`deep ${MASK}`);
+			expect(caught.errors[0].message).toBe(`one ${MASK}`);
+			return Bun.inspect(caught);
+		},
+		"a value in an error that is its own cause": async () => {
+			const thrown: Error = new Error(`bad ${VALUE}`);
+			thrown.cause = thrown;
+			const caught = await session([], {
+				end: () => {
+					throw thrown;
+				},
+			}).catch((error) => error);
+			expect(caught).toBe(thrown);
+			return caught.message;
+		},
+		"a value in a thrown object": () =>
+			session([], {
+				end: () => {
+					throw { message: `bad ${VALUE}` };
+				},
+			}).catch((error) => error),
+		"a value in a frozen error": async () => {
+			const thrown = Object.freeze(new TypeError(`bad ${VALUE}`));
+			const caught = await session([], {
+				end: () => {
+					throw thrown;
+				},
+			}).catch((error) => error);
+			expect(caught).toBeInstanceOf(TypeError);
+			expect(caught.name).toBe("TypeError");
+			expect(caught.message).toBe(`bad ${MASK}`);
+			return Bun.inspect(caught);
+		},
 		"a value in a thrown error": async () => {
 			try {
 				await session([], {
@@ -295,6 +370,10 @@ const CELLS: Record<string, Record<string, () => Promise<unknown>>> = {
 			command('printf \'{"a":"%s"}\' "$TOKEN" > "$NS_OUTPUT"', {
 				more: { outputFile: true },
 			}),
+		"a value that the output writes with other escapes": () =>
+			command(`printf '%s' '{"a":"pine-\\u0034711-apple"}' > "$NS_OUTPUT"`, {
+				more: { outputFile: true },
+			}).then(decoded),
 		"a value as a JSON key": () =>
 			command('printf \'{"%s":1}\' "$TOKEN" > "$NS_OUTPUT"', {
 				more: { outputFile: true },
@@ -350,6 +429,10 @@ const CELLS: Record<string, Record<string, () => Promise<unknown>>> = {
 		"a value in an output's data": () => call({ data: { a: ["TOKEN"] } }),
 		"a value as a JSON key": () => call({ data: { deep: [{ TOKEN: 1 }] } }),
 		"a value in JSON text": () => call({ text: '[{"a":"TOKEN"}]' }),
+		"a value that JSON text writes with other escapes": () =>
+			call({ text: String.raw`{"a":"pine-\u0034711-apple"}` }).then(decoded),
+		"a value that a JSON string writes with other escapes": () =>
+			call({ text: String.raw`"pine-\u0034711-apple"` }).then(decoded),
 		"a value in a tool's error": () =>
 			call({ text: "bad TOKEN", isError: true }),
 		"a value in a server's error": () => call({ throws: "bad TOKEN" }),
@@ -361,6 +444,8 @@ const CELLS: Record<string, Record<string, () => Promise<unknown>>> = {
 			call({}, { tool: VALUE }),
 	},
 	request: {
+		"a value in the status text": () =>
+			request("", "", { url: `http://127.0.0.1:${statusPort}/` }),
 		"a value in the output": () => request("is ", "."),
 		"a value split over chunks": () => request("is ", "."),
 		"a value in an output's data": () =>
@@ -454,6 +539,59 @@ describe("what a later step reads keeps its shape", () => {
 		});
 	});
 
+	test("a header keeps its name when a value is in it", async () => {
+		const result = await request("", "", { value: "x-echo" });
+		expect(result).toMatchObject({
+			kind: "answered",
+			response: { headers: { "x-echo": MASK } },
+		});
+	});
+
+	test("JSON text keeps its layout when the values go out of it as they are", async () => {
+		expect(
+			await call({ text: '[ {"n": 1.0,\t"of": "TOKEN"} ]' }),
+		).toMatchObject({ text: '[ {"n": 1.0,\t"of": "•••"} ]' });
+	});
+
+	test("text that is not valid JSON hides the value as plain text", async () => {
+		expect(
+			await call({ text: '{"n": 4711, "of": "TOKEN"' }, { value: "4711" }),
+		).toMatchObject({ text: '{"n": •••, "of": "•••"' });
+	});
+
+	test("a number in JSON text that is written again reads as it does in data", async () => {
+		expect(
+			await call({
+				text: String.raw`{"big":12345678901234567890,"of":"pine-\u0034711-apple"}`,
+			}),
+		).toMatchObject({
+			text: `{"big":12345678901234567000,"of":"•••"}`,
+		});
+	});
+
+	test("a number of a command's output that has the digits of a value is hidden", async () => {
+		const events = await command('printf \'{"n": 4711}\' > "$NS_OUTPUT"', {
+			value: "4711",
+			more: { outputFile: true },
+		});
+		expect(events.at(-1)).toMatchObject({ output: '{"n":•••}' });
+	});
+
+	test("a value that runs over the parts of a JSON text is hidden in it", async () => {
+		const value = 'left-part","right-part';
+		const result = await call(
+			{ text: '["left-part","right-part",1]' },
+			{ value },
+		);
+		expect(result).toMatchObject({ text: '["•••",1]' });
+		expect(
+			await call(
+				{ text: '["left-part","right-part"]' },
+				{ value: `${value}"]` },
+			),
+		).toMatchObject({ text: '["•••' });
+	});
+
 	test("an event keeps its own fields, and the data of a report its names", async () => {
 		const report: AgentEvent = {
 			type: "report",
@@ -472,5 +610,74 @@ describe("what a later step reads keeps its shape", () => {
 				-1,
 			),
 		).toEqual({ type: "finished", usage });
+	});
+});
+
+describe("a value that is a JSON document is hidden as a whole, however it is written", () => {
+	const document = { user: "fern", key: { id: "k-77", words: ["oak", "elm"] } };
+	const value = JSON.stringify(document);
+	const other = {
+		key: { words: ["oak", "elm"], id: "k-77" },
+		user: "fern",
+	};
+
+	test("in a tool's text", async () => {
+		expect(
+			await call({ text: JSON.stringify({ c: other, n: 1 }) }, { value }),
+		).toMatchObject({ text: '{"c":"•••","n":1}' });
+		expect(
+			await call({ text: JSON.stringify(other) }, { value }),
+		).toMatchObject({ text: '"•••"' });
+	});
+
+	test("in a tool's data and arguments", async () => {
+		expect(
+			await call({ data: { c: [other] } }, { value, more: { a: other } }),
+		).toMatchObject({
+			structuredContent: { c: [MASK] },
+			arguments: { a: MASK },
+		});
+		// Data is an object or nothing.
+		expect(await call({ data: other }, { value })).toMatchObject({
+			structuredContent: null,
+		});
+	});
+
+	test("in a web request's body and a command's output", async () => {
+		expect(
+			await request(`{"c":${JSON.stringify(other)},"of":"`, '"}', {
+				value,
+				json: true,
+			}),
+		).toMatchObject({ response: { body: { c: MASK, of: MASK } } });
+		const events = await command(
+			`printf '%s' '${JSON.stringify({ c: other })}' > "$NS_OUTPUT"`,
+			{ value, more: { outputFile: true } },
+		);
+		expect(events.at(-1)).toMatchObject({ output: '{"c":"•••"}' });
+	});
+
+	test("in a session's tool input", async () => {
+		expect(
+			(
+				await session(
+					[
+						{
+							type: "tool-end",
+							toolCallId: "t",
+							name: "W",
+							input: { c: other },
+						},
+					],
+					{ value },
+				)
+			).at(-1),
+		).toMatchObject({ input: { c: MASK } });
+	});
+
+	test("an empty document hides nothing but its own text", async () => {
+		expect(
+			await call({ data: { a: {}, b: [] } }, { value: "{}" }),
+		).toMatchObject({ structuredContent: { a: {}, b: [] } });
 	});
 });
