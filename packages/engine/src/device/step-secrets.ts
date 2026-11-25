@@ -2,13 +2,8 @@ import type { McpServerConfig } from "@nightshift/agents/types";
 import type { JsonValue } from "@nightshift/flows";
 import type { SecretUse, StepRun } from "../contract";
 import type { DeviceConnectionsPort } from "./ports";
-import {
-	redactExec,
-	redactJson,
-	redactJsonText,
-	redactSession,
-	redactText,
-} from "./redact";
+import { redactExec, redactSession } from "./redact";
+import { redactText, type SecretMask, secretMask } from "./secret-mask";
 import type { ExecEvent, SessionEvent, ToolResult } from "./types";
 import type { WebRequestResult } from "./web-request";
 import { unreachableNote } from "./words";
@@ -98,9 +93,9 @@ export function stepSecrets(
 		hideExec: (events) =>
 			values.length > 0 ? redactExec(events, values) : events,
 		hideTool: (result) =>
-			values.length > 0 ? hiddenTool(result, values) : result,
+			values.length > 0 ? hiddenTool(result, secretMask(values)) : result,
 		hideRequest: (result) =>
-			values.length > 0 ? hiddenRequest(result, values) : result,
+			values.length > 0 ? hiddenRequest(result, secretMask(values)) : result,
 	};
 }
 
@@ -121,56 +116,52 @@ function missingSecretsMessage(
 }
 
 /** A tool call's result with the values masked: its message, its text, its data and the arguments. */
-function hiddenTool(result: ToolResult, values: readonly string[]): ToolResult {
+function hiddenTool(result: ToolResult, mask: SecretMask): ToolResult {
 	if (result.kind === "refused") {
-		return { ...result, message: redactText(result.message, values) };
+		return { ...result, message: mask.text(result.message) };
 	}
 	if (result.kind === "failed") {
 		return {
 			...result,
-			message: redactText(result.message, values),
-			arguments: result.arguments && hiddenFields(result.arguments, values),
+			message: mask.text(result.message),
+			arguments: result.arguments && hiddenFields(result.arguments, mask),
+			...(result.asked
+				? { asked: hiddenFields(result.asked, mask) ?? {} }
+				: {}),
 		};
 	}
 	return {
 		...result,
-		arguments: hiddenFields(result.arguments, values) ?? {},
-		text: redactJsonText(result.text, values),
+		arguments: hiddenFields(result.arguments, mask) ?? {},
+		text: mask.jsonText(result.text),
 		structuredContent:
-			result.structuredContent &&
-			hiddenFields(result.structuredContent, values),
+			result.structuredContent && hiddenFields(result.structuredContent, mask),
 	};
 }
 
 /** An object with the values masked; nothing when it is a value as a whole. */
-function hiddenFields<T extends object>(
-	fields: T,
-	values: readonly string[],
-): T | null {
-	const hidden = redactJson(fields, values);
+function hiddenFields<T extends object>(fields: T, mask: SecretMask): T | null {
+	const hidden = mask.json(fields);
 	return typeof hidden === "object" ? (hidden as T) : null;
 }
 
 /** A request's result with the values masked: its messages, headers and body. */
 function hiddenRequest(
 	result: WebRequestResult,
-	values: readonly string[],
+	mask: SecretMask,
 ): WebRequestResult {
 	if (result.kind !== "answered") {
-		return { ...result, message: redactText(result.message, values) };
+		return { ...result, message: mask.text(result.message) };
 	}
 	const { response } = result;
 	return {
 		kind: "answered",
 		response: {
 			...response,
-			statusText: redactText(response.statusText, values),
+			statusText: mask.text(response.statusText),
 			// A header keeps its name: the step reads it by that.
-			headers: redactJson(response.headers, values, "values") as Record<
-				string,
-				string
-			>,
-			body: redactJson(response.body, values) as JsonValue,
+			headers: mask.json(response.headers, "values") as Record<string, string>,
+			body: mask.json(response.body) as JsonValue,
 		},
 	};
 }

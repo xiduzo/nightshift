@@ -57,6 +57,7 @@ export async function callServerTool(
 					? error.message
 					: `The connection "${connection}" did not answer: ${messageOf(error)}`,
 			arguments: sent,
+			...(sent === null ? { asked: input.arguments } : {}),
 		};
 	}
 	return {

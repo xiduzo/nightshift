@@ -440,6 +440,11 @@ const CELLS: Record<string, Record<string, () => Promise<unknown>>> = {
 			call({ text: "ok" }, { more: { a: VALUE } }),
 		"a value in the arguments of a call that failed": () =>
 			call({ throws: "bad" }, { more: { a: VALUE } }),
+		"a value in the arguments of a call that was not made": async () => {
+			const result = await call({}, { tool: "nope", more: { a: VALUE } });
+			expect(result).toMatchObject({ kind: "failed", arguments: null });
+			return result;
+		},
 		"a value in the name of a tool it does not have": () =>
 			call({}, { tool: VALUE }),
 	},
@@ -641,6 +646,26 @@ describe("a value that is a JSON document is hidden as a whole, however it is wr
 		expect(await call({ data: other }, { value })).toMatchObject({
 			structuredContent: null,
 		});
+	});
+
+	test("as the arguments of a call, which are an object then too", async () => {
+		const whole = { template: JSON.stringify({ text: "ok" }) };
+		expect(
+			await device(JSON.stringify(whole)).callTool({
+				connection: "echo",
+				tool: "echo",
+				arguments: whole,
+				signal: signal(),
+			}),
+		).toMatchObject({ kind: "called", arguments: {} });
+		expect(
+			await device(JSON.stringify(whole)).callTool({
+				connection: "echo",
+				tool: "nope",
+				arguments: whole,
+				signal: signal(),
+			}),
+		).toMatchObject({ kind: "failed", asked: {} });
 	});
 
 	test("in a web request's body and a command's output", async () => {

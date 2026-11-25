@@ -417,6 +417,12 @@ export type ToolResult =
 			message: string;
 			/** The arguments the call was about to send; null when it got no further than listing. */
 			arguments: Record<string, JsonValue> | null;
+			/**
+			 * When `arguments` is null because nothing was sent: the arguments the
+			 * call was made with, as a person wrote them. Absent when it is not
+			 * known whether the call was sent, as when its Device went away.
+			 */
+			asked?: Record<string, JsonValue>;
 	  };
 
 export type ReadFileInput = {

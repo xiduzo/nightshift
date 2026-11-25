@@ -1,11 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
-import {
-	redactExec,
-	redactSession,
-	redactText,
-	streamRedactor,
-} from "./redact";
+import { redactExec, redactSession, streamRedactor } from "./redact";
+import { redactText } from "./secret-mask";
 import type { ExecEvent } from "./types";
 
 /** Every chunk through one redactor, then what it held back. */

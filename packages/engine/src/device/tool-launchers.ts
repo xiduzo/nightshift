@@ -16,7 +16,7 @@ import type { Login } from "@nightshift/flows";
 import { now as timeNow } from "@nightshift/time";
 import type { SecretEnv, SecretUse } from "../contract";
 import type { DeviceCliToolLookup } from "./ports";
-import { redactText } from "./redact";
+import { redactText } from "./secret-mask";
 import { type DeviceCliTool, programOf, unreachableNote } from "./words";
 
 /**
