@@ -76,7 +76,7 @@ describe("nightshift leave", () => {
 				keyKept: false,
 			}),
 		).toEqual([
-			"This computer left studio. It did not answer. Remove this computer on its Devices page too.",
+			"This computer left studio. It can still list this computer. Remove this computer on its Devices page too.",
 			"Your Personal stays as it is.",
 		]);
 	});

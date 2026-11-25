@@ -36,7 +36,7 @@ export function LeaveHostButton({ hostName }: { hostName: string }) {
 				toast.success(`You left ${result.host.name}`);
 			} else {
 				toast.warning(
-					`You left ${result.host.name}. It did not answer. Remove this computer on its Devices page too.`,
+					`You left ${result.host.name}. It can still list this computer. Remove this computer on its Devices page too.`,
 				);
 			}
 			if (result.waiting !== null) {

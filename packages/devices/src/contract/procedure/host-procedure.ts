@@ -42,8 +42,9 @@ export const refusalDataSchema = exact<{ kind: RefusalKind }>()(
 );
 
 /**
- * Beside a refusal of the Device key: the Host that refuses. A Host says it
- * only to a call that asks for that Host by its id (`HOST_HEADER`).
+ * The Host that refuses, beside a refusal of the Device key, or of a role
+ * that a keyed call checks (`Caller.may`). A Host says it only to a call
+ * that asks for that Host by its id (`HOST_HEADER`).
  */
 export const keyRefusalSchema = z.object({ hostId: deviceId });
 

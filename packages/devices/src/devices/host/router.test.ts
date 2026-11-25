@@ -9,8 +9,8 @@ import { type HostPeerContext, hostRouter } from "./adapters/in/host-router";
 
 /**
  * The errors a Device gets from its Host keep the codes older Devices
- * know: a refusal is a BAD_REQUEST with its words, and a FORBIDDEN or an
- * UNAUTHORIZED only ever means the Device key. A failure is plain words,
+ * know: a refusal is a BAD_REQUEST with its words, an UNAUTHORIZED only
+ * ever means the Device key, and a FORBIDDEN its permission or a role. A failure is plain words,
  * and its details stay in the Host's log.
  */
 

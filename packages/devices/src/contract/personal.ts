@@ -154,7 +154,7 @@ export type LeaveResult = {
 	host: { id: string; name: string };
 	/**
 	 * The Host took the leave: this computer's access there is gone. False:
-	 * it did not answer, so it still lists this computer until its owner
+	 * it did not confirm it, so it can still list this computer until its owner
 	 * removes it there.
 	 */
 	told: boolean;
