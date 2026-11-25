@@ -1,4 +1,4 @@
-import { isOpenStatus } from "../domain/run-files";
+import { keepsWork } from "../domain/run-files";
 import {
 	cleanupTime,
 	hasLeftovers,
@@ -19,7 +19,7 @@ import type {
 export type SweepRunCopiesPorts = {
 	branches: RunBranches;
 	projects: CleanupProjects;
-	runs: Pick<CleanupRuns, "listRuns" | "runStatus" | "isActive">;
+	runs: Pick<CleanupRuns, "listRuns" | "runStatus" | "flowUnread" | "isActive">;
 	ground: CleanupGround;
 	removalLog: Pick<RemovalLog, "removed">;
 };
@@ -53,7 +53,8 @@ const shortIdOf = (runId: string) => runId.slice(0, 8);
  * rerun makes the copy again from them (`restoreWorktree`).
  *
  * A run that is still open (running, waiting at a Gate, asleep) is never
- * touched, nor is a branch another worktree has checked out, nor a
+ * touched, nor is one Night Shift cut short whose flow this version cannot
+ * read (`keepsWork`), nor is a branch another worktree has checked out, nor a
  * worktree git does not know. Every removal is logged as
  * `WorktreeRemoved`. Remote branches are never touched. The switch
  * `cleanUpRuns` turns all of it off.
@@ -67,10 +68,13 @@ export const sweepRunCopies =
 	(ports: SweepRunCopiesPorts) => async (): Promise<SweepResult> => {
 		const { branches, runs, ground } = ports;
 
-		/** The run goes on (or started again): nothing removes its work. */
-		async function isOpen(runId: string): Promise<boolean> {
+		/** The run goes on (or started again), or only another version can continue it: nothing removes its work. */
+		async function keeps(runId: string): Promise<boolean> {
 			const status = await runs.runStatus(runId);
-			return runs.isActive(runId) || (status !== null && isOpenStatus(status));
+			return (
+				runs.isActive(runId) ||
+				(status !== null && (await keepsWork(runId, status, runs)))
+			);
 		}
 
 		async function record(
@@ -122,7 +126,7 @@ export const sweepRunCopies =
 			const deleted: string[] = [];
 			let worktreePath: string | null = null;
 			try {
-				if (await isOpen(runId)) return false;
+				if (await keeps(runId)) return false;
 				if (keep.copy && state.head) {
 					const commit =
 						(state.changes ?? 0) > 0
@@ -180,7 +184,7 @@ export const sweepRunCopies =
 			for (const [shortId, refs] of kept) {
 				const run = byShortId.get(shortId);
 				if (!run || cleanupTime(run, afterDays) > now) continue;
-				if (await isOpen(run.id)) continue;
+				if (await keeps(run.id)) continue;
 				const expired: string[] = [];
 				try {
 					for (const ref of refs) {
@@ -212,12 +216,12 @@ export const sweepRunCopies =
 			try {
 				const projectRuns = await runs.listRuns(project.spaceId, project.id);
 				const now = ground.now();
-				const due = projectRuns.filter(
-					(run) =>
-						!isOpenStatus(run.status) &&
-						!runs.isActive(run.id) &&
-						cleanupTime(run, RUN_COPY_DAYS) <= now,
-				);
+				const due: EndedRun[] = [];
+				for (const run of projectRuns) {
+					if (cleanupTime(run, RUN_COPY_DAYS) > now) continue;
+					if (runs.isActive(run.id)) continue;
+					if (!(await keepsWork(run.id, run.status, runs))) due.push(run);
+				}
 				const states =
 					due.length > 0
 						? await branches.inspect(

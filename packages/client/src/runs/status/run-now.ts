@@ -112,7 +112,7 @@ type RunRead = Pick<
 	RunSummary,
 	"status" | "result" | "reason" | "walker" | "wakeAt" | "signal"
 > &
-	Partial<Pick<RunDetail, "commands" | "steps">>;
+	Partial<Pick<RunDetail, "commands" | "steps" | "flowUnread">>;
 
 /** The name of the device that walks a run, as people read it. */
 export function walkerName(walker: Pick<RunSummary["walker"], "name">): string {
@@ -337,10 +337,19 @@ function finishedNotice(
  * End node.
  */
 function endedNotice(
-	run: Pick<RunRead, "reason" | "result">,
+	run: Pick<RunRead, "reason" | "result" | "flowUnread">,
 	status: "finished" | "failed" | "interrupted" | "stopped",
 	resume: boolean,
 ): RunNotice | null {
+	// Nothing continues a run whose flow does not read: its reason says what to do.
+	if (run.flowUnread && run.reason && status === "interrupted") {
+		return notice(
+			"interrupted",
+			["The run was interrupted"],
+			firstLine(run.reason) ?? "",
+			[run.reason],
+		);
+	}
 	const resumeHere = "Resume it to continue.";
 	const continueHere = "Resume it to continue where it stopped.";
 	switch (status) {

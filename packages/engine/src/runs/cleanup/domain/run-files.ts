@@ -7,7 +7,8 @@ import type { RunStatus } from "../../../run-status";
  * this computer (ADR 22), and when they go. There is no git, so nothing
  * tells what is safe to keep: the sweep removes the folder of a run that
  * ended `cleanUpAfterDays` ago, whatever is in it. It never touches a run
- * that is still open. A folder of a run this computer does not know (the
+ * that is still open, nor one that only another version can continue
+ * (`keepsWork`). A folder of a run this computer does not know (the
  * folder of a step it ran for another Person's run) goes `cleanUpAfterDays`
  * after its last change. Each Device sweeps its own folders. Each removal
  * of a run this computer knows is logged as `WorktreeRemoved`.
@@ -50,18 +51,34 @@ export function isOpenStatus(status: RunStatus): boolean {
 	return status === "running" || status === "waiting" || status === "sleeping";
 }
 
+/**
+ * Whether nothing removes the work of a run with this status: the run is
+ * open, or Night Shift cut it short and cannot continue it, because this
+ * version cannot read its flow. A version that reads it continues it.
+ */
+export async function keepsWork(
+	runId: string,
+	status: RunStatus,
+	reads: { flowUnread(runId: string): Promise<boolean> },
+): Promise<boolean> {
+	return (
+		isOpenStatus(status) ||
+		(status === "interrupted" && (await reads.flowUnread(runId)))
+	);
+}
+
 /** A run this computer knows: what the cleanup reads of it. */
 export type KnownRun = {
 	id: string;
 	projectId: string;
 	createdAt: number;
 	endedAt: number | null;
-	/** Running, waiting or sleeping: nothing removes its folder. */
-	open: boolean;
+	/** It goes on, or this version cannot continue it (`keepsWork`): nothing removes its folder. */
+	keeps: boolean;
 	runFolder: boolean;
 };
 
-/** What `knownRun` reads of a run: its row, then its state, and whether a step of it is at work here. */
+/** What `knownRun` reads of a run: its row, then its state and whether its flow reads, and whether a step of it is at work here. */
 export type KnownRunReads = {
 	/** The run's row. Refuses (`not-found`) a run this computer does not know. */
 	runRow(runId: string): Promise<{ projectId: string; createdAt: Date }>;
@@ -70,6 +87,7 @@ export type KnownRunReads = {
 		end: { at: number } | null;
 		runFolder: boolean;
 	}>;
+	flowUnread(runId: string): Promise<boolean>;
 	isActive(runId: string): boolean;
 };
 
@@ -91,7 +109,8 @@ export async function knownRun(
 		projectId: row.projectId,
 		createdAt: instant(row.createdAt),
 		endedAt: state.end?.at ?? null,
-		open: isOpenStatus(state.status) || reads.isActive(runId),
+		keeps:
+			reads.isActive(runId) || (await keepsWork(runId, state.status, reads)),
 		runFolder: state.runFolder,
 	};
 }

@@ -6,7 +6,7 @@ import { isOpenStatus, type KnownRunReads, knownRun } from "./run-files";
 
 function reads(
 	status: RunStatus,
-	options: { active?: boolean; error?: unknown } = {},
+	options: { active?: boolean; unread?: boolean; error?: unknown } = {},
 ): KnownRunReads {
 	return {
 		async runRow() {
@@ -16,6 +16,7 @@ function reads(
 		async runState() {
 			return { status, end: { at: 9 }, runFolder: true };
 		},
+		flowUnread: async () => options.unread ?? false,
 		isActive: () => options.active ?? false,
 	};
 }
@@ -27,15 +28,25 @@ describe("knownRun", () => {
 			projectId: "project-1",
 			createdAt: 5,
 			endedAt: 9,
-			open: false,
+			keeps: false,
 			runFolder: true,
 		});
 	});
 
-	test("a run at work here is open, whatever its status", async () => {
+	test("a run at work here keeps its folder, whatever its status", async () => {
 		expect(
-			(await knownRun("run-1", reads("failed", { active: true })))?.open,
+			(await knownRun("run-1", reads("failed", { active: true })))?.keeps,
 		).toBe(true);
+	});
+
+	test("a run cut short keeps its folder while its flow does not read; a run that ended does not", async () => {
+		const keeps = async (status: RunStatus, unread: boolean) =>
+			(await knownRun("run-1", reads(status, { unread })))?.keeps;
+		expect(await keeps("interrupted", true)).toBe(true);
+		expect(await keeps("interrupted", false)).toBe(false);
+		for (const status of ["finished", "failed", "stopped"] as const) {
+			expect(await keeps(status, true)).toBe(false);
+		}
 	});
 
 	test("a run this computer does not know is null; another error goes on", async () => {

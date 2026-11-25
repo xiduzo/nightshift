@@ -11,7 +11,7 @@ import type {
 
 export type ListRunFilesPorts = {
 	access: Pick<Access, "openRun">;
-	runs: Pick<CleanupRuns, "runRow" | "runState" | "isActive">;
+	runs: Pick<CleanupRuns, "runRow" | "runState" | "flowUnread" | "isActive">;
 	folders: Pick<RunFolderFiles, "list">;
 	removalLog: Pick<RemovalLog, "removals">;
 	ground: Pick<CleanupGround, "settings">;
@@ -49,7 +49,7 @@ export const listRunFiles =
 			files: listed.files,
 			more: listed.more,
 			cleanupAt:
-				cleanUpRuns && !run.open ? cleanupTime(run, cleanUpAfterDays) : null,
+				cleanUpRuns && !run.keeps ? cleanupTime(run, cleanUpAfterDays) : null,
 			removed: null,
 		};
 	};

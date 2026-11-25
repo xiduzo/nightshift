@@ -5,6 +5,7 @@ import type { Git } from "./git";
 import type { Runner } from "./graph";
 import { getRunRow, type RunLog } from "./log";
 import type { Projects } from "./projects";
+import { shownRunFlow } from "./read";
 import type { RunFolders } from "./run-folders";
 import type { Views } from "./runs";
 import { type Cleanup, wireCleanup } from "./runs";
@@ -46,6 +47,8 @@ export function wireEngineCleanup(deps: {
 			runStatus: views.reads.runStatus,
 			runRow: (runId) => getRunRow(db, runId),
 			runState: (runId) => log.state(runId),
+			flowUnread: async (runId) =>
+				shownRunFlow(await getRunRow(db, runId)).flowUnread !== undefined,
 			isActive: (runId) => runner.isActive(runId),
 		},
 		projects: deps.projects,

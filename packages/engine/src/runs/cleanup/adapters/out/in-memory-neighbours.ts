@@ -31,6 +31,8 @@ export type TwinRun = {
 	endedAt: number | null;
 	baseRef: string;
 	runFolder: boolean;
+	/** This version cannot read its flow. */
+	flowUnread: boolean;
 };
 
 /** The runs of this computer, and which have a step at work here. */
@@ -50,6 +52,7 @@ export function inMemoryCleanupRuns() {
 				endedAt: DAY_MS,
 				baseRef: "base",
 				runFolder: false,
+				flowUnread: false,
 				...run,
 			});
 		},
@@ -76,6 +79,9 @@ export function inMemoryCleanupRuns() {
 				end: run?.endedAt != null ? { at: run.endedAt } : null,
 				runFolder: run?.runFolder ?? false,
 			};
+		},
+		async flowUnread(runId: string) {
+			return twin.runs.get(runId)?.flowUnread ?? false;
 		},
 		isActive(runId: string) {
 			return twin.active.has(runId);

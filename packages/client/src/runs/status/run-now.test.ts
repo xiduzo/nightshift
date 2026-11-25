@@ -405,6 +405,14 @@ describe("why a run ended", () => {
 		]);
 	});
 
+	test("an interrupted run whose flow does not read offers no resume", () => {
+		const reason =
+			"This run is from an older version of Night Shift. Start the flow again.";
+		expect(
+			notice("interrupted", { reason, flowUnread: "older" }),
+		).toMatchObject({ body: [reason], resumable: false });
+	});
+
 	test("a flow that ended as failed is run again, not resumed", () => {
 		expect(
 			notice("failed", { result: "failed", reason: "Tests fail" }),

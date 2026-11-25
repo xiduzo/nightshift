@@ -9,7 +9,7 @@ import type {
 
 export type SweepRunFoldersPorts = {
 	folders: Pick<RunFolderFiles, "runIds" | "lastChange" | "remove" | "path">;
-	runs: Pick<CleanupRuns, "runRow" | "runState" | "isActive">;
+	runs: Pick<CleanupRuns, "runRow" | "runState" | "flowUnread" | "isActive">;
 	ground: CleanupGround;
 	removalLog: Pick<RemovalLog, "removed">;
 };
@@ -21,7 +21,7 @@ export type RunFilesSweep = { removed: string[]; kept: number };
  * The scheduled cleanup of the run folders on this computer: each one
  * that is due goes, with its files. The folder of a run this computer
  * knows is due `cleanUpAfterDays` after the run ended, never while it is
- * open. The folder of a run it does not know is due `cleanUpAfterDays`
+ * open or only another version can continue it. The folder of a run it does not know is due `cleanUpAfterDays`
  * after its last change. Each removal of a run it knows is logged as
  * `WorktreeRemoved`. An error with one folder is logged and skipped.
  */
@@ -29,14 +29,14 @@ export const sweepRunFolders =
 	(ports: SweepRunFoldersPorts) => async (): Promise<RunFilesSweep> => {
 		const { folders } = ports;
 
-		/** Whether the folder of `runId` is due: never while its run is open. */
+		/** Whether the folder of `runId` is due: never while its run keeps it. */
 		async function due(
 			runId: string,
 			run: KnownRun | null,
 			afterDays: number,
 			now: number,
 		): Promise<boolean> {
-			if (run) return !run.open && cleanupTime(run, afterDays) <= now;
+			if (run) return !run.keeps && cleanupTime(run, afterDays) <= now;
 			const changed = await folders.lastChange(runId);
 			return (
 				changed !== null && lastChangeCleanupTime(changed, afterDays) <= now

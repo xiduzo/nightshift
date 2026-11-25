@@ -80,6 +80,20 @@ describe("sweepRunCopies", () => {
 		expect(ports.branches.done).toEqual([]);
 	});
 
+	test("leaves a run that started again while git looked at its copy", async () => {
+		const { ports, sweep } = await setup();
+		ports.branches.leave(REPO, SHORT, {
+			head: { commit: "c1", branch: `nightshift/${SHORT}`, unsaved: 0 },
+		});
+		const { inspect } = ports.branches;
+		ports.branches.inspect = async (...asked) => {
+			ports.runs.add({ id: RUN, status: "running", endedAt: null });
+			return inspect(...asked);
+		};
+		expect(await sweep()).toEqual({ removed: [], expired: [], left: 1 });
+		expect(ports.branches.done).toEqual([]);
+	});
+
 	test("does nothing while the switch is off", async () => {
 		const { ports, sweep } = await setup();
 		ports.ground.cleanUpRuns = false;

@@ -37,6 +37,8 @@ export type CleanupRuns = {
 		end: { at: number } | null;
 		runFolder: boolean;
 	}>;
+	/** Whether this version cannot read the run's flow. */
+	flowUnread(runId: string): Promise<boolean>;
 	/** A step of the run is at work in this process. */
 	isActive(runId: string): boolean;
 };
