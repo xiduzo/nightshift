@@ -70,6 +70,32 @@ const NO_PROFILES: Pick<PeerProfiles, "here" | "lastKnown"> = {
 	lastKnown: async () => null,
 };
 
+/** What a computer alone gives Placement beside its own facts. */
+const ALONE: Pick<
+	Parameters<typeof wirePlacement>[0],
+	| "work"
+	| "relay"
+	| "copies"
+	| "isHost"
+	| "ownProfiles"
+	| "offersHere"
+	| "mayUseOffers"
+> = {
+	work: null,
+	relay: null,
+	copies: { list: async () => [], kept: async () => null },
+	isHost: () => false,
+	ownProfiles: () => null,
+	offersHere: async () => [],
+	mayUseOffers: async () => false,
+};
+
+/** This computer, as its owner's runs reach it. */
+function here(deviceId: string) {
+	const device = testDevice({ harnesses: {} }, deviceId);
+	return { device, deviceFor: () => device };
+}
+
 /** No project here: a module that reads only the plan never asks. */
 const NO_PROJECTS = {
 	find: async () => {
@@ -1385,12 +1411,12 @@ describe("the owner's other Devices in a Space of the home Host", () => {
 			db: b.db,
 			directory: deviceDirectory(b.db),
 		});
-		const placement = wirePlacement().createPlacement({
+		const placement = wirePlacement({
 			db: b.db,
-			device: testDevice({ harnesses: {} }, b.deviceId),
+			...here(b.deviceId),
 			walkerId: async () => b.deviceId,
 			profiles: NO_PROFILES,
-			keptDevice: async () => null,
+			...ALONE,
 			registry: {
 				selfOwnerId: () => wireRegistry({ db: b.db }).readSelfOwner(),
 			} as never,
@@ -1413,6 +1439,7 @@ describe("the owner's other Devices in a Space of the home Host", () => {
 				},
 			} as unknown as HostRelay,
 			copies: {
+				kept: async () => null,
 				list: async () => [
 					{
 						deviceId: "laptop",
@@ -1515,12 +1542,12 @@ describe("the owner's other Devices in a Space of the home Host", () => {
 describe("a Device of the plan, by id", () => {
 	/** A's placement module, with no registry and no names it learned. */
 	const placementOfA = () =>
-		wirePlacement().createPlacement({
+		wirePlacement({
 			db: a.db,
-			device: testDevice({ harnesses: {} }, a.deviceId),
+			...here(a.deviceId),
 			walkerId: async () => a.deviceId,
 			profiles: NO_PROFILES,
-			keptDevice: async () => null,
+			...ALONE,
 			registry: {
 				selfOwnerId: () => wireRegistry({ db: a.db }).readSelfOwner(),
 			} as never,
@@ -1558,12 +1585,12 @@ describe("a Device of the plan, by id", () => {
 
 describe("a run with no starter", () => {
 	test("sends nothing to another Device: its calls there are refused here", async () => {
-		const placement = wirePlacement().createPlacement({
+		const placement = wirePlacement({
 			db: a.db,
-			device: testDevice({ harnesses: {} }, a.deviceId),
+			...here(a.deviceId),
 			walkerId: async () => a.deviceId,
 			profiles: NO_PROFILES,
-			keptDevice: async () => null,
+			...ALONE,
 			registry: {
 				selfOwnerId: () => wireRegistry({ db: a.db }).readSelfOwner(),
 			} as never,

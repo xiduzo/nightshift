@@ -50,7 +50,7 @@ export type PeerOptions = {
 	ownOffers?: () => readonly DeviceOffer[];
 	/** This computer's profiles, which its owner may use. Without it, unknown. */
 	ownProfiles?: () => readonly DeviceProfile[];
-	/** "Be a Host" is on here (`PlacementDeps.isHost`). */
+	/** "Be a Host" is on here. Without it, it is not. */
 	isHost?: () => boolean;
 	/**
 	 * The copies of the documents of this computer's owner's other Devices
@@ -164,7 +164,7 @@ export function createPeers(
 	});
 
 	/** Where a run's steps run: its plan at start, read while it walks (`placement.ts`). */
-	const placement = wirePlacement().createPlacement({
+	const placement = wirePlacement({
 		db,
 		device,
 		walkerId: context.walkerId,
@@ -173,16 +173,18 @@ export function createPeers(
 		hostSpaces,
 		projects: context.projects,
 		profiles: context.profiles,
-		keptDevice: context.keptDevice,
 		flows: context.flows,
-		...(work ? { work } : {}),
-		...(relay ? { relay } : {}),
+		work: work ?? null,
+		relay: relay ?? null,
 		// Another Person's run here uses this computer through its Offers.
-		localFor: admission.deviceFor,
+		deviceFor: admission.deviceFor,
 		offersHere: admission.inForce,
-		...(options.ownProfiles ? { ownProfiles: options.ownProfiles } : {}),
-		...(options.copies ? { copies: options.copies } : {}),
-		...(options.isHost ? { isHost: options.isHost } : {}),
+		ownProfiles: () => options.ownProfiles?.() ?? null,
+		copies: {
+			list: async () => options.copies?.list() ?? [],
+			kept: context.keptDevice,
+		},
+		isHost: () => options.isHost?.() ?? false,
 		mayUseOffers: (spaceId, personId) =>
 			options.mayUseOffers?.(spaceId, personId) ?? Promise.resolve(false),
 	});

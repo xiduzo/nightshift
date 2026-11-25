@@ -1,9 +1,54 @@
+import type {
+	Device,
+	DeviceProfile,
+	OwnDevice,
+	PeerProjects,
+	PlacedRun,
+	PlanDevices,
+	PlanInput,
+	PlannedRun,
+} from "@nightshift/engine";
 import type { DeviceCopy } from "@nightshift/engine/settings";
+import type { WorkFor, WorkRelay } from "../../../contract";
+import type { DeviceOffer } from "../../offers";
 
 /**
  * The driven ports of placement. Neighbour ports are `@filledBy`; the
- * composition of the package passes them to `wirePlacement`.
+ * composition of the package passes them to `wirePlacement`. The registry
+ * is a slice of this package, so a use case names it itself.
  */
+
+/**
+ * This computer.
+ * @filledBy devices/wire
+ */
+export type ThisComputer = {
+	device: Device;
+	/** Its id as the Walker of the runs it walks. */
+	walkerId(): Promise<string>;
+	/** It as a run reaches it: through its Offers, for another Person's run. */
+	deviceFor(run: PlacedRun): Device;
+	/** "Be a Host" is on here. */
+	isHost(): boolean;
+	/** The profiles its owner may use. Null: unknown. */
+	ownProfiles(): readonly DeviceProfile[] | null;
+	/** Its Offers into a Space that are in force. */
+	offersHere(spaceId: string): Promise<readonly DeviceOffer[]>;
+};
+
+/**
+ * The Spaces: which Host keeps one, and what its document says.
+ * @filledBy devices/wire
+ */
+export type Spaces = {
+	/** The Host that keeps the Space, or null for a Space of this Replica's own. */
+	hostOf(spaceId: string): Promise<string | null>;
+	/** The Offers its document lists (`spaceOffers` reads them), and the names it has of Devices. */
+	open(spaceId: string): Promise<{
+		offers: { values(): Iterable<unknown> };
+		deviceName(deviceId: string): string | null;
+	}>;
+};
 
 /**
  * Person and Space facts Placement needs from auth and links.
@@ -18,12 +63,66 @@ export type SpacePeople = {
 	personalSpaceIdBySlug(personId: string): Promise<string | null>;
 	personNames(ids: readonly string[]): Promise<Map<string, string>>;
 	keptByHomeHost(spaceId: string): Promise<boolean>;
+	/** The Person's role in the Space uses Offers. */
+	mayUseOffers(spaceId: string, personId: string): Promise<boolean>;
 };
 
 /**
- * The copies of the owner's other Devices.
+ * The Projects of a Space and their Clones.
+ * @filledBy engine/projects
+ */
+export type SpaceProjects = Pick<PeerProjects, "find" | "clones">;
+
+/**
+ * What this Replica keeps of the documents of other Devices.
  * @filledBy engine/settings
  */
-export type DeviceCopiesPort = {
+export type DeviceCopies = {
+	/** The copies of the owner's other Devices. */
 	list(): Promise<DeviceCopy[]>;
+	/** The document a Host keeps of a Device, or null. */
+	kept(deviceId: string): Promise<DeviceCopy | null>;
+};
+
+/**
+ * The Devices of the Person, as the Host that keeps a Space lists them.
+ */
+export type HostDevices = {
+	/** Null while the Host cannot be reached. A refusal of the Host is thrown. Empty on a computer without Links. */
+	list(project: {
+		spaceId: string;
+		projectId: string;
+	}): Promise<OwnDevice[] | null>;
+};
+
+/**
+ * The way to the other Devices: the work relay, and a Device over one.
+ * @filledBy devices/wire
+ */
+export type OtherDevices = {
+	relay: WorkRelay;
+	/** False on a computer that reaches no other Device. */
+	reaches: boolean;
+	over(
+		relay: WorkRelay,
+		device: { id: string; name: string },
+		forRun: WorkFor,
+	): Device;
+};
+
+/**
+ * The engine's plan of a run over the Devices it may use.
+ * @filledBy engine/wire
+ */
+export type RunPlanner = Required<
+	Pick<PlanDevices, "profileFor" | "lastKnown" | "flows">
+> & {
+	planNodes(
+		start: PlanInput["start"],
+		devices: PlanDevices,
+		personId: string | null,
+		byPerson: boolean,
+	): Promise<PlannedRun>;
+	/** The words for a Device this computer cannot reach. */
+	unreachable: string;
 };
