@@ -325,3 +325,66 @@ Each entry names its source. "Read" means found by reading and not reproduced.
 - 71 files, +989/-1,317. Engine code 178,566 to 178,255. A new field needs 3 edits, not 7.
 - Read only: `proposeFromRun`, `knownLearnings` and `learnsFromRuns` of `Knowledge` have no
   caller outside engine/knowledge.
+
+### MF. Leave and rejoin (631386db4 to a7feee069, ADR 42)
+
+- The faults that MB found are fixed. A leave pauses schedules on this computer only, outside
+  the shared document. A rejoin turns on only what the leave paused.
+- A Project whose flows wait for the Host keeps flow and schedule names of its own. Its
+  schedules and Calls follow. Kept variables and run numbers of a renamed flow start again.
+- The fixes add 2,865 lines and 294 complexity to the server packages.
+- A build from before a7feee069 fires paused schedules on both computers. Do not go back.
+
+### PRE, S3. Conversions, with an end (7f7c6271b, 69787f208)
+
+- One start of each install writes the fields that readers filled with a default, and keeps
+  the Device key under its own name. The end state removes both conversions.
+
+### FX. Faults on main (8d1aec4bc to bf7ae5821)
+
+- A quick run by profile never worked: the web sent a name where the start wants an id.
+- Runs that start at once in one clone raced for a git lock. offers.test: 3 of 20 red on the
+  base, 0 of 24 after. OpenCode 1.x chooses the port of its server itself.
+
+### R3. Only the current format is read (ADR 43)
+
+- The readers of older flows, histories, names, peers and schedules go. Stored data stays.
+  A peer of another build is offline until its update, with one message (ADR 45).
+- Not built: "schedules without a version are unreadable". A merge never writes that mark,
+  so live schedules would stop.
+- Two use cases go, both for older flow formats.
+
+### B1, B234, RU, LS. One way for each thing
+
+- The dashboard computed 2,097 lines of values that no reader uses. `read-flow-health` goes.
+- One loopback listener, one CLI command table, one field kit, one secret form, one
+  `messageOf`, one `isRecord`. The CLI table costs 181 lines more and 151 complexity less.
+
+### TW. A database port is tested on its real adapter (ADR 44)
+
+- 27 ports. The in-memory twin and the second contract run go. Use cases and their tests stay.
+- No mutant is lost. More die than before: the twins hid a delete without its Space condition.
+- A check finds a twin by the port that it implements. An untyped object in a call escapes it.
+- The engine suite needs no more CPU time.
+
+### Measured and not done (owner, 2026-11-24)
+
+- Merge families of near-identical requests: no. One request, one use case.
+- Reply schemas of packages/api: they stay. `exact` finds an accidental field.
+- Page loaders and node tables: not now. The result needs a person to look at each page.
+- Spread codemod and zod at the harness seam: no. They only lower a number.
+
+### The review of the whole branch
+
+- Three reviews, no blocker, six findings, all fixed. Two concerned stored data: a save of a
+  list dropped entries it could not read, and the cleanup took the work of a run whose flow
+  could not be read. A test now runs each sweep over such data.
+- A flaky CI test came from 14 test files that never ended their engine.
+- Open: a stop in a short moment after an Agent asks makes the first resume stop again.
+- Not covered: a browser, a phone, two real daemons over a network.
+
+### Numbers (scc, 5ff33c00b to 332649c77, before the review fixes)
+
+- Six server packages: 265,056 to 256,625 lines, 22,734 to 21,867 complexity, 2,689 to 2,564 files.
+- apps and packages: 492,120 to 482,509 lines, 43,730 to 42,287 complexity.
+- Use-case files: 412 to 371. Most of the difference is the forwards of ADR 41.
