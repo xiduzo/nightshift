@@ -4,7 +4,6 @@ export {
 	arrive,
 	createRaces,
 	fanOutOf,
-	OUTRUN_ERROR,
 	openRound,
 	outrun,
 	placeOf,

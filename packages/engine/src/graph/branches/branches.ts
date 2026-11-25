@@ -54,9 +54,6 @@ export function fanOutOf(flow: Flow, joinId: string): FanOut | null {
 	return null;
 }
 
-/** Why a branch's step was aborted: another branch reached a `first` Join. */
-export const OUTRUN_ERROR = "Another branch reached the Join first.";
-
 /** The race of the `first` Joins, and the running steps of branches it may abort. In memory, one per Thread. */
 export type Races = {
 	/** A step of a branch node runs: `abort` stops it when its branch loses. Returns the release. */

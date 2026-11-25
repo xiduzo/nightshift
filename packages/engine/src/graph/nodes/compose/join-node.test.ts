@@ -9,6 +9,7 @@ import { now } from "@nightshift/time";
 import { foldRun } from "../../../log";
 import { getRunRow } from "../../../log/run-row/run-row";
 import { deriveSteps } from "../../../read";
+import { OUTRUN_ERROR } from "../../../read/waiting-session";
 import {
 	agent,
 	command,
@@ -25,7 +26,6 @@ import {
 	type Sandbox,
 	waitFor,
 } from "../../../testing/test-support";
-import { OUTRUN_ERROR } from "../../branches/branches";
 import { heldOf } from "../../state/state";
 
 /**

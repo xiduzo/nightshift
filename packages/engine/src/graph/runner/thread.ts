@@ -96,8 +96,6 @@ export type ThreadSnapshot = {
 	hasCheckpoint: boolean;
 	/** The thread still has a task: an interrupt, or a node a stop or a death cut short. */
 	hasTasks: boolean;
-	/** The graph nodes of the tasks that run again: no interrupt holds them. */
-	open: string[];
 };
 
 /** How one drive ended. */
@@ -185,9 +183,6 @@ export function openThread(row: RunRow, deps: ThreadDeps): Thread {
 			values,
 			hasCheckpoint,
 			hasTasks: latest.tasks.length > 0,
-			open: latest.tasks
-				.filter((task) => task.interrupts.length === 0)
-				.map((task) => task.name),
 		};
 	}
 

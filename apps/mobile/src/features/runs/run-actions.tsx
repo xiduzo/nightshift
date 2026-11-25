@@ -118,7 +118,9 @@ function askOf(
 				title: retry ? "Retry this run?" : "Resume this run?",
 				description: retry
 					? "The run continues at the step that failed."
-					: `The run continues at ${resumeAt ?? "its last step"}.`,
+					: resumeAt
+						? `The run continues at ${resumeAt}.`
+						: "The run continues where it stopped.",
 				confirm: retry ? "Retry" : "Resume run",
 				run: () => {
 					only("resume");

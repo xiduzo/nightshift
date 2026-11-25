@@ -32,6 +32,7 @@ import {
 	shownRunFlow,
 	stepMetrics,
 	toSummary,
+	waitingSession,
 } from "../../../../read";
 import { isTestRun, type RunStatus } from "../../../../run-status";
 import type { RunViews } from "../../application/ports";
@@ -253,6 +254,7 @@ export function toRunDetail(
 		calledTraversals: deriveCalledTraversals(run),
 		takeOverCommand: takeOverCommand(summary.worktreePath, last, harnessOf),
 		resumes: runResumes(run),
+		resumeStepId: waitingSession(run)?.id ?? null,
 		commands,
 		variables: [...run.variableChanges],
 		leases: deriveLeases(run),

@@ -17,14 +17,20 @@ import type { StepSummary } from "@/shared/api";
 import { orpc } from "@/shared/api";
 import { runMutations } from "../queries";
 
-/** Continues a stopped, failed or interrupted run at its last step's node. */
+/**
+ * Continues a stopped, failed or interrupted run. A prompt goes to the
+ * session of `sessionStep`. When no session waits, there is nothing to type.
+ */
 export function ResumeComposer({
 	runId,
 	lastStep,
+	sessionStep,
 	className,
 }: {
 	runId: string;
 	lastStep: StepSummary | undefined;
+	/** The Agent step whose session gets the prompt. Unset: no session waits. */
+	sessionStep: StepSummary | undefined;
 	className?: string;
 }) {
 	const id = useId();
@@ -42,20 +48,38 @@ export function ResumeComposer({
 
 	const submit = () => {
 		if (resumeRun.isPending) return;
-		resumeRun.mutate({ runId, prompt: prompt.trim() || undefined });
+		resumeRun.mutate({
+			runId,
+			prompt: (sessionStep && prompt.trim()) || undefined,
+		});
 	};
 
-	const where = lastStep?.scope
-		? lastStep.scope.itemId === null
-			? `The run continues at ${lastStep.nodeId}, inside the called flow.`
-			: `The run continues at ${lastStep.nodeId}, inside the called flow, with the same item.`
-		: lastStep
-			? lastStep.nodeType === "agent"
-				? `The agent at ${lastStep.nodeId} continues where it stopped.`
-				: lastStep.gate !== null
-					? `The gate ${lastStep.nodeId} opens again and waits for your answer.`
-					: `${lastStep.nodeId} runs again.`
+	const where = sessionStep
+		? sessionStep.scope
+			? sessionStep.scope.itemId === null
+				? `The run continues at ${sessionStep.nodeId}, inside the called flow.`
+				: `The run continues at ${sessionStep.nodeId}, inside the called flow, with the same item.`
+			: `The agent at ${sessionStep.nodeId} continues where it stopped.`
+		: lastStep?.gate && lastStep.outcome === "stopped"
+			? `The gate ${lastStep.nodeId} opens again and waits for your answer.`
 			: "The run continues where it stopped.";
+
+	const button = (
+		<InputGroupButton
+			type="submit"
+			variant="default"
+			size="sm"
+			className="ml-auto"
+			disabled={resumeRun.isPending}
+		>
+			{resumeRun.isPending ? (
+				<Spinner data-icon="inline-start" />
+			) : (
+				<PlayIcon data-icon="inline-start" />
+			)}
+			{resumeRun.isPending ? "Resuming…" : "Resume"}
+		</InputGroupButton>
+	);
 
 	return (
 		<form
@@ -65,51 +89,47 @@ export function ResumeComposer({
 				submit();
 			}}
 		>
-			<label
-				htmlFor={`${id}-prompt`}
-				className="text-xs leading-relaxed text-muted-foreground"
-			>
-				<span className="font-medium text-foreground">
-					Follow-up prompt (optional).
-				</span>{" "}
-				{where}
-			</label>
-			<InputGroup className="bg-background">
-				<InputGroupTextarea
-					id={`${id}-prompt`}
-					value={prompt}
-					onChange={(event) => setPrompt(event.target.value)}
-					onKeyDown={(event) => {
-						if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-							event.preventDefault();
-							submit();
-						}
-					}}
-					placeholder="Tell the agent what to do next…"
-					className="max-h-40 min-h-12 text-sm md:text-sm"
-					rows={2}
-				/>
-				<InputGroupAddon align="block-end">
-					<InputGroupText className="hidden text-xs sm:flex">
-						<Kbd>⌘</Kbd>
-						<Kbd>Enter</Kbd>
-					</InputGroupText>
-					<InputGroupButton
-						type="submit"
-						variant="default"
-						size="sm"
-						className="ml-auto"
-						disabled={resumeRun.isPending}
+			{sessionStep ? (
+				<>
+					<label
+						htmlFor={`${id}-prompt`}
+						className="text-xs leading-relaxed text-muted-foreground"
 					>
-						{resumeRun.isPending ? (
-							<Spinner data-icon="inline-start" />
-						) : (
-							<PlayIcon data-icon="inline-start" />
-						)}
-						{resumeRun.isPending ? "Resuming…" : "Resume"}
-					</InputGroupButton>
-				</InputGroupAddon>
-			</InputGroup>
+						<span className="font-medium text-foreground">
+							Follow-up prompt (optional).
+						</span>{" "}
+						{where}
+					</label>
+					<InputGroup className="bg-background">
+						<InputGroupTextarea
+							id={`${id}-prompt`}
+							value={prompt}
+							onChange={(event) => setPrompt(event.target.value)}
+							onKeyDown={(event) => {
+								if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+									event.preventDefault();
+									submit();
+								}
+							}}
+							placeholder="Tell the agent what to do next…"
+							className="max-h-40 min-h-12 text-sm md:text-sm"
+							rows={2}
+						/>
+						<InputGroupAddon align="block-end">
+							<InputGroupText className="hidden text-xs sm:flex">
+								<Kbd>⌘</Kbd>
+								<Kbd>Enter</Kbd>
+							</InputGroupText>
+							{button}
+						</InputGroupAddon>
+					</InputGroup>
+				</>
+			) : (
+				<div className="flex items-center gap-2 text-xs text-muted-foreground">
+					{where}
+					{button}
+				</div>
+			)}
 			{resumeRun.error ? (
 				<p role="alert" className="text-xs text-destructive">
 					{resumeRun.error.message}

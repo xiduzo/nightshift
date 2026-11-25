@@ -23,7 +23,6 @@ import {
 	planReentry,
 	type ReentryRequest,
 	reentryUpdate,
-	resumeTarget,
 } from "./reentry";
 import type { ThreadSnapshot, ThreadState } from "./thread";
 
@@ -135,8 +134,26 @@ function summary(point: ResumePoint) {
 	};
 }
 
+/** The run failed on the end of `nodeId`, which no edge leaves. */
+const runFailed = (nodeId: string, seq: number): LoggedEvent => ({
+	...(logOf({
+		type: "RunEnded",
+		payload: {
+			status: "failed",
+			reason: `Node "${nodeId}" ended with "pass" and no edge leaves it on that outcome.`,
+		},
+	})[0] as LoggedEvent),
+	seq,
+});
+
+/** What `RunResumed` names, for a thread that never ran. */
+const targetOf = (events: LoggedEvent[]) => {
+	const { nodeId, stepId, scope } = plan(events, threadAt(FRESH)).resumed;
+	return { nodeId, stepId, scope };
+};
+
 describe("the daemon side agrees with the node side", () => {
-	test("a finished run re-enters on its last top-level step: reenteredNode names it, resumeTarget names its session, reentryUpdate leaves its visit uncommitted", () => {
+	test("a finished run re-enters on its last top-level step: reenteredNode names it, RunResumed names its session, reentryUpdate leaves its visit uncommitted", () => {
 		const events = logOf(
 			started("s1", "a", 1),
 			...session("s1", "h-a"),
@@ -148,11 +165,10 @@ describe("the daemon side agrees with the node side", () => {
 			runEnded("finished"),
 		);
 		expect(reenteredNode(foldRun(events))).toBe("b");
-		expect(resumeTarget(foldRun(events))).toEqual({
+		expect(targetOf(events)).toEqual({
 			nodeId: "b",
 			stepId: "s2",
 			scope: null,
-			topNodeId: "b",
 		});
 		const flow = {
 			nodes: [{ id: "a" }, { id: "b" }],
@@ -183,11 +199,10 @@ describe("the daemon side agrees with the node side", () => {
 			ended("s1", "pass"),
 			runEnded("stopped"),
 		);
-		expect(resumeTarget(foldRun(events))).toEqual({
+		expect(targetOf(events)).toEqual({
 			nodeId: "a",
 			stepId: null,
 			scope: null,
-			topNodeId: "a",
 		});
 		const point = resumePoint(
 			{ id: "a" },
@@ -205,19 +220,23 @@ describe("the daemon side agrees with the node side", () => {
 			...session("s1", "h-a"),
 			ended("s1", "pass"),
 			edgeTaken("a", "b"),
+			runEnded("stopped"),
 		);
 		expect(reenteredNode(foldRun(events))).toBeNull();
-		expect(resumeTarget(foldRun(events))).toEqual({
+		expect(targetOf(events)).toEqual({
 			nodeId: "b",
 			stepId: null,
 			scope: null,
-			topNodeId: "b",
 		});
 	});
 
 	test("a step without a harness session is no resume target, as the Agent rule would not take it up", () => {
-		const events = logOf(started("s1", "a", 1), ended("s1", "interrupted"));
-		expect(resumeTarget(foldRun(events))?.stepId).toBeNull();
+		const events = logOf(
+			started("s1", "a", 1),
+			ended("s1", "interrupted"),
+			runEnded("stopped"),
+		);
+		expect(targetOf(events)?.stepId).toBeNull();
 		expect(
 			resumePoint(
 				{ id: "a" },
@@ -235,18 +254,17 @@ describe("the daemon side agrees with the node side", () => {
 			started("s1", "caller", 1, null, "call"),
 			started("s2", "inner", 1, scope),
 			...session("s2", "h-in"),
+			runEnded("stopped"),
 		);
-		expect(resumeTarget(foldRun(events))).toEqual({
+		expect(targetOf(events)).toEqual({
 			nodeId: "inner",
 			stepId: "s2",
 			scope,
-			topNodeId: "caller",
 		});
 		expect(reenteredNode(foldRun(events))).toBe("caller");
 	});
 
-	test("no step yet: no target, no re-entered node", () => {
-		expect(resumeTarget(foldRun(logOf()))).toBeNull();
+	test("no step yet: no re-entered node", () => {
 		expect(reenteredNode(foldRun(logOf()))).toBeNull();
 	});
 });
@@ -273,7 +291,6 @@ function threadAt(
 		values: {},
 		hasCheckpoint: state.kind !== "fresh",
 		hasTasks: state.kind === "interrupted" || state.kind === "pending",
-		open: state.kind === "pending" ? state.next : [],
 		...over,
 	};
 }
@@ -500,10 +517,17 @@ describe("planReentry: a resume", () => {
 				started("s2", "b", 1),
 				...session("s2", "h-b"),
 				ended("s2", "pass"),
+			);
+			const parked = [...events, runFailed("b", events.length + 1)];
+			expect(plan(parked, threadAt(parkedAt("s2"))).resumed.stepId).toBe("s2");
+			const stopped = logOf(
+				runStarted(),
+				started("s2", "b", 1),
+				...session("s2", "h-b"),
+				ended("s2", "pass"),
 				runEnded("stopped"),
 			);
-			expect(plan(events, threadAt(parkedAt("s2"))).resumed.stepId).toBe("s2");
-			expect(plan(events, threadAt(gateAt("s2"))).resumed.stepId).toBeNull();
+			expect(plan(stopped, threadAt(gateAt("s2"))).resumed.stepId).toBeNull();
 		});
 
 		test("a branch that parked with no session: its node, not the later step of another branch", () => {
@@ -562,8 +586,8 @@ describe("planReentry: a resume", () => {
 					},
 				},
 				ended("s2", "error"),
-				runEnded("failed"),
 			);
+			events.push(runFailed("b", events.length + 1));
 			expect(plan(events, threadAt(parkedAt("s2"))).resumed.stepId).toBe("s2");
 		});
 	});

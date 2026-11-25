@@ -66,6 +66,7 @@ export function RunStatusPanel({
 	onShowGate,
 	onShowReport,
 	lastStep,
+	sessionStep,
 	askWhy,
 	agentAnswer,
 	className,
@@ -75,8 +76,10 @@ export function RunStatusPanel({
 	onShowGate: () => void;
 	/** Scrolls to the run's report. Unset: the run has none. */
 	onShowReport?: () => void;
-	/** Where resuming continues. */
+	/** The last step that started. */
 	lastStep: StepSummary | undefined;
+	/** The Agent step whose session gets the prompt of a resume. Unset: no session waits. */
+	sessionStep: StepSummary | undefined;
 	/** "Ask why" and "Improve this flow", beside the reason the run ended. */
 	askWhy?: ReactNode;
 	/** The answer of "Ask why", below the buttons. */
@@ -173,7 +176,11 @@ export function RunStatusPanel({
 					) : null}
 					{agentAnswer}
 					{notice.resumable ? (
-						<ResumeComposer runId={run.id} lastStep={lastStep} />
+						<ResumeComposer
+							runId={run.id}
+							lastStep={lastStep}
+							sessionStep={sessionStep}
+						/>
 					) : null}
 				</CollapsibleContent>
 			</Collapsible>

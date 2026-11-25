@@ -287,7 +287,6 @@ export {
 	rememberedUseful,
 	rememberUseful,
 	rerunStarts,
-	resumedStep,
 	retryDelay,
 	runNow,
 	runningStep,

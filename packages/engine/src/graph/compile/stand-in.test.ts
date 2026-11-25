@@ -10,6 +10,7 @@ import {
 } from "../../log";
 import { listMemory } from "../../memory";
 import { parseCalledFlows, parseRunFlow } from "../../read";
+import { OUTRUN_ERROR } from "../../read/waiting-session";
 import { defaultRunSettings } from "../../settings/settings";
 import {
 	agent,
@@ -24,7 +25,6 @@ import {
 import { createSandbox, type Sandbox } from "../../testing/test-support";
 import type { UsageMoment } from "../../usage";
 import { keptValues } from "../../variables";
-import { OUTRUN_ERROR } from "../branches/branches";
 import { closeOpenWork } from "../runner/open-work";
 import { scoreGate } from "../step/gate";
 

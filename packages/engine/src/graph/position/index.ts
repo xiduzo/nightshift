@@ -6,7 +6,6 @@ export {
 	heldStep,
 	holdEnded,
 	isCutShort,
-	isDone,
 	latestFront,
 	loggedVisits,
 	positionOf,

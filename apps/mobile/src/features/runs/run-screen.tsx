@@ -13,7 +13,6 @@ import {
 	plainText,
 	type RunDetail,
 	rerunStarts,
-	resumedStep,
 	runNow,
 	runningStep,
 	runningSteps,
@@ -241,8 +240,8 @@ function RunBody({
 	const computer = computerName(run.device);
 	const restartStep = runningStep(steps);
 	const rerunFrom = rerunStarts(steps);
-	const lastStep = resumedStep(ownSteps);
-	const resumeAt = lastStep ? stepName(lastStep, labels) : null;
+	const sessionStep = steps.find((step) => step.id === run.resumeStepId);
+	const resumeAt = sessionStep ? stepName(sessionStep, labels) : null;
 	const gate = gates[0] ?? null;
 	const actions = {
 		status,

@@ -265,15 +265,6 @@ function doneAfter(
 	};
 }
 
-/**
- * Whether `step` ended on its own and the run did not finish after it: a
- * re-entry goes on from its end, and no harness session continues it.
- */
-export function isDone(run: RunState, step: DerivedStep): boolean {
-	if (step.endedAt === null || isCutShort(step)) return false;
-	return doneAfter(run, step, scopeKey(step.scope)) !== null;
-}
-
 /** The step the checkpoint holds for `nodeId`, or null when it holds another node's, or none. */
 export function heldStep(
 	state: Pick<PositionState, "pending">,

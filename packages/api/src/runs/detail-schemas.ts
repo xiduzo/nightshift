@@ -35,6 +35,7 @@ export const runDetailSchema = exact<RunDetail>()(
 				action: z.enum(["resume", "rerun", "restart"]),
 			}),
 		),
+		resumeStepId: z.string().nullable(),
 		commands: z.array(
 			z.object({
 				id: z.string(),

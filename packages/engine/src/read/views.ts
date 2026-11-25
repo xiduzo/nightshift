@@ -426,6 +426,8 @@ export type RunDetail = RunSummary & {
 	takeOverCommand: string | null;
 	/** Every resume, oldest first. */
 	resumes: RunResume[];
+	/** The Agent step whose session gets the prompt of a resume. Null: no session waits. */
+	resumeStepId: string | null;
 	/**
 	 * Actions on a run walked elsewhere that its Walker has not applied yet,
 	 * oldest first. Known where they wait: on the Host.

@@ -2,7 +2,6 @@ import {
 	askWhy,
 	askWhyAnswer,
 	mergeSteps,
-	resumedStep,
 	runNow,
 	runReport,
 } from "@nightshift/client";
@@ -325,7 +324,8 @@ function RunPageBody({ runId, stepId }: { runId: string; stepId?: string }) {
 				onShowReport={
 					reportStepId !== null ? () => showStep(reportStepId) : undefined
 				}
-				lastStep={resumedStep(steps)}
+				lastStep={lastStep}
+				sessionStep={steps.find((step) => step.id === runData.resumeStepId)}
 				askWhy={
 					askWhyAnswer(status) ? (
 						<>

@@ -12,10 +12,5 @@ export {
 	stepPosition,
 	stepState,
 } from "./progress";
-export {
-	type RerunStart,
-	rerunStarts,
-	resumedStep,
-	runningStep,
-} from "./retry";
+export { type RerunStart, rerunStarts, runningStep } from "./retry";
 export { runTime } from "./time";

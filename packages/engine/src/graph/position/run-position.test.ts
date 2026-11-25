@@ -6,14 +6,12 @@ import type {
 	LoggedEvent,
 } from "../../log/events/events";
 import type { Scope } from "../../log/events/step/step-payloads";
-import { deriveSteps } from "../../read/run-views";
 import type { Pending, PendingParked, RunStateValues } from "../state/state";
 import {
 	commitVisit,
 	frontOf,
 	heldStep,
 	holdEnded,
-	isDone,
 	latestFront,
 	loggedVisits,
 	positionOf,
@@ -391,19 +389,6 @@ describe("a step that is done: it ended on its own, and the commit after it neve
 			doneAt({ pending: { ...pending, answer: "B." }, visits }, ...log)?.step
 				.id,
 		).toBe("s1");
-	});
-
-	test("isDone asks the same of any step the log has", () => {
-		const events = logOf(started("s1", "a"), ended("s1"));
-		const [step] = deriveSteps(foldRun(events));
-		if (!step) throw new Error("no step");
-		expect(isDone(foldRun(events), step)).toBe(true);
-		const finished = logOf(
-			started("s1", "a"),
-			ended("s1"),
-			runEnded("finished"),
-		);
-		expect(isDone(foldRun(finished), step)).toBe(false);
 	});
 });
 

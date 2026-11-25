@@ -11,9 +11,9 @@ import {
 import {
 	deriveInputs,
 	deriveNodeOutputs,
-	deriveSteps,
 	deriveTraversals,
 	deriveVariables,
+	waitingSession,
 } from "../../read";
 import {
 	RunRefusal,
@@ -24,14 +24,12 @@ import {
 import { placeOf } from "../branches";
 import { DEFAULT_RESUME_PROMPT } from "../context";
 import {
-	isDone,
 	latestFront,
 	loggedVisits,
 	positionOf,
 	reenteredNode,
 	takeBackVisit,
 } from "../position";
-import { askNodeId, parkNodeId, waitNodeId } from "../route";
 import type { Parked, ResumeValue, RunStateUpdate } from "../state";
 import { sessionOf } from "../step";
 import { resumeEach, type ThreadEntry, type ThreadSnapshot } from "./thread";
@@ -95,15 +93,12 @@ export type ResumeTarget = {
 /**
  * What `RunResumed` records: the node the run continues at, from the log.
  * When the run took an edge after its last step started (it stopped or
- * died between steps), that edge's target; else the last step's node, with
- * its id when it is an Agent step with a harness session to continue (the
- * same session `resumePoint` takes up, `sessionOf`), and its scope. Null
- * when the run never started a step.
+ * died between steps), that edge's target; else the last step's node, and
+ * its scope. Null when the run never started a step.
  */
-export function resumeTarget(run: RunState): ResumeTarget | null {
+function resumeTarget(run: RunState): ResumeTarget | null {
 	const { last, movedOn } = latestFront(run);
 	let nodeId: string;
-	let stepId: string | null = null;
 	let scope: Scope | null;
 	if (movedOn) {
 		nodeId = movedOn.payload.to;
@@ -111,36 +106,25 @@ export function resumeTarget(run: RunState): ResumeTarget | null {
 	} else if (last) {
 		nodeId = last.nodeId;
 		scope = last.scope;
-		// A step that is done goes on from its end: no session continues.
-		if (
-			last.nodeType === "agent" &&
-			sessionOf(last) !== null &&
-			!isDone(run, last)
-		) {
-			stepId = last.id;
-		}
 	} else {
 		return null;
 	}
 	const topNodeId = callersOf(run, scope).at(-1)?.nodeId ?? nodeId;
-	return { nodeId, stepId, scope, topNodeId };
+	return { nodeId, stepId: null, scope, topNodeId };
 }
 
 /**
- * What `RunResumed` records: the Agent step that gets the prompt. Parallel
- * branches can wait with a session each, and one prompt goes to one of
- * them: the one whose step started last, which the run page names. The
- * others go on with "Continue where you left off.". Without a session that
- * waits: the node of a branch that parked, else `resumeTarget`.
+ * What `RunResumed` records: the Agent step that gets the prompt
+ * (`waitingSession`, which the run page names too). Without one: the node of
+ * a branch that parked, else the node `resumeTarget` says. A session on
+ * another branch goes on with "Continue where you left off.".
  */
 function targetOf(
 	flow: Flow,
 	run: RunState,
 	thread: ThreadSnapshot,
 ): ResumeTarget | null {
-	const [step] = waitingSessions(flow, run, thread).sort(
-		(a, b) => b.startSeq - a.startSeq,
-	);
+	const step = waitingSession(run);
 	if (step) {
 		const topNodeId = callersOf(run, step.scope).at(-1)?.nodeId ?? step.nodeId;
 		return {
@@ -160,61 +144,6 @@ function targetOf(
 		}
 	}
 	return resumeTarget(run);
-}
-
-/**
- * The Agent steps whose sessions go on when the thread does: the step of
- * each interrupt, and the step that each other task takes up (inside a
- * Call: the last Agent step there). A step that is done has no session
- * that goes on.
- */
-function waitingSessions(
-	flow: Flow,
-	run: RunState,
-	thread: ThreadSnapshot,
-): DerivedStep[] {
-	const waiting: DerivedStep[] = [];
-	if (thread.state.kind === "interrupted") {
-		for (const { value } of thread.state.interrupts) {
-			const step = value.stepId ? run.steps.get(value.stepId) : undefined;
-			if (step?.nodeType !== "agent") continue;
-			// The session of the step before counts when its own got no name yet.
-			const session =
-				sessionOf(step) ?? step.sessions.findLast((s) => s.resumeSessionId);
-			// The checkpoint saw the end of a parked step: it opens again.
-			if (session && (value.kind === "parked" || !isDone(run, step))) {
-				waiting.push(step);
-			}
-		}
-	}
-	const at = positionOf(thread.values, run, null);
-	for (const name of thread.open) {
-		const node = flow.nodes.find(
-			({ id }) =>
-				name === id ||
-				name === parkNodeId(id) ||
-				name === waitNodeId(id) ||
-				name === askNodeId(id),
-		);
-		if (!node || at.done(node)) continue;
-		const held = at.held(node);
-		const taken = held
-			? held.step
-			: at.looping(node)
-				? at.latest(node)
-				: at.uncommitted(node);
-		if (!taken) continue;
-		const inside = deriveSteps(run).findLast(
-			(step) =>
-				(step.id === taken.id ||
-					callersOf(run, step.scope).some((c) => c.id === taken.id)) &&
-				step.nodeType === "agent" &&
-				sessionOf(step) !== null &&
-				!isDone(run, step),
-		);
-		if (inside) waiting.push(inside);
-	}
-	return waiting;
 }
 
 /** The Call steps around `scope`, from the inside out. */

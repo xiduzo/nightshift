@@ -83,6 +83,7 @@ export function runDetailOfSummary(run: RunSummary): RunDetail {
 		calledTraversals: [],
 		takeOverCommand: null,
 		resumes: [],
+		resumeStepId: null,
 		commands: [],
 		handOffs: [],
 		variables: [],
