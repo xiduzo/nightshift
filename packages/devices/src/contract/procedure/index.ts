@@ -15,3 +15,9 @@ export {
 	relay,
 	sync,
 } from "./host-procedure";
+export {
+	codeOfRefusal,
+	type RefusalCode,
+	refusalCodeSchema,
+	refusalOfCode,
+} from "./refusal-code";

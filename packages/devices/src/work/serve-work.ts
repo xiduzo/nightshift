@@ -1,6 +1,6 @@
 import { type Device, noRunFolders } from "@nightshift/engine";
 import { Refusal, wordsFor } from "@nightshift/refusal";
-import type { WorkReply, WorkRequest } from "../contract";
+import { codeOfRefusal, type WorkReply, type WorkRequest } from "../contract";
 
 /**
  * The placed Device's side of a call: `serveWork` answers one `WorkRequest`
@@ -172,6 +172,11 @@ export async function* serveWork(
 				error,
 			);
 		}
-		yield { kind: "error", message: wordsFor(error) };
+		const code = codeOfRefusal(error);
+		yield {
+			kind: "error",
+			message: wordsFor(error),
+			...(code ? { code } : {}),
+		};
 	}
 }

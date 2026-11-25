@@ -21,7 +21,7 @@ import {
 	WEB_REQUEST_METHODS,
 } from "@nightshift/flows";
 import { z } from "zod";
-import { exact } from "../procedure";
+import { exact, type RefusalCode, refusalCodeSchema } from "../procedure";
 import { type SecretMove, secretMoveSchema } from "../secrets";
 
 /**
@@ -146,9 +146,10 @@ export type WorkReply =
 	| { kind: "result"; value: unknown }
 	/**
 	 * The call failed or was refused there; the message is for people.
+	 * `code`: a refusal the Walker finds by its class (`refusal-code.ts`).
 	 * `offline`: the Device could not be reached, or went away mid-call.
 	 */
-	| { kind: "error"; message: string; offline?: boolean };
+	| { kind: "error"; message: string; code?: RefusalCode; offline?: boolean };
 
 export const workReplySchema = z.discriminatedUnion("kind", [
 	z.object({ kind: z.literal("item"), item: z.unknown() }),
@@ -156,6 +157,7 @@ export const workReplySchema = z.discriminatedUnion("kind", [
 	z.object({
 		kind: z.literal("error"),
 		message: z.string(),
+		code: refusalCodeSchema.optional(),
 		offline: z.boolean().optional(),
 	}),
 ]);

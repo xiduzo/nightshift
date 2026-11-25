@@ -37,12 +37,14 @@ export {
 } from "./personal";
 export { OFFLINE_AFTER_MS } from "./presence";
 export {
+	codeOfRefusal,
 	type HostProcedureMeta,
 	hostAnswer,
 	keyRefusalSchema,
 	NOT_A_HOST,
 	ODD_HOST_ANSWER,
 	refusalDataSchema,
+	refusalOfCode,
 } from "./procedure";
 export type { HostRelay, InStep } from "./relay";
 export {

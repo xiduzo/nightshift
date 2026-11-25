@@ -4,6 +4,7 @@ import { oc } from "@orpc/contract";
 import { z } from "zod";
 import { versionRefusalSchema } from "../version";
 import { exact } from "./described";
+import { type RefusalCode, refusalCodeSchema } from "./refusal-code";
 
 /**
  * What every procedure of the Host's contract starts from: its refusals,
@@ -24,11 +25,15 @@ export const NOT_A_HOST =
 export const deviceId = z.string().regex(/^[\w-]{1,64}$/);
 
 /**
- * The kind of a refusal a Host sends as a BAD_REQUEST (`Refusal.kind`).
+ * The kind of a refusal a Host sends as a BAD_REQUEST (`Refusal.kind`),
+ * and its code when the Device finds it by its class (`refusal-code.ts`).
  * A call that does not fit its input schema has none: the Device reads it
  * as `invalid`.
  */
-export const refusalDataSchema = exact<{ kind: RefusalKind }>()(
+export const refusalDataSchema = exact<{
+	kind: RefusalKind;
+	code?: RefusalCode;
+}>()(
 	z.object({
 		kind: z.enum([
 			"invalid",
@@ -38,6 +43,7 @@ export const refusalDataSchema = exact<{ kind: RefusalKind }>()(
 			"conflict",
 			"unavailable",
 		]),
+		code: refusalCodeSchema.optional(),
 	}),
 );
 

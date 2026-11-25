@@ -23,6 +23,7 @@ import {
  */
 const SHAPES: Record<string, string> = {
 	1: "d063c69fb6dba609",
+	2: "c082a45aaf2f7d9d",
 };
 
 /** A schema as plain data, with its keys in order. Null: the procedure has none. */

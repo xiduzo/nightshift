@@ -21,7 +21,13 @@ import type {
 	WorktreeChanges,
 } from "@nightshift/engine";
 import { Refusal, wordsFor } from "@nightshift/refusal";
-import type { WorkCall, WorkFor, WorkRelay } from "../contract";
+import {
+	refusalOfCode,
+	type WorkCall,
+	type WorkFor,
+	type WorkRelay,
+	type WorkReply,
+} from "../contract";
 import { pause } from "../links";
 
 /**
@@ -49,10 +55,19 @@ function stopped(name: string): string {
 
 /**
  * The error of a reply, as a refusal: the serving Device sent words for
- * people (its refusal, or its plain words for a failure it logged).
+ * people (its refusal, or its plain words for a failure it logged), and
+ * the code of a refusal found by its class.
  */
-function refusalOf(reply: { message: string; offline?: boolean }): Refusal {
-	return new Refusal(reply.offline ? "unavailable" : "conflict", reply.message);
+function refusalOf(
+	reply: Pick<
+		Extract<WorkReply, { kind: "error" }>,
+		"message" | "code" | "offline"
+	>,
+): Refusal {
+	return refusalOfCode({
+		...reply,
+		kind: reply.offline ? "unavailable" : "conflict",
+	});
 }
 
 /** The words a step shows for a call that failed: a refusal's own, else plain words, and the details go to the log. */

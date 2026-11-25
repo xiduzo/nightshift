@@ -1,8 +1,13 @@
 import { describe, expect, test } from "bun:test";
-import { HostUnreachableError, OlderHostError } from "@nightshift/engine";
+import {
+	HostUnreachableError,
+	NotOnThisComputer,
+	OlderHostError,
+} from "@nightshift/engine";
 import { Refusal } from "@nightshift/refusal";
 import { ORPCError } from "@orpc/client";
 import type { HostClient } from "../contract";
+import { readable } from "../devices/host/adapters/in/readable";
 import { partialHostClient } from "../testing";
 import {
 	fromHost,
@@ -51,6 +56,29 @@ describe("the error a person gets for a Host's error", () => {
 			kind: "not-found",
 			message: "This run does not exist.",
 		});
+	});
+
+	test("a refusal the Device finds by its class crosses the wire as its class, whatever its words", () => {
+		const reworded = Object.assign(new NotOnThisComputer(), {
+			message: "Other words.",
+		});
+		const sent = readable(reworded, ["sync", "startRun"]);
+		// What the Device's client reads of the answer.
+		const refusal = fromHost(
+			new ORPCError(sent.code, { message: sent.message, data: sent.data }),
+		);
+		expect(refusal).toBeInstanceOf(NotOnThisComputer);
+		expect(refusal).toMatchObject({
+			kind: "conflict",
+			message: new NotOnThisComputer().message,
+		});
+		const plain = fromHost(
+			new ORPCError("BAD_REQUEST", {
+				message: new NotOnThisComputer().message,
+				data: { kind: "conflict" },
+			}),
+		);
+		expect(plain).not.toBeInstanceOf(NotOnThisComputer);
 	});
 
 	test("a refusal of an older Host has no kind: it is not valid", () => {

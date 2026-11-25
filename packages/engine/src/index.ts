@@ -49,6 +49,7 @@ export {
 	HostUnreachableError,
 	isLoopbackHost,
 	NIGHT_SHIFT,
+	NotOnThisComputer,
 	OlderHostError,
 	OtherVersionError,
 	permissionOf,

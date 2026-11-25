@@ -11,6 +11,7 @@ import {
 	hostVersionOf,
 	keyRefusalSchema,
 	refusalDataSchema,
+	refusalOfCode,
 } from "../contract";
 
 /**
@@ -116,6 +117,8 @@ export function fromHost(error: unknown): unknown {
 		return new OlderHostError({ cause: error });
 	}
 	const data = refusalDataSchema.safeParse(error.data);
+	const code =
+		error.code === "BAD_REQUEST" && data.success ? data.data.code : undefined;
 	const kind =
 		error.code === "BAD_REQUEST" && data.success
 			? data.data.kind
@@ -123,7 +126,12 @@ export function fromHost(error: unknown): unknown {
 	if (error.code === "UNAUTHORIZED" || kind === "signed-out") {
 		return new NotPairedError(refusingHost(error), { cause: error });
 	}
-	if (kind) return new Refusal(kind, error.message, { cause: error });
+	if (kind) {
+		return refusalOfCode(
+			{ code, kind, message: error.message },
+			{ cause: error },
+		);
+	}
 	return new Error(`The Host answered ${error.code}.`, { cause: error });
 }
 

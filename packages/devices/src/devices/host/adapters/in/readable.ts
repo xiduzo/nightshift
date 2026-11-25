@@ -1,6 +1,7 @@
 import { HostUnreachableError } from "@nightshift/engine";
 import { FAILURE_MESSAGE, Refusal } from "@nightshift/refusal";
 import { ORPCError } from "@orpc/server";
+import { codeOfRefusal } from "../../../../contract";
 
 /**
  * The error a Device gets for `error`, thrown by the procedure at `path`,
@@ -8,7 +9,8 @@ import { ORPCError } from "@orpc/server";
  * - An ORPCError passes on as it is.
  * - A HostUnreachableError is HOST_UNREACHABLE (503).
  * - Any other Refusal is a BAD_REQUEST with its words and its kind
- *   beside them, a not-found included. An UNAUTHORIZED only ever means the
+ *   beside them, a not-found included, and its code when the Device finds
+ *   it by its class (`codeOfRefusal`). An UNAUTHORIZED only ever means the
  *   key. A FORBIDDEN means a permission of the key, or a role that does not
  *   allow the call. A NOT_FOUND means a Host too old to serve the procedure.
  * - Any other error is a failure: INTERNAL_SERVER_ERROR with plain
@@ -32,7 +34,7 @@ export function readable(
 	if (error instanceof Refusal) {
 		return new ORPCError("BAD_REQUEST", {
 			message: error.message,
-			data: { kind: error.kind },
+			data: { kind: error.kind, ...codeOf(error) },
 			cause: error,
 		});
 	}
@@ -41,4 +43,10 @@ export function readable(
 		message: FAILURE_MESSAGE,
 		cause: error,
 	});
+}
+
+/** The code of a refusal the Device finds by its class, as BAD_REQUEST data. */
+function codeOf(error: Refusal) {
+	const code = codeOfRefusal(error);
+	return code ? { code } : {};
 }

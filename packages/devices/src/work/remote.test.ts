@@ -2,7 +2,11 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { createRunFolders, type Device } from "@nightshift/engine";
+import {
+	createRunFolders,
+	type Device,
+	NotOnThisComputer,
+} from "@nightshift/engine";
 import {
 	connectionsOf,
 	createSandbox,
@@ -307,6 +311,19 @@ describe("the run folder of a remote Device", () => {
 	});
 });
 
+describe("a worktree on a Device without the project", () => {
+	test("is refused there, and the Walker gets the refusal's class", async () => {
+		const device = remoteDevice(
+			relayTo(testDevice({ harnesses: {}, clonePath: async () => null })),
+			{ id: "laptop", name: "laptop" },
+			FOR_RUN,
+		);
+		await expect(
+			device.worktree({ id: "run-1", projectId: "project-1" }),
+		).rejects.toBeInstanceOf(NotOnThisComputer);
+	});
+});
+
 describe("a run's copy made again on another Device", () => {
 	const restore = (reply: WorkReply) =>
 		remoteDevice(
@@ -327,6 +344,19 @@ describe("a run's copy made again on another Device", () => {
 		await expect(
 			restore({ kind: "error", message: "git could not make the copy." }),
 		).rejects.toThrow("git could not make the copy.");
+	});
+
+	test("a refusal found by its class crosses the wire as its class, whatever its words", async () => {
+		const refused = await restore({
+			kind: "error",
+			code: "not-on-this-computer",
+			message: "Other words.",
+		}).catch((error: unknown) => error);
+		expect(refused).toBeInstanceOf(NotOnThisComputer);
+		expect(refused).toMatchObject({
+			kind: "conflict",
+			message: new NotOnThisComputer().message,
+		});
 	});
 
 	test("a call that did not reach the Device leaves the copy as it is", async () => {
