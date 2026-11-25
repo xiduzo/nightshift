@@ -1,9 +1,7 @@
 import type { Permissions } from "@nightshift/auth";
 import type { Schedule, ScheduleIssue } from "@nightshift/flows";
-import { Refusal } from "@nightshift/refusal";
 import type { Access } from "../../access";
-import type { Actor } from "../../contract";
-import { NOT_ON_THIS_COMPUTER } from "../../projects";
+import { type Actor, NotOnThisComputer } from "../../contract";
 import type { UsageNotes } from "../../usage";
 import { withTimeZone } from "../domain/saved-schedules";
 import type { ScheduledProjects, ScheduleOffers, ScheduleStore } from "./ports";
@@ -49,7 +47,7 @@ export const saveSchedules =
 		await access.openSpace(actor, { spaceId, need: SAVES_SCHEDULES });
 		const project = await projects.inSpace(projectId, spaceId);
 		if (project.hasFolder && !project.clonedHere) {
-			throw new Refusal("conflict", NOT_ON_THIS_COMPUTER);
+			throw new NotOnThisComputer();
 		}
 		const written = await offers.schedulesWithOffers(
 			{ id: projectId, flows: () => store.flows(projectId) },

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { FLOW_VERSION, type Flow, type FlowNode } from "@nightshift/flows";
+import { NotOnThisComputer } from "../../../contract";
 import type { Device } from "../../../device";
 import { inMemoryDeviceFit } from "../adapters/out/in-memory-neighbours";
 import type { PlacedDevice, PlanDevices } from "./plan-nodes";
@@ -7,9 +8,8 @@ import { planNodes } from "./plan-nodes";
 
 /**
  * The plan of a run over the twin of the fit check: the use case binds the
- * node walk to the flows of the run, the words of a move and the refusal
- * of a project that is not on this computer. The node walk itself is
- * tested over real Devices beside the slice (`run-plan.test.ts`).
+ * node walk to the flows of the run and the words of a move. The node
+ * walk itself is tested over real Devices beside the slice (`run-plan.test.ts`).
  */
 
 const flow = (nodes: FlowNode[]): Flow =>
@@ -95,6 +95,7 @@ describe("plan nodes", () => {
 			"ada",
 		).catch((error: unknown) => error);
 
+		expect(refused).toBeInstanceOf(NotOnThisComputer);
 		expect(refused).toMatchObject({
 			kind: "conflict",
 			message:

@@ -5,9 +5,6 @@
 import type { Login } from "@nightshift/flows";
 import type { NotRead } from "../contract";
 
-export const NOT_ON_THIS_COMPUTER =
-	"This project is not on this computer. Add its folder here to use it.";
-
 /** What a person reads when a step needs Project secrets that cannot be read now. */
 const PROJECT_UNREACHABLE =
 	"Night Shift could not read this project's secrets now. Check that this computer is online, then try again.";

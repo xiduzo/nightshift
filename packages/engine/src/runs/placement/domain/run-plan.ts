@@ -6,7 +6,11 @@ import {
 	runsAs,
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
-import type { PlannedDevice, StartRunInput } from "../../../contract";
+import {
+	NotOnThisComputer,
+	type PlannedDevice,
+	type StartRunInput,
+} from "../../../contract";
 import { withComputerAgents } from "./computer-agents";
 import { chooseDevices } from "./device-order";
 import { namedDevice, placeNodes } from "./node-places";
@@ -81,7 +85,7 @@ export async function planRun<D, C>(
 		);
 	}
 	if (run === walker && !walker.hasClone) {
-		throw new Refusal("conflict", rules.notOnThisComputer);
+		throw new NotOnThisComputer();
 	}
 	const { flows, named, byId } = await placeNodes(
 		await withComputerAgents(chosen.flows, calledNames, run, devices),

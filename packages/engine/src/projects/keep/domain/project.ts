@@ -24,10 +24,6 @@ import { instant } from "@nightshift/time";
  *   the Host only.
  */
 
-/** A call that needs the project's folder on this computer, for a project without one. */
-export const NOT_ON_THIS_COMPUTER =
-	"This project is not on this computer. Add its folder here to use it.";
-
 /** A change this Replica cannot make to a Space a Host keeps. */
 export const HOSTED_ELSEWHERE =
 	"Your Host keeps the projects of this Space. Change them on your Host.";

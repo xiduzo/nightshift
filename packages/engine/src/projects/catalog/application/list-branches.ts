@@ -1,13 +1,8 @@
 import { Refusal } from "@nightshift/refusal";
 import type { Access } from "../../../access";
-import type { Actor } from "../../../contract";
+import { type Actor, NotOnThisComputer } from "../../../contract";
 import type { Branches } from "../../../git";
-import {
-	NOT_ON_THIS_COMPUTER,
-	PROJECT_NOT_FOUND,
-	type ProjectStore,
-	type Repos,
-} from "../../keep";
+import { PROJECT_NOT_FOUND, type ProjectStore, type Repos } from "../../keep";
 
 export type ListBranchesPorts = {
 	access: Pick<Access, "openSpace">;
@@ -35,6 +30,6 @@ export const listBranches =
 		const [row] = await ports.store.here({ projectId, kept: true, spaceId });
 		if (row) return ports.repos.branches(row.repoPath);
 		throw (await ports.store.find(projectId, spaceId))
-			? new Refusal("conflict", NOT_ON_THIS_COMPUTER)
+			? new NotOnThisComputer()
 			: new Refusal("not-found", PROJECT_NOT_FOUND);
 	};

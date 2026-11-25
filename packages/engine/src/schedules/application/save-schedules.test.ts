@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { FLOW_VERSION, type Flow, type Schedule } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { allowing } from "../../access/adapters/out/in-memory-access";
-import { NOT_ON_THIS_COMPUTER } from "../../projects";
+import { NotOnThisComputer } from "../../contract";
 import type { UsageMoment } from "../../usage";
 import { schedulePorts } from "../test-support";
 import { saveSchedules } from "./save-schedules";
@@ -161,10 +161,11 @@ describe("the save of a project's schedules", () => {
 	test("refuses a project with a folder and no Clone on this computer, before the Offers are asked", async () => {
 		const { ports, save, saved } = await project({ clonedHere: false });
 		const refused = await refusalOf(save([nightly()]));
-		expect(refused).toBeInstanceOf(Refusal);
+		expect(refused).toBeInstanceOf(NotOnThisComputer);
 		expect(refused).toMatchObject({
 			kind: "conflict",
-			message: NOT_ON_THIS_COMPUTER,
+			message:
+				"This project is not on this computer. Add its folder here to use it.",
 		});
 		expect(ports.offers.asked).toEqual([]);
 		expect(await saved()).toEqual([]);

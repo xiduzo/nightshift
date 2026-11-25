@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { allowing } from "../../../access/adapters/out/in-memory-access";
-import type { Actor } from "../../../contract";
-import { NOT_ON_THIS_COMPUTER, PROJECT_NOT_FOUND } from "../../keep";
+import { type Actor, NotOnThisComputer } from "../../../contract";
+import { PROJECT_NOT_FOUND } from "../../keep";
 import { catalogPorts } from "../test-support";
 import { listBranches } from "./list-branches";
 
@@ -47,7 +47,7 @@ describe("listBranches", () => {
 		).toEqual({ current: null, local: [], remote: [] });
 		await expect(
 			listBranches(ports)(ADA, { spaceId: "s1", projectId: "p1" }),
-		).rejects.toThrow(NOT_ON_THIS_COMPUTER);
+		).rejects.toThrow(NotOnThisComputer);
 		await expect(
 			listBranches(ports)(ADA, { spaceId: "s2", projectId: "p1" }),
 		).rejects.toThrow(PROJECT_NOT_FOUND);

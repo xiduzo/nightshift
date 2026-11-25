@@ -16,7 +16,6 @@ export {
 	type ListedProject,
 	type MovingProject,
 	NO_FOLDER,
-	NOT_ON_THIS_COMPUTER,
 	ownSpace,
 	PROJECT_NOT_FOUND,
 	type Project,

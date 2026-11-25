@@ -7,7 +7,8 @@
  * and its wire schema), where a run can be placed (`Placement`,
  * `OwnDevice`), and the ports a vertical asks of the
  * devices: the Device rows (`DeviceDirectory`), the Hosts (`Relay`, and
- * `HostUnreachableError` when one cannot be reached), the leases a Host
+ * `HostUnreachableError` when one cannot be reached), the refusal of a
+ * project that is not on this computer (`NotOnThisComputer`), the leases a Host
  * keeps (`LeaseHost`, ADR 7), the Offer rule of a schedule (`OffersPort`), the name of the branch of one item of a Call (`itemBranchName`, in `branches/`) and whether a host names this computer (`isLoopbackHost`).
  * The words of the ports of more than one vertical are in sub-verticals:
  * what the walk reads (`walk/`: the run's plan, `WalkSettings`), one use of
@@ -43,6 +44,7 @@ export type {
 	SpaceLease,
 } from "./leases";
 export { isLoopbackHost } from "./loopback";
+export { NotOnThisComputer } from "./not-on-this-computer";
 export type { OffersPort } from "./offers";
 export type {
 	DeviceProfile,

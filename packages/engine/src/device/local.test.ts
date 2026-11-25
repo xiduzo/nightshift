@@ -11,6 +11,7 @@ import {
 import type { Decider, McpServerConfig } from "@nightshift/agents/types";
 import { FLOW_VERSION, PAGE_READER_ENV } from "@nightshift/flows";
 import { createArtifactStore } from "../artifacts/store";
+import { NotOnThisComputer } from "../contract";
 import { createRunFolders } from "../run-folders/run-folders";
 import type { PersonalSecrets, ProjectSecrets } from "../secrets";
 import type { CliToolStore } from "../settings/cli-tools";
@@ -1437,6 +1438,14 @@ describe("worktree", () => {
 			baseRef: (await mustGit(sandbox.repoPath, ["rev-parse", "HEAD"])).trim(),
 		});
 		expect(existsSync(join(worktree.worktreePath, "README.md"))).toBe(true);
+	});
+
+	test("a project without a clone here is refused", async () => {
+		const refused = await device({ clonePath: async () => null })
+			.worktree({ id: "run-1", projectId: "project-1" })
+			.catch((error: unknown) => error);
+		expect(refused).toBeInstanceOf(NotOnThisComputer);
+		expect(refused).toMatchObject({ kind: "conflict" });
 	});
 });
 

@@ -17,7 +17,6 @@ export {
 } from "./copies";
 export {
 	type ListedProject,
-	NOT_ON_THIS_COMPUTER,
 	PROJECT_NOT_FOUND,
 	type Project,
 	type TakenProjects,

@@ -11,6 +11,7 @@ import { findProgram } from "@nightshift/agents/types";
 import { deciderNameSchema, FLOW_VERSION } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 
+import { NotOnThisComputer } from "../contract";
 import { createWorktreeSnapshots, createWorktrees, systemGit } from "../git";
 import type { RunFolders } from "../run-folders";
 import { localExec } from "./exec";
@@ -37,7 +38,6 @@ import {
 	sendRequest,
 	type WebRequestResult,
 } from "./web-request";
-import { NOT_ON_THIS_COMPUTER } from "./words";
 
 export type {
 	DeviceCliTools,
@@ -133,7 +133,7 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 	/** The folder of the project's Clone here; throws without one. */
 	async function cloneOf(projectId: string): Promise<string> {
 		const path = (await deps.clonePath?.(projectId)) ?? null;
-		if (path === null) throw new Refusal("conflict", NOT_ON_THIS_COMPUTER);
+		if (path === null) throw new NotOnThisComputer();
 		return path;
 	}
 

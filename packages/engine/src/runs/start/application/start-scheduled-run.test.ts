@@ -1,8 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { Refusal } from "@nightshift/refusal";
-import type { StartRunInput } from "../../../contract";
+import { NotOnThisComputer, type StartRunInput } from "../../../contract";
 import type { RunTrigger } from "../../../log";
-import { NOT_ON_THIS_COMPUTER } from "../../../projects";
 import type { RunSummary } from "../../../read";
 import {
 	HERE,
@@ -83,7 +82,7 @@ describe("a schedule's start", () => {
 	});
 
 	test("says where the project is missing in the words of a schedule", async () => {
-		const p = places({ refuse: new Refusal("conflict", NOT_ON_THIS_COMPUTER) });
+		const p = places({ refuse: new NotOnThisComputer() });
 		await expect(
 			p.start({ input: input(), trigger: SCHEDULED }),
 		).rejects.toThrow(SCHEDULE_PROJECT_MISSING);

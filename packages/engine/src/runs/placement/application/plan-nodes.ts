@@ -1,7 +1,7 @@
 import type { StartRunInput } from "../../../contract";
 import type { Device } from "../../../device";
 import { flowsForRun } from "../../../flows";
-import { type ListedProject, NOT_ON_THIS_COMPUTER } from "../../../projects";
+import type { ListedProject } from "../../../projects";
 import { takenOverSecrets } from "../../../secrets";
 import type { PlacedOn, PlanLookups, PlanOf } from "../domain/plan-shapes";
 import { planRun } from "../domain/run-plan";
@@ -38,16 +38,15 @@ export type PlanNodesPorts = { fit: DeviceFit };
 /**
  * Plans a run over the Devices it may use (`PlanDevices`), as the domain's
  * node walk says (`planRun`), with the fit check of the walk, the flows of
- * the run, the words of a move and the refusal of a project that is not on
- * this computer. The devices' planner (`PlacementPort.plan`) calls it, and
- * so does the engine's own fake of a computer alone.
+ * the run and the words of a move. The devices' planner
+ * (`PlacementPort.plan`) calls it, and so does the engine's own fake of a
+ * computer alone.
  */
 export function planNodes(ports: PlanNodesPorts) {
 	const rules = {
 		...ports.fit,
 		flowsForRun,
 		takenOverSecrets,
-		notOnThisComputer: NOT_ON_THIS_COMPUTER,
 	};
 	return (
 		start: StartRunInput,

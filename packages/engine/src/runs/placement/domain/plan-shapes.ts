@@ -172,6 +172,4 @@ export type PlanRules<D, C> = {
 	flowsForRun(sources: FlowSources, start: StartRunInput): RunFlows;
 	/** What the warning of a move says about the secrets where the step goes (`takenOverSecrets`). */
 	takenOverSecrets(at: { host: boolean }): string;
-	/** The refusal of a run whose project is not on this computer. */
-	notOnThisComputer: string;
 };

@@ -1,7 +1,7 @@
 import { Refusal } from "@nightshift/refusal";
-import type { StartRunInput } from "../../../contract";
+import { NotOnThisComputer, type StartRunInput } from "../../../contract";
 import type { RunTrigger } from "../../../log";
-import { NOT_ON_THIS_COMPUTER, type Projects } from "../../../projects";
+import type { Projects } from "../../../projects";
 import type { RunSummary } from "../../../read";
 import type { wireWalk } from "../../walk";
 import { placeOf, SCHEDULE_PROJECT_MISSING } from "../domain/start-place";
@@ -58,7 +58,10 @@ export const startScheduledRun =
 			}
 			return await ports.here({ spaceId, input, trigger });
 		} catch (error) {
-			if (error instanceof Refusal && error.message === NOT_ON_THIS_COMPUTER) {
+			if (
+				error instanceof Refusal &&
+				error.message === new NotOnThisComputer().message
+			) {
 				throw new Refusal(error.kind, SCHEDULE_PROJECT_MISSING);
 			}
 			throw error;
