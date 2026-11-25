@@ -8,6 +8,7 @@
  * import this entry.
  */
 
+export { HOST_UNREACHABLE, OLDER_HOST } from "../contract/relay";
 export { spaceDocumentName } from "../documents/space/space-document";
 export { wireStore as createProjectFlows } from "../flows/store/wire";
 export { createRunHistory } from "../log/history/history";

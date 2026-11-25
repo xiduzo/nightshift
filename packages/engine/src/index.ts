@@ -46,10 +46,8 @@ export type {
 } from "./contract";
 export {
 	COMMAND_KINDS,
-	HOST_UNREACHABLE,
 	HostUnreachableError,
 	NIGHT_SHIFT,
-	OLDER_HOST,
 	OlderHostError,
 	OtherVersionError,
 	permissionOf,

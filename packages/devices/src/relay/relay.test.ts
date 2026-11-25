@@ -2,13 +2,16 @@ import { describe, expect, spyOn, test } from "bun:test";
 import {
 	HostUnreachableError,
 	NIGHT_SHIFT,
-	OLDER_HOST,
 	OlderHostError,
 	type OwnDevice,
 	type TranscriptEntry,
-	HOST_UNREACHABLE as UNREACHABLE,
 } from "@nightshift/engine";
-import { createSandbox, waitFor } from "@nightshift/engine/testing";
+import {
+	createSandbox,
+	OLDER_HOST,
+	HOST_UNREACHABLE as UNREACHABLE,
+	waitFor,
+} from "@nightshift/engine/testing";
 import { type OtherVersion, Refusal } from "@nightshift/refusal";
 import { ORPCError } from "@orpc/client";
 import type { HostClient, WorkReply, WorkRequest } from "../contract";

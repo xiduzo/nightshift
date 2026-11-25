@@ -16,7 +16,7 @@ import { kitCommand } from "@nightshift/flows/testing";
 import { eq } from "drizzle-orm";
 import { applyUpdate, encodeStateAsUpdate } from "yjs";
 import type { ArchiveHost } from "../archive";
-import { NIGHT_SHIFT, OLDER_HOST, OlderHostError } from "../contract";
+import { NIGHT_SHIFT, OlderHostError } from "../contract";
 import { createSandbox, type Sandbox, waitFor } from "../testing";
 import { testKnowledge } from "../testing/knowledge";
 import { otherSpace } from "../testing/test-support";
@@ -388,7 +388,7 @@ describe("a Host of an older version", () => {
 		);
 		await expect(
 			b.knowledge.read("p1", "wiki/Home.md", { maxBytes: 1024 }),
-		).rejects.toThrow(OLDER_HOST);
+		).rejects.toThrow(new OlderHostError().message);
 	});
 });
 

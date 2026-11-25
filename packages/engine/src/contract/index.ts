@@ -49,9 +49,7 @@ export type {
 	Placement,
 } from "./placement";
 export {
-	HOST_UNREACHABLE,
 	HostUnreachableError,
-	OLDER_HOST,
 	OlderHostError,
 	OtherVersionError,
 	type Relay,

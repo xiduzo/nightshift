@@ -31,7 +31,6 @@ import { hostRouter } from "@nightshift/devices";
 import {
 	type Engine,
 	GateClosedError,
-	HOST_UNREACHABLE,
 	HostUnreachableError,
 	NeedsApp,
 	type OpenGate,
@@ -41,7 +40,7 @@ import {
 	SpaceNotFound,
 } from "@nightshift/engine";
 import { PROJECT_NOT_FOUND } from "@nightshift/engine/projects";
-import { testInbox } from "@nightshift/engine/testing";
+import { HOST_UNREACHABLE, testInbox } from "@nightshift/engine/testing";
 import { singleAgentFlow } from "@nightshift/flows";
 import {
 	FAILURE_MESSAGE,
