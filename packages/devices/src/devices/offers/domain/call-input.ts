@@ -139,18 +139,22 @@ export function declaredCall(call: WorkCall): WorkCall {
  * Why a session on `harness` cannot start from this input, or null when
  * it can. The session it continues is named by its id, which is text. A
  * built-in harness takes it as an argument, so it is never an option: a
- * custom agent makes its own ids, and gets them as data. The limits are
- * numbers.
+ * custom agent makes its own ids, and gets them as data. The turn
+ * limit is a positive whole number, and the budget is not negative.
  */
 export function sessionRefusal(
 	input: Pick<OfferedInput, "resumeSessionId" | "maxTurns" | "maxBudgetUsd">,
 	harness: AgentHarnessName,
 ): string | null {
 	const { resumeSessionId: id, maxTurns, maxBudgetUsd } = input;
-	for (const limit of [maxTurns, maxBudgetUsd]) {
-		if (limit !== undefined && typeof limit !== "number") {
-			return UNREADABLE_REQUEST;
-		}
+	if (maxTurns !== undefined && !(Number.isInteger(maxTurns) && maxTurns > 0)) {
+		return UNREADABLE_REQUEST;
+	}
+	if (
+		maxBudgetUsd !== undefined &&
+		!(Number.isFinite(maxBudgetUsd) && maxBudgetUsd >= 0)
+	) {
+		return UNREADABLE_REQUEST;
 	}
 	if (id === undefined) return null;
 	const named =

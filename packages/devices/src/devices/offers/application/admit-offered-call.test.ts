@@ -565,14 +565,30 @@ describe("a session that goes on", () => {
 			}
 		});
 
-		test(`has limits that are numbers (${who})`, async () => {
+		test(`has limits it can keep to (${who})`, async () => {
 			for (const limit of [
 				{ maxTurns: "3" },
 				{ maxBudgetUsd: "1" },
 				{ maxTurns: null },
+				{ maxTurns: 0 },
+				{ maxTurns: -1 },
+				{ maxTurns: 1.5 },
+				{ maxBudgetUsd: -0.01 },
+				{ maxBudgetUsd: Number.NaN },
+				{ maxBudgetUsd: Number.POSITIVE_INFINITY },
+				{ maxBudgetUsd: null },
 			]) {
 				const { ask, of, by } = onHarness("claude-code")[who]();
 				expect(await ask(of(limit), { personId: by })).toBe(UNREADABLE_REQUEST);
+			}
+			for (const limit of [
+				{ maxTurns: 1 },
+				{ maxTurns: 100_000 },
+				{ maxBudgetUsd: 0 },
+				{ maxBudgetUsd: 0.004 },
+			]) {
+				const { ask, of, by } = onHarness("claude-code")[who]();
+				expect(await ask(of(limit), { personId: by })).toBe("served");
 			}
 		});
 	}
