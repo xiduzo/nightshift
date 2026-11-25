@@ -20,7 +20,7 @@ import {
 	type StepOutcome,
 	type StepOutputs,
 } from "../../log";
-import { arrive, openRound, outrun, placeOf } from "../branches";
+import { arrive, openRound, outrun, placeOf, reopenRound } from "../branches";
 import type { NodeAction, StepContext, StopService } from "../context";
 import { commitVisit, type DoneStep, takenUp } from "../position";
 import type { PendingParked, RunStateUpdate, RunStateValues } from "../state";
@@ -456,11 +456,12 @@ function arrivalAt(
  * The park node of every flow node (`interruptNode`). It interrupts with the
  * parked step (the runner appends `RunEnded`), after nothing else (design
  * rule 4). A resume jumps back to the node, which reopens the parked step
- * when it can, else starts a new visit (`takenUp`).
+ * when it can, else starts a new visit (`takenUp`). A Join that parked
+ * after it went on gets its next round (`reopenRound`).
  */
 export function parkNode(
 	node: FlowNode,
-	ctx: Pick<StepContext, "log" | "run">,
+	ctx: Pick<StepContext, "log" | "run" | "flow">,
 ): NodeAction {
 	return interruptNode({
 		kind: "parked",
@@ -477,10 +478,14 @@ export function parkNode(
 				: {}),
 			...(pending.atStopTime ? { atStopTime: true } : {}),
 		}),
-		answer: async (pending) => {
+		answer: async (pending, _answer, state) => {
 			const run = await ctx.log.state(ctx.run.id);
 			return new Command({
-				update: { pending: takenUp(run, pending) },
+				update: {
+					pending: takenUp(run, pending),
+					// A Join that parked after it went on goes on again.
+					...reopenRound(ctx.flow, state, node.id),
+				},
 				goto: node.id,
 			});
 		},

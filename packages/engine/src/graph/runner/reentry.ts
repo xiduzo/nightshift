@@ -21,7 +21,7 @@ import {
 	type RunStatus,
 	refuseUnless,
 } from "../../run-status";
-import { placeOf } from "../branches";
+import { placeOf, reopenRound } from "../branches";
 import { DEFAULT_RESUME_PROMPT } from "../context";
 import {
 	latestFront,
@@ -295,7 +295,11 @@ export function planReentry(input: {
 				entry: {
 					kind: "goto",
 					nodeId: target.topNodeId,
-					update: { ...reenteredSeed(flow, run, thread), ...cleared },
+					update: {
+						...reenteredSeed(flow, run, thread),
+						...reopenRound(flow, thread.values, target.topNodeId),
+						...cleared,
+					},
 				},
 				clearTasks: false,
 			};
@@ -350,6 +354,7 @@ function planRerun(
 				loops: Object.fromEntries(
 					Object.keys(thread.values.loops ?? {}).map((id) => [id, null]),
 				),
+				...reopenRound(flow, thread.values, nodeId),
 			}
 		: reentryUpdate(flow, run, null);
 	return {

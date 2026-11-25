@@ -523,6 +523,136 @@ describe("a Gate on a branch", () => {
 	});
 });
 
+describe("a jump to a Join that went on", () => {
+	/** start → [one, two] → joined: the Join ends the flow. */
+	const lastJoin = () =>
+		flowOf(
+			[
+				command("start", "true"),
+				command("one", "true"),
+				command("two", "true"),
+				joinNode("joined"),
+			],
+			[
+				edge("s1", "start", "pass", "one"),
+				edge("s2", "start", "pass", "two"),
+				edge("j1", "one", "pass", "joined"),
+				edge("j2", "two", "pass", "joined"),
+			],
+		);
+	/** Runs the flow to its end, then asks `again` of it, and returns the steps that ended. */
+	async function after(
+		again: Parameters<ReturnType<typeof testRunner>["take"]>[1],
+	) {
+		const h = await startRun(sandbox, lastJoin());
+		const runner = testRunner(h, { overdueSweepMs: 3_600_000 });
+		try {
+			await runner.take(h.runId, {
+				kind: "start",
+				prepare: async () => ({
+					row: await getRunRow(sandbox.db, h.runId),
+					inputs: {},
+					stopAt: null,
+				}),
+			});
+			await settle(runner, h, "finished");
+			await runner.take(h.runId, again);
+			await settle(runner, h, "finished");
+			return (await ended(h)).map(([id]) => id).sort();
+		} finally {
+			await runner.release();
+		}
+	}
+
+	test("a resume of a run that ended at its Join runs the Join again, and the run finishes", async () => {
+		expect(await after({ kind: "resume", by: "person" })).toEqual([
+			"joined",
+			"joined",
+			"one",
+			"start",
+			"two",
+		]);
+	});
+
+	test("a run again from a branch runs that branch, then the Join goes on with both", async () => {
+		expect(
+			await after({ kind: "rerun", by: "person", nodeId: "two", fresh: true }),
+		).toEqual(["joined", "joined", "one", "start", "two", "two"]);
+	});
+
+	test("a Join that went on and then parked: a resume runs it again, and the run fails as before", async () => {
+		const flow = lastJoin();
+		// Its one way on is spent after the first round: the Join parks.
+		flow.edges.push({ ...edge("back", "joined", "done", "start"), max: 1 });
+		const h = await startRun(sandbox, flow);
+		const runner = testRunner(h, { overdueSweepMs: 3_600_000 });
+		const reason = async () =>
+			(await h.events()).findLast((e) => e.type === "RunEnded")?.payload;
+		try {
+			await runner.take(h.runId, {
+				kind: "start",
+				prepare: async () => ({
+					row: await getRunRow(sandbox.db, h.runId),
+					inputs: {},
+					stopAt: null,
+				}),
+			});
+			await settle(runner, h, "failed");
+			const first = await reason();
+			expect(first).toMatchObject({ reason: expect.stringContaining("max") });
+			await runner.take(h.runId, { kind: "resume", by: "person" });
+			await settle(runner, h, "failed");
+			expect(await reason()).toEqual(first);
+		} finally {
+			await runner.release();
+		}
+	});
+
+	test("a Join that waits for the first: a run again from the branch that lost goes on with that branch", async () => {
+		const h = await startRun(
+			sandbox,
+			fanOut([command("quick", "true"), command("slow", "sleep 0.3")], "first"),
+		);
+		const runner = testRunner(h, { overdueSweepMs: 3_600_000 });
+		const joined = async () =>
+			deriveSteps(foldRun(await h.events()))
+				.filter((s) => s.nodeId === "joined")
+				.map((s) => Object.keys(s.outputs.data as object));
+		try {
+			await runner.take(h.runId, {
+				kind: "start",
+				prepare: async () => ({
+					row: await getRunRow(sandbox.db, h.runId),
+					inputs: {},
+					stopAt: null,
+				}),
+			});
+			await settle(runner, h, "finished");
+			await runner.take(h.runId, {
+				kind: "rerun",
+				by: "person",
+				nodeId: "slow",
+				fresh: true,
+			});
+			await settle(runner, h, "finished");
+			expect(await joined()).toEqual([["quick"], ["slow"]]);
+		} finally {
+			await runner.release();
+		}
+	});
+
+	test("a run again from the Join goes on at once", async () => {
+		expect(
+			await after({
+				kind: "rerun",
+				by: "person",
+				nodeId: "joined",
+				fresh: true,
+			}),
+		).toEqual(["joined", "joined", "one", "start", "two"]);
+	});
+});
+
 /** Waits until no drive holds the run and its status is `status`. */
 async function settle(
 	runner: ReturnType<typeof testRunner>,

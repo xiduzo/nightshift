@@ -142,6 +142,40 @@ export function openRound(
 }
 
 /**
+ * The state a jump to `nodeId` writes so that its Join goes on again: the
+ * next round of that Join, open. A re-entry jumps to a node whose round is
+ * closed: the Join itself (a resume of a run whose last step was the
+ * Join), or a node of a branch (a run again from it). Without a new round
+ * the Join sees a round it closed and does nothing, and the walk stops
+ * without an end. The jump to the Join keeps every arrival. The jump to a
+ * branch keeps the arrivals of the other branches, and that branch arrives
+ * again; a `first` Join keeps none, so it waits for the next arrival.
+ * Nothing when `nodeId` is neither, or its Join's round is still open.
+ */
+export function reopenRound(
+	flow: Flow,
+	state: Partial<Pick<RunStateValues, "joins">>,
+	nodeId: string,
+): RunStateUpdate {
+	const place = placeOf(flow, nodeId);
+	const atJoin = !place;
+	const joinId = place?.fanOut.join ?? nodeId;
+	const join = flow.nodes.find((n) => n.id === joinId);
+	const round = state.joins?.[joinId];
+	if (join?.type !== "join" || !round?.closed) return {};
+	const arrived = atJoin
+		? round.arrived
+		: join.wait === "first"
+			? []
+			: round.arrived.filter(
+					(a) => placeOf(flow, a.from)?.branch !== place.branch,
+				);
+	return {
+		joins: { [joinId]: { round: round.round + 1, arrived, closed: false } },
+	};
+}
+
+/**
  * The state a branch writes when it reaches its Join: its arrival in the
  * Join's round. For a `first` Join the first arrival also claims the round
  * and stops the steps that run in the other branches.

@@ -757,6 +757,12 @@ from.
    merge, so all branches that arrive in one super-step count.
 3. A branch whose round is closed goes no further (`outrun`). Its new
    steps do not start, and a step that ends routes nowhere.
+4. A jump to a Join whose round is closed, or to a node of its branches,
+   opens the next round (`reopenRound`). A resume of a run that ended at
+   its Join, a run again from a branch or from the Join, a resume of a
+   Join that parked, and a restart after a death before `RunEnded` jump
+   there. The Join keeps every arrival. A branch keeps the arrivals of the
+   other branches. A `first` Join keeps none.
 
 **`first`.** A super-step waits for all its tasks. So the Join alone
 would wait for the slowest branch. The first branch that reaches a

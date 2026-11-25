@@ -125,6 +125,15 @@ const FANOUT: Flow = flowOf(
 	],
 );
 
+/**
+ * The fan-out again, with the Join as its last node: the crash before
+ * `RunEnded` leaves a thread that reached its end and a log without it.
+ */
+const JOIN_LAST: Flow = flowOf(
+	FANOUT.nodes.filter((node) => node.id !== "decide"),
+	FANOUT.edges.filter((e) => e.to !== "decide"),
+);
+
 /** What a run did, as a person reads it from the log. */
 type Story = {
 	/** Each step that ended on its own: node, item, outcome. A cut-short step is left out. */
@@ -432,68 +441,87 @@ describe("a crash at every write of a walk", () => {
 	}
 });
 
-describe("a crash at every write of a walk with parallel branches", () => {
-	let baseline: Story;
-	let writes = 0;
+const PARALLEL = [
+	{
+		name: "a crash at every write of a walk with parallel branches",
+		flow: FANOUT,
+		last: [["decide", null, "go"]] as Story["steps"],
+		ended: { status: "finished", reason: 'Ended at node "decide" with "go".' },
+	},
+	{
+		name: "a crash at every write of a walk that ends at its Join",
+		flow: JOIN_LAST,
+		last: [] as Story["steps"],
+		ended: { status: "finished", reason: null },
+	},
+];
 
-	beforeAll(async () => {
-		const clean = await walk(null, FANOUT);
-		baseline = clean.story;
-		writes = clean.writes;
-	}, 60_000);
+for (const shape of PARALLEL) {
+	describe(shape.name, () => {
+		let baseline: Story;
+		let writes = 0;
 
-	/** The branches end in any order: compare the steps as a set. */
-	const unordered = (story: Story) => ({
-		...story,
-		steps: [...story.steps].sort((a, b) =>
-			a.join("|").localeCompare(b.join("|")),
-		),
-	});
+		beforeAll(async () => {
+			const clean = await walk(null, shape.flow);
+			baseline = clean.story;
+			writes = clean.writes;
+		}, 60_000);
 
-	test("the walk without a crash: both branches, the Join, the rule", () => {
-		expect(unordered(baseline)).toEqual({
-			steps: [
-				["build", null, "pass"],
-				["decide", null, "go"],
-				["joined", null, "done"],
-				["lint", null, "pass"],
-				["review", null, "pass"],
-			],
-			items: [],
-			ended: {
-				status: "finished",
-				reason: 'Ended at node "decide" with "go".',
-			},
+		/** The branches end in any order: compare the steps as a set. */
+		const unordered = (story: Story) => ({
+			...story,
+			steps: [...story.steps].sort((a, b) =>
+				a.join("|").localeCompare(b.join("|")),
+			),
 		});
-		expect(writes).toBeGreaterThan(20);
-	});
 
-	for (const kind of ["crash", "stop"] as const) {
-		test(
-			`a ${kind} before each write: the run ends as the walk without one`,
-			async () => {
-				const wrong: {
-					at: number;
-					story?: Story;
-					uncommitted?: string[];
-					error?: string;
-				}[] = [];
-				for (let at = 1; at <= writes; at++) {
-					try {
-						const { story, uncommitted } = await walk({ at, kind }, FANOUT);
-						if (
-							!Bun.deepEquals(unordered(story), unordered(baseline)) ||
-							uncommitted.length > 0
-						) {
-							wrong.push({ at, story, uncommitted });
+		test("the walk without a crash: both branches, the Join, what comes after", () => {
+			expect(unordered(baseline)).toEqual(
+				unordered({
+					steps: [
+						["build", null, "pass"],
+						["joined", null, "done"],
+						["lint", null, "pass"],
+						["review", null, "pass"],
+						...shape.last,
+					],
+					items: [],
+					ended: shape.ended,
+				}),
+			);
+			expect(writes).toBeGreaterThan(20);
+		});
+
+		for (const kind of ["crash", "stop"] as const) {
+			test(
+				`a ${kind} before each write: the run ends as the walk without one`,
+				async () => {
+					const wrong: {
+						at: number;
+						story?: Story;
+						uncommitted?: string[];
+						error?: string;
+					}[] = [];
+					for (let at = 1; at <= writes; at++) {
+						try {
+							const { story, uncommitted } = await walk(
+								{ at, kind },
+								shape.flow,
+							);
+							if (
+								!Bun.deepEquals(unordered(story), unordered(baseline)) ||
+								uncommitted.length > 0
+							) {
+								wrong.push({ at, story, uncommitted });
+							}
+						} catch (error) {
+							wrong.push({ at, error: String(error) });
 						}
-					} catch (error) {
-						wrong.push({ at, error: String(error) });
 					}
-				}
-				expect(wrong).toEqual([]);
-			},
-			{ timeout: 600_000 },
-		);
-	}
-});
+					expect(wrong).toEqual([]);
+				},
+				{ timeout: 600_000 },
+			);
+		}
+	});
+}
