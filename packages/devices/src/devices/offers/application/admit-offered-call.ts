@@ -16,7 +16,7 @@ import type {
 	WorkReply,
 	WorkRequest,
 } from "../../../contract";
-import { declaredCall } from "../domain/call-input";
+import { declaredCall, sessionRefusal } from "../domain/call-input";
 import { createOfferUse, type OfferUse, offerKey } from "../domain/offer-use";
 import {
 	folderNamed,
@@ -100,6 +100,8 @@ export type AdmitOfferedCallPorts = {
  *   waits for one of the Offer's sessions while it runs its session cap.
  *   One slot map per Offer counts the sessions of both paths, and a
  *   reload hands it to the next engine (`OfferUse`).
+ * - A session that goes on names the one it continues by its id
+ *   (`sessionRefusal`).
  * - Withdrawing an Offer aborts the calls under it (`withdrawn`). A
  *   session it aborts answers with why, so the step of a run walked
  *   elsewhere fails at once: its Walker does not wait for this Device as
@@ -288,6 +290,14 @@ export function admitOfferedCall(ports: AdmitOfferedCallPorts): OfferAdmission {
 				call.kind !== "session" ||
 				!("offered" in call.input)
 			) {
+				const refusal =
+					call.kind === "session" && !("offered" in call.input)
+						? sessionRefusal(call.input, call.input.harness)
+						: null;
+				if (refusal !== null) {
+					yield { kind: "error", message: refusal };
+					return;
+				}
 				yield* ports.serve(
 					device,
 					{ ...request, call: declaredCall(call) },
@@ -307,6 +317,11 @@ export function admitOfferedCall(ports: AdmitOfferedCallPorts): OfferAdmission {
 					kind: "error",
 					message: `${device.name} no longer has the profile "${profile}".`,
 				};
+				return;
+			}
+			const refusal = sessionRefusal(call.input, settings.harness);
+			if (refusal !== null) {
+				yield { kind: "error", message: refusal };
 				return;
 			}
 			// Keyed by the profile's id: a rename keeps the count and the calls.

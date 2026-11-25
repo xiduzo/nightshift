@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import type { WorkCall, WorkReply, WorkRequest } from "../../../contract";
+import {
+	UNREADABLE_REQUEST,
+	type WorkCall,
+	type WorkReply,
+	type WorkRequest,
+} from "../../../contract";
 import { NO_STARTER } from "../domain/offered-call";
 import { admitOfferedCall } from "./admit-offered-call";
 
@@ -494,4 +499,62 @@ describe("the input of a call", () => {
 			expect(inputOf(served[0])).toEqual(input);
 		}
 	});
+});
+
+describe("a session that goes on", () => {
+	const onHarness = (harness: string) => ({
+		offered: () => ({ ...setUp({ harness }), of: session, by: "bob" }),
+		owner: () => ({
+			...setUp(),
+			of: (extra: object): WorkCall => ({
+				kind: "session",
+				input: {
+					cwd: WORKTREE,
+					prompt: "Go on.",
+					harness: harness as "codex",
+					model: "m",
+					permissionMode: "plan",
+					...extra,
+				},
+			}),
+			by: "ada",
+		}),
+	});
+	const NO_SESSION = "That is not the id of a session.";
+
+	for (const who of ["offered", "owner"] as const) {
+		test(`names the session by its id (${who})`, async () => {
+			for (const [harness, id, outcome] of [
+				["claude-code", "0f8fad5b-d9cb-469f-a165-70867728950e", "served"],
+				["opencode", "ses_1-a", "served"],
+				["claude-code", undefined, "served"],
+				["claude-code", "-p", NO_SESSION],
+				["codex", "--json", NO_SESSION],
+				["claude-code", ["a"], NO_SESSION],
+				["claude-code", null, NO_SESSION],
+				["acp:goose", "-V1StGXR8", "served"],
+				["acp:goose", { a: 1 }, NO_SESSION],
+			] as const) {
+				const { ask, served, of, by } = onHarness(harness)[who]();
+				const call = of({ resumeSessionId: id });
+				expect([harness, id, await ask(call, { personId: by })]).toEqual([
+					harness,
+					id,
+					outcome,
+				]);
+				expect(served).toHaveLength(outcome === "served" ? 1 : 0);
+			}
+		});
+
+		test(`has limits that are numbers (${who})`, async () => {
+			for (const limit of [
+				{ maxTurns: "3" },
+				{ maxBudgetUsd: "1" },
+				{ maxTurns: null },
+			]) {
+				const { ask, of, by } = onHarness("claude-code")[who]();
+				expect(await ask(of(limit), { personId: by })).toBe(UNREADABLE_REQUEST);
+			}
+		});
+	}
 });
