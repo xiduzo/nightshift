@@ -4,7 +4,12 @@ import { useEffect } from "react";
 import { toast } from "sonner";
 import { accountQueries } from "./queries";
 
-/** Night Shift was updated under this page: says so, and reloads the page when the person asks. */
+const NOTICE = "version";
+
+/**
+ * Night Shift was updated under this page: says so, and reloads the page
+ * when the person asks. Says nothing once the versions agree again.
+ */
 export function VersionNotice() {
 	const status = useQuery({
 		...accountQueries.status(),
@@ -14,9 +19,12 @@ export function VersionNotice() {
 		? versionMessage("page", status.data.version)
 		: null;
 	useEffect(() => {
-		if (!message) return;
+		if (!message) {
+			toast.dismiss(NOTICE);
+			return;
+		}
 		toast.warning(message, {
-			id: "version",
+			id: NOTICE,
 			duration: Number.POSITIVE_INFINITY,
 			action: { label: "Reload page", onClick: () => location.reload() },
 		});
