@@ -81,20 +81,22 @@ async function callTool(node: ToolNode, step: StepHandle): Promise<BodyResult> {
 	});
 	if (result.kind === "refused") return end("error", empty, result.message);
 	// Every Tool step records the call, then its answer.
-	const recordCall = (args: Record<string, JsonValue>) =>
+	const recordCall = (args: Record<string, JsonValue> | undefined) =>
 		step.record(null, {
 			type: "tool-call",
 			connection: node.connection,
 			tool: node.tool,
-			arguments: args,
+			arguments: args ?? {},
+			...(args ? {} : { argumentsUnknown: true }),
 		});
 	if (result.kind === "failed") {
 		if (signal.aborted) {
 			if (result.arguments) recordCall(result.arguments);
 			return { kind: "aborted", outputs: empty };
 		}
-		// A call that was not made sent no arguments: none are recorded.
-		recordCall(result.arguments ?? {});
+		// What was sent, else what it asked for. A Device that went away says
+		// neither: the call may have been made, and the record says so.
+		recordCall(result.arguments ?? result.asked);
 		step.record(null, {
 			type: "tool-called",
 			isError: true,

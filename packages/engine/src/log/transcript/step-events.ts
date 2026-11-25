@@ -178,6 +178,8 @@ export type ToolEvent =
 			connection: string;
 			tool: string;
 			arguments: Record<string, JsonValue>;
+			/** The arguments are not known (`arguments` is empty): the Device went away with the call. */
+			argumentsUnknown?: true;
 	  }
 	| {
 			type: "tool-called";

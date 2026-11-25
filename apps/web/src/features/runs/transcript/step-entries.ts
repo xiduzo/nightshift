@@ -462,7 +462,7 @@ export function applyStepEntries(
 					name: event.tool,
 					connection: event.connection,
 					input: event.arguments,
-					hasInput: true,
+					hasInput: event.argumentsUnknown !== true,
 				});
 				break;
 			case "tool-called": {

@@ -13,12 +13,14 @@ import {
 	edge,
 	flowOf,
 	payloads,
+	placementOn,
 	startRun,
 } from "../../../testing/graph";
 import {
 	connectionsOf,
 	createSandbox,
 	type Sandbox,
+	testDevice,
 } from "../../../testing/test-support";
 import { dataOf } from "./tool";
 
@@ -281,7 +283,7 @@ describe("the Tool node", () => {
 		});
 	});
 
-	test("a tool the connection does not have fails, naming the tools it has; a call that was not made records no arguments", async () => {
+	test("a tool the connection does not have fails, naming the tools it has; the record has what the call asked for", async () => {
 		const h = await start(flowOf([tool("file", "close_issue", { id: "1" })]));
 		const { parked } = await drive(h, { inputs: {} });
 		const message =
@@ -303,10 +305,32 @@ describe("the Tool node", () => {
 				type: "tool-call",
 				connection: "tracker",
 				tool: "close_issue",
-				arguments: {},
+				arguments: { id: "1" },
 			},
 			{ type: "tool-called", isError: true, text: message, data: null },
 		]);
+	});
+
+	test("a Device that went away with the call: the record says the arguments are not known", async () => {
+		const h = await start(flowOf([tool("file", "say", { text: "hi" })]));
+		h.ctx.placement = placementOn(() => ({
+			...testDevice(h.local),
+			callTool: async () => ({
+				kind: "failed",
+				message: "It went away.",
+				arguments: null,
+			}),
+		}));
+		await drive(h, { inputs: {} });
+		const [step] = deriveSteps(foldRun(await h.events()));
+		const transcript = await readTranscriptFile(step?.transcriptPath as string);
+		expect(transcript[0]?.event).toEqual({
+			type: "tool-call",
+			connection: "tracker",
+			tool: "say",
+			arguments: {},
+			argumentsUnknown: true,
+		});
 	});
 
 	test("a server that cannot be reached fails the step with a readable error", async () => {

@@ -213,6 +213,7 @@ const stepEventSchema = z.discriminatedUnion("type", [
 		connection: z.string(),
 		tool: z.string(),
 		arguments: z.record(z.string(), z.json()),
+		argumentsUnknown: z.literal(true).optional(),
 	}),
 	z.object({
 		type: z.literal("tool-called"),
