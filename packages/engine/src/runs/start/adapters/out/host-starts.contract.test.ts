@@ -1,8 +1,10 @@
+import { describe, expect, test } from "bun:test";
 import { createDb } from "@nightshift/db";
 import { project, run } from "@nightshift/db/schema";
 import { migratedDb } from "@nightshift/db/testing";
+import { Refusal, type RefusalKind } from "@nightshift/refusal";
 import { now } from "@nightshift/time";
-import type { StartRunInput } from "../../../../contract";
+import { NotOnThisComputer, type StartRunInput } from "../../../../contract";
 import { createRunLog } from "../../../../log";
 import type { RunSummary } from "../../../../read";
 import { ownDevice } from "../../../../testing/alone-directory";
@@ -11,6 +13,10 @@ import { localSpaceId } from "../../../../testing/test-support";
 import { hostStartsContract } from "./host-starts.contract";
 import { inMemoryHostStarts } from "./in-memory-host-starts";
 import { relayHostStarts } from "./relay-host-starts";
+
+/** The refusal of a Host, as a Link brings it: its kind and its words, never its class. */
+const overALink = (kind: RefusalKind, words: string) =>
+	new Refusal(kind, words, { cause: new Error("The answer of the Host.") });
 
 /**
  * The contract of `HostStarts`, on both adapters. The real side runs on
@@ -110,3 +116,41 @@ hostStartsContract(
 			listRuns: async () => [],
 		}),
 );
+
+describe("the refusal of a Host, over its Link", () => {
+	const START = {
+		projectId: "project-1",
+		flowName: "watch",
+		spaceId: "space-1",
+	};
+	/** What a start throws when the Host refuses it with `refusal`. */
+	async function refused(refusal: Error): Promise<unknown> {
+		const db = await migratedDb();
+		return relayHostStarts({
+			db,
+			log: createRunLog(db, { walkerId: "here", dataDir: "/nowhere" }),
+			relay: { startRun: () => Promise.reject(refusal) },
+			now,
+			listRuns: async () => [],
+		})
+			.start(START)
+			.catch((error: unknown) => error);
+	}
+
+	test("a Host without a Clone of the project says so by its words: the start throws NotOnThisComputer", async () => {
+		const { kind, message } = new NotOnThisComputer();
+		const answer = overALink(kind, message);
+		const error = await refused(answer);
+		expect(error).toBeInstanceOf(NotOnThisComputer);
+		expect(error).toMatchObject({ kind, message, cause: answer });
+	});
+
+	test("every other refusal is as the Host gave it", async () => {
+		const other = overALink("conflict", "Too many runs.");
+		expect(await refused(other)).toBe(other);
+		const otherKind = overALink("unavailable", new NotOnThisComputer().message);
+		expect(await refused(otherKind)).toBe(otherKind);
+		const failed = new Error(new NotOnThisComputer().message);
+		expect(await refused(failed)).toBe(failed);
+	});
+});

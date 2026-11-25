@@ -44,6 +44,7 @@ function places(options: { refuse?: Refusal } = {}) {
 			return SUMMARY;
 		},
 		onHost: async ({ spaceId, input }) => {
+			if (options.refuse) throw options.refuse;
 			started.push({ where: "host", spaceId, input });
 			return SUMMARY;
 		},
@@ -89,6 +90,19 @@ describe("a schedule's start", () => {
 		await expect(
 			p.start({ input: input(), trigger: SCHEDULED }),
 		).rejects.toMatchObject({ kind: "conflict" });
+		await expect(
+			p.start({ input: input("project-hosted"), trigger: SCHEDULED }),
+		).rejects.toThrow(SCHEDULE_PROJECT_MISSING);
+		// The case is the class of the refusal, not its words.
+		const reworded = Object.assign(new NotOnThisComputer(), {
+			message: "Other words.",
+		});
+		await expect(
+			places({ refuse: reworded }).start({
+				input: input(),
+				trigger: SCHEDULED,
+			}),
+		).rejects.toThrow(SCHEDULE_PROJECT_MISSING);
 		const other = places({ refuse: new Refusal("invalid", "Not valid.") });
 		await expect(
 			other.start({ input: input(), trigger: SCHEDULED }),

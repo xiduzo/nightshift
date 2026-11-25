@@ -58,10 +58,7 @@ export const startScheduledRun =
 			}
 			return await ports.here({ spaceId, input, trigger });
 		} catch (error) {
-			if (
-				error instanceof Refusal &&
-				error.message === new NotOnThisComputer().message
-			) {
+			if (error instanceof NotOnThisComputer) {
 				throw new Refusal(error.kind, SCHEDULE_PROJECT_MISSING);
 			}
 			throw error;

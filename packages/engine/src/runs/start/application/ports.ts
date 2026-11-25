@@ -54,7 +54,11 @@ export type SpaceKeeper = {
 
 /** The starts this computer hands to the Host that keeps a Space: the Host walks the run. */
 export type HostStarts = {
-	/** Has the Host start the run. Throws `HostUnreachableError` when no Host can take it. */
+	/**
+	 * Has the Host start the run. Throws `HostUnreachableError` when no Host
+	 * can take it, and `NotOnThisComputer` when the Host has no Clone of the
+	 * project.
+	 */
 	start(input: StartRunInput & { spaceId: string }): Promise<{ runId: string }>;
 	/**
 	 * Waits until the run's row and its first event reached this Replica,
