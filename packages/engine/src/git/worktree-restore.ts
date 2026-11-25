@@ -170,6 +170,8 @@ export function createWorktreeRestore(git: Git, parts: RestoreParts) {
 		if (input.author)
 			await setWorktreeAuthor(repoPath, worktreePath, input.author);
 		for (const [ref, commit] of keptRefs) {
+			// What the run handed on stays for its next Hand-off.
+			if (ref.startsWith(`${kept.prefix}handed/`)) continue;
 			const own = ref.startsWith(heads) ? ref.slice(heads.length) : branch;
 			if (await isAncestor(repoPath, commit, `refs/heads/${own}`)) {
 				await gitOrThrow(git, repoPath, ["update-ref", "-d", ref]);

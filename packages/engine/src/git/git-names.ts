@@ -29,7 +29,13 @@ export function branchName(value: unknown): string {
 }
 
 function isBranchName(name: string): boolean {
-	if (name.startsWith("-") || name === "@" || name.endsWith(".")) return false;
+	if (
+		name.startsWith("-") ||
+		name === "@" ||
+		name === "HEAD" ||
+		name.endsWith(".")
+	)
+		return false;
 	if (NOT_IN_A_BRANCH.test(name)) return false;
 	if (name.includes("..") || name.includes("@{")) return false;
 	return name

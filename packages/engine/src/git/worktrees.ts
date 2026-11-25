@@ -1,9 +1,11 @@
-import { mkdir, realpath, stat } from "node:fs/promises";
+import { mkdir, realpath } from "node:fs/promises";
 import { dirname } from "node:path";
 import { Refusal } from "@nightshift/refusal";
 
+import { DirtyWorktreeError } from "./dirty-worktree";
 import { type Git, gitOrThrow, systemGit } from "./git";
-import { branchName, objectId, revision } from "./git-names";
+import { branchName, revision } from "./git-names";
+import { createHandOff } from "./hand-off";
 import {
 	BASE_FETCH_TIMEOUT_MS,
 	type Branches,
@@ -28,23 +30,6 @@ export function baseNotFetched(branch: string): string {
 /** The run's warning when its base branch and the remote's went apart. */
 export function baseDiverged(branch: string): string {
 	return `The newest ${branch} and the ${branch} on the run's computer have different commits. This run starts from the one on the run's computer.`;
-}
-
-export class DirtyWorktreeError extends Refusal {
-	constructor(message: string) {
-		// Words for the person: the step that fails shows them as they are.
-		super("conflict", message);
-		this.name = "DirtyWorktreeError";
-	}
-}
-
-/** The changes that block a hand-off, for its message: up to five files. */
-function changesShown(changes: readonly string[]): string {
-	const shown = changes
-		.slice(0, 5)
-		.map((line) => line.slice(3))
-		.join(", ");
-	return changes.length > 5 ? `${shown} and ${changes.length - 5} more` : shown;
 }
 
 /** The clones that get per-worktree config now: runs that start at once turn it on once. */
@@ -443,86 +428,14 @@ export function createWorktrees(git: Git) {
 		);
 	}
 
-	/**
-	 * The sending half of a Hand-off: refuses a worktree with changes that
-	 * are not committed (decision 3: nothing is committed for you), then
-	 * pushes the checked-out branch, and the run's own branch, to `origin`.
-	 * The branches are the run's: a push replaces them.
-	 */
-	async function pushRunBranch(
-		cwd: string,
-		runBranch: string,
-	): Promise<{ commit: string; branch: string }> {
-		branchName(runBranch);
-		const changes = await uncommittedChanges(cwd);
-		if (changes.length > 0) {
-			throw new DirtyWorktreeError(
-				`The run's copy of the project has changes that are not committed (${changesShown(changes)}). Night Shift does not commit for you, so the work cannot move to the next device. Make the step before commit its work.`,
-			);
-		}
-		const branch = (await currentBranch(cwd)) ?? runBranch;
-		const commit = await gitOrThrow(git, cwd, ["rev-parse", "HEAD"]);
-		const refspecs = [`+HEAD:refs/heads/${branch}`];
-		if (branch !== runBranch) {
-			refspecs.push(`+refs/heads/${runBranch}:refs/heads/${runBranch}`);
-		}
-		await gitOrThrow(git, cwd, ["push", "-q", "origin", ...refspecs]);
-		return { commit, branch };
-	}
-
-	/**
-	 * The receiving half of a Hand-off: fetches `branch` from `origin` into
-	 * the clone, then checks it out at `commit` in the run's worktree (added
-	 * when this clone has none). A worktree it has must be clean.
-	 */
-	async function pullRunBranch(input: {
-		repoPath: string;
-		shortId: string;
-		branch: string;
-		commit: string;
-		author?: { name: string; email: string };
-	}): Promise<{ worktreePath: string; branch: string; baseRef: string }> {
-		const { repoPath } = input;
-		const branch = branchName(input.branch);
-		const commit = objectId(input.commit);
-		await gitOrThrow(git, repoPath, [
-			"fetch",
-			"-q",
-			"origin",
-			`+refs/heads/${branch}:refs/remotes/origin/${branch}`,
-		]);
-		const { worktreePath } = worktreeLocation(repoPath, input.shortId);
-		const exists = await stat(worktreePath).catch(() => null);
-		if (exists?.isDirectory()) {
-			const changes = await uncommittedChanges(worktreePath);
-			if (changes.length > 0) {
-				throw new DirtyWorktreeError(
-					`The run's copy of the project on this device has changes that are not committed (${changesShown(changes)}). Commit or discard them there first.`,
-				);
-			}
-			await gitOrThrow(git, worktreePath, [
-				"checkout",
-				"-q",
-				"-B",
-				branch,
-				commit,
-			]);
-		} else {
-			await mkdir(dirname(worktreePath), { recursive: true });
-			await gitOrThrow(git, repoPath, [
-				"worktree",
-				"add",
-				"-q",
-				"-B",
-				branch,
-				worktreePath,
-				commit,
-			]);
-			if (input.author)
-				await setWorktreeAuthor(input.repoPath, worktreePath, input.author);
-		}
-		return { worktreePath, branch, baseRef: commit };
-	}
+	const { pushRunBranch, pullRunBranch } = createHandOff(git, {
+		resolveCommit,
+		isAncestor,
+		branchExists,
+		currentBranch,
+		uncommittedChanges,
+		setWorktreeAuthor,
+	});
 
 	const { restoreWorktree } = createWorktreeRestore(git, {
 		resolveCommit,

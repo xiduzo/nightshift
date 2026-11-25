@@ -60,6 +60,7 @@ describe("branchName", () => {
 			"a..b",
 			"a@{1}",
 			"@",
+			"HEAD",
 			"/a",
 			"a/",
 			"a//b",
