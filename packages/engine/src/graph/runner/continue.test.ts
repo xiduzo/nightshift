@@ -307,7 +307,7 @@ async function walk(name: string, past: readonly Past[], fault?: Fault) {
 	// No step of an Agent or a Command ran a second visit.
 	const steps = deriveSteps(await state());
 	expect(steps.filter((s) => s.visit > 1)).toEqual([]);
-	return calls.map((c) => [c.who, c.prompt] as const);
+	return { calls: calls.map((c) => [c.who, c.prompt] as const), steps };
 }
 
 /** The prompts that `past` sends, one per call after the first. */
@@ -331,15 +331,19 @@ const PASTS: [string, Past[]][] = [
 ];
 for (const [name, past] of PASTS) {
 	test(`${name}, ${past.join(" then ")}: one Continue each, and each prompt once`, async () => {
-		const calls = await walk(name, past);
+		const { calls } = await walk(name, past);
 		expect(calls.map(([, prompt]) => prompt)).toEqual(told(past));
 	});
 }
 
 test("two branches that ask: the prompt goes to the Agent that started last", async () => {
 	const past: Past[] = ["stop", "drop", "stop"];
-	const calls = await walk("two branches that ask", past);
-	const last = calls[1]?.[0];
+	const { calls, steps } = await walk("two branches that ask", past);
+	// The Agent whose step started last in the log, not the one the harness
+	// was called for last: two branches call it in either order.
+	const last = steps
+		.filter((s) => s.nodeType === "agent")
+		.reduce((a, b) => (b.startSeq > a.startSeq ? b : a)).nodeId;
 	const of = (mine: boolean) =>
 		calls.filter(([who]) => (who === last) === mine).map(([, p]) => p);
 	expect(of(true).slice(1)).toEqual(["P0.", "P1.", "P2."]);
@@ -367,7 +371,7 @@ const FAULTS: [Fault, (P: string) => string[]][] = [
 for (const [fault, expected] of FAULTS) {
 	for (const past of [["stop"], ["park", "drop"]] as Past[][]) {
 		test(`after ${past.join(" then ")}, a ${fault.kind} before ${fault.before}: the prompt is not lost, and no end runs again`, async () => {
-			const calls = await walk("one Agent", past, fault);
+			const { calls } = await walk("one Agent", past, fault);
 			expect(calls.map(([, prompt]) => prompt)).toEqual([
 				...told(past).slice(0, -1),
 				...expected(`P${past.length - 1}.`),
