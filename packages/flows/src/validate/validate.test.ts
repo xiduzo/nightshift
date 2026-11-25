@@ -2240,6 +2240,7 @@ describe("parseFlow with options", () => {
 			parseFlow({ version, start: "worker", nodes: [], edges: [] });
 		expect(of(FLOW_VERSION - 1)).toEqual({
 			flow: null,
+			why: "older",
 			issues: [
 				{
 					severity: "error",

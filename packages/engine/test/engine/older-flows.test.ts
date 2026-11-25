@@ -562,6 +562,7 @@ describe("a flow of an older format", () => {
 		]);
 		expect(await space.flows.get(projectId, "build")).toMatchObject({
 			flow: null,
+			flowUnread: "older",
 			issues: [{ severity: "error", message: OLDER_FLOW }],
 		});
 		const start = await refusalOf(

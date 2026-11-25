@@ -186,10 +186,19 @@ describe("loadFlowSource", () => {
 			name: "broken",
 			path: "broken",
 			flow: null,
+			flowUnread: "invalid",
 			issues: [
 				{ severity: "error", message: "Not valid JSON: Unexpected token" },
 			],
 		});
+	});
+
+	test("a flow that does not read says why: older, newer or not valid", () => {
+		const of = (json: unknown) => loadFlowSource({ f: { json } }, "f");
+		expect(of({ version: FLOW_VERSION - 1 }).flowUnread).toBe("older");
+		expect(of({ version: FLOW_VERSION + 1 }).flowUnread).toBe("newer");
+		expect(of({ version: FLOW_VERSION }).flowUnread).toBe("invalid");
+		expect(of(caller())).not.toHaveProperty("flowUnread");
 	});
 
 	test("refuses a missing flow as not found, in words for people", () => {

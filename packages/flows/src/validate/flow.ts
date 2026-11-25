@@ -18,6 +18,7 @@ import { checkCall, type ErrorsOf } from "./calls";
 import { findCycles } from "./cycles";
 import type {
 	FlowIssue,
+	FlowUnread,
 	ProjectFlowMap,
 	Report,
 	ValidateOptions,
@@ -313,17 +314,20 @@ const errorsOf: ErrorsOf = (flow, options, chain) =>
 
 /**
  * Reads (`readFlow`) and validates unknown JSON. Why it does not read comes
- * back as issues.
+ * back as `why`, and in words as issues.
  */
 export function parseFlow(
 	json: unknown,
 	options: ValidateOptions = {},
-): { flow: Flow; issues: FlowIssue[] } | { flow: null; issues: FlowIssue[] } {
+):
+	| { flow: Flow; issues: FlowIssue[] }
+	| { flow: null; why: FlowUnread; issues: FlowIssue[] } {
 	const read = readFlow(json);
 	if (read.flow === null) {
 		const { why, issues } = read;
 		return {
 			flow: null,
+			why,
 			issues: issues.map(({ path, message }) => ({
 				severity: "error",
 				message:

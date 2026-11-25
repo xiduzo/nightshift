@@ -70,8 +70,13 @@ export type FlowDevices = {
 export type LoadedFlow = FlowFile & {
 	/** Null when the file does not parse against the schema. */
 	flow: Flow | null;
+	/** Why there is no flow: an older or a newer Night Shift made it, or it is not valid. Absent with a flow. */
+	flowUnread?: FlowUnread;
 	issues: FlowIssue[];
 };
+
+/** Why a flow does not read (`readFlow`). Not JSON is `invalid`. */
+export type FlowUnread = "older" | "newer" | "invalid";
 
 /** The flow files of a project, by name. Null when a file does not load. */
 export type ProjectFlowMap = Readonly<Record<string, Flow | null>>;

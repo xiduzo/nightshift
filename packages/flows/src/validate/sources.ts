@@ -212,10 +212,20 @@ function loadedFlow(
 			name,
 			path: name,
 			flow: null,
+			flowUnread: "invalid",
 			issues: [
 				{ severity: "error", message: `Not valid JSON: ${file.jsonError}` },
 			],
 		};
 	}
-	return { name, path: name, ...parseFlow(file.json, { flows, name }) };
+	const parsed = parseFlow(file.json, { flows, name });
+	return parsed.flow
+		? { name, path: name, flow: parsed.flow, issues: parsed.issues }
+		: {
+				name,
+				path: name,
+				flow: null,
+				flowUnread: parsed.why,
+				issues: parsed.issues,
+			};
 }

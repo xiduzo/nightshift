@@ -71,6 +71,7 @@ export const loadedFlowSchema = exact<LoadedFlow>()(
 		name: z.string(),
 		path: z.string(),
 		flow: flowSchema.nullable(),
+		flowUnread: z.enum(["older", "newer", "invalid"]).optional(),
 		issues: z.array(flowIssueSchema),
 	}),
 );

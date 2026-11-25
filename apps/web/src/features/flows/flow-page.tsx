@@ -1,4 +1,4 @@
-import { flowNameSchema, newFlow, OLDER_FLOW } from "@nightshift/flows";
+import { flowNameSchema, newFlow } from "@nightshift/flows";
 import {
 	Alert,
 	AlertDescription,
@@ -108,9 +108,7 @@ export function FlowPage({
 
 	if (!loaded.data.flow && !startOver) {
 		// A save over it is refused: it stays for the Night Shift that made it.
-		const older = loaded.data.issues.some(
-			({ message }) => message === OLDER_FLOW,
-		);
+		const older = loaded.data.flowUnread === "older";
 		return (
 			<Shell crumbs={crumbs}>
 				<Card className="mx-auto w-full max-w-2xl">
