@@ -1,6 +1,6 @@
 import type { JsonValue, WebRequestMethod } from "@nightshift/flows";
 import { messageOf } from "@nightshift/refusal";
-import { type AddressRules, checkHost } from "../web-access";
+import { type AddressRules, checkHost } from "../../web-access";
 import type { WebRequestResult, WebResponse } from "./types";
 
 /**

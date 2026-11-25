@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { type OutgoingRequest, sendRequest } from "./web-request";
+import { type OutgoingRequest, sendRequest } from "./send-request";
 
 /**
  * The core of a web request against two real local servers: the answer as

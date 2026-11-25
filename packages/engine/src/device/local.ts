@@ -1,200 +1,50 @@
 import { stat } from "node:fs/promises";
-import { delimiter } from "node:path";
-import { harnessNoun } from "@nightshift/agents/harness-facts";
 import type {
-	AgentSessionInput,
 	Decider,
 	DeciderName,
 	DecisionInput,
 	DecisionResult,
-	SessionContribution,
 	ValueInput,
 	ValueResult,
 } from "@nightshift/agents/types";
-import { findProgram, foldContributions } from "@nightshift/agents/types";
-import {
-	type AgentHarnessName,
-	deciderNameSchema,
-	FLOW_VERSION,
-	PAGE_READER_ENV,
-} from "@nightshift/flows";
+import { findProgram } from "@nightshift/agents/types";
+import { deciderNameSchema, FLOW_VERSION } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 
-import type { ArtifactStore } from "../artifacts";
-import type { SecretUse } from "../contract";
-import {
-	createWorktreeSnapshots,
-	createWorktrees,
-	type Git,
-	systemGit,
-} from "../git";
+import { createWorktreeSnapshots, createWorktrees, systemGit } from "../git";
 import type { RunFolders } from "../run-folders";
-import { spawnCommand } from "./command";
-import { ARTIFACTS_ENV, type KeptFiles, openKeptFiles } from "./kept-files";
-import type {
-	DeviceCliToolsPort,
-	DeviceConnectionsPort,
-	DeviceProfilesPort,
-	DeviceProjectPort,
-	Harnesses,
-} from "./ports";
+import { localExec } from "./exec";
+import {
+	type DeviceConnections,
+	type LocalDeviceDeps,
+	NO_CONNECTIONS,
+} from "./local-deps";
 import { readFolderFile } from "./read-file";
+import { localSession } from "./session";
 import { stepSecrets } from "./step-secrets";
 import { callServerTool } from "./tool-call";
-import type { ToolLaunchers } from "./tool-launchers";
 import {
 	type AddressCheck,
 	addressKey,
 	type Capabilities,
 	type DeciderFacts,
 	type Device,
-	type ExecEvent,
-	type ExecInput,
-	type OfferedSessionInput,
-	type RequestText,
-	type SessionEvent,
-	type SessionInput,
-	type StepKnowledge,
 	type ToolResult,
-	type WebRequestInput,
-	type WebRequestResult,
 } from "./types";
-import { type OutgoingRequest, sendRequest } from "./web-request";
-import { cliToolsInstruction, NOT_ON_THIS_COMPUTER } from "./words";
+import {
+	outgoing,
+	requestSecretNames,
+	sendRequest,
+	type WebRequestResult,
+} from "./web-request";
+import { NOT_ON_THIS_COMPUTER } from "./words";
 
-/**
- * The page reader of a step is its project's (ADR 39). The one that Night
- * Shift itself was started with does not reach a step.
- */
-const PAGE_READER_NAMES: readonly string[] = Object.values(PAGE_READER_ENV);
-
+export type {
+	DeviceCliTools,
+	DeviceConnections,
+	LocalDeviceDeps,
+} from "./local-deps";
 export type { Harnesses } from "./ports";
-
-/** What the Device reads of this computer's connections and secrets. */
-export type DeviceConnections = DeviceConnectionsPort;
-
-/** What the Device reads of this computer's CLI tools. */
-export type DeviceCliTools = DeviceCliToolsPort;
-
-/**
- * Everything on this computer a step body may touch: the harnesses, the
- * decider, this computer's configuration as its stores (connections and
- * secrets, CLI tools, Agent Profiles), `sh -c` and git worktrees.
- * `createDaemon` (`@nightshift/daemon`) wires it from the daemon's stores;
- * a test wires it over the same stores, or fakes of them.
- */
-export type LocalDeviceDeps = {
-	id: string;
-	name: string;
-	/** The harnesses added on this computer. */
-	harnesses: Harnesses;
-	/** Decides Decision nodes and makes values for Value nodes. */
-	decider?: Decider;
-	/**
-	 * Who answers for Night Shift's own Decider and Brief writer here, from
-	 * this computer's settings. Read on each `capabilities` call.
-	 */
-	builtinModels?: () => NonNullable<DeciderFacts["builtin"]>;
-	/**
-	 * This computer's connections and secrets (`ConnectionStore`): an Agent
-	 * node's MCP servers with `${NAME}` expanded, a Command node's secrets
-	 * by name, from the scopes of the use (`secretScopes`). Without it:
-	 * no connections, and a node with connections is refused; a command's
-	 * secrets come from `process.env`.
-	 */
-	connections?: DeviceConnections;
-	/**
-	 * This computer's CLI tools (`CliToolStore`): their names, the program
-	 * each runs, and what an agent learns about them (each description and
-	 * help, after a new session's prompt). Without it: none is defined,
-	 * and a tool runs the program of its name.
-	 */
-	cliTools?: DeviceCliTools;
-	/** This computer's Agent Profiles, by id. Without it: none. */
-	profiles?: DeviceProfilesPort;
-	/** Project readiness before a worktree. Without it: no check (tests). */
-	checkProject?: DeviceProjectPort;
-	/** Where a program is on this computer, or null. Default: `findProgram`. */
-	which?: (program: string) => string | null;
-	/**
-	 * The CLI tools' launchers and logins (`createToolLaunchers`). Without
-	 * it, a tool runs the program of its name with this computer's sign-in.
-	 */
-	toolLaunchers?: Pick<ToolLaunchers, "prepare" | "forCommand" | "guarded">;
-	/*
-	 * Every secret this Device reads for a step goes through `connections`,
-	 * `toolLaunchers`, `harnesses`, the decider and `secretValues`.
-	 * Which scopes each reads is the Secret scope rule's (`secretScopes`),
-	 * not this file's: it passes the facts of the use on.
-	 */
-	/**
-	 * The folder of a project's Clone on this computer, or null when it has
-	 * none. Without it, this computer has no Clones: a run cannot start here.
-	 */
-	clonePath?: (projectId: string) => Promise<string | null>;
-	/**
-	 * The runs' own folders on this computer (ADR 22): a run of a project
-	 * without a folder works in its folder here. Without it, this computer
-	 * cannot run such a project.
-	 */
-	runFolders?: Pick<RunFolders, "make">;
-	/**
-	 * The git port: worktrees, Hand-offs and item branches, and finding git
-	 * before a worktree is added. Default: the git programs on this computer.
-	 */
-	git?: Git;
-	/**
-	 * Whether this computer takes snapshots of a run's worktree, over the
-	 * git port, to tell what a step changed there (`snapshotWorktree`,
-	 * `worktreeChanges`). The daemon's does. Without it, it has neither.
-	 */
-	snapshots?: boolean;
-	/**
-	 * Where a session keeps its artifacts, and reads the files of the run's
-	 * answers. Without it, sessions keep none and get none.
-	 */
-	artifacts?: Pick<ArtifactStore, "save" | "answerFolder">;
-	/**
-	 * The projects' knowledge on this computer, in step with their Spaces
-	 * (ADR 4). A step that asks for it gets it here, and gives it back when
-	 * it ends. Without it, a step gets none.
-	 */
-	knowledge?: StepKnowledge;
-	/**
-	 * What a run step's harness session adds to its environment, read as
-	 * the session starts: the export to monitoring gives Claude Code its
-	 * own telemetry under the step (`@nightshift/telemetry`). `values` are
-	 * the secret values in `env` (an API key in its headers): the session's
-	 * output has them as `•••`. `config`: the harness's own `--config`
-	 * overrides (Codex sets its telemetry there). Without it, or when it
-	 * gives nothing: nothing.
-	 */
-	sessionEnv?: (session: {
-		harness: AgentHarnessName;
-		runId: string;
-		stepId: string;
-	}) => {
-		env: Record<string, string>;
-		values: readonly string[];
-		config?: Record<string, string>;
-	};
-	/**
-	 * The values of the saved secrets (Personal ones too, when `use`
-	 * allows them) and of the ones the connections reference, read as a
-	 * session starts: its output has each as `•••`, as an exported run has.
-	 * Without it: only the values the session was given (its CLI tools'
-	 * logins, its MCP servers' and `sessionEnv`'s).
-	 */
-	secretValues?: (use?: SecretUse) => Promise<readonly string[]>;
-	/**
-	 * Whether a web request from this computer may reach loopback and
-	 * private addresses (`web-access/addresses.ts`), read at each request. A
-	 * Host's Settings decide it there. Without it: they may, as on a laptop.
-	 */
-	privateNetwork?: () => boolean;
-	/** The addresses of a host name, for a test. Default: the system's resolver. */
-	resolve?: (hostname: string) => Promise<string[]>;
-};
 
 /** The run's own folder here, as the Device port answers it: no branch, no base. */
 function runFolderOf(
@@ -206,14 +56,6 @@ function runFolderOf(
 	};
 }
 
-/** What an agent learns about the files a person added to the run's answers. */
-function answerFilesInstruction(paths: readonly string[]): string {
-	return [
-		"The person added files to their answers in this run. Read the ones your task needs:",
-		...paths.map((path) => `- ${path}`),
-	].join("\n");
-}
-
 /** What `decide` answers on a Device without a decider (or one that makes no values). */
 function noDecider(
 	makes: "decision" | "value",
@@ -223,143 +65,6 @@ function noDecider(
 		errorKind: "harness",
 		message: `No decider is configured for ${makes === "value" ? "Value" : "Decision"} nodes.`,
 		costUsd: null,
-	};
-}
-
-/** A Device without connections: a node with connections is refused, and a command's secrets come from the environment. */
-const NO_CONNECTIONS: DeviceConnections = {
-	names: () => new Set(),
-	async mcpServersFor(node, _use) {
-		return (node.connections ?? []).length > 0
-			? {
-					ok: false,
-					message: `The node uses connections (${node.connections?.join(", ")}), but there are none. Add them under Agents → Tools.`,
-				}
-			: { ok: true, servers: {} };
-	},
-	async secretEnv(names, _use) {
-		const missing = names.filter((name) => process.env[name] === undefined);
-		if (missing.length > 0) return { ok: false, missing };
-		return {
-			ok: true,
-			env: Object.fromEntries(
-				names.map((name) => [name, process.env[name] ?? ""]),
-			),
-		};
-	},
-};
-
-/** Whether a command's text names a CLI tool, as a word of its own. */
-function namesTool(command: string, tool: string): boolean {
-	const name = tool.replace(/[.*+?^${}()|[\]\\]/g, (char) => `\\${char}`);
-	return new RegExp(`(^|[^\\w.-])${name}($|[^\\w.-])`).test(command);
-}
-
-/** The secrets a request names, each once. */
-function requestSecretNames(
-	input: Omit<WebRequestInput, "signal" | "run">,
-): string[] {
-	const texts: RequestText[] = [
-		input.url,
-		...(input.query ?? []).map((field) => field.value),
-		...(input.headers ?? []).map((field) => field.value),
-		...(input.body === undefined
-			? []
-			: input.body.kind === "text"
-				? [input.body.text]
-				: input.body.fields.map((field) => field.value)),
-	];
-	return [
-		...new Set(
-			texts.flatMap((text) =>
-				text.flatMap((part) => ("secret" in part ? [part.secret] : [])),
-			),
-		),
-	];
-}
-
-/** A request text with its secrets filled in. */
-function filled(text: RequestText, env: Record<string, string>): string {
-	return text
-		.map((part) => {
-			if ("text" in part) return part.text;
-			const value = env[part.secret] ?? "";
-			return part.escape === "json"
-				? JSON.stringify(value).slice(1, -1)
-				: value;
-		})
-		.join("");
-}
-
-/** Whether a text holds a secret. */
-function holdsSecret(text: RequestText): boolean {
-	return text.some((part) => "secret" in part);
-}
-
-/** The request as it goes out: every secret filled in, the query on the URL, the form encoded. */
-function outgoing(
-	input: Omit<WebRequestInput, "run">,
-	env: Record<string, string>,
-): OutgoingRequest {
-	let url = filled(input.url, env);
-	const query = (input.query ?? []).map(
-		(field) => [field.name, filled(field.value, env)] as [string, string],
-	);
-	if (query.length > 0) {
-		try {
-			const parsed = new URL(url);
-			for (const [name, value] of query)
-				parsed.searchParams.append(name, value);
-			url = parsed.toString();
-		} catch {
-			// Not a URL: `sendRequest` refuses it.
-		}
-	}
-	const body = input.body;
-	return {
-		method: input.method,
-		url,
-		headers: (input.headers ?? []).map((field) => ({
-			name: field.name,
-			value: filled(field.value, env),
-			secret: holdsSecret(field.value),
-		})),
-		...(body === undefined
-			? {}
-			: body.kind === "text"
-				? {
-						body: {
-							contentType: body.contentType,
-							text: filled(body.text, env),
-						},
-					}
-				: {
-						body: {
-							contentType: "application/x-www-form-urlencoded",
-							text: new URLSearchParams(
-								body.fields.map((field): [string, string] => [
-									field.name,
-									filled(field.value, env),
-								]),
-							).toString(),
-						},
-					}),
-		timeoutMs: input.timeoutMs,
-		maxBytes: input.maxBytes,
-		showHost: !holdsSecret(input.url),
-		signal: input.signal,
-	};
-}
-
-/** The session's `saveArtifact`: copies the file and tells the agent it is kept. */
-function keepArtifact(
-	store: Pick<ArtifactStore, "save">,
-	step: { runId: string; stepId: string },
-	cwd: string,
-): NonNullable<AgentSessionInput["saveArtifact"]> {
-	return async (file) => {
-		const artifact = await store.save({ ...step, cwd, ...file });
-		return `Kept "${artifact.title}" as an artifact of this run.`;
 	};
 }
 
@@ -396,6 +101,9 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 	const findCli = (name: string) => which(cliTools?.program(name) ?? name);
 	const connections: DeviceConnections = deps.connections ?? NO_CONNECTIONS;
 
+	const session = localSession(deps, connections);
+	const exec = localExec(deps, connections);
+
 	const deciderFacts: DeciderFacts | null = decider
 		? {
 				values: decider.value !== undefined,
@@ -411,145 +119,6 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 			}
 		: null;
 
-	async function* session(
-		input: SessionInput | OfferedSessionInput,
-	): AsyncGenerator<SessionEvent> {
-		if ("offered" in input) {
-			// Resolved by the Offer's guard before it reaches this computer.
-			yield {
-				type: "refused",
-				message: `This device runs the profile "${input.offered.profile}" only through an Offer.`,
-			};
-			return;
-		}
-		const {
-			harness: name,
-			connections: _connections,
-			clis,
-			artifacts,
-			knowledge: _knowledge,
-			knowledgeOnly: _knowledgeOnly,
-			files,
-			underOffer,
-			run,
-			...rest
-		} = input;
-		// Where this session happens: the Secret scope rule decides what its
-		// `${NAME}` references read (ADR 13, ADR 18).
-		const secrets = stepSecrets(connections, run, underOffer);
-		const { use } = secrets;
-		const harness = harnesses.get(name, use);
-		if (!harness) {
-			yield {
-				type: "refused",
-				message: `No ${harnessNoun(name)} is added. Add it under Agents.`,
-			};
-			return;
-		}
-		// `${NAME}` in env values and headers reads the scopes of `use`. The
-		// values go to the harness only, never into the log.
-		const mcp = await secrets.servers(input.connections);
-		if (!mcp.ok) {
-			yield { type: "refused", message: mcp.message };
-			return;
-		}
-		// Plan mode runs no command: no CLI tools, no logins.
-		const runsCommands = input.permissionMode !== "plan";
-		const withClis = runsCommands && clis !== undefined && clis.length > 0;
-		// Each CLI tool with a login runs through a launcher of this session.
-		// The secrets the logins read go to the launchers only.
-		const tools =
-			withClis && deps.toolLaunchers
-				? await deps.toolLaunchers.prepare(clis, use)
-				: null;
-		if (tools && !tools.ok) {
-			yield { type: "refused", message: tools.message };
-			return;
-		}
-		let known: Awaited<ReturnType<StepKnowledge["forSession"]>> | null = null;
-		try {
-			// A new session learns its CLI tools after the prompt. A resumed
-			// session has them already.
-			const guide =
-				!input.resumeSessionId && withClis && cliTools
-					? cliToolsInstruction(await cliTools.guides(clis))
-					: "";
-			const guarded = deps.toolLaunchers?.guarded() ?? [];
-			// The knowledge as the Space has it now, before the agent reads it.
-			known = deps.knowledge
-				? await deps.knowledge.forSession(
-						input,
-						artifacts
-							? { runId: artifacts.runId, stepId: artifacts.stepId }
-							: {},
-					)
-				: null;
-			const added = artifacts
-				? deps.sessionEnv?.({ harness: name, ...artifacts })
-				: undefined;
-			// The files of the run's answers, in a folder the agent may read.
-			const answers =
-				artifacts && deps.artifacts && files && files.length > 0
-					? await deps.artifacts.answerFolder(artifacts.runId, files)
-					: null;
-			// What each part adds to the session, in this order.
-			const contributions: SessionContribution[] = [
-				...(added ? [{ env: added.env }] : []),
-				...(known ? [known.contribution] : []),
-				...(answers
-					? [
-							{
-								addDirs: [answers.dir],
-								afterPrompt: answerFilesInstruction(answers.paths),
-							},
-						]
-					: []),
-				...(guide ? [{ afterPrompt: guide }] : []),
-				...(tools?.env ? [{ env: tools.env }] : []),
-			];
-			yield { type: "ready", harness: name };
-			const run = harness.run({
-				...rest,
-				...foldContributions(rest, contributions),
-				...(clis && clis.length > 0 ? { clis } : {}),
-				...(Object.keys(mcp.servers).length > 0
-					? { mcpServers: mcp.servers }
-					: {}),
-				...(artifacts && deps.artifacts
-					? {
-							saveArtifact: keepArtifact(deps.artifacts, artifacts, rest.cwd),
-						}
-					: {}),
-				...(tools?.toolsPath ? { toolsPath: tools.toolsPath } : {}),
-				...(added?.config && Object.keys(added.config).length > 0
-					? { harnessConfig: added.config }
-					: {}),
-				scrubEnv: [...guarded, ...PAGE_READER_NAMES],
-			});
-			const events = known ? known.events(run) : run;
-			// Every secret value the session could see comes back as `•••`.
-			secrets.add(tools?.values);
-			secrets.add(added?.values);
-			secrets.add(
-				await harness.secretValues?.().catch((error) => {
-					console.warn("The agent's secrets were not read:", error);
-					return [];
-				}),
-			);
-			secrets.add(
-				await deps.secretValues?.(use).catch((error) => {
-					console.warn("The saved secrets were not read:", error);
-					return [];
-				}),
-			);
-			yield* secrets.hideSession(events);
-		} finally {
-			await tools?.cleanup();
-			// What the step changed, and the learnings it proposed, go to the Space.
-			await known?.done();
-		}
-	}
-
 	function decide(input: DecisionInput): Promise<DecisionResult>;
 	function decide(input: ValueInput): Promise<ValueResult>;
 	async function decide(
@@ -559,100 +128,6 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 			return decider?.value ? decider.value(input) : noDecider("value");
 		}
 		return decider ? decider.decide(input) : noDecider("decision");
-	}
-
-	/**
-	 * `sh -c` here. A command's secrets come from the scopes of its use
-	 * (`secretScopes`), on this computer: one it does not have refuses the
-	 * command before it starts. Their values go to the command only; its
-	 * output has them as `•••` before it leaves this computer.
-	 *
-	 * Each CLI tool with a login runs through its launcher, found first on
-	 * PATH: `gh` in the command runs as the gh tool. The login's values go
-	 * to the launcher only, and come back as `•••` too.
-	 */
-	async function* exec(input: ExecInput): AsyncGenerator<ExecEvent> {
-		const {
-			secrets: named = [],
-			knowledge,
-			run,
-			artifacts,
-			...command
-		} = input;
-		const secrets = stepSecrets(connections, run);
-		// The secrets of the CLI tools' logins go to their launchers only. A
-		// command that names one in `secrets` gets it below.
-		const scrub = [
-			...PAGE_READER_NAMES,
-			...(deps.toolLaunchers?.guarded() ?? []).filter(
-				(name) => !named.includes(name),
-			),
-		];
-		const found = await secrets.env(named, "The command");
-		if (!found.ok) {
-			yield { type: "refused", message: found.message };
-			return;
-		}
-		// The knowledge as the Space has it now, before the command reads it.
-		// The sync flows write in its folder. The key of its page reader comes
-		// from the scopes of this step, as a secret the command names would.
-		const known =
-			knowledge && deps.knowledge
-				? await deps.knowledge.forCommand(knowledge.projectId, {
-						secret: secrets.one,
-					})
-				: null;
-		let tools: Awaited<ReturnType<ToolLaunchers["forCommand"]>> | null = null;
-		let kept: KeptFiles | null = null;
-		try {
-			tools = (await deps.toolLaunchers?.forCommand(secrets.use)) ?? null;
-			// The files the command puts in `NS_ARTIFACTS` become artifacts of
-			// the run here, on the computer that runs it, as an agent's do.
-			kept =
-				artifacts && deps.artifacts
-					? openKeptFiles(deps.artifacts, artifacts)
-					: null;
-			const leftOut = (tools?.leftOut ?? []).filter(({ tool }) =>
-				namesTool(command.command, tool),
-			);
-			const env: Record<string, string> = {
-				...known?.env,
-				...command.env,
-				...tools?.env,
-				...found.env,
-				...(kept ? { [ARTIFACTS_ENV]: kept.path } : {}),
-			};
-			if (tools?.toolsPath) {
-				env.PATH = [tools.toolsPath, command.env?.PATH ?? process.env.PATH]
-					.filter(Boolean)
-					.join(delimiter);
-			}
-			secrets.add(tools?.values);
-			const events = spawnCommand({ ...command, env }, scrub);
-			for await (const event of secrets.hideExec(events)) {
-				// Why the command failed, last in its output: a tool it names that
-				// could not run.
-				if (event.type === "exit" && event.exitCode !== 0) {
-					for (const { message } of leftOut) {
-						const text = secrets.hideText(`${message}\n`);
-						yield { type: "output", stream: "stderr", text };
-					}
-				}
-				// The files it kept, before the step ends.
-				if (event.type === "exit" && kept) {
-					for (const problem of await kept.keep()) {
-						const text = secrets.hideText(`${problem}\n`);
-						yield { type: "output", stream: "stderr", text };
-					}
-				}
-				yield event;
-			}
-		} finally {
-			await tools?.cleanup();
-			kept?.remove();
-			// What the command changed, a sync's files, go to the Space.
-			await known?.done();
-		}
 	}
 
 	/** The folder of the project's Clone here; throws without one. */

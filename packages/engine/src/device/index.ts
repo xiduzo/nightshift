@@ -18,9 +18,6 @@ export type {
 	OfferedSessionInput,
 	ReadFileInput,
 	ReadFileResult,
-	RequestField,
-	RequestPart,
-	RequestText,
 	RestoredWorktree,
 	RunFolder,
 	RunRef,
@@ -28,9 +25,14 @@ export type {
 	SessionInput,
 	ToolCallInput,
 	ToolResult,
-	WebRequestInput,
-	WebRequestResult,
-	WebResponse,
 	Worktree,
 } from "./types";
 export { addressKey } from "./types";
+export type {
+	RequestField,
+	RequestPart,
+	RequestText,
+	WebRequestInput,
+	WebRequestResult,
+	WebResponse,
+} from "./web-request";

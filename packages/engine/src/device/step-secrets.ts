@@ -8,12 +8,8 @@ import {
 	redactSession,
 	redactText,
 } from "./redact";
-import type {
-	ExecEvent,
-	SessionEvent,
-	ToolResult,
-	WebRequestResult,
-} from "./types";
+import type { ExecEvent, SessionEvent, ToolResult } from "./types";
+import type { WebRequestResult } from "./web-request";
 import { unreachableNote } from "./words";
 
 /**

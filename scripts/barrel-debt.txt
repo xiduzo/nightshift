@@ -11,5 +11,4 @@
 # Add no line here.
 # `bun scripts/check-budgets.ts --tighten` lowers the numbers to today's.
 apps/web/src/shared/api/index.ts 87
-packages/engine/src/device/index.ts 33
 packages/engine/src/read/index.ts 59
