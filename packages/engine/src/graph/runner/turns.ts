@@ -121,7 +121,14 @@ export function createTurns(
 			// No step sleeps beside it: the daemon died after the answer, and
 			// recovery ended the steps that ran beside it. Nothing else moves
 			// the thread, so this answer does: the Gate goes on with the first.
-			if ((await log.state(row.id)).waits.length > 0) {
+			// The run goes on when the steps beside it are done: a sleeper
+			// wakes, another Gate gets its answer. Then this answer has no use.
+			const other = snapshot.state;
+			if (
+				(await log.state(row.id)).waits.length > 0 ||
+				(other.kind === "interrupted" &&
+					other.interrupts.some(({ value }) => value.kind === "gate"))
+			) {
 				throw new RunRefusal("gate-closed", ANSWERED);
 			}
 			if (!reserve(row.id, intent, options)) return QUEUED;
@@ -146,10 +153,11 @@ export function createTurns(
 			snapshot = await threadOf(row).snapshot();
 			const at = snapshot.state;
 			if (at.kind !== "interrupted" || !at.interrupts.some(isThis)) {
-				// The thread went on past the Gate: it had its answer.
-				const gate = (await log.state(row.id)).steps.get(intent.stepId);
-				const open = gate?.endedAt === null && gate.gate !== null;
-				throw new RunRefusal("gate-closed", open ? GATE_GONE : CONTINUED);
+				// The thread went on past the Gate: with an answer it had, or
+				// without one (its step went on before it asked again).
+				const step = (await log.state(row.id)).steps.get(intent.stepId);
+				const answered = (step?.gateWaits.at(-1)?.answeredBy ?? null) !== null;
+				throw new RunRefusal("gate-closed", answered ? CONTINUED : GATE_GONE);
 			}
 		}
 		const at = snapshot.state;
@@ -167,10 +175,20 @@ export function createTurns(
 			...(data !== undefined ? { data } : {}),
 			...(via ? { via } : {}),
 		};
-		// Parallel branches may hold several Gates: the answer goes to its own.
-		const each = resumeEach(at, (parked) =>
-			parked.kind === "gate" && parked.stepId === intent.stepId ? value : null,
-		);
+		// Parallel branches may hold several Gates: the answer goes to its own,
+		// by the id of its interrupt. Also when the thread holds only this
+		// one while another Gate's task has not reached its interrupt yet:
+		// an answer without an id goes to the first interrupt that asks.
+		const mine = at.kind === "interrupted" ? at.interrupts.find(isThis) : null;
+		const each =
+			resumeEach(at, (parked) =>
+				parked.kind === "gate" && parked.stepId === intent.stepId
+					? value
+					: null,
+			) ??
+			(mine && (await log.state(row.id)).gates.length > 1
+				? { [mine.id]: value }
+				: null);
 		drive(row, inputOf({ kind: "resume", value, ...(each ? { each } : {}) }));
 		// The ask node ends the step on the answer, or an Agent's step opens
 		// again with it. The Turn ends once the Gate closed, so the run no

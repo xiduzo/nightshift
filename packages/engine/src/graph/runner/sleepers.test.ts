@@ -381,27 +381,7 @@ for (const [where, before] of [
 		}
 	});
 
-test("recovery keeps every sleeper", () => {
-	const open = openWork(both().state(), { kind: "interrupted" });
-	expect(open.steps).toEqual([]);
-	expect(open.endsRun).toBe(false);
-});
-
-test("recovery keeps every open Gate, and a sleeper beside one", () => {
-	const log = runEvents()
-		.runStarted()
-		.stepStarted("a", "a")
-		.waitStarted("a", { until: 400 })
-		.stepStarted("g", "g")
-		.gateOpened("g")
-		.stepStarted("h", "h")
-		.gateOpened("h");
-	const open = openWork(log.state(), { kind: "interrupted" });
-	expect(open.steps).toEqual([]);
-	expect(open.endsRun).toBe(false);
-});
-
-test("two branches ask, and the daemon dies before the second ask is saved: each answer reaches its own Agent", async () => {
+test("a second answer to an answered ask, while another branch waits at its Gate, is refused and never sent", async () => {
 	const harness = fakeHarness((input) =>
 		input.resumeSessionId
 			? reportingScript("pass", "Done.")
@@ -426,34 +406,18 @@ test("two branches ask, and the daemon dies before the second ask is saved: each
 		),
 		{ harness },
 	);
-	let gates = 0;
-	let died = false;
-	let runner = testRunner(h, {
-		overdueSweepMs: 3_600_000,
-		openThread: (row, deps) => {
-			const thread = openThread(row, deps);
-			const { log } = thread.ctx;
-			thread.ctx.log = {
-				...log,
-				append: async (input, rows) => {
-					if (died) throw new Error("the daemon died");
-					if (input.type === "GateOpened") gates++;
-					return log.append(input, rows);
-				},
-			};
-			const putWrites = thread.saver.putWrites.bind(thread.saver);
-			thread.saver.putWrites = async (...args) => {
-				// The writes of the task that asked second.
-				if (died || gates === 2) {
-					died = true;
-					throw new Error("the daemon died");
-				}
-				return putWrites(...args);
-			};
-			return thread;
-		},
-	});
+	const runner = testRunner(h, { overdueSweepMs: 3_600_000 });
 	const state = async () => foldRun(await h.events());
+	const still = () => waitFor(() => !runner.isActive(h.runId));
+	const answer = async (nodeId: string, note: string) => {
+		const gate = (await state()).gates.find((g) => g.nodeId === nodeId);
+		return runner.take(h.runId, {
+			kind: "answer",
+			stepId: gate?.stepId ?? "",
+			choice: "answer",
+			note,
+		});
+	};
 	try {
 		await runner.take(h.runId, {
 			kind: "start",
@@ -463,51 +427,158 @@ test("two branches ask, and the daemon dies before the second ask is saved: each
 				stopAt: null,
 			}),
 		});
-		await waitFor(() => died && !runner.isActive(h.runId));
-		await runner.release();
-		runner = testRunner(h, { overdueSweepMs: 3_600_000 });
-		await closeOpenWork(
-			{
-				log: h.log,
-				bus: h.deps.shared.bus,
-				flowOf: parseRunFlow,
-				calledFlowsOf: parseCalledFlows,
-			},
-			h.runId,
-			{ kind: "interrupted", reason: "Night Shift stopped." },
+		await waitFor(async () => (await state()).gates.length === 2);
+		await still();
+		await answer("a", "For a.");
+		await still();
+		await expect(answer("a", "Again for a.")).rejects.toThrow(
+			"This Gate has its answer. The run continues when the other branches are done.",
 		);
-		expect((await state()).gates.map((g) => g.nodeId).sort()).toEqual([
-			"a",
-			"b",
-		]);
-		for (const nodeId of ["b", "a"]) {
-			const gate = (await state()).gates.find((g) => g.nodeId === nodeId);
-			await runner.take(h.runId, {
-				kind: "answer",
-				stepId: gate?.stepId ?? "",
-				choice: "answer",
-				note: `For ${nodeId}.`,
-			});
-			await waitFor(() => !runner.isActive(h.runId));
-		}
+		await answer("b", "For b.");
 		await waitFor(async () => (await state()).status === "finished");
-		const owners = new Map<string, string>();
-		for (const call of harness.calls) {
-			if (!call.resumeSessionId) {
-				owners.set(`fake-session-${owners.size + 1}`, call.prompt);
-			}
-		}
-		const told = harness.calls
-			.filter((call) => call.prompt.startsWith("For "))
-			.map((call) => [owners.get(call.resumeSessionId ?? ""), call.prompt]);
-		expect(told.sort()).toEqual([
-			["Do a", "For a."],
-			["Do b", "For b."],
-		]);
+		const told = harness.calls.map((call) => call.prompt);
+		expect(told).toContain("For a.");
+		expect(told).toContain("For b.");
+		expect(told).not.toContain("Again for a.");
 	} finally {
 		await runner.release();
 	}
 });
+
+test("recovery keeps every sleeper", () => {
+	const open = openWork(both().state(), { kind: "interrupted" });
+	expect(open.steps).toEqual([]);
+	expect(open.endsRun).toBe(false);
+});
+
+test("recovery keeps every open Gate, and a sleeper beside one", () => {
+	const log = runEvents()
+		.runStarted()
+		.stepStarted("a", "a")
+		.waitStarted("a", { until: 400 })
+		.stepStarted("g", "g")
+		.gateOpened("g")
+		.stepStarted("h", "h")
+		.gateOpened("h");
+	const open = openWork(log.state(), { kind: "interrupted" });
+	expect(open.steps).toEqual([]);
+	expect(open.endsRun).toBe(false);
+});
+
+for (const [saved, order] of [
+	...[0, 1, 2].flatMap((n) => [
+		[n, ["b", "a"]],
+		[n, ["a", "b"]],
+	]),
+] as [number, string[]][])
+	test(`two branches ask, the daemon dies after ${saved} writes past the second ask, and ${order[0]} is answered first: each answer reaches its own Agent`, async () => {
+		const harness = fakeHarness((input) =>
+			input.resumeSessionId
+				? reportingScript("pass", "Done.")
+				: reportingScript("needs-input", "Which one?"),
+		);
+		const asks = (id: string) => agent(id, `Do ${id}`, { ask: "person" });
+		const h = await startRun(
+			sandbox,
+			flowOf(
+				[
+					command("start", "true"),
+					asks("a"),
+					asks("b"),
+					{ id: "joined", type: "join", position: at, wait: "all" },
+				],
+				[
+					edge("1", "start", "pass", "a"),
+					edge("2", "start", "pass", "b"),
+					edge("3", "a", "pass", "joined"),
+					edge("4", "b", "pass", "joined"),
+				],
+			),
+			{ harness },
+		);
+		let gates = 0;
+		let writes = 0;
+		let died = false;
+		let runner = testRunner(h, {
+			overdueSweepMs: 3_600_000,
+			openThread: (row, deps) => {
+				const thread = openThread(row, deps);
+				const { log } = thread.ctx;
+				thread.ctx.log = {
+					...log,
+					append: async (input, rows) => {
+						if (died) throw new Error("the daemon died");
+						if (input.type === "GateOpened") gates++;
+						return log.append(input, rows);
+					},
+				};
+				const putWrites = thread.saver.putWrites.bind(thread.saver);
+				thread.saver.putWrites = async (...args) => {
+					// The writes after both asked: `saved` of them land.
+					if (died || (gates === 2 && writes++ >= saved)) {
+						died = true;
+						throw new Error("the daemon died");
+					}
+					return putWrites(...args);
+				};
+				return thread;
+			},
+		});
+		const state = async () => foldRun(await h.events());
+		try {
+			await runner.take(h.runId, {
+				kind: "start",
+				prepare: async () => ({
+					row: await getRunRow(sandbox.db, h.runId),
+					inputs: {},
+					stopAt: null,
+				}),
+			});
+			await waitFor(() => died && !runner.isActive(h.runId));
+			await runner.release();
+			runner = testRunner(h, { overdueSweepMs: 3_600_000 });
+			await closeOpenWork(
+				{
+					log: h.log,
+					bus: h.deps.shared.bus,
+					flowOf: parseRunFlow,
+					calledFlowsOf: parseCalledFlows,
+				},
+				h.runId,
+				{ kind: "interrupted", reason: "Night Shift stopped." },
+			);
+			expect((await state()).gates.map((g) => g.nodeId).sort()).toEqual([
+				"a",
+				"b",
+			]);
+			for (const nodeId of order) {
+				const gate = (await state()).gates.find((g) => g.nodeId === nodeId);
+				await runner.take(h.runId, {
+					kind: "answer",
+					stepId: gate?.stepId ?? "",
+					choice: "answer",
+					note: `For ${nodeId}.`,
+				});
+				await waitFor(() => !runner.isActive(h.runId));
+			}
+			await waitFor(async () => (await state()).status === "finished");
+			const owners = new Map<string, string>();
+			for (const call of harness.calls) {
+				if (!call.resumeSessionId) {
+					owners.set(`fake-session-${owners.size + 1}`, call.prompt);
+				}
+			}
+			const told = harness.calls
+				.filter((call) => call.prompt.startsWith("For "))
+				.map((call) => [owners.get(call.resumeSessionId ?? ""), call.prompt]);
+			expect(told.sort()).toEqual([
+				["Do a", "For a."],
+				["Do b", "For b."],
+			]);
+		} finally {
+			await runner.release();
+		}
+	});
 
 /** A log where `a` sleeps until 400 and `b`, which slept later, until 800. */
 const both = () =>

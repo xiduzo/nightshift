@@ -821,13 +821,17 @@ for an answered task (`ThreadState`, `ThreadSnapshot.answered`). So the
 timer of a sleeper beside the answered ask wakes the run, though the log
 still reads `waiting`. The Agent goes on with the answer when that sleeper
 wakes: a super-step ends only when all its tasks end. A second answer is
-refused while a step sleeps beside it. When none sleeps (the daemon died
+refused while a step sleeps beside it, or another Gate waits beside it. When none sleeps (the daemon died
 after the wake), the second answer drives the thread on, and the Agent
 goes on with the first answer.
 
 An answer to a Gate whose interrupt the thread does not hold (the daemon
 died before it was saved) first drives the thread on to that interrupt.
-Then the answer goes to its own Gate, not to another branch.
+Then the answer goes to its own Gate, not to another branch. While another
+Gate is open in the log, the answer goes by the id of its interrupt, so a
+Gate whose interrupt is not saved yet cannot take it. When the thread goes
+on past the Gate without an answer, the person reads "This Gate does not
+wait anymore."
 
 ## The resume point (`graph/step/resume-point.ts`)
 
