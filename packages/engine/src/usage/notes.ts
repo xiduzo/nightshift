@@ -12,7 +12,11 @@ export type UsageMoment =
 			scorePullRequests: boolean;
 	  }
 	| { kind: "schedule-fired" }
-	| { kind: "schedule-skipped"; reason: string }
+	| {
+			/** Why the cron time did not start: the code, not the words of the log. */
+			kind: "schedule-skipped";
+			reason: "missed" | "paused" | "still_open";
+	  }
 	| {
 			kind: "gate-answered";
 			by: "person" | "deadline";

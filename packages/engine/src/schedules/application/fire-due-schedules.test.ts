@@ -188,11 +188,7 @@ describe("the scheduler's look", () => {
 		});
 		expect(ports.runs.started).toHaveLength(1);
 		expect(second.usage).toEqual([
-			{
-				kind: "schedule-skipped",
-				reason:
-					"Missed by 30 min. Night Shift was off, or the computer was asleep. This schedule starts at most 15 min late.",
-			},
+			{ kind: "schedule-skipped", reason: "missed" },
 		]);
 	});
 
@@ -308,12 +304,7 @@ describe("the scheduler's look", () => {
 		]);
 		expect(ports.notices.misses).toEqual([]);
 		expect(ports.runs.started).toEqual([]);
-		expect(usage).toEqual([
-			{
-				kind: "schedule-skipped",
-				reason: "You paused this schedule for tonight.",
-			},
-		]);
+		expect(usage).toEqual([{ kind: "schedule-skipped", reason: "paused" }]);
 	});
 
 	test("lateMinutes does not start a time from before the schedule existed", async () => {
@@ -327,7 +318,9 @@ describe("the scheduler's look", () => {
 	});
 
 	test("does not start while an earlier run of the schedule is still open", async () => {
-		const { ports, look } = await watching([nightly({ cron: "0 * * * *" })]);
+		const { ports, look, usage } = await watching([
+			nightly({ cron: "0 * * * *" }),
+		]);
 		ports.clock.set(at(16, 22));
 		await look();
 		ports.runs.setStatus("run-1", "waiting");
@@ -342,6 +335,10 @@ describe("the scheduler's look", () => {
 			reason: "An earlier run of this schedule is still waiting.",
 			runId: "run-1",
 		});
+		expect(usage).toEqual([
+			{ kind: "schedule-fired" },
+			{ kind: "schedule-skipped", reason: "still_open" },
+		]);
 		expect(ports.runs.started).toHaveLength(1);
 		expect(ports.notices.misses).toEqual([]);
 

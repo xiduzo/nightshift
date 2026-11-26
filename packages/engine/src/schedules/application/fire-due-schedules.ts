@@ -1,6 +1,6 @@
 import type { Schedule } from "@nightshift/flows";
 import { Refusal, wordsFor } from "@nightshift/refusal";
-import type { UsageNotes } from "../../usage";
+import type { UsageMoment, UsageNotes } from "../../usage";
 import { openRunOf, openRunSkipWords } from "../domain/open-run";
 import type { ScheduleHistory } from "../domain/schedule-history";
 import {
@@ -18,6 +18,9 @@ import type {
 	ScheduleStore,
 	ScheduleSwitch,
 } from "./ports";
+
+/** Why a cron time did not start, as usage notes it. */
+type SkipCode = Extract<UsageMoment, { kind: "schedule-skipped" }>["reason"];
 
 export type FireDueSchedulesPorts = {
 	log: Pick<ScheduleLog, "histories" | "fired" | "skipped">;
@@ -63,11 +66,12 @@ export const fireDueSchedules =
 			projectId: string,
 			scheduleId: string,
 			at: number,
+			why: SkipCode,
 			reason: string,
 			runId: string | null = null,
 		): Promise<void> {
 			await log.skipped({ projectId, scheduleId, at, reason, runId });
-			usage?.note({ kind: "schedule-skipped", reason });
+			usage?.note({ kind: "schedule-skipped", reason: why });
 		}
 
 		async function consider(
@@ -80,7 +84,7 @@ export const fireDueSchedules =
 			if (decision.kind === "none") return;
 			const { due } = decision;
 			if (decision.kind === "missed") {
-				await skip(projectId, schedule.id, due, decision.reason);
+				await skip(projectId, schedule.id, due, decision.kind, decision.reason);
 				try {
 					notices.missed(decision.missed);
 				} catch (error) {
@@ -93,7 +97,7 @@ export const fireDueSchedules =
 			}
 
 			if (decision.kind === "paused") {
-				await skip(projectId, schedule.id, due, decision.reason);
+				await skip(projectId, schedule.id, due, decision.kind, decision.reason);
 				return;
 			}
 
@@ -103,6 +107,7 @@ export const fireDueSchedules =
 					projectId,
 					schedule.id,
 					due,
+					"still_open",
 					openRunSkipWords(open),
 					open.runId,
 				);

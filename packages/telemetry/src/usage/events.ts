@@ -183,15 +183,6 @@ export function stepEndedEvent(
 	});
 }
 
-function skipReason(reason: string): string {
-	if (reason.startsWith("Missed by ")) return "missed";
-	if (reason.startsWith("You paused this schedule")) return "paused";
-	if (reason.startsWith("An earlier run of this schedule is still ")) {
-		return "still_open";
-	}
-	return "_OTHER";
-}
-
 function checkStatus(
 	id: string,
 	steps: { id: string; status: string }[],
@@ -247,7 +238,7 @@ export function momentEvent(
 				"schedule.skip_reason": listed(
 					USAGE_EVENT.scheduleSkipped,
 					"schedule.skip_reason",
-					skipReason(moment.reason),
+					moment.reason,
 					"_OTHER",
 				),
 			});
