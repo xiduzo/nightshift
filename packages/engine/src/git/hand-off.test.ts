@@ -51,7 +51,7 @@ describe("a hand-off of a branch the run made", () => {
 	let copyB: string;
 	beforeEach(async () => {
 		const origin = join(sandbox.root, "origin.git");
-		await mustGit(sandbox.root, ["init", "-q", "--bare", origin]);
+		await mustGit(sandbox.root, ["init", "-q", "--bare", "-b", "main", origin]);
 		a = sandbox.repoPath;
 		await mustGit(a, ["remote", "add", "origin", origin]);
 		await mustGit(a, ["push", "-q", "origin", "HEAD"]);
