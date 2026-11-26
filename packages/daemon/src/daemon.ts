@@ -355,16 +355,20 @@ async function makeDaemon(
 	 * The price list that prices tokens when a harness reports no cost: the
 	 * bundled one, then a newer one fetched once a day into the data folder.
 	 * Not awaited: the daemon starts on the bundled list, never on the network.
+	 * A stop aborts the fetch and waits for it: one writer of the list.
 	 */
+	const fetchPrices = outside.fetch ?? fetch;
 	void slots
 		.replace(
 			"nightshiftPrices",
-			() =>
+			(stopped) =>
 				startPriceUpdates({
 					file: join(dataDir, "prices.json"),
-					...(outside.fetch ? { fetch: outside.fetch } : {}),
-					onError: (error) =>
-						console.warn("The price list was not updated:", error),
+					fetch: (url, init) => fetchPrices(url, { ...init, signal: stopped }),
+					onError: (error) => {
+						if (stopped.aborted) return;
+						console.warn("The price list was not updated:", error);
+					},
 				}),
 			(before) => before.stop(),
 		)

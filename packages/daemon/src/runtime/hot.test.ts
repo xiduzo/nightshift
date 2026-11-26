@@ -124,6 +124,58 @@ describe("the slots of a daemon across reloads", () => {
 	});
 });
 
+describe("a replaced slot that is still made (a make that is not awaited)", () => {
+	/** A worker whose make ends when the test says so, or when its signal aborts. */
+	function slowWorker(id: number) {
+		let done = () => {};
+		let signal: AbortSignal | undefined;
+		const make = (asked: AbortSignal) => {
+			signal = asked;
+			return new Promise<Worker>((resolve) => {
+				done = () => resolve({ id, stopped: false });
+				if (asked.aborted) done();
+				asked.addEventListener("abort", () => done());
+			});
+		};
+		return { make, done: () => done(), signal: () => signal };
+	}
+	const stopWorker = (worker: Worker) => {
+		worker.stopped = true;
+	};
+
+	test("a stop aborts the make, waits for it, and stops what it made", async () => {
+		const registry: Registry = {};
+		const slots = hotSlots(registry);
+		const slow = slowWorker(1);
+		const made = slots.replace("worker", slow.make, stopWorker);
+
+		await slots.stop();
+
+		expect(slow.signal()?.aborted).toBe(true);
+		const worker = await made;
+		expect(worker.stopped).toBe(true);
+		expect(registry.worker).toBeUndefined();
+	});
+
+	test("a later start waits for an earlier make of the slot, and stops what it made first", async () => {
+		const registry: Registry = {};
+		const slow = slowWorker(1);
+		const earlier = hotSlots(registry).replace("worker", slow.make, stopWorker);
+		const later = hotSlots(registry).replace(
+			"worker",
+			() => ({ id: 2, stopped: false }),
+			stopWorker,
+		);
+		await Bun.sleep(0);
+		slow.done();
+
+		const [first, second] = await Promise.all([earlier, later]);
+		expect(first.stopped).toBe(true);
+		expect(second).toMatchObject({ id: 2, stopped: false });
+		expect(registry.worker).toBe(second);
+	});
+});
+
 describe("two reloads at once (two saves in a row)", () => {
 	type Starts = Registry & { nightshiftDaemonStart?: Promise<void> };
 

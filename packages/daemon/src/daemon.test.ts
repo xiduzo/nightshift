@@ -421,6 +421,40 @@ describe("the daemon, wired in one process", () => {
 		expect(await lease()).toBeNull();
 	}, 30_000);
 
+	test("a stop while the price list is fetched aborts the fetch and leaves no price updates behind", async () => {
+		dir = await mkdtemp(join(tmpdir(), "nightshift-daemon-"));
+		let asked: AbortSignal | undefined;
+		const daemon = await createDaemon(envIn(dir), {
+			port: PORT,
+			outside: {
+				// A fetch that answers only when it is aborted.
+				fetch: (_url, init) =>
+					new Promise<Response>((_resolve, reject) => {
+						asked = init?.signal ?? undefined;
+						asked?.addEventListener("abort", () =>
+							reject(new DOMException("The fetch was aborted.", "AbortError")),
+						);
+					}),
+				sleepLock: null,
+			},
+		});
+		for (let i = 0; i < 100 && !asked; i++) await Bun.sleep(10);
+		expect(asked?.aborted).toBe(false);
+		const warned = spyOn(console, "warn");
+
+		await daemon.stop();
+		await hot.nightshiftStopping;
+
+		expect(asked?.aborted).toBe(true);
+		expect(hot.nightshiftPrices).toBeUndefined();
+		expect(
+			warned.mock.calls.some(([line]) =>
+				String(line).startsWith("The price list was not updated"),
+			),
+		).toBe(false);
+		warned.mockRestore();
+	});
+
 	test("a reload that fails keeps the lease: the daemon before it still holds the database", async () => {
 		dir = await mkdtemp(join(tmpdir(), "nightshift-daemon-"));
 		const env = envIn(dir);

@@ -131,11 +131,13 @@ export type HotSlots<R extends object> = {
 	): Promise<Value<R, K>>;
 	/**
 	 * Replaced on each start: the one before stops first, then `make`
-	 * makes this one. `stop` also runs when the daemon stops.
+	 * makes this one. `stop` also runs when the daemon stops. A make still in
+	 * flight counts: a later start waits for it and stops what it made, and
+	 * a stop aborts `signal`, waits for the make and stops what it made.
 	 */
 	replace<K extends keyof R>(
 		name: K,
-		make: () => Value<R, K> | Promise<Value<R, K>>,
+		make: (signal: AbortSignal) => Value<R, K> | Promise<Value<R, K>>,
 		stop: (value: Value<R, K>) => unknown,
 	): Promise<Value<R, K>>;
 	/**
@@ -157,6 +159,9 @@ export type HotSlots<R extends object> = {
 	stop(): Promise<void>;
 };
 
+/** The makes of replaced slots in flight, by slot, on the store: every start of the process sees them. */
+const MAKING = Symbol.for("nightshiftMaking");
+
 /** The lifecycle of each slot of `store`: in the daemon, the registry (`hot`). */
 export function hotSlots<R extends object>(store: R): HotSlots<R> {
 	type Ending = { name: keyof R; end: (value: never) => unknown };
@@ -164,6 +169,15 @@ export function hotSlots<R extends object>(store: R): HotSlots<R> {
 	const replaced: Ending[] = [];
 	const handedOver: Ending[] = [];
 	const slots = store as Record<keyof R, unknown>;
+	const holder = store as { [MAKING]?: Map<keyof R, Promise<unknown>> };
+	if (!holder[MAKING]) {
+		// Not enumerable: the registry's own slots stay what a reader sees.
+		Object.defineProperty(holder, MAKING, { value: new Map() });
+	}
+	const making = holder[MAKING] as Map<keyof R, Promise<unknown>>;
+	/** The makes of this start: its stop aborts them and waits for them. */
+	const asked = new AbortController();
+	const mine = new Set<Promise<unknown>>();
 
 	/** Ends the slots of `endings` that hold a value, and empties them. */
 	const end = (endings: readonly Ending[]) =>
@@ -186,19 +200,37 @@ export function hotSlots<R extends object>(store: R): HotSlots<R> {
 			slots[name] ??= await make();
 			return slots[name] as Value<R, typeof name>;
 		},
-		async replace(name, make, stop) {
+		replace(name, make, stop) {
 			replaced.push({ name, end: stop });
-			const before = slots[name] as Value<R, typeof name> | undefined;
-			slots[name] = undefined;
-			if (before !== undefined && before !== null) await stop(before);
-			const value = await make();
-			slots[name] = value;
-			return value;
+			const earlier = making.get(name);
+			const made = (async () => {
+				// An earlier make of this slot lands first: then it is the one before.
+				await earlier;
+				const before = slots[name] as Value<R, typeof name> | undefined;
+				slots[name] = undefined;
+				if (before !== undefined && before !== null) await stop(before);
+				const value = await make(asked.signal);
+				slots[name] = value;
+				return value;
+			})();
+			const settled = made.then(
+				() => {},
+				() => {},
+			);
+			making.set(name, settled);
+			mine.add(settled);
+			void settled.then(() => {
+				mine.delete(settled);
+				if (making.get(name) === settled) making.delete(name);
+			});
+			return made;
 		},
 		handOver(name, release) {
 			handedOver.push({ name, end: release });
 		},
 		async stop() {
+			asked.abort();
+			await Promise.all(mine);
 			await end(replaced);
 			await Promise.all([end(kept), end(handedOver)]);
 		},
