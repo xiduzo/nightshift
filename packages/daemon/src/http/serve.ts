@@ -86,22 +86,24 @@ class AddressUnavailableError extends ListenError {
 }
 
 /**
- * Why a listen failed. Bun says EADDRINUSE for every failed listen, also
- * for an address that is not this computer's and for a name without an
- * address. So the port counts as taken only when the address takes a
- * free port.
+ * Why a listen failed. The code alone does not say it: on macOS Bun says
+ * EADDRINUSE for every failed listen, also for an address that is not this
+ * computer's and for a name without an address. On Linux such an address
+ * gives EADDRNOTAVAIL, EINVAL or a failed lookup. So the address is
+ * checked first: when it does not take a free port either, the address is
+ * the fault. Else EADDRINUSE means the port is taken, and any other error
+ * (a certificate Bun refuses) stays as it is.
  */
 function listenErrorOf(hostname: string, port: number, error: unknown): Error {
-	if ((error as { code?: unknown }).code !== "EADDRINUSE") {
-		// Another error (a certificate Bun refuses) stays as it is.
-		return error as Error;
-	}
 	try {
 		Bun.serve({ hostname, port: 0, fetch: () => new Response() }).stop(true);
 	} catch {
 		return new AddressUnavailableError(hostname, { cause: error });
 	}
-	return new PortTakenError(port, { cause: error });
+	if ((error as { code?: unknown }).code === "EADDRINUSE") {
+		return new PortTakenError(port, { cause: error });
+	}
+	return error as Error;
 }
 
 /**

@@ -147,6 +147,17 @@ describe("serveDaemon", () => {
 		);
 	});
 
+	test("given a certificate Bun refuses, when the daemon listens, then the error stays its own", () => {
+		const listen = () =>
+			serveDaemon(
+				{ ...plainDaemon, tls: { cert: "not a certificate", key: "no key" } },
+				{ port: 0, oneListener: true },
+			);
+
+		expect(listen).toThrow();
+		expect(listen).not.toThrow(ListenError);
+	});
+
 	test.skipIf(!Bun.which("openssl"))(
 		"given the https port is taken, when the daemon listens, then it stops the http listener it started and names the https port",
 		() => {
