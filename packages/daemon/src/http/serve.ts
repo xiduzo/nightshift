@@ -152,6 +152,19 @@ export function serveDaemon(
 	return servers;
 }
 
+/**
+ * Where a listener answers, for the log. Bun's `url` throws for an IPv6
+ * address with a zone (`fe80::1%lo0`), so that one is written out.
+ */
+export function answersAt(server: Bun.Server<SocketData>): string {
+	try {
+		return server.url.href;
+	} catch {
+		const host = (server.hostname ?? "").replace(/^\[|\]$/g, "");
+		return `${server.protocol}://[${host}]:${server.port}/`;
+	}
+}
+
 /** A port as text, or undefined when it names none. */
 export function portOf(value: string | undefined): number | undefined {
 	const port = Number(value);

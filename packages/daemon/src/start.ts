@@ -1,5 +1,5 @@
 import { createDaemon, type Daemon, type DaemonOptions } from "./daemon";
-import { serveDaemon } from "./http";
+import { answersAt, serveDaemon } from "./http";
 import { type DaemonEnv, notifySystemd } from "./runtime";
 import type { SocketData } from "./sync";
 
@@ -62,7 +62,7 @@ export async function startDaemon(
 		throw error;
 	}
 	for (const server of servers) {
-		console.log(`Night Shift answers at ${server.url}`);
+		console.log(`Night Shift answers at ${answersAt(server)}`);
 	}
 	// Under systemd: started, and the watchdog's pings.
 	notifySystemd();

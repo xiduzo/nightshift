@@ -52,11 +52,11 @@ function isHostName(text: string): boolean {
 	);
 }
 
-/** An IPv6 address, bracketed or not, without a zone (Bun cannot bind `%lo0`). */
+/** An IPv6 address, bracketed or not, with or without a zone (`fe80::1%lo0`). */
 function isIPv6Address(text: string): boolean {
 	const bare =
 		text.startsWith("[") && text.endsWith("]") ? text.slice(1, -1) : text;
-	return !bare.includes("%") && isIPv6(bare);
+	return isIPv6(bare);
 }
 
 /**

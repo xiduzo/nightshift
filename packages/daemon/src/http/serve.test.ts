@@ -1,9 +1,10 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
+	answersAt,
 	type DaemonServe,
 	ListenError,
 	listeners,
@@ -104,6 +105,36 @@ describe("serveDaemon", () => {
 		}
 	});
 
+	test("given a port that another program has, the daemon's check of the address leaves no listener behind", () => {
+		const other = otherProgram();
+		const serve = Bun.serve;
+		const made: Bun.Server<undefined>[] = [];
+		const stopped: Bun.Server<undefined>[] = [];
+		const spy = spyOn(Bun, "serve").mockImplementation(((
+			options: Parameters<typeof Bun.serve>[0],
+		) => {
+			const server = serve(options as never) as Bun.Server<undefined>;
+			made.push(server);
+			const stop = server.stop.bind(server);
+			server.stop = (force?: boolean) => {
+				stopped.push(server);
+				return stop(force);
+			};
+			return server;
+		}) as typeof Bun.serve);
+		try {
+			expect(() =>
+				serveDaemon(plainDaemon, { port: other.port as number }),
+			).toThrow(PortTakenError);
+		} finally {
+			spy.mockRestore();
+			other.stop(true);
+		}
+		// The listen failed: only the check of the address made a server.
+		expect(made).toHaveLength(1);
+		expect(stopped).toEqual(made);
+	});
+
 	test("given an address that is not this computer's, when the daemon listens, then it names the address, not the port", () => {
 		// TEST-NET-1 (RFC 5737): never an address of this computer.
 		const listen = () =>
@@ -173,6 +204,48 @@ describe("serveDaemon", () => {
 			} finally {
 				plain?.stop(true);
 				secure?.stop(true);
+			}
+		},
+	);
+});
+
+describe("where a listener answers, for the log", () => {
+	test("its address", () => {
+		const [server] = serveDaemon(
+			{
+				hostname: "127.0.0.1",
+				fetch: () => new Response("OK"),
+				websocket: { message() {} },
+			},
+			{ port: 0 },
+		);
+		try {
+			expect(answersAt(server as Bun.Server<never>)).toBe(
+				`http://127.0.0.1:${server?.port}/`,
+			);
+		} finally {
+			server?.stop(true);
+		}
+	});
+
+	// The loopback interface has a link-local address with this name on macOS.
+	test.skipIf(process.platform !== "darwin")(
+		"an IPv6 address with a zone, which Bun's url cannot write",
+		() => {
+			const [server] = serveDaemon(
+				{
+					hostname: "fe80::1%lo0",
+					fetch: () => new Response("OK"),
+					websocket: { message() {} },
+				},
+				{ port: 0 },
+			);
+			try {
+				expect(answersAt(server as Bun.Server<never>)).toBe(
+					`http://[fe80::1%lo0]:${server?.port}/`,
+				);
+			} finally {
+				server?.stop(true);
 			}
 		},
 	);

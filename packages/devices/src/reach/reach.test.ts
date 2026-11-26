@@ -62,6 +62,8 @@ describe("where a Host may listen (NIGHTSHIFT_LISTEN, --listen)", () => {
 			"[::]",
 			"fd7a:115c:a1e0::1",
 			"::ffff:127.0.0.1",
+			"fe80::1%lo0",
+			"[fe80::1%lo0]",
 			"localhost",
 			"LOCALHOST",
 			"studio",
@@ -103,7 +105,7 @@ describe("where a Host may listen (NIGHTSHIFT_LISTEN, --listen)", () => {
 			"studio-",
 			"studio..lan",
 			".studio",
-			"fe80::1%lo0",
+			"fe80::1%",
 			`${"a".repeat(64)}.example.com`,
 			`${"a".repeat(63)}.${"b".repeat(63)}.${"c".repeat(63)}.${"d".repeat(62)}`,
 		]) {
@@ -121,3 +123,19 @@ describe("where a Host may listen (NIGHTSHIFT_LISTEN, --listen)", () => {
 		}
 	});
 });
+
+// The loopback interface has a link-local address with this name on macOS.
+test.skipIf(process.platform !== "darwin")(
+	"an IPv6 address with a zone binds, as written",
+	() => {
+		for (const listen of ["fe80::1%lo0", "[fe80::1%lo0]"]) {
+			const server = Bun.serve({
+				hostname: listenHostname("network", parseListen(listen)),
+				port: 0,
+				fetch: () => new Response("OK"),
+			});
+			expect(server.port).toBeGreaterThan(0);
+			server.stop(true);
+		}
+	},
+);
