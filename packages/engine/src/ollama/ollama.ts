@@ -96,21 +96,33 @@ export async function createOllama(deps: {
 	});
 
 	/** A client for `at`, each request bounded by `timeoutMs` when it is given. */
-	function clientFor(at: OllamaEndpoint, timeoutMs?: number): Ollama {
+	function clientFor(
+		at: OllamaEndpoint,
+		timeoutMs?: number,
+		stop?: AbortSignal,
+	): Ollama {
 		return new Ollama({
 			host: at.address,
 			headers: at.headers,
-			fetch: ((input: string | URL | Request, init?: RequestInit) =>
-				fetchImpl(input, {
+			fetch: ((input: string | URL | Request, init?: RequestInit) => {
+				const signals = [
+					...(timeoutMs ? [AbortSignal.timeout(timeoutMs)] : []),
+					...(stop ? [stop] : []),
+				];
+				return fetchImpl(input, {
 					...init,
-					...(timeoutMs ? { signal: AbortSignal.timeout(timeoutMs) } : {}),
-				})) as typeof fetch,
+					...(signals.length > 0 ? { signal: AbortSignal.any(signals) } : {}),
+				});
+			}) as typeof fetch,
 		});
 	}
 
-	async function answersAt(at: OllamaEndpoint): Promise<boolean> {
+	async function answersAt(
+		at: OllamaEndpoint,
+		stop?: AbortSignal,
+	): Promise<boolean> {
 		try {
-			await clientFor(at, ASK_TIMEOUT_MS).version();
+			await clientFor(at, ASK_TIMEOUT_MS, stop).version();
 			return true;
 		} catch {
 			return false;
@@ -166,7 +178,7 @@ export async function createOllama(deps: {
 	const starter = createOllamaStarter({
 		binary: () => which("ollama"),
 		spawn,
-		answers: () => answersAt(local),
+		answers: (stop) => answersAt(local, stop),
 		env,
 		modelsDir: join(dataDir, "ollama"),
 		host: new URL(OLLAMA_LOCAL).host,

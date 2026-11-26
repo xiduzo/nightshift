@@ -27,8 +27,8 @@ export type OllamaStarterOptions = {
 	/** The `ollama` program on PATH. Null: there is none, nothing starts. */
 	binary: () => string | null;
 	spawn: SpawnOllama;
-	/** Whether an Ollama answers on this computer now. */
-	answers: () => Promise<boolean>;
+	/** Whether an Ollama answers on this computer now. A stop aborts the question. */
+	answers: (signal: AbortSignal) => Promise<boolean>;
 	/** The child's environment: PATH, HOME and the like. */
 	env: Record<string, string | undefined>;
 	/** Where the child keeps its models: in Night Shift's data folder. */
@@ -44,7 +44,10 @@ export type OllamaStarterOptions = {
 	maxWaitMs?: number;
 	/** A child that ran this long starts the waits from the first again. */
 	stableMs?: number;
-	/** How long a stop waits for the child before it kills it. */
+	/**
+	 * How long a stop waits for the child before it kills it. Below the 2 s
+	 * that a daemon's stop may take (STOP_WITHIN_MS of the daemon).
+	 */
 	stopWaitMs?: number;
 	/** How long a start waits for the child to answer. */
 	upWaitMs?: number;
@@ -69,7 +72,7 @@ export function createOllamaStarter(options: OllamaStarterOptions) {
 		firstWaitMs = 1_000,
 		maxWaitMs = 60_000,
 		stableMs = 60_000,
-		stopWaitMs = 5_000,
+		stopWaitMs = 1_000,
 		upWaitMs = 30_000,
 	} = options;
 
@@ -79,6 +82,8 @@ export function createOllamaStarter(options: OllamaStarterOptions) {
 	let loop: Promise<void> | null = null;
 	/** Ends the wait between starts early, on a stop. */
 	let wake: (() => void) | null = null;
+	/** Aborts the question in flight, on a stop. */
+	let asking = new AbortController();
 	/** Whether the child Night Shift started answers. */
 	let up = false;
 
@@ -121,7 +126,7 @@ export function createOllamaStarter(options: OllamaStarterOptions) {
 		});
 		const until = now() + upWaitMs;
 		while (wanted && !ended && now() < until) {
-			if (await answers()) return true;
+			if (await answers(asking.signal)) return true;
 			await new Promise((resolve) => setTimeout(resolve, 250));
 		}
 		return false;
@@ -137,12 +142,14 @@ export function createOllamaStarter(options: OllamaStarterOptions) {
 				);
 				return;
 			}
+			const another = await answers(asking.signal);
+			// A stop came while it asked: nothing wakes a wait that starts now.
+			if (!wanted) return;
 			// Another Ollama answers here: use it, start none.
-			if (await answers()) {
+			if (another) {
 				await sleep(maxWaitMs);
 				continue;
 			}
-			if (!wanted) return;
 			const started = spawn([program, "serve"], {
 				env: {
 					...Object.fromEntries(
@@ -179,6 +186,7 @@ export function createOllamaStarter(options: OllamaStarterOptions) {
 		/** Starts the child and keeps it running. Does nothing when it already runs. */
 		start(): void {
 			wanted = true;
+			if (asking.signal.aborted) asking = new AbortController();
 			loop ??= keepRunning().finally(() => {
 				loop = null;
 			});
@@ -187,6 +195,7 @@ export function createOllamaStarter(options: OllamaStarterOptions) {
 		async stop(): Promise<void> {
 			wanted = false;
 			wake?.();
+			asking.abort();
 			const running = child;
 			if (running) {
 				running.kill("SIGTERM");

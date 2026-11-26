@@ -79,9 +79,6 @@ describe("the dev entry with a listen address it cannot use", () => {
 		const { code, said } = await startWith("elsewhere", {
 			NIGHTSHIFT_HOST: "on",
 			NIGHTSHIFT_HOST_ADDRESSES: "https://nightshift.example.com",
-			// A Host starts Ollama by itself. Its stop can outlast the bound of a
-			// stop, and the lease would stay: not what this test is about.
-			NIGHTSHIFT_OLLAMA: "off",
 			// TEST-NET-1 (RFC 5737): never an address of this computer.
 			NIGHTSHIFT_LISTEN: "192.0.2.1",
 		});

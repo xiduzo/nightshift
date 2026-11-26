@@ -159,3 +159,96 @@ describe("the Ollama starter", () => {
 		await h.starter.stop();
 	});
 });
+
+describe("a stop while the starter asks whether an Ollama answers", () => {
+	/** A starter whose question takes `ms`, and ends early on an abort when `hears` says so. */
+	function asking(ms: number, hears: boolean) {
+		const asked: AbortSignal[] = [];
+		const starter = createOllamaStarter({
+			binary: () => "/usr/bin/ollama",
+			spawn: () => {
+				throw new Error("Another Ollama answers: none starts.");
+			},
+			answers: (signal) => {
+				asked.push(signal);
+				return new Promise<boolean>((resolve) => {
+					const timer = setTimeout(() => resolve(true), ms);
+					if (!hears) return;
+					signal.addEventListener("abort", () => {
+						clearTimeout(timer);
+						resolve(false);
+					});
+				});
+			},
+			env: {},
+			modelsDir: "/data/ollama",
+			host: "127.0.0.1:11434",
+			log: () => {},
+			maxWaitMs: 60_000,
+		});
+		return { starter, asked };
+	}
+
+	test("aborts the question, and ends at once", async () => {
+		const { starter, asked } = asking(10_000, true);
+		starter.start();
+		await Bun.sleep(10);
+		const since = performance.now();
+		await starter.stop();
+		expect(asked[0]?.aborted).toBe(true);
+		expect(performance.now() - since).toBeLessThan(500);
+	}, 5_000);
+
+	test("a start after a stop asks again, with a question it does not abort", async () => {
+		const { starter, asked } = asking(10_000, true);
+		starter.start();
+		await Bun.sleep(10);
+		await starter.stop();
+		starter.start();
+		await Bun.sleep(10);
+		expect(asked.at(-1)?.aborted).toBe(false);
+		await starter.stop();
+	}, 5_000);
+
+	test("does not wait for the next question when the answer comes after the stop", async () => {
+		const { starter } = asking(100, false);
+		starter.start();
+		await Bun.sleep(10);
+		const since = performance.now();
+		await starter.stop();
+		expect(performance.now() - since).toBeLessThan(1_000);
+	}, 5_000);
+});
+
+test("a child that does not end on SIGTERM is killed within the 2 s a daemon's stop may take", async () => {
+	const signals: (NodeJS.Signals | undefined)[] = [];
+	let running = false;
+	let end = () => {};
+	const starter = createOllamaStarter({
+		binary: () => "/usr/bin/ollama",
+		spawn: () => {
+			running = true;
+			const exited = new Promise<number | null>((resolve) => {
+				end = () => resolve(null);
+			});
+			return {
+				exited,
+				kill: (signal) => {
+					signals.push(signal);
+					if (signal === "SIGKILL") end();
+				},
+			};
+		},
+		answers: async () => running,
+		env: {},
+		modelsDir: "/data/ollama",
+		host: "127.0.0.1:11434",
+		log: () => {},
+	});
+	starter.start();
+	for (let i = 0; i < 200 && !starter.up(); i++) await Bun.sleep(5);
+	const since = performance.now();
+	await starter.stop();
+	expect(signals).toEqual(["SIGTERM", "SIGKILL"]);
+	expect(performance.now() - since).toBeLessThan(2_000);
+}, 10_000);
