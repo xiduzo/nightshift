@@ -10,6 +10,7 @@ import { migrateDb } from "@nightshift/db/migrate";
 import type { HostClient, OpenDocumentChannel } from "@nightshift/devices";
 import {
 	createSyncedDocuments,
+	killStartedOllama,
 	type PersonalSecrets,
 	type ProjectSecrets,
 } from "@nightshift/engine";
@@ -181,7 +182,7 @@ async function makeDaemon(
 
 	const slots = hotSlots(hot);
 	const stop = lastingStop(() => slots.stop());
-	stopOnSignals(stop);
+	stopOnSignals(stop, killStartedOllama);
 	const lease = await slots.keep(
 		"nightshiftLease",
 		() => holdLease(db),

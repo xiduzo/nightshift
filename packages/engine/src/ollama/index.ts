@@ -10,3 +10,4 @@ export {
 	type OllamaService,
 	type OllamaStatus,
 } from "./ollama";
+export { killStartedOllama } from "./starter";

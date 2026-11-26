@@ -1,8 +1,13 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { bunSpawn, createOllamaStarter, type OllamaChild } from "./starter";
+import {
+	bunSpawn,
+	createOllamaStarter,
+	killStartedOllama,
+	type OllamaChild,
+} from "./starter";
 
 /** A fake `ollama serve`: it ends when it is killed or when the test ends it. */
 function fakeChild(output: string[] = []) {
@@ -291,6 +296,109 @@ describe("`ollama serve` as Bun starts it", () => {
 				}
 			}
 			expect(alive).toBe(false);
+		} finally {
+			await rm(dir, { recursive: true, force: true });
+		}
+	}, 10_000);
+});
+
+describe("a stop at once, when Night Shift must end now", () => {
+	// A server with a runner of its own, both until they are killed.
+	const SERVER = `(sleep 30) & echo $! > "$RUNNER"; wait`;
+	/** The started servers, until they end, and the runners, until a test saw them end. */
+	let servers: { kill(signal: NodeJS.Signals): void; ended: boolean }[] = [];
+	let runners = new Set<number>();
+	let others: Bun.Subprocess[] = [];
+	afterEach(() => {
+		for (const server of servers) if (!server.ended) server.kill("SIGKILL");
+		servers = [];
+		for (const pid of runners) if (alive(pid)) process.kill(pid, "SIGKILL");
+		runners = new Set();
+		for (const other of others) {
+			if (other.exitCode === null && other.signalCode === null)
+				other.kill("SIGKILL");
+		}
+		others = [];
+	});
+
+	function serve(runnerFile: string) {
+		const child = bunSpawn(["sh", "-c", SERVER], {
+			env: { PATH: process.env.PATH ?? "/usr/bin:/bin", RUNNER: runnerFile },
+		});
+		const server = { kill: child.kill, ended: false };
+		void child.exited.then(() => {
+			server.ended = true;
+		});
+		servers.push(server);
+		return child;
+	}
+
+	const alive = (pid: number) => {
+		try {
+			process.kill(pid, 0);
+			return true;
+		} catch {
+			return false;
+		}
+	};
+	async function gone(pid: number): Promise<boolean> {
+		for (let i = 0; i < 50 && alive(pid); i++) await Bun.sleep(20);
+		if (alive(pid)) return false;
+		runners.delete(pid);
+		return true;
+	}
+	async function readPid(file: string): Promise<number> {
+		for (let i = 0; i < 100; i++) {
+			const pid = Number(
+				(
+					await Bun.file(file)
+						.text()
+						.catch(() => "")
+				).trim(),
+			);
+			if (pid > 0) return pid;
+			await Bun.sleep(20);
+		}
+		throw new Error(`no pid in ${file}`);
+	}
+
+	test("it ends the `ollama serve` Night Shift started, and its runners", async () => {
+		const dir = await mkdtemp(join(tmpdir(), "nightshift-ollama-"));
+		try {
+			const runnerFile = join(dir, "runner");
+			const child = serve(runnerFile);
+			const runner = await readPid(runnerFile);
+			runners.add(runner);
+			killStartedOllama();
+			await child.exited;
+			expect(await gone(runner)).toBe(true);
+		} finally {
+			await rm(dir, { recursive: true, force: true });
+		}
+	}, 10_000);
+
+	test("after a stop, it kills nothing: the group is no longer Night Shift's", async () => {
+		const dir = await mkdtemp(join(tmpdir(), "nightshift-ollama-"));
+		try {
+			const runnerFile = join(dir, "runner");
+			const child = serve(runnerFile);
+			const runner = await readPid(runnerFile);
+			runners.add(runner);
+			child.kill("SIGKILL");
+			await child.exited;
+			expect(await gone(runner)).toBe(true);
+			// A program of someone else, in a group of its own.
+			const other = Bun.spawn(["sleep", "30"], { detached: true });
+			others.push(other);
+			const killed = spyOn(process, "kill");
+			try {
+				killStartedOllama();
+				expect(killed).not.toHaveBeenCalled();
+			} finally {
+				killed.mockRestore();
+			}
+			expect(other.exitCode).toBeNull();
+			expect(other.signalCode).toBeNull();
 		} finally {
 			await rm(dir, { recursive: true, force: true });
 		}

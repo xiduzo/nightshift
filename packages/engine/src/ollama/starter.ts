@@ -221,6 +221,33 @@ export function createOllamaStarter(options: OllamaStarterOptions) {
 }
 
 /**
+ * The process groups of the `ollama serve` children that run now, by the
+ * pid of their leader: a group joins when Bun starts it and leaves when
+ * its leader ends. On `globalThis`, which `bun --hot` keeps: a child
+ * started before a reload is still found after it.
+ */
+const kept = globalThis as { nightshiftOllamaGroups?: Set<number> };
+kept.nightshiftOllamaGroups ??= new Set();
+const startedGroups = kept.nightshiftOllamaGroups;
+
+/**
+ * Kills every `ollama serve` that Night Shift started and that still runs,
+ * with its runners, at once: for a process that must exit now and cannot
+ * wait for a stop. An Ollama that Night Shift did not start is never in
+ * the list.
+ */
+export function killStartedOllama(): void {
+	for (const leader of startedGroups) {
+		try {
+			process.kill(-leader, "SIGKILL");
+		} catch {
+			// The group has ended already.
+		}
+	}
+	startedGroups.clear();
+}
+
+/**
  * `ollama serve` through Bun, its output read by the starter. It leads a
  * process group of its own, and a kill goes to the whole group: a SIGKILL
  * of the server alone leaves its runners (`llama-server`, with a model in
@@ -234,6 +261,8 @@ export const bunSpawn: SpawnOllama = (argv, { env }) => {
 		stderr: "pipe",
 		detached: true,
 	});
+	startedGroups.add(proc.pid);
+	void proc.exited.then(() => startedGroups.delete(proc.pid));
 	return {
 		exited: proc.exited,
 		kill: (signal) => {

@@ -193,6 +193,7 @@ export {
 export type { NodeMemory } from "./memory";
 export {
 	createOllama,
+	killStartedOllama,
 	type OllamaEndpoint,
 	type OllamaModel,
 	type OllamaService,

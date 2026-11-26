@@ -1,3 +1,4 @@
+import { constants } from "node:os";
 import { hot } from "./hot";
 
 /** How long a clean stop may take before the process exits anyway. */
@@ -54,19 +55,36 @@ export async function afterStops(): Promise<void> {
 /**
  * SIGINT, SIGTERM and SIGHUP stop the newest daemon of this process, then
  * exit with code 0. Registered once per process: `bun --hot` reloads only
- * swap the stop they call. If the stop hangs, a second signal stops the
- * process at once (`once`: the default action is back), and every watchdog
- * sends SIGKILL a few seconds after SIGTERM.
+ * swap the stops they call. `stopNow` runs before each exit: it kills at
+ * once what must not outlive the process (the `ollama serve` Night Shift
+ * started), also when the stop gave up at its bound. A second signal does
+ * not wait for the stop: it runs `stopNow` and exits with 128 + the
+ * signal's number, as the signal itself would. Every watchdog also sends
+ * SIGKILL a few seconds after SIGTERM.
  */
-export function stopOnSignals(stop: () => Promise<void>): void {
+export function stopOnSignals(
+	stop: () => Promise<void>,
+	stopNow: () => void,
+): void {
 	const registered = hot.nightshiftStop !== undefined;
 	hot.nightshiftStop = stop;
+	hot.nightshiftStopNow = stopNow;
 	if (registered) return;
+	const exit = (code: number) => {
+		try {
+			hot.nightshiftStopNow?.();
+		} finally {
+			process.exit(code);
+		}
+	};
+	let stopping = false;
 	for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) {
-		process.once(signal, () => {
+		process.on(signal, () => {
+			if (stopping) return exit(128 + constants.signals[signal]);
+			stopping = true;
 			void (hot.nightshiftStop?.() ?? Promise.resolve())
 				.catch(() => {})
-				.finally(() => process.exit(0));
+				.finally(() => exit(0));
 		});
 	}
 }
