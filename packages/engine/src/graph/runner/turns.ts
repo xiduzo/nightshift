@@ -12,7 +12,7 @@ import { findOverdue } from "./deadlines";
 import type { Drives } from "./drive";
 import type { ReentryRequest } from "./reentry";
 import type { RunnerState, TurnQueue, TurnState } from "./run-slots";
-import { inputOf, type openThread, resumeEach } from "./thread";
+import { type Interrupt, inputOf, type openThread, resumeEach } from "./thread";
 import {
 	type Intent,
 	RestartTooLate,
@@ -39,7 +39,11 @@ const CANNOT_WAKE =
 
 /** An answer to a Gate whose answer the thread holds already. */
 const ANSWERED =
-	"This Gate has its answer. The run goes on with it when the steps beside it wake.";
+	"This Gate has its answer. The run continues when the other branches are done.";
+/** An answer to a Gate whose answer the thread had, and went on with. */
+const CONTINUED = "This Gate has its answer. The run continues with it.";
+/** An answer to a Gate that the walk left behind. */
+const GATE_GONE = "This Gate does not wait anymore.";
 
 const HALTED: Taken = { kind: "halted" };
 const QUEUED: Taken = { kind: "queued" };
@@ -107,18 +111,48 @@ export function createTurns(
 		if (flow && branchPlaces(flow).size > 0) {
 			throw new RunRefusal("not-now", BRANCHES_WORK);
 		}
-		// The thread holds this Gate's answer already: its step goes on
-		// once the sleepers beside it woke. A second answer would go to
-		// one of them.
-		const at = await threadOf(row).state();
-		if (
-			at.kind === "interrupted" &&
-			!at.interrupts.some(
-				({ value }) => value.kind === "gate" && value.stepId === intent.stepId,
-			)
-		) {
-			throw new RunRefusal("gate-closed", ANSWERED);
+		const isThis = ({ value }: Interrupt) =>
+			value.kind === "gate" && value.stepId === intent.stepId;
+		let snapshot = await threadOf(row).snapshot();
+		// A task of the thread took this Gate's answer already: it goes on
+		// with the other tasks of its super-step. A second answer would go
+		// to one of them.
+		if (snapshot.answered.some(isThis)) {
+			// No step sleeps beside it: the daemon died after the answer, and
+			// recovery ended the steps that ran beside it. Nothing else moves
+			// the thread, so this answer does: the Gate goes on with the first.
+			if ((await log.state(row.id)).waits.length > 0) {
+				throw new RunRefusal("gate-closed", ANSWERED);
+			}
+			if (!reserve(row.id, intent, options)) return QUEUED;
+			const asked =
+				(await log.state(row.id)).steps.get(intent.stepId)?.gate?.openedSeq ??
+				0;
+			drive(row, inputOf({ kind: "continue" }));
+			await untilGateClosed(row.id, intent.stepId, asked);
+			return DRIVING;
 		}
+		const before = snapshot.state;
+		if (
+			(before.kind === "interrupted" && !before.interrupts.some(isThis)) ||
+			before.kind === "pending"
+		) {
+			// The daemon died before the Gate's interrupt was saved: the thread
+			// goes on to it first, so the answer reaches its own Gate and no
+			// other one.
+			if (!reserve(row.id, intent, options)) return QUEUED;
+			drive(row, inputOf({ kind: "continue" }));
+			await walkOf(row.id)?.done;
+			snapshot = await threadOf(row).snapshot();
+			const at = snapshot.state;
+			if (at.kind !== "interrupted" || !at.interrupts.some(isThis)) {
+				// The thread went on past the Gate: it had its answer.
+				const gate = (await log.state(row.id)).steps.get(intent.stepId);
+				const open = gate?.endedAt === null && gate.gate !== null;
+				throw new RunRefusal("gate-closed", open ? GATE_GONE : CONTINUED);
+			}
+		}
+		const at = snapshot.state;
 		if (!reserve(row.id, intent, options)) return QUEUED;
 		// The Gate's deadline, if it has one, no longer applies.
 		sleeps.forget(row.id);

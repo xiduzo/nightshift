@@ -238,10 +238,15 @@ export function createSleeps(deps: SleepDeps) {
 	 * it fires.
 	 */
 	function restore(runId: string, run: RunState): void {
+		// One timer per run: the first of a sleep and a Gate's deadline. A
+		// Gate and a sleep can wait at once on parallel branches.
 		const until = run.sleep ? wakesNext(run)?.payload.until : null;
-		if (until != null) schedule(runId, until);
-		const deadline = firstDeadline(run)?.deadline;
-		if (deadline) schedule(runId, deadline.at);
+		const deadline = firstDeadline(run)?.deadline.at;
+		const first = Math.min(
+			until ?? Number.POSITIVE_INFINITY,
+			deadline ?? Number.POSITIVE_INFINITY,
+		);
+		if (first !== Number.POSITIVE_INFINITY) schedule(runId, first);
 	}
 
 	return { schedule, restore, forget, dispose };

@@ -96,6 +96,11 @@ export type ThreadSnapshot = {
 	hasCheckpoint: boolean;
 	/** The thread still has a task: an interrupt, or a node a stop or a death cut short. */
 	hasTasks: boolean;
+	/**
+	 * The interrupts whose task took its answer already: the task goes on
+	 * with the other tasks of its super-step. `state` does not list them.
+	 */
+	answered: Interrupt[];
 };
 
 /** How one drive ended. */
@@ -183,6 +188,7 @@ export function openThread(row: RunRow, deps: ThreadDeps): Thread {
 			values,
 			hasCheckpoint,
 			hasTasks: latest.tasks.length > 0,
+			answered: interruptsOf(latest, true),
 		};
 	}
 
@@ -217,10 +223,7 @@ function stateOf(
 ): ThreadState {
 	// A task that has its result took its answer: its super-step waits only
 	// for the other tasks.
-	const interrupts = snapshot.tasks
-		.flatMap((task) => (task.result === undefined ? task.interrupts : []))
-		.filter((i) => i.value !== undefined && i.id !== undefined)
-		.map((i) => ({ id: i.id as string, value: i.value as Parked }));
+	const interrupts = interruptsOf(snapshot, false);
 	const [interrupt] = interrupts;
 	if (interrupt) {
 		return { kind: "interrupted", value: interrupt.value, interrupts };
@@ -236,6 +239,16 @@ function stateOf(
 	if (next.length > 0) return { kind: "pending", next: [...next] };
 	if (!hasCheckpoint) return { kind: "fresh" };
 	return { kind: "ended", ended: values.ended ?? null };
+}
+
+/** The interrupts of the tasks that took their answer (`answered`), or of the others. */
+function interruptsOf(snapshot: GraphSnapshot, answered: boolean): Interrupt[] {
+	return snapshot.tasks
+		.flatMap((task) =>
+			(task.result !== undefined) === answered ? task.interrupts : [],
+		)
+		.filter((i) => i.value !== undefined && i.id !== undefined)
+		.map((i) => ({ id: i.id as string, value: i.value as Parked }));
 }
 
 /**

@@ -234,7 +234,7 @@ test("a Gate beside a sleeper: the answer goes on when the sleeper wakes, and a 
 		beside(agent("b", "Do b", { ask: "person" }), "pass"),
 		{ harness, now: () => now },
 	);
-	const runner = testRunner(h, { overdueSweepMs: 3_600_000 });
+	let runner = testRunner(h, { overdueSweepMs: 3_600_000 });
 	const state = async () => foldRun(await h.events());
 	const still = () => waitFor(() => !runner.isActive(h.runId));
 	try {
@@ -260,6 +260,13 @@ test("a Gate beside a sleeper: the answer goes on when the sleeper wakes, and a 
 		// The Agent goes on with the answer in the super-step after it, which
 		// comes once the sleeper beside it woke.
 		await expect(answer()).rejects.toThrow("This Gate has its answer.");
+		// A new daemon: recovery keeps the sleeper beside the open Gate.
+		await runner.release();
+		runner = testRunner(h, { overdueSweepMs: 3_600_000 });
+		const open = openWork(await state(), { kind: "interrupted" });
+		expect(open).toMatchObject({ steps: [], endsRun: false });
+		runner.restore(h.runId, await state());
+		await expect(answer()).rejects.toThrow("This Gate has its answer.");
 		now = RESET.a as number;
 		await runner.take(h.runId, { kind: "wake", early: false });
 		await waitFor(async () => (await state()).status === "finished");
@@ -271,10 +278,235 @@ test("a Gate beside a sleeper: the answer goes on when the sleeper wakes, and a 
 	}
 });
 
+for (const [where, before] of [
+	["before the checkpoint of the wake", "checkpoint"],
+	["as the answered Agent goes on", "StepReopened"],
+] as const)
+	test(`the daemon dies ${where}, after the sleeper beside an answered Gate woke: the next answer moves the run, and the Agent gets the first one`, async () => {
+		let now = T0;
+		const harness = fakeHarness((input) =>
+			input.resumeSessionId
+				? reportingScript("pass", "Done.")
+				: input.prompt === "Do a" && now < (RESET.a as number)
+					? usageLimitScript((RESET.a as number) - 1000)
+					: reportingScript("needs-input", "Which one?"),
+		);
+		const h = await startRun(
+			sandbox,
+			beside(agent("b", "Do b", { ask: "person" }), "pass"),
+			{ harness, now: () => now },
+		);
+		let died = false;
+		let runner = testRunner(h, {
+			overdueSweepMs: 3_600_000,
+			openThread: (row, deps) => {
+				const thread = openThread(row, deps);
+				const { log } = thread.ctx;
+				thread.ctx.log = {
+					...log,
+					append: async (input, rows) => {
+						// The Agent that was answered opens its step again: dead.
+						if (died || input.type === before) {
+							died = true;
+							throw new Error("the daemon died");
+						}
+						return log.append(input, rows);
+					},
+				};
+				const put = thread.saver.put.bind(thread.saver);
+				thread.saver.put = async (...args) => {
+					// The checkpoint of the wake's super-step: its writes are saved.
+					const woke = (await h.events()).some((e) => e.type === "WaitEnded");
+					if (died || (before === "checkpoint" && woke)) {
+						died = true;
+						throw new Error("the daemon died");
+					}
+					return put(...args);
+				};
+				return thread;
+			},
+		});
+		const state = async () => foldRun(await h.events());
+		const still = () => waitFor(() => !runner.isActive(h.runId));
+		try {
+			await runner.take(h.runId, {
+				kind: "start",
+				prepare: async () => ({
+					row: await getRunRow(sandbox.db, h.runId),
+					inputs: {},
+					stopAt: null,
+				}),
+			});
+			const gate = await waitFor(async () => (await state()).gate ?? false);
+			await still();
+			const answer = (note: string) =>
+				runner.take(h.runId, {
+					kind: "answer",
+					stepId: gate.stepId,
+					choice: "answer",
+					note,
+				});
+			await answer("The red one.");
+			await still();
+			now = RESET.a as number;
+			await runner.take(h.runId, { kind: "wake", early: false });
+			await waitFor(() => died && !runner.isActive(h.runId));
+			await runner.release();
+			runner = testRunner(h, { overdueSweepMs: 3_600_000 });
+			await closeOpenWork(
+				{
+					log: h.log,
+					bus: h.deps.shared.bus,
+					flowOf: parseRunFlow,
+					calledFlowsOf: parseCalledFlows,
+				},
+				h.runId,
+				{ kind: "interrupted", reason: "Night Shift stopped." },
+			);
+			runner.restore(h.runId, await state());
+			// The log still waits at the Gate, and nothing else wakes the run.
+			expect((await state()).status).toBe("waiting");
+			// The thread had the first answer: it goes on with it.
+			await answer("The blue one.").catch((error: Error) => {
+				expect(error.message).toBe(
+					"This Gate has its answer. The run continues with it.",
+				);
+			});
+			await waitFor(async () => (await state()).status === "finished");
+			const told = harness.calls.map((call) => call.prompt);
+			expect(told.filter((p) => p === "The red one.")).toHaveLength(1);
+			expect(told).not.toContain("The blue one.");
+		} finally {
+			await runner.release();
+		}
+	});
+
 test("recovery keeps every sleeper", () => {
 	const open = openWork(both().state(), { kind: "interrupted" });
 	expect(open.steps).toEqual([]);
 	expect(open.endsRun).toBe(false);
+});
+
+test("recovery keeps every open Gate, and a sleeper beside one", () => {
+	const log = runEvents()
+		.runStarted()
+		.stepStarted("a", "a")
+		.waitStarted("a", { until: 400 })
+		.stepStarted("g", "g")
+		.gateOpened("g")
+		.stepStarted("h", "h")
+		.gateOpened("h");
+	const open = openWork(log.state(), { kind: "interrupted" });
+	expect(open.steps).toEqual([]);
+	expect(open.endsRun).toBe(false);
+});
+
+test("two branches ask, and the daemon dies before the second ask is saved: each answer reaches its own Agent", async () => {
+	const harness = fakeHarness((input) =>
+		input.resumeSessionId
+			? reportingScript("pass", "Done.")
+			: reportingScript("needs-input", "Which one?"),
+	);
+	const asks = (id: string) => agent(id, `Do ${id}`, { ask: "person" });
+	const h = await startRun(
+		sandbox,
+		flowOf(
+			[
+				command("start", "true"),
+				asks("a"),
+				asks("b"),
+				{ id: "joined", type: "join", position: at, wait: "all" },
+			],
+			[
+				edge("1", "start", "pass", "a"),
+				edge("2", "start", "pass", "b"),
+				edge("3", "a", "pass", "joined"),
+				edge("4", "b", "pass", "joined"),
+			],
+		),
+		{ harness },
+	);
+	let gates = 0;
+	let died = false;
+	let runner = testRunner(h, {
+		overdueSweepMs: 3_600_000,
+		openThread: (row, deps) => {
+			const thread = openThread(row, deps);
+			const { log } = thread.ctx;
+			thread.ctx.log = {
+				...log,
+				append: async (input, rows) => {
+					if (died) throw new Error("the daemon died");
+					if (input.type === "GateOpened") gates++;
+					return log.append(input, rows);
+				},
+			};
+			const putWrites = thread.saver.putWrites.bind(thread.saver);
+			thread.saver.putWrites = async (...args) => {
+				// The writes of the task that asked second.
+				if (died || gates === 2) {
+					died = true;
+					throw new Error("the daemon died");
+				}
+				return putWrites(...args);
+			};
+			return thread;
+		},
+	});
+	const state = async () => foldRun(await h.events());
+	try {
+		await runner.take(h.runId, {
+			kind: "start",
+			prepare: async () => ({
+				row: await getRunRow(sandbox.db, h.runId),
+				inputs: {},
+				stopAt: null,
+			}),
+		});
+		await waitFor(() => died && !runner.isActive(h.runId));
+		await runner.release();
+		runner = testRunner(h, { overdueSweepMs: 3_600_000 });
+		await closeOpenWork(
+			{
+				log: h.log,
+				bus: h.deps.shared.bus,
+				flowOf: parseRunFlow,
+				calledFlowsOf: parseCalledFlows,
+			},
+			h.runId,
+			{ kind: "interrupted", reason: "Night Shift stopped." },
+		);
+		expect((await state()).gates.map((g) => g.nodeId).sort()).toEqual([
+			"a",
+			"b",
+		]);
+		for (const nodeId of ["b", "a"]) {
+			const gate = (await state()).gates.find((g) => g.nodeId === nodeId);
+			await runner.take(h.runId, {
+				kind: "answer",
+				stepId: gate?.stepId ?? "",
+				choice: "answer",
+				note: `For ${nodeId}.`,
+			});
+			await waitFor(() => !runner.isActive(h.runId));
+		}
+		await waitFor(async () => (await state()).status === "finished");
+		const owners = new Map<string, string>();
+		for (const call of harness.calls) {
+			if (!call.resumeSessionId) {
+				owners.set(`fake-session-${owners.size + 1}`, call.prompt);
+			}
+		}
+		const told = harness.calls
+			.filter((call) => call.prompt.startsWith("For "))
+			.map((call) => [owners.get(call.resumeSessionId ?? ""), call.prompt]);
+		expect(told.sort()).toEqual([
+			["Do a", "For a."],
+			["Do b", "For b."],
+		]);
+	} finally {
+		await runner.release();
+	}
 });
 
 /** A log where `a` sleeps until 400 and `b`, which slept later, until 800. */
@@ -320,6 +552,32 @@ test("a wake moves the step that wakes, and each interrupt whose step the log do
 	expect(plan(both(), { kind: "pending", next: ["a", "b"] })).toMatchObject({
 		entry: { kind: "continue" },
 	});
+});
+
+test("a new daemon sets the timer of a sleep that comes before the deadline of a Gate beside it", async () => {
+	const woken: string[] = [];
+	const sleeps = createSleeps({ now: () => 500, wake: (id) => woken.push(id) });
+	sleeps.restore(
+		"run-1",
+		runEvents()
+			.runStarted()
+			.stepStarted("a", "a")
+			.waitStarted("a", { until: 400 })
+			.stepStarted("g", "g")
+			.push(
+				"GateOpened",
+				{
+					question: "Ship it?",
+					choices: [{ name: "yes" }],
+					deadline: { at: 900_000, choose: "yes" },
+				},
+				{ stepId: "g" },
+			)
+			.state(),
+	);
+	await waitFor(() => woken.length > 0, { timeoutMs: 500 });
+	sleeps.dispose();
+	expect(woken).toEqual(["run-1"]);
 });
 
 test("a new daemon sets the timer of the step that wakes first", async () => {

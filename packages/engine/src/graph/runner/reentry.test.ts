@@ -291,6 +291,7 @@ function threadAt(
 		values: {},
 		hasCheckpoint: state.kind !== "fresh",
 		hasTasks: state.kind === "interrupted" || state.kind === "pending",
+		answered: [],
 		...over,
 	};
 }
@@ -413,16 +414,18 @@ describe("planReentry: a resume", () => {
 	});
 
 	test("the daemon died before the end of a park: the thread parks again, and nothing runs", () => {
-		const events = logOf(
-			runStarted(),
-			started("s1", "a", 1),
-			...session("s1", "h-a"),
-			ended("s1", "error"),
-			{
-				type: "RunEnded",
-				payload: { status: "interrupted", reason: "Night Shift stopped." },
-			},
-		);
+		const parked = (stopAt: number | null = null) =>
+			logOf(
+				runStarted(stopAt),
+				started("s1", "a", 1),
+				...session("s1", "h-a"),
+				ended("s1", "error"),
+				{
+					type: "RunEnded",
+					payload: { status: "interrupted", reason: "Night Shift stopped." },
+				},
+			);
+		const events = parked();
 		const daemon = { kind: "resume", by: "daemon" } as const;
 		expect(plan(events, threadAt(parkedAt("s1", "a")), daemon)).toEqual({
 			resumed: {
@@ -436,6 +439,15 @@ describe("planReentry: a resume", () => {
 			entry: { kind: "continue" },
 			clearTasks: false,
 		});
+		// The stop time stays: the thread, which parks again, keeps it too.
+		const past = plan(
+			parked(5_000),
+			threadAt(parkedAt("s1", "a")),
+			daemon,
+			5_000,
+		);
+		expect(past.entry).toEqual({ kind: "continue" });
+		expect(past.resumed).not.toHaveProperty("clearStopAt");
 		// A person who resumes it asks for the step again.
 		expect(plan(events, threadAt(parkedAt("s1", "a"))).entry).toEqual({
 			kind: "resume",

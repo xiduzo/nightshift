@@ -228,14 +228,16 @@ export function firstDeadline(
 }
 
 /**
- * The step the run is parked at (an open Gate or a sleeping step) and the
- * calling steps around it, from the inside out. Empty when the run is not
- * parked. These steps stay open while the run waits or sleeps.
+ * The steps the run is parked at (each open Gate and each sleeping step:
+ * parallel branches may hold several, and a Gate beside a sleep) and the
+ * calling steps around them, from the inside out. Empty when the run is
+ * not parked. These steps stay open while the run waits or sleeps.
  */
 export function parkedSteps(run: RunState): DerivedStep[] {
-	const ids = run.gate
-		? [run.gate.stepId]
-		: run.waits.flatMap((wait) => wait.stepId ?? []);
+	const ids = [
+		...run.gates.map((gate) => gate.stepId),
+		...run.waits.flatMap((wait) => wait.stepId ?? []),
+	];
 	const parked = new Map<string, DerivedStep>();
 	for (const id of ids) {
 		for (const step of withEnclosing(run, id)) parked.set(step.id, step);

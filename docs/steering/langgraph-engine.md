@@ -487,8 +487,10 @@ packages/engine/src/
     cap from the log, not the graph.
 12. **Recovery at startup** keeps the facts of `recoverInterruptedWork`:
     - Open sessions, steps and runs become `interrupted`.
-    - Sleeping runs get their timers back.
-    - Open Gates stay.
+    - Sleeping runs get their timers back. A run gets one timer: the
+      first of its sleeps and its Gates' deadlines.
+    - Open Gates stay, every one of them, and so do the sleeping steps
+      beside them (`parkedSteps`).
     - The daemon resumes interrupted runs itself under the same policy as
       before, now by `invoke(null)`.
     - A drive that parked and died before its `RunEnded` parks again
@@ -815,10 +817,17 @@ Two branches may each hold a Gate or an Agent's ask at once, and each
 answer goes to its own step. An Agent's ask closes in the log when its
 step reopens, in the super-step after the answer. So while another
 branch still waits, the answered ask looks open. The thread lists no interrupt
-for an answered task (`ThreadState`). So a second answer is refused, and
-the timer of a sleeper beside the answered ask wakes the run, though the
-log still reads `waiting`. The Agent goes on with the answer when that
-sleeper wakes: a super-step ends only when all its tasks end.
+for an answered task (`ThreadState`, `ThreadSnapshot.answered`). So the
+timer of a sleeper beside the answered ask wakes the run, though the log
+still reads `waiting`. The Agent goes on with the answer when that sleeper
+wakes: a super-step ends only when all its tasks end. A second answer is
+refused while a step sleeps beside it. When none sleeps (the daemon died
+after the wake), the second answer drives the thread on, and the Agent
+goes on with the first answer.
+
+An answer to a Gate whose interrupt the thread does not hold (the daemon
+died before it was saved) first drives the thread on to that interrupt.
+Then the answer goes to its own Gate, not to another branch.
 
 ## The resume point (`graph/step/resume-point.ts`)
 
