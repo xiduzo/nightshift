@@ -1,6 +1,7 @@
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
+import { writeWhole } from "../../../../archive";
 import type { ReadMarks } from "../../application/ports";
 import type { KeptRead } from "../../domain/page-read";
 
@@ -68,11 +69,10 @@ export function fsReadMarks(dataDir: string): ReadMarks {
 	async function write(projectId: string): Promise<void> {
 		const entries = loaded.get(projectId);
 		if (!entries) return;
-		await mkdir(root, { recursive: true });
-		const file = fileOf(projectId);
-		const part = `${file}.part`;
-		await writeFile(part, JSON.stringify(Object.fromEntries(entries)));
-		await rename(part, file);
+		await writeWhole(
+			fileOf(projectId),
+			JSON.stringify(Object.fromEntries(entries)),
+		);
 	}
 
 	async function flush(): Promise<void> {
