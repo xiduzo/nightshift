@@ -57,6 +57,7 @@ export type { HostExchange } from "./exchange";
 export type { KeptDevices } from "./handover";
 export type { HostRole, JoinProgress, OpenDocumentChannel } from "./links";
 export { inContainer, machineFingerprint } from "./machine";
+export { parseListen } from "./reach";
 export { startDevices } from "./wire";
 export { deviceDirectory } from "./wire-peers-directory";
 export type { PeerEngine } from "./wire-peers-engine";

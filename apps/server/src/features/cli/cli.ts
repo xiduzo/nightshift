@@ -12,6 +12,7 @@ import {
 	startDaemon,
 	webHandler,
 } from "@nightshift/daemon";
+import { parseListen } from "@nightshift/devices";
 
 import { BadArguments, needsValue, readArgs, required } from "./args";
 import { type Command, command } from "./command";
@@ -145,6 +146,8 @@ export function serveOptions(
 		return port;
 	};
 	const port = merged.PORT ? asPort(merged.PORT) : DEFAULT_PORT;
+	// Checked here too, so a typo stops `serve` before anything starts.
+	parseListen(merged.NIGHTSHIFT_LISTEN);
 	const https = (merged.NIGHTSHIFT_HOST_ADDRESSES ?? "")
 		.split(",")
 		.map((a) => a.trim())

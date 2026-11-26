@@ -89,65 +89,48 @@ describe("nightshift serve", () => {
 		expect(() => serveOptions([], { NIGHTSHIFT_TLS_PORT: "https" })).toThrow(
 			"https is not a port.",
 		);
+		for (const listen of ["127.0.0.1:3000", ":::", "http://localhost"])
+			expect(() => serveOptions(["--listen", listen], {})).toThrow(
+				`${listen} is not an address to listen on.`,
+			);
+		expect(() => serveOptions([], { NIGHTSHIFT_LISTEN: "studio lan" })).toThrow(
+			"studio lan is not an address to listen on.",
+		);
+		for (const listen of ["::1", "[::1]", "studio.lan"])
+			expect(() => serveOptions(["--listen", listen], {})).not.toThrow();
 	});
 
-	test("a bad port ends it with exit code 2 before anything starts", () => {
-		const root = mkdtempSync(join(tmpdir(), "nightshift-serve-"));
-		try {
-			const dataDir = join(root, "data");
-			const ended = Bun.spawnSync(
-				[
-					process.execPath,
-					resolve(import.meta.dir, "../../cli.ts"),
-					...["serve", "--data-dir", dataDir, "--tls-port", "https"],
-				],
-				// A daemon that starts all the same takes no real data and no port.
-				{
-					cwd: root,
-					env: { PATH: process.env.PATH, HOME: root, PORT: "9" },
-					timeout: 20_000,
-				},
-			);
-			expect(ended.stderr.toString()).toStartWith("https is not a port.\n");
-			expect(ended.exitCode).toBe(2);
-			expect(existsSync(dataDir)).toBe(false);
-		} finally {
-			rmSync(root, { recursive: true, force: true });
-		}
-	}, 30_000);
-
-	test("NIGHTSHIFT_LISTEN that is not an address stops the start, and says why", () => {
-		const root = mkdtempSync(join(tmpdir(), "nightshift-serve-"));
-		try {
-			const ended = Bun.spawnSync(
-				[
-					process.execPath,
-					resolve(import.meta.dir, "../../cli.ts"),
-					// Not a Host: the value is checked all the same.
-					...["serve", "--data-dir", join(root, "data")],
-				],
-				// Where `.env.schema` is, so the daemon reads its environment.
-				{
-					cwd: resolve(import.meta.dir, "../../.."),
-					env: {
-						PATH: process.env.PATH,
-						HOME: root,
-						PORT: "9",
-						NIGHTSHIFT_KEY_STORE: "file",
-						NIGHTSHIFT_SCHEDULER: "off",
-						NIGHTSHIFT_DESKTOP_NOTIFICATIONS: "off",
-						NIGHTSHIFT_LISTEN: "127.0.0.1:3000",
+	test("a bad port or --listen ends it with exit code 2 before anything starts", () => {
+		for (const [flag, value, words] of [
+			["--tls-port", "https", "https is not a port."],
+			[
+				"--listen",
+				"127.0.0.1:3000",
+				"127.0.0.1:3000 is not an address to listen on.",
+			],
+		] as const) {
+			const root = mkdtempSync(join(tmpdir(), "nightshift-serve-"));
+			try {
+				const dataDir = join(root, "data");
+				const ended = Bun.spawnSync(
+					[
+						process.execPath,
+						resolve(import.meta.dir, "../../cli.ts"),
+						...["serve", "--data-dir", dataDir, flag, value],
+					],
+					// A daemon that starts all the same takes no real data and no port.
+					{
+						cwd: root,
+						env: { PATH: process.env.PATH, HOME: root, PORT: "9" },
+						timeout: 20_000,
 					},
-					timeout: 30_000,
-				},
-			);
-			expect(ended.stderr.toString()).toContain(
-				"127.0.0.1:3000 is not an address to listen on. Use an IP address or a host name, for example 127.0.0.1.",
-			);
-			expect(ended.stdout.toString()).not.toContain("Night Shift answers at");
-			expect(ended.exitCode).not.toBe(0);
-		} finally {
-			rmSync(root, { recursive: true, force: true });
+				);
+				expect(ended.stderr.toString()).toStartWith(`${words}`);
+				expect(ended.exitCode).toBe(2);
+				expect(existsSync(dataDir)).toBe(false);
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
 		}
 	}, 45_000);
 });

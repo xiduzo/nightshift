@@ -143,6 +143,7 @@
         "@nightshift/auth": "workspace:*",
         "@nightshift/daemon": "workspace:*",
         "@nightshift/db": "workspace:*",
+        "@nightshift/devices": "workspace:*",
         "@nightshift/engine": "workspace:*",
         "@nightshift/flows": "workspace:*",
         "@nightshift/refusal": "workspace:*",
