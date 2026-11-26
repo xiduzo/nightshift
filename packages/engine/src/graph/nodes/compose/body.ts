@@ -31,7 +31,7 @@ import {
 } from "../../data";
 
 import type { Parked, RunStateValues } from "../../state";
-import type { OpenStep } from "../../step";
+import type { AbortReason, OpenStep } from "../../step";
 
 /**
  * What a Call node does, once and per element: running a called flow as a
@@ -40,8 +40,9 @@ import type { OpenStep } from "../../step";
  * The body is compiled once per node (`bodyGraph`) and invoked with the
  * node's config passed through, so it checkpoints under the node's task
  * namespace and an interrupt inside it resumes inside it. The body's own
- * `StepContext` is the caller's with `flow` and `flowName` replaced, and
- * `placement.deviceFor` when the Subflow names a computer.
+ * `StepContext` is the caller's with `flow` and `flowName` replaced,
+ * `signal` the Call step's own, and `placement.deviceFor` when the Subflow
+ * names a computer.
  *
  * How a body ends, in the walk's terms (`ScopeEnd` in engine.ts):
  *
@@ -58,6 +59,12 @@ import type { OpenStep } from "../../step";
  * - `stopped`: a person stopped the run, or the stop time or a stop after
  *   the step fired inside the body. The caller ends its step `stopped` and
  *   rethrows the interrupt, so the run parks; a resume lands back inside.
+ * - `cut`: the Call step's own signal stopped the body (`callStopped`):
+ *   another branch won a `first` Join, or the Call ran past its time
+ *   budget. The body's steps watch that signal, not only the run's, so
+ *   they end `stopped` at once. The body's park is swallowed, as for
+ *   `failed`: the caller ends its step as `abortEnd` says and the walk goes
+ *   on. The run does not end as a person's stop.
  * - `aborted`: the body parked `failed` before a step started (the step
  *   cap). The caller ends its step `error` and rethrows.
  * - `paused`: a wait or a Gate inside the body. The caller leaves its step
@@ -97,9 +104,23 @@ export type BodyEnd =
 			interrupt: GraphInterrupt;
 	  }
 	| { kind: "aborted"; reason: string; interrupt: GraphInterrupt }
+	| { kind: "cut" }
 	| { kind: "paused"; interrupt: GraphInterrupt };
 
 export type BodyGraph = ReturnType<ReturnType<typeof compileFlow>["compile"]>;
+
+/** The signal the steps of each compiled body watch: that of the Call step that runs it now (`runBody`). */
+const watched = new WeakMap<BodyGraph, { signal: AbortSignal }>();
+
+/**
+ * The Call step's own signal stopped it: another branch won a `first`
+ * Join, or the step ran past its time budget. A stop of the run aborts the
+ * same signal with `stopped`: that one is a person's stop, not the Call's.
+ */
+export function callStopped(signal: AbortSignal): boolean {
+	const reason = signal.reason as AbortReason | undefined;
+	return signal.aborted && (reason === "outrun" || reason === "timeout");
+}
 
 /**
  * The called flow compiled for the caller's run, with its own `flow` and
@@ -133,18 +154,25 @@ export function bodyGraph(
 									run,
 								),
 				};
-	return compileFlow(called, {
+	const watch = { signal: ctx.signal() };
+	const graph = compileFlow(called, {
 		...ctx,
 		flow: called,
 		flowName: caller.flow,
 		callPath: [...ctx.callPath, caller.id],
 		placement,
+		// The body's steps stop with the Call step: a stop of the run, a
+		// branch that lost a `first` Join, or the Call's time budget.
+		signal: () => watch.signal,
 	}).compile();
+	watched.set(graph, watch);
+	return graph;
 }
 
 /**
  * Runs the body for the given inputs under the caller's config, with the
- * scope and the element's `run` fields in `configurable`.
+ * scope and the element's `run` fields in `configurable`. The body's steps
+ * watch `signal`, the Call step's own.
  */
 export async function runBody(input: {
 	graph: BodyGraph;
@@ -156,7 +184,12 @@ export async function runBody(input: {
 	run: BodyRun;
 	/** The caller's stop time, as `stopAtOf` reads it: the body checks the same one. */
 	stopAt: number | null;
+	/** The Call step's signal. */
+	signal: AbortSignal;
 }): Promise<BodyEnd> {
+	const watch = watched.get(input.graph);
+	if (!watch) throw new Error("The body graph was not made by bodyGraph.");
+	watch.signal = input.signal;
 	const config: LangGraphRunnableConfig = {
 		...input.config,
 		configurable: {
@@ -176,6 +209,7 @@ export async function runBody(input: {
 		if (!isGraphInterrupt(error)) throw error;
 		const value = error.interrupts[0]?.value as Parked | undefined;
 		if (value?.kind !== "parked") return { kind: "paused", interrupt: error };
+		if (callStopped(input.signal)) return { kind: "cut" };
 		if (value.status === "stopped") {
 			return {
 				kind: "stopped",

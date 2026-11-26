@@ -1,6 +1,6 @@
 /** One step: the step runner and its seam, how a node enters again, the sleep of a step, its Gate and brief, and the worktree of the run on its Device. */
 
-export { budgetError } from "./abort";
+export { abortEnd, budgetError } from "./abort";
 export { beginStep } from "./begin-step";
 export { deciderCostSource, sessionCostUnknown, warnDeciderCost } from "./cost";
 export { openGate, scoreGate } from "./gate";
@@ -16,5 +16,11 @@ export {
 } from "./resume-point";
 export { runFolderOn } from "./run-worktree";
 export { type OwnWait, pendingWaitOf, waitNode } from "./sleep";
-export type { BodyEnd, BodyResult, OpenStep, StepHandle } from "./step-handle";
+export type {
+	AbortReason,
+	BodyEnd,
+	BodyResult,
+	OpenStep,
+	StepHandle,
+} from "./step-handle";
 export { doneAndGo, runStep } from "./step-runner";

@@ -33,7 +33,9 @@ export function abortEnd(
 	node: FlowNode,
 	signal: AbortSignal,
 	outputs: StepOutputs,
-): Pick<StepEnd, "outcome" | "outputs" | "error"> {
+): Pick<StepEnd, "outputs" | "error"> & {
+	outcome: "error" | "fail" | "stopped";
+} {
 	const reason = signal.reason as AbortReason | undefined;
 	const budget = () => ctx.kindOf(node).timeBudget(node, ctx.policy());
 	if (reason === "timeout") {

@@ -174,7 +174,7 @@ export type StepContext = StepShared & {
 	 * current numbers, in bodies too.
 	 */
 	policy(): ResolvedPolicy;
-	/** The run's abort signal: a person stopped the run. */
+	/** The run's abort signal: a person stopped the run. In a called flow, the Subflow step's own. */
 	signal(): AbortSignal;
 	/**
 	 * The race of the `first` Joins of this thread and the running steps of

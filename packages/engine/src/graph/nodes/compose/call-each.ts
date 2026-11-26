@@ -23,7 +23,8 @@ import type {
 	StepOutcome,
 	StepOutputs,
 } from "../../../log";
-import { itemStates } from "../../../read";
+import { itemStates, OUTRUN_ERROR } from "../../../read";
+import { outrun } from "../../branches";
 import {
 	type NodeAction,
 	STOP_AFTER_STEP_REASON,
@@ -50,6 +51,7 @@ import {
 } from "../../route";
 import type { Loop } from "../../state";
 import {
+	abortEnd,
 	beginStep,
 	entryOf,
 	RESUME_RULES,
@@ -62,6 +64,7 @@ import {
 	type BodyGraph,
 	bodyGraph,
 	bodyOutputs,
+	callStopped,
 	failedEndReason,
 	hasStoppedEdge,
 	newOutputsSeen,
@@ -88,10 +91,12 @@ import {
  * (`runBody`), the element ends `failed` with the reason, and the loop goes
  * on with free work. An element whose outputs do not fit a type a person
  * gave them fails the same way (`typedOutputs`, Q42). A stop inside the
- * body ends the step `stopped` and propagates the park; a wait or a Gate
- * inside the body propagates with the step open. Everything before the
- * body runs again on the resume and
- * after a daemon death (rule 4), so the node continues the open element it
+ * body ends the step `stopped` and propagates the park; when the step's
+ * own signal stops it (another branch won a `first` Join, also between
+ * two elements, or its time budget ran out), the step ends as `abortEnd`
+ * says and the walk continues; a wait or a Gate inside the body propagates
+ * with the step open. Everything before the body runs again on the resume
+ * and after a daemon death (rule 4), so the node continues the open element it
  * finds in the log (no `ItemStarted` or branch twice) and the body resumes
  * under the same namespace; an ended step (stopped, or `interrupted` by
  * recovery) is reopened first (`StepReopened`), as `openCallStep` does.
@@ -217,6 +222,11 @@ export function callEachNode(node: CallEachNode, ctx: StepContext): NodeAction {
 				wrappingUp: true,
 			});
 		const wrapsUp = hasStoppedEdge(ctx.flow, node);
+		/** The step's own signal stopped it: it ends as any aborted step does, and the walk continues. */
+		const cut = () => {
+			const ended = abortEnd(ctx, node, step.signal, {});
+			return finish(ended.outcome, ended.error);
+		};
 		const endItem = async (
 			itemId: string,
 			itemState: EnginePayloads["ItemEnded"]["state"],
@@ -290,6 +300,10 @@ export function callEachNode(node: CallEachNode, ctx: StepContext): NodeAction {
 					? null
 					: positionOf(state, runState, scope).cursorBehind(node);
 			if (behind !== null) return next(behind);
+			// Another branch won a `first` Join between two elements.
+			if (outrun(ctx, state, node, config)) {
+				return finish("stopped", OUTRUN_ERROR);
+			}
 			if (ctx.signal().aborted) return parkStopped(PERSON_STOP);
 			const stop = stopBeforeNext(
 				ctx,
@@ -303,6 +317,7 @@ export function callEachNode(node: CallEachNode, ctx: StepContext): NodeAction {
 			try {
 				items = await readSource(ctx, node, tctx, step);
 			} catch (error) {
+				if (callStopped(step.signal)) return cut();
 				if (ctx.signal().aborted) return parkStopped(PERSON_STOP);
 				return finish("error", messageOf(error));
 			}
@@ -433,9 +448,12 @@ export function callEachNode(node: CallEachNode, ctx: StepContext): NodeAction {
 			graph,
 			config,
 			stopAt: stopAtOf(state, config),
+			signal: step.signal,
 			...body,
 		});
 		switch (ended.kind) {
+			case "cut":
+				return cut();
 			case "paused":
 				// The step stays open: the element continues after the wait.
 				step.leaveOpen();
@@ -557,7 +575,7 @@ async function readSource(
 				cwd: worktree,
 				env,
 				logPath: ctx.log.files(ctx.run.id).commandLog(step.stepId),
-				signal: ctx.signal(),
+				signal: step.signal,
 				onOutput: (stream, text) => {
 					if (stream === "stdout") stdout += text;
 				},

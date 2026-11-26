@@ -775,6 +775,11 @@ would wait for the slowest branch. The first branch that reaches a
 `first` Join claims the round in memory (`Races`, one per Thread). It
 aborts the steps that run on the other branches (`AbortReason` `outrun`).
 Those steps end `stopped` with "Another branch reached the Join first.".
+A Subflow on such a branch stops the steps of its called flow too: they
+watch the Subflow step's signal. The Subflow step ends `stopped` with the
+same words, and the walk continues. A Subflow with `each` starts no next
+element after its branch lost. A Subflow that runs past its time budget
+stops its called flow the same way and ends `error`.
 After a restart the claim is gone, and the Join picks the earliest
 arrival from the state.
 
@@ -1278,7 +1283,7 @@ type StepContext = StepShared & {
   flowName: string;                  // {{run.flow}}
   flows: Record<string, Flow>;       // called flows by name
   policy(): ResolvedPolicy;          // resolved at each use, like settings()
-  signal(): AbortSignal;             // the run's abort signal
+  signal(): AbortSignal;             // the run's abort signal; in a called flow, the Subflow step's
   races: Races;
 };
 ```

@@ -20,6 +20,7 @@ import { eachOutputs, renderBindings, resolveInputs } from "../../data";
 import { scopeOf } from "../../route";
 import type { RunStateUpdate } from "../../state";
 import {
+	abortEnd,
 	beginStep,
 	doneAndGo,
 	entryOf,
@@ -196,6 +197,7 @@ async function callOnce(
 		graph,
 		config,
 		stopAt: stopAtOf(state, config),
+		signal: step.signal,
 		...body,
 	});
 	switch (ended.kind) {
@@ -203,6 +205,13 @@ async function callOnce(
 			// The step stays open: the called flow continues after the wait.
 			step.leaveOpen();
 			throw ended.interrupt;
+		case "cut": {
+			// Another branch won, or the time budget ran out: the step ends as
+			// any aborted step does, and the walk continues from it.
+			const outputs = await bodyOutputs(ctx, body);
+			const cut = abortEnd(ctx, node, step.signal, outputs);
+			return end(cut.outcome, cut.outputs, cut.error);
+		}
 		case "stopped": {
 			if (ended.atStopTime && hasStoppedEdge(ctx.flow, node)) {
 				// The stop time ended the called flow: wrap the run up along the edge.
