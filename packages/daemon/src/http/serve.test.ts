@@ -232,20 +232,22 @@ describe("where a listener answers, for the log", () => {
 	test.skipIf(process.platform !== "darwin")(
 		"an IPv6 address with a zone, which Bun's url cannot write",
 		() => {
-			const [server] = serveDaemon(
-				{
-					hostname: "fe80::1%lo0",
-					fetch: () => new Response("OK"),
-					websocket: { message() {} },
-				},
-				{ port: 0 },
-			);
-			try {
-				expect(answersAt(server as Bun.Server<never>)).toBe(
-					`http://[fe80::1%lo0]:${server?.port}/`,
+			for (const hostname of ["fe80::1%lo0", "[fe80::1%lo0]"]) {
+				const [server] = serveDaemon(
+					{
+						hostname,
+						fetch: () => new Response("OK"),
+						websocket: { message() {} },
+					},
+					{ port: 0 },
 				);
-			} finally {
-				server?.stop(true);
+				try {
+					expect(answersAt(server as Bun.Server<never>)).toBe(
+						`http://[fe80::1%lo0]:${server?.port}/`,
+					);
+				} finally {
+					server?.stop(true);
+				}
 			}
 		},
 	);

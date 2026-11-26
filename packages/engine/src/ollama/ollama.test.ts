@@ -27,6 +27,8 @@ const ref = (name: string) => `\${${name}}`;
 function fakeOllama() {
 	const state = {
 		up: true,
+		/** Its version request answers only when the request is aborted. */
+		hangs: false,
 		/** How long each part of a download takes. */
 		partMs: 5,
 		models: [] as { name: string; capabilities?: string[] }[],
@@ -39,6 +41,13 @@ function fakeOllama() {
 		const url = new URL(String(input instanceof Request ? input.url : input));
 		state.requests.push({ url: url.href, headers: new Headers(init?.headers) });
 		if (!state.up) throw new TypeError("fetch failed: ECONNREFUSED");
+		if (state.hangs && url.pathname === "/api/version") {
+			const signal = init?.signal;
+			return new Promise<Response>((_resolve, reject) => {
+				if (signal?.aborted) reject(signal.reason);
+				signal?.addEventListener("abort", () => reject(signal.reason));
+			});
+		}
 		if (url.pathname === "/api/version")
 			return Response.json({ version: "0.13.0" });
 		if (url.pathname === "/api/tags")
@@ -93,6 +102,8 @@ async function harness(
 		binary?: string | null;
 		/** Whether an Ollama answers on this computer at the start. */
 		up?: boolean;
+		/** Whether its version request answers only when it is aborted. */
+		hangs?: boolean;
 	} = {},
 ) {
 	const env = options.env ?? {};
@@ -119,6 +130,7 @@ async function harness(
 	await Promise.all([settings.load(), connections.load()]);
 	const ollama = fakeOllama();
 	ollama.state.up = options.up ?? true;
+	ollama.state.hangs = options.hangs ?? false;
 	const spawned: string[][] = [];
 	// The `ollama` program on PATH: a test installs it later by setting it.
 	const found = {
@@ -388,4 +400,24 @@ describe("a model of a decider", () => {
 		await until(() => h.spawned.length === 1);
 		expect(h.spawned[0]).toEqual(["/opt/homebrew/bin/ollama", "serve"]);
 	});
+
+	test("a stop aborts the question whether an Ollama answers here", async () => {
+		const { service } = await harness({
+			env: { NIGHTSHIFT_HOST: "on" },
+			hangs: true,
+		});
+		await Bun.sleep(20);
+		const since = performance.now();
+		await service.stop();
+		expect(performance.now() - since).toBeLessThan(1_000);
+	});
+
+	test("the question whether an Ollama answers here ends after its time, and then Night Shift starts one", async () => {
+		const { spawned } = await harness({
+			env: { NIGHTSHIFT_HOST: "on" },
+			hangs: true,
+		});
+		for (let i = 0; i < 100 && spawned.length === 0; i++) await Bun.sleep(50);
+		expect(spawned).toHaveLength(1);
+	}, 10_000);
 });
