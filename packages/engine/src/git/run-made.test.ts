@@ -29,7 +29,7 @@ const made = (branch: string[], head: string[], run: Partial<Run> = {}) =>
 		branch: "feat",
 		tip: id("c"),
 		handed: null,
-		forward: new Set(),
+		forward: new Map(),
 		bornOn: null,
 		only: [],
 		...run,
@@ -60,17 +60,25 @@ describe("the run's", () => {
 
 	test("a move that dropped no commit", () => {
 		const theirs = line("b>c", "rebase (finish): refs/heads/feat onto c", THEM);
-		const forward = new Set([`${id("b")}>${id("c")}`]);
+		const forward = new Map([[`${id("b")}>${id("c")}`, []]]);
 		expect(made([born, theirs], [birth], { forward })).toBe(true);
 		expect(made([born, theirs], [birth])).toBe(false);
 		// What it brought that no other branch has.
 		expect(made([born, theirs], [birth], { forward, only: [id("c")] })).toBe(
 			false,
 		);
+		// What it brought must be made in the copy, or be on another branch.
+		const brought = new Map([[`${id("b")}>${id("c")}`, [id("c")]]]);
+		expect(made([born, theirs], [birth], { forward: brought })).toBe(false);
+		expect(
+			made([born, theirs], [birth, line("a>c", "commit: one")], {
+				forward: brought,
+			}),
+		).toBe(true);
 		// A move back is not one.
 		expect(
 			made([born, theirs], [birth], {
-				forward: new Set([`${id("c")}>${id("b")}`]),
+				forward: new Map([[`${id("c")}>${id("b")}`, []]]),
 			}),
 		).toBe(false);
 	});

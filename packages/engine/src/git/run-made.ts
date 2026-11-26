@@ -68,8 +68,11 @@ export function runMade(
 		branch: string;
 		tip: string;
 		handed: string | null;
-		/** The moves (`old>new`) that dropped no commit: `old` is in `new`. */
-		forward: ReadonlySet<string>;
+		/**
+		 * The moves (`old>new`) that dropped no commit (`old` is in `new`), each
+		 * with the commits it brought that no other branch has.
+		 */
+		forward: ReadonlyMap<string, readonly string[]>;
 		/** Its first commit, when another branch, a tag or the remote's branch has it. */
 		bornOn: string | null;
 		/** The commits at `tip` that no branch has that the run does not move. */
@@ -113,7 +116,9 @@ export function runMade(
 		else if (
 			!sameMove.has(line.text) &&
 			!made.has(line.now) &&
-			!run.forward.has(`${line.old}>${line.now}`)
+			!(run.forward.get(`${line.old}>${line.now}`) ?? [undefined]).every(
+				(commit) => commit !== undefined && made.has(commit),
+			)
 		)
 			return false;
 	}

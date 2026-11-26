@@ -169,10 +169,15 @@ export function createHandOff(git: Git, parts: HandOffParts) {
 				(await onlyOn(cwd, { ...run, tip: first }, [])).length === 0)
 				? first
 				: null;
-		const forward = new Set<string>();
+		// A move that dropped no commit, with what it brought that nothing
+		// else has. The run's own names keep nothing here: anyone can fill them.
+		const forward = new Map<string, string[]>();
 		for (const move of new Set(movesOf(branch))) {
 			const [old = "", now = ""] = move.split(">");
-			if (await isAncestor(cwd, old, now)) forward.add(move);
+			if (await isAncestor(cwd, old, now)) {
+				const brought = { ...run, tip: now };
+				forward.set(move, await onlyOn(cwd, brought, [old], false));
+			}
 		}
 		const known = [handed, bornOn].filter((id) => id !== null);
 		const only = await onlyOn(cwd, run, known);
@@ -189,6 +194,7 @@ export function createHandOff(git: Git, parts: HandOffParts) {
 		cwd: string,
 		{ shortId, branch, tip }: { shortId: string; branch: string; tip: string },
 		known: readonly string[],
+		ownKeeps = true,
 	): Promise<string[]> {
 		const list = async (...args: string[]) =>
 			(await gitOrThrow(git, cwd, args)).split("\n").filter(Boolean);
@@ -221,8 +227,7 @@ export function createHandOff(git: Git, parts: HandOffParts) {
 			...moved.map((name) => `--exclude=origin/${name}`),
 			"--remotes",
 			"--tags",
-			`refs/heads/${own}`,
-			`refs/remotes/origin/${own}`,
+			...(ownKeeps ? [`refs/heads/${own}`, `refs/remotes/origin/${own}`] : []),
 			...known,
 		);
 	}
