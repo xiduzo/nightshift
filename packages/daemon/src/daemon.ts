@@ -122,7 +122,8 @@ export type Daemon = DaemonServe & {
  * serves. It does not listen: `startDaemon` does. One per process: `bun
  * --hot` calls it again on each reload, and each piece that must have one
  * owner names its slot and lifecycle here (`hotSlots`, `runtime/hot.ts`).
- * Two reloads at once start one after the other (`oneStartAtATime`).
+ * Two reloads at once start one after the other (`oneStartAtATime`). A
+ * first start that fails gives the lease up.
  *
  * The blocks of a capability are in `wire-*.ts` beside this file: auth,
  * config, devices, knowledge, notifications and projects. A lane of the
@@ -133,7 +134,19 @@ export function createDaemon(
 	env: DaemonEnv,
 	options: DaemonOptions = {},
 ): Promise<Daemon> {
-	return oneStartAtATime(hot, () => makeDaemon(env, options));
+	return oneStartAtATime(hot, async () => {
+		// No lease in this process yet: no listener of a daemon before answers.
+		const first = hot.nightshiftLease === undefined;
+		try {
+			return await makeDaemon(env, options);
+		} catch (error) {
+			// A first start that fails stops what it started and gives the lease
+			// up, so the next start does not wait for it. A reload that fails
+			// keeps it: the listeners of the daemon before still answer.
+			if (first) await hot.nightshiftStop?.();
+			throw error;
+		}
+	});
 }
 
 async function makeDaemon(

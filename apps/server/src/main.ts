@@ -8,12 +8,13 @@
  * over to the new daemon, and the engine before it lets go of its runs.
  *
  * When it cannot listen (its port is taken, or its address is not this
- * computer's), the daemon stops and the process exits with code 1:
- * `bun run night` then stops too, and says why.
+ * computer's) or refuses to start, the process says why and exits with
+ * code 1: `bun run night` then stops too.
  */
 import "varlock/auto-load";
 
 import { daemonPort, ListenError, startDaemon } from "@nightshift/daemon";
+import { Refusal } from "@nightshift/refusal";
 
 import { ENV } from "./env";
 
@@ -27,9 +28,9 @@ try {
 		desktop: "system",
 	});
 } catch (error) {
-	// The daemon already stopped: say why and exit. Any other error goes
-	// to the process guard, as before.
-	if (!(error instanceof ListenError)) throw error;
+	// It cannot listen, or it refuses to start (a refusal has words for the
+	// person): say why and exit. Any other error goes to the process guard.
+	if (!(error instanceof ListenError || error instanceof Refusal)) throw error;
 	console.error(error.message);
 	process.exit(1);
 }

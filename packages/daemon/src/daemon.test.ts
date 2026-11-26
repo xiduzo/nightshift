@@ -319,6 +319,43 @@ describe("the daemon, wired in one process", () => {
 		expect((await call(next, "/health"))?.status).toBe(200);
 	});
 
+	test("a first start that fails gives the lease up and stops every slot: the next start begins fresh", async () => {
+		dir = await mkdtemp(join(tmpdir(), "nightshift-daemon-"));
+		const env = envIn(dir);
+		await expect(
+			start({ ...env, NIGHTSHIFT_LISTEN: "127.0.0.1:3000" }),
+		).rejects.toThrow("127.0.0.1:3000 is not an address to listen on.");
+
+		expect(hot.nightshiftLease).toBeUndefined();
+		expect(hot.nightshiftDocuments).toBeUndefined();
+		const url = [...(hot.nightshiftDatabases?.keys() ?? [])].find((each) =>
+			each.includes(dir as string),
+		);
+		const [row] = await processDatabase(url as string)
+			.select()
+			.from(daemonLease);
+		expect(row?.owner).toBeNull();
+
+		const next = await start(env);
+		expect(next.info.lease.epoch).toBe((row?.epoch ?? 0) + 1);
+		expect((await call(next, "/health"))?.status).toBe(200);
+	});
+
+	test("a reload that fails keeps the lease: the daemon before it still holds the database", async () => {
+		dir = await mkdtemp(join(tmpdir(), "nightshift-daemon-"));
+		const env = envIn(dir);
+		const first = await start(env);
+		await expect(
+			start({ ...env, NIGHTSHIFT_LISTEN: "127.0.0.1:3000" }),
+		).rejects.toThrow("is not an address to listen on.");
+
+		expect(hot.nightshiftLease).toBeDefined();
+		const [row] = await processDatabase(first.info.databaseUrl)
+			.select()
+			.from(daemonLease);
+		expect(row?.owner).toBe(first.info.leaseOwner);
+	});
+
 	test("a reload makes its own knowledge, and the one before closes", async () => {
 		dir = await mkdtemp(join(tmpdir(), "nightshift-daemon-"));
 		const env = envIn(dir);
