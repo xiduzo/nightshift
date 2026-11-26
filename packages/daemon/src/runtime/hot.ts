@@ -81,6 +81,11 @@ export type HotRegistry = KeptDevices &
 		nightshiftFacts?: Timer;
 		/** The stop of the newest daemon: the signal handlers call it. */
 		nightshiftStop?: () => Promise<void>;
+		/**
+		 * The whole stop of the slots, which goes on after the stop above gave
+		 * up at its bound. It ends the slots by name: the next start waits for it.
+		 */
+		nightshiftStopping?: Promise<void>;
 		/** The latest start of a daemon, ended or failed (`oneStartAtATime`). */
 		nightshiftDaemonStart?: Promise<void>;
 	};

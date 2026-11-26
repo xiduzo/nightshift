@@ -341,6 +341,45 @@ describe("the daemon, wired in one process", () => {
 		expect((await call(next, "/health"))?.status).toBe(200);
 	});
 
+	test("a stop that outlasts its bound ends before the next start: the next start holds the lease", async () => {
+		dir = await mkdtemp(join(tmpdir(), "nightshift-daemon-"));
+		const env = envIn(dir);
+		// A first start that fails late, on an error of its own, while one of
+		// its slots (the telemetry) stops only when the test says so.
+		let finish = () => {};
+		const slow = new Promise<void>((resolve) => {
+			finish = resolve;
+		});
+		const failing = spyOn(http, "createHttp").mockImplementationOnce(() => {
+			const made = hot.nightshiftTelemetry;
+			if (!made) throw new Error("The daemon made no telemetry.");
+			const stop = made.stop.bind(made);
+			made.stop = async () => {
+				await slow;
+				await stop();
+			};
+			throw new Error("A start that fails late.");
+		});
+		await expect(start(env)).rejects.toThrow("A start that fails late.");
+		failing.mockRestore();
+
+		const next = start(env);
+		const first = await Promise.race([
+			next.then(() => "started" as const),
+			Bun.sleep(3_000).then(() => "waits" as const),
+		]);
+		finish();
+		const daemon = await next;
+		await Bun.sleep(100);
+
+		const [row] = await processDatabase(daemon.info.databaseUrl)
+			.select()
+			.from(daemonLease);
+		expect(row?.owner).toBe(daemon.info.leaseOwner);
+		expect((await call(daemon, "/health"))?.status).toBe(200);
+		expect(first).toBe("waits");
+	}, 30_000);
+
 	test("a reload that fails keeps the lease: the daemon before it still holds the database", async () => {
 		dir = await mkdtemp(join(tmpdir(), "nightshift-daemon-"));
 		const env = envIn(dir);

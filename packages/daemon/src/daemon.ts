@@ -135,6 +135,9 @@ export function createDaemon(
 	options: DaemonOptions = {},
 ): Promise<Daemon> {
 	return oneStartAtATime(hot, async () => {
+		// A stop that gave up at its bound goes on, and would end this start's
+		// slots (its lease too): wait until it ended.
+		await hot.nightshiftStopping;
 		// No lease in this process yet: no listener of a daemon before answers.
 		const first = hot.nightshiftLease === undefined;
 		try {
@@ -176,7 +179,11 @@ async function makeDaemon(
 	await migrateDb(db, { migrationsFolder: options.migrationsFolder });
 
 	const slots = hotSlots(hot);
-	const stop = () => boundedStop(() => slots.stop());
+	const stop = () =>
+		boundedStop(() => {
+			hot.nightshiftStopping = slots.stop();
+			return hot.nightshiftStopping;
+		});
 	stopOnSignals(stop);
 	const lease = await slots.keep(
 		"nightshiftLease",
