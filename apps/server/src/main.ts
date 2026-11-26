@@ -8,8 +8,9 @@
  * over to the new daemon, and the engine before it lets go of its runs.
  *
  * When it cannot listen (its port is taken, or its address is not this
- * computer's) or refuses to start, the process says why and exits with
- * code 1: `bun run night` then stops too.
+ * computer's), the process says why and exits with code 1: `bun run
+ * night` then stops too. A first start that refuses exits the same way. A
+ * reload that refuses keeps the daemon before it, as any other error does.
  */
 import "varlock/auto-load";
 
@@ -17,6 +18,10 @@ import { daemonPort, ListenError, startDaemon } from "@nightshift/daemon";
 import { Refusal } from "@nightshift/refusal";
 
 import { ENV } from "./env";
+
+/** Set once a daemon of this process started: a later evaluation is a reload. */
+const entry = globalThis as { nightshiftDevEntryStarted?: true };
+const reload = entry.nightshiftDevEntryStarted === true;
 
 try {
 	await startDaemon({
@@ -27,10 +32,13 @@ try {
 		// Notifications on this computer's desktop, through the OS programs.
 		desktop: "system",
 	});
+	entry.nightshiftDevEntryStarted = true;
 } catch (error) {
-	// It cannot listen, or it refuses to start (a refusal has words for the
-	// person): say why and exit. Any other error goes to the process guard.
-	if (!(error instanceof ListenError || error instanceof Refusal)) throw error;
+	// It cannot listen, or its first start refuses (a refusal has words for
+	// the person): say why and exit. Any other error, and a refusal of a
+	// reload, goes to the process guard: the daemon before keeps running.
+	const refused = error instanceof Refusal && !reload;
+	if (!(error instanceof ListenError || refused)) throw error;
 	console.error(error.message);
 	process.exit(1);
 }

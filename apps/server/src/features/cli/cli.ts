@@ -13,7 +13,6 @@ import {
 	webHandler,
 } from "@nightshift/daemon";
 import { parseListen } from "@nightshift/devices";
-import { Refusal } from "@nightshift/refusal";
 
 import { BadArguments, needsValue, readArgs, required } from "./args";
 import { type Command, command } from "./command";
@@ -200,10 +199,8 @@ async function serve(options: ServeOptions): Promise<undefined> {
 		...(ui ? { web: ui } : {}),
 	}).catch((error: unknown) => {
 		// The daemon already stopped. Exit with code 1, as the process guard
-		// does, with the message only: a refusal has words for the person too.
-		if (!(error instanceof ListenError || error instanceof Refusal)) {
-			throw error;
-		}
+		// does, with the message only.
+		if (!(error instanceof ListenError)) throw error;
 		console.error(error.message);
 		process.exit(1);
 	});
