@@ -389,3 +389,29 @@ Each entry names its source. "Read" means found by reading and not reproduced.
 - Six server packages: 265,056 to 256,625 lines, 22,734 to 21,867 complexity, 2,689 to 2,564 files.
 - apps and packages: 492,120 to 482,509 lines, 43,730 to 42,287 complexity.
 - Use-case files: 412 to 371. Most of the difference is the forwards of ADR 41.
+
+### After the branch: lanes C1 to C8 and D2 to D7 (2026-11-25 to 2026-11-26)
+
+- Each lane had its own copy, an independent review and CI before `main`.
+- C1: the writer that knows why a run ends gives its code. The old reader of words stays only
+  for logs written before the code.
+- C2, C3, C5: one rule for the secrets of a step, one rule for the ids of an offered call, and
+  one rule for what a Host's list of Spaces changes. C5 adds `host_space.left_at`.
+- C4: Devices placement is one use case per request. C6: no feature finds a case by its words.
+- C7: `--listen` is checked where a Host's reach is decided. One loopback rule.
+- C8: the read marks of knowledge are written whole. A failed save leaves no part file.
+- D2: a Subflow on the branch that loses a `first` Join, or past its time budget, stops its
+  steps at once. Before, the losing Agent ran its full time.
+- D3: where an answer goes is a pure plan with a table test, beside the plan of a wake.
+- D4: a skipped schedule gives telemetry its code, not its sentence.
+- D5: a run again that cannot reach its Join is refused before it writes, with words.
+- D6: the sentence of a node kind is `endSentence`, so it does not read like the code.
+- D7: a second signal ends the Ollama that Night Shift started, then the daemon exits.
+- Not done: a Wait beside an open Gate still loses a signal (D1). The fix adds a resume value to
+  stored checkpoints. The owner decides.
+
+### Numbers (scc, 5ff33c00b to 09a20ab32)
+
+- Six server packages: 265,056 to 268,728 lines, 22,734 to 22,861 complexity.
+- Use-case files: 412 to 376.
+- The lines after the branch are mostly tests and the rules that the lanes added.
