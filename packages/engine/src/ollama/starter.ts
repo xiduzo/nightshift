@@ -219,3 +219,31 @@ export function createOllamaStarter(options: OllamaStarterOptions) {
 		},
 	};
 }
+
+/**
+ * `ollama serve` through Bun, its output read by the starter. It leads a
+ * process group of its own, and a kill goes to the whole group: a SIGKILL
+ * of the server alone leaves its runners (`llama-server`, with a model in
+ * memory) behind.
+ */
+export const bunSpawn: SpawnOllama = (argv, { env }) => {
+	const proc = Bun.spawn(argv, {
+		env,
+		stdin: "ignore",
+		stdout: "pipe",
+		stderr: "pipe",
+		detached: true,
+	});
+	return {
+		exited: proc.exited,
+		kill: (signal) => {
+			try {
+				process.kill(-proc.pid, signal);
+			} catch {
+				// The group has ended already.
+			}
+		},
+		stdout: proc.stdout,
+		stderr: proc.stderr,
+	};
+};

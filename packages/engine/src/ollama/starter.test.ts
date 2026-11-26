@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { createOllamaStarter, type OllamaChild } from "./starter";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { bunSpawn, createOllamaStarter, type OllamaChild } from "./starter";
 
 /** A fake `ollama serve`: it ends when it is killed or when the test ends it. */
 function fakeChild(output: string[] = []) {
@@ -252,3 +255,44 @@ test("a child that does not end on SIGTERM is killed within the 2 s a daemon's s
 	expect(signals).toEqual(["SIGTERM", "SIGKILL"]);
 	expect(performance.now() - since).toBeLessThan(2_000);
 }, 10_000);
+
+describe("`ollama serve` as Bun starts it", () => {
+	// A server that ignores SIGTERM, and a runner of its own that does too.
+	const SERVER = `trap "" TERM; (trap "" TERM; sleep 10) & echo $! > "$RUNNER"; wait`;
+
+	test("a kill ends its runners too: none stays behind", async () => {
+		const dir = await mkdtemp(join(tmpdir(), "nightshift-ollama-"));
+		try {
+			const runnerFile = join(dir, "runner");
+			const child = bunSpawn(["sh", "-c", SERVER], {
+				env: { PATH: process.env.PATH ?? "/usr/bin:/bin", RUNNER: runnerFile },
+			});
+			let runner = 0;
+			for (let i = 0; i < 100 && !runner; i++) {
+				await Bun.sleep(20);
+				runner = Number(
+					(
+						await Bun.file(runnerFile)
+							.text()
+							.catch(() => "")
+					).trim(),
+				);
+			}
+			expect(runner).toBeGreaterThan(0);
+			child.kill("SIGKILL");
+			await child.exited;
+			let alive = true;
+			for (let i = 0; i < 50 && alive; i++) {
+				await Bun.sleep(20);
+				try {
+					process.kill(runner, 0);
+				} catch {
+					alive = false;
+				}
+			}
+			expect(alive).toBe(false);
+		} finally {
+			await rm(dir, { recursive: true, force: true });
+		}
+	}, 10_000);
+});

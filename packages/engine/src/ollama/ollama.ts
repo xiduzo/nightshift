@@ -10,7 +10,7 @@ import {
 } from "./endpoint";
 import type { OllamaSecretsPort, OllamaSettingsPort } from "./ports";
 import { createOllamaPulls } from "./pulls";
-import { createOllamaStarter, type SpawnOllama } from "./starter";
+import { bunSpawn, createOllamaStarter, type SpawnOllama } from "./starter";
 
 /**
  * The Ollama Night Shift uses, for search by meaning and for Decision
@@ -321,19 +321,3 @@ export async function createOllama(deps: {
 		},
 	};
 }
-
-/** `ollama serve` through Bun, its output read by the starter. */
-const bunSpawn: SpawnOllama = (argv, { env }) => {
-	const proc = Bun.spawn(argv, {
-		env,
-		stdin: "ignore",
-		stdout: "pipe",
-		stderr: "pipe",
-	});
-	return {
-		exited: proc.exited,
-		kill: (signal) => proc.kill(signal),
-		stdout: proc.stdout,
-		stderr: proc.stderr,
-	};
-};
