@@ -35,7 +35,11 @@ export function pausedHere(db: Database): PausedHere {
 			const [own] = await db
 				.select({ id: project.id })
 				.from(project)
-				.leftJoin(hostSpace, eq(hostSpace.spaceId, project.spaceId))
+				// A Space this computer left is no Host's here.
+				.leftJoin(
+					hostSpace,
+					and(eq(hostSpace.spaceId, project.spaceId), isNull(hostSpace.leftAt)),
+				)
 				.where(and(eq(project.id, projectId), isNull(hostSpace.spaceId)));
 			return new Set(own ? ids : []);
 		},

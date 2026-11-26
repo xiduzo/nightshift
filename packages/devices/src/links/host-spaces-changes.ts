@@ -14,7 +14,15 @@ export type KeptHostSpace = {
 	name: string;
 	role: string;
 	personal: boolean;
+	/**
+	 * This computer's Person left the Space: the Host stopped listing it.
+	 * Only the Host of the row may bring it back.
+	 */
+	left: boolean;
 };
+
+/** The Host of a row this computer left before it kept which Host that was. */
+export const UNKNOWN_HOST = "";
 
 /** The membership of this computer's Person in a Space here. */
 export type HostSpaceMembership = {
@@ -52,17 +60,20 @@ export type HostSpaceChange =
 			membership: MembershipChange | null;
 	  }
 	| {
-			/** The Host no longer lists these Spaces: the membership ends, the rows stay. */
+			/** The Host no longer lists these Spaces: the membership ends, the rows stay, marked left. */
 			kind: "leave";
 			spaceIds: string[];
 	  };
 
 /**
  * The changes that a Host's list makes here, in order. A Space of this
- * Replica's own, or one another Host keeps, is never taken. A personal
+ * Replica's own, or one another Host keeps or kept, is never taken. A
+ * Space this computer left comes back through its own Host, or through
+ * the first Host that lists it when that Host is not known. A personal
  * Space is "Personal" when it is this computer's own, else named after
  * its Host. A Space listed as before changes nothing. A Space of this
- * Host that the list leaves out loses the membership.
+ * Host that the list leaves out loses the membership, and its row is
+ * marked left.
  */
 export function hostSpaceChanges(state: HostSpaceState): HostSpaceChange[] {
 	const { host } = state;
@@ -73,7 +84,7 @@ export function hostSpaceChanges(state: HostSpaceState): HostSpaceChange[] {
 	for (const listed of state.listed) {
 		const row = kept.get(listed.id);
 		if (state.own.has(listed.id) && !row) continue;
-		if (row && row.hostId !== host.id) continue;
+		if (row && !mayTake(row, host.id)) continue;
 		const name = !listed.personal
 			? listed.name
 			: personalSpaceName(
@@ -81,7 +92,8 @@ export function hostSpaceChanges(state: HostSpaceState): HostSpaceChange[] {
 				);
 		const membership = memberships.get(listed.id);
 		if (
-			row?.name === name &&
+			row?.left === false &&
+			row.name === name &&
 			row.role === listed.role &&
 			row.personal === listed.personal &&
 			membership?.role === listed.role
@@ -94,6 +106,7 @@ export function hostSpaceChanges(state: HostSpaceState): HostSpaceChange[] {
 			name,
 			role: listed.role,
 			personal: listed.personal,
+			left: false,
 		};
 		changes.push({
 			kind: "take",
@@ -112,8 +125,16 @@ export function hostSpaceChanges(state: HostSpaceState): HostSpaceChange[] {
 	}
 	const listedIds = new Set(state.listed.map((s) => s.id));
 	const gone = state.kept
-		.filter((row) => row.hostId === host.id && !listedIds.has(row.spaceId))
+		.filter(
+			(row) =>
+				row.hostId === host.id && !row.left && !listedIds.has(row.spaceId),
+		)
 		.map((row) => row.spaceId);
 	if (gone.length > 0) changes.push({ kind: "leave", spaceIds: gone });
 	return changes;
+}
+
+/** Whether a Host may take a kept row: its own, or a left one whose Host is not known. */
+function mayTake(row: KeptHostSpace, hostId: string): boolean {
+	return row.hostId === hostId || (row.left && row.hostId === UNKNOWN_HOST);
 }

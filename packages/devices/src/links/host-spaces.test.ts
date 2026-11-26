@@ -6,7 +6,12 @@ import { createSandbox, type Sandbox } from "@nightshift/engine/testing";
 import { and, eq, sql } from "drizzle-orm";
 import type { ListedSpace } from "../contract";
 import { createHostLinks } from "./host-links";
-import { createHostSpaces } from "./host-spaces";
+import {
+	createHostSpaces,
+	keptByHomeHost,
+	personInSpace,
+	personOnHost,
+} from "./host-spaces";
 
 const personalSpaceId = (
 	db: Parameters<typeof testSpaces>[0],
@@ -215,13 +220,13 @@ describe("the Spaces a Host keeps", () => {
 		expect(kept).toEqual({ name: "Platform", role: "admin", personal: false });
 	});
 
-	test("a Space the Host stops listing ends the membership before its row goes", async () => {
+	test("a Space the Host stops listing ends the membership before its row is marked left", async () => {
 		const hostSpaces = createHostSpaces(sandbox.db);
 		await hostSpaces.update(studio, listed, personId);
-		// The row cannot go: what was written before it stays.
+		// The row cannot be marked left: what was written before it stays.
 		await sandbox.db.run(
 			sql.raw(
-				"CREATE TRIGGER keep_row BEFORE DELETE ON host_space BEGIN SELECT RAISE(ABORT, 'kept'); END",
+				"CREATE TRIGGER keep_row BEFORE UPDATE OF left_at ON host_space WHEN NEW.left_at IS NOT NULL BEGIN SELECT RAISE(ABORT, 'kept'); END",
 			),
 		);
 
@@ -273,6 +278,92 @@ describe("the Spaces a Host keeps", () => {
 		expect(await nameOf("space-team")).toBe("Team");
 		expect(await hostSpaces.ofHost(attic.id)).toEqual(["space-attic"]);
 		expect(await roleOf("space-attic")).toBe("member");
+	});
+
+	test("a Space the Host lists again after it stopped comes back", async () => {
+		const hostSpaces = createHostSpaces(sandbox.db);
+		await hostSpaces.update(studio, listed, personId);
+		await hostSpaces.update(studio, [listed[0] as ListedSpace], personId);
+
+		expect(await hostSpaces.hostOf("space-team")).toBeNull();
+		expect(await hostSpaces.keeper("space-team")).toBeNull();
+
+		await hostSpaces.update(studio, listed, personId);
+
+		expect(await hostSpaces.hostOf("space-team")).toBe(studio.id);
+		expect(await roleOf("space-team")).toBe("member");
+		expect(await membershipsIn("space-team")).toBe(1);
+		expect(await hostSpaces.listed(studio.id)).toEqual([
+			{ id: "space-personal-a", name: "Personal on studio", personal: true },
+			{ id: "space-team", name: "Team", personal: false },
+		]);
+	});
+
+	test("a Space one Host stopped listing comes back only through that Host", async () => {
+		const hostSpaces = createHostSpaces(sandbox.db);
+		await hostSpaces.update(studio, listed, personId);
+		await hostSpaces.update(studio, [], personId);
+		await hostSpaces.update(
+			attic,
+			[{ id: "space-team", name: "Taken", personal: false, role: "owner" }],
+			personId,
+		);
+
+		expect(await hostSpaces.hostOf("space-team")).toBeNull();
+		expect(await hostSpaces.listed(attic.id)).toEqual([]);
+		expect(await roleOf("space-team")).toBeNull();
+		expect(await nameOf("space-team")).toBe("Team");
+
+		await hostSpaces.update(studio, listed, personId);
+		expect(await hostSpaces.hostOf("space-team")).toBe(studio.id);
+		expect(await roleOf("space-team")).toBe("member");
+	});
+
+	test("a Space this computer left is no Host's for every read", async () => {
+		const hostSpaces = createHostSpaces(sandbox.db);
+		await createHostLinks(sandbox.db).save(homeLink);
+		await hostSpaces.update(studio, listed, personId);
+		await hostSpaces.update(studio, [], personId);
+
+		expect(await hostSpaces.hostOf("space-team")).toBeNull();
+		expect(await hostSpaces.keeper("space-team")).toBeNull();
+		expect(await hostSpaces.listed(studio.id)).toEqual([]);
+		expect(await hostSpaces.ofHost(studio.id)).toEqual([]);
+		expect(await personOnHost(sandbox.db, "space-team")).toBeNull();
+		expect(await keptByHomeHost(sandbox.db, "space-team")).toBe(false);
+		expect(await personInSpace(sandbox.db, "space-team", personId)).toBe(
+			personId,
+		);
+		// The row stays, to tell which Host may bring the Space back.
+		const [row] = await sandbox.db
+			.select({ hostId: hostSpace.hostId, leftAt: hostSpace.leftAt })
+			.from(hostSpace)
+			.where(eq(hostSpace.spaceId, "space-team"));
+		expect(row?.hostId).toBe(studio.id);
+		expect(row?.leftAt).toBeInstanceOf(Date);
+	});
+
+	test("a Space left before its Host was known goes to the first Host that lists it, once", async () => {
+		const hostSpaces = createHostSpaces(sandbox.db);
+		await hostSpaces.update(studio, listed, personId);
+		await hostSpaces.update(studio, [], personId);
+		// As the migration leaves such a Space: left, its Host not known.
+		await sandbox.db
+			.update(hostSpace)
+			.set({ hostId: "" })
+			.where(eq(hostSpace.spaceId, "space-team"));
+
+		await hostSpaces.update(
+			attic,
+			[{ id: "space-team", name: "Team", personal: false, role: "viewer" }],
+			personId,
+		);
+		expect(await hostSpaces.hostOf("space-team")).toBe(attic.id);
+		expect(await roleOf("space-team")).toBe("viewer");
+
+		await hostSpaces.update(studio, listed, personId);
+		expect(await hostSpaces.hostOf("space-team")).toBe(attic.id);
+		expect(await roleOf("space-team")).toBe("viewer");
 	});
 
 	test("a Space listed twice ends as its last listing, with one membership", async () => {

@@ -2,7 +2,7 @@ import { wireSpaces } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import { hostLink, hostSpace } from "@nightshift/db/schema";
 import { asDate, instantOrNull } from "@nightshift/time";
-import { asc, desc, eq, inArray, or } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, or } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import type { ListedSpace } from "../contract";
 import type { HostLink } from "./host-links";
@@ -19,7 +19,9 @@ import {
  * Person in that role: the Person who owns this computer acts here as its
  * owner on the Host, so sessions, the Space switcher and the role checks
  * work unchanged. A Space the Host stops listing loses that member row;
- * its rows stay.
+ * its rows stay, and its `host_space` row is marked left (`left_at`). A
+ * left Space is no Host's here: every read below skips it. Only the Host
+ * of its row brings it back.
  *
  * Such a Space is the Host's: this Replica never writes its document. It
  * changes it only through the Host's procedures.
@@ -78,6 +80,7 @@ export function createHostSpaces(db: Database) {
 					name: hostSpace.name,
 					role: hostSpace.role,
 					personal: hostSpace.personal,
+					leftAt: hostSpace.leftAt,
 				})
 				.from(hostSpace)
 				.where(
@@ -92,7 +95,10 @@ export function createHostSpaces(db: Database) {
 			const changes = hostSpaceChanges({
 				host,
 				listed: spaces,
-				kept,
+				kept: kept.map(({ leftAt, ...row }) => ({
+					...row,
+					left: leftAt !== null,
+				})),
 				own,
 				memberships,
 				ownPersonal,
@@ -105,18 +111,21 @@ export function createHostSpaces(db: Database) {
 						spaceIds: change.spaceIds,
 						personId,
 					});
+					// The row stays: it tells which Host may bring the Space back.
 					await db
-						.delete(hostSpace)
+						.update(hostSpace)
+						.set({ leftAt: asDate(), updatedAt: asDate() })
 						.where(inArray(hostSpace.spaceId, change.spaceIds));
 					continue;
 				}
-				const { spaceId, name, role, personal } = change.space;
+				const { spaceId, hostId, name, role, personal } = change.space;
+				const row = { spaceId, hostId, name, role, personal, leftAt: null };
 				await db
 					.insert(hostSpace)
-					.values(change.space)
+					.values(row)
 					.onConflictDoUpdate({
 						target: hostSpace.spaceId,
-						set: { name, role, personal, updatedAt: asDate() },
+						set: { ...row, updatedAt: asDate() },
 					});
 				await bound.mirrorHostSpace({ id: spaceId, name });
 				const { membership } = change;
@@ -139,7 +148,7 @@ export function createHostSpaces(db: Database) {
 			const [row] = await db
 				.select({ hostId: hostSpace.hostId })
 				.from(hostSpace)
-				.where(eq(hostSpace.spaceId, spaceId));
+				.where(and(eq(hostSpace.spaceId, spaceId), isNull(hostSpace.leftAt)));
 			return row?.hostId ?? null;
 		},
 
@@ -167,7 +176,7 @@ export function createHostSpaces(db: Database) {
 					personal: hostSpace.personal,
 				})
 				.from(hostSpace)
-				.where(eq(hostSpace.hostId, hostId))
+				.where(and(eq(hostSpace.hostId, hostId), isNull(hostSpace.leftAt)))
 				.orderBy(desc(hostSpace.personal), asc(hostSpace.name));
 		},
 
@@ -176,7 +185,7 @@ export function createHostSpaces(db: Database) {
 			const rows = await db
 				.select({ spaceId: hostSpace.spaceId })
 				.from(hostSpace)
-				.where(eq(hostSpace.hostId, hostId));
+				.where(and(eq(hostSpace.hostId, hostId), isNull(hostSpace.leftAt)));
 			return rows.map((r) => r.spaceId);
 		},
 	};
@@ -235,7 +244,7 @@ async function keeperOf(
 		})
 		.from(hostSpace)
 		.leftJoin(hostLink, eq(hostLink.hostId, hostSpace.hostId))
-		.where(eq(hostSpace.spaceId, spaceId));
+		.where(and(eq(hostSpace.spaceId, spaceId), isNull(hostSpace.leftAt)));
 	if (!row) return null;
 	const { hostId, name, personId, role, revokedAt } = row;
 	return {

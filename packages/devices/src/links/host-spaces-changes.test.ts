@@ -5,6 +5,7 @@ import {
 	type HostSpaceState,
 	hostSpaceChanges,
 	type KeptHostSpace,
+	UNKNOWN_HOST,
 } from "./host-spaces-changes";
 
 const studio = { id: "host-a", name: "studio" };
@@ -22,7 +23,7 @@ const theirs: ListedSpace = {
 	role: "owner",
 };
 
-const keptTeam: KeptHostSpace = {
+const keptTeam: Row = {
 	spaceId: "space-team",
 	hostId: studio.id,
 	name: "Team",
@@ -30,27 +31,32 @@ const keptTeam: KeptHostSpace = {
 	personal: false,
 };
 
-const state = (over: Partial<HostSpaceState>): HostSpaceState => ({
+/** A kept row, still kept unless it says it was left. */
+type Row = Omit<KeptHostSpace, "left"> & { left?: boolean };
+
+type World = Partial<Omit<HostSpaceState, "kept">> & { kept?: Row[] };
+
+const state = ({ kept = [], ...over }: World): HostSpaceState => ({
 	host: studio,
 	listed: [],
-	kept: [],
 	own: new Set(),
 	memberships: new Map(),
 	ownPersonal: null,
 	...over,
+	kept: kept.map((row) => ({ left: false, ...row })),
 });
 
 const take = (
-	space: Omit<KeptHostSpace, "hostId">,
+	space: Omit<KeptHostSpace, "hostId" | "left">,
 	membership: Extract<HostSpaceChange, { kind: "take" }>["membership"],
 ): HostSpaceChange => ({
 	kind: "take",
-	space: { ...space, hostId: studio.id },
+	space: { ...space, hostId: studio.id, left: false },
 	membership,
 });
 
 describe("what a Host's list of Spaces changes here", () => {
-	test.each<[string, Partial<HostSpaceState>, HostSpaceChange[]]>([
+	test.each<[string, World, HostSpaceChange[]]>([
 		[
 			"a new shared Space: kept with its name, and a membership in its role",
 			{ listed: [team] },
@@ -300,6 +306,87 @@ describe("what a Host's list of Spaces changes here", () => {
 					{ kind: "add", role: "member" },
 				),
 			],
+		],
+		[
+			"left, listed again by its Host: it comes back with a membership",
+			{
+				listed: [team],
+				own: new Set(["space-team"]),
+				kept: [{ ...keptTeam, left: true }],
+			},
+			[
+				take(
+					{
+						spaceId: "space-team",
+						name: "Team",
+						role: "member",
+						personal: false,
+					},
+					{ kind: "add", role: "member" },
+				),
+			],
+		],
+		[
+			"left, listed again by its Host with the membership still here: it comes back",
+			{
+				listed: [team],
+				own: new Set(["space-team"]),
+				kept: [{ ...keptTeam, left: true }],
+				memberships: new Map([["space-team", { id: "m-1", role: "member" }]]),
+			},
+			[
+				take(
+					{
+						spaceId: "space-team",
+						name: "Team",
+						role: "member",
+						personal: false,
+					},
+					null,
+				),
+			],
+		],
+		[
+			"left through another Host: never taken",
+			{
+				listed: [team],
+				own: new Set(["space-team"]),
+				kept: [{ ...keptTeam, hostId: "host-b", left: true }],
+			},
+			[],
+		],
+		[
+			"left through a Host that is not known: the first Host that lists it takes it",
+			{
+				listed: [team],
+				own: new Set(["space-team"]),
+				kept: [{ ...keptTeam, hostId: UNKNOWN_HOST, left: true }],
+			},
+			[
+				take(
+					{
+						spaceId: "space-team",
+						name: "Team",
+						role: "member",
+						personal: false,
+					},
+					{ kind: "add", role: "member" },
+				),
+			],
+		],
+		[
+			"kept by a Host that is not known, and not left: never taken",
+			{
+				listed: [team],
+				own: new Set(["space-team"]),
+				kept: [{ ...keptTeam, hostId: UNKNOWN_HOST }],
+			},
+			[],
+		],
+		[
+			"a left Space the Host still does not list: no change",
+			{ listed: [], kept: [{ ...keptTeam, left: true }] },
+			[],
 		],
 		[
 			"listed as before: nothing changes",

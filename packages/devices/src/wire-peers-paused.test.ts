@@ -1,6 +1,8 @@
 import { expect, test } from "bun:test";
 import { hostSpace, project, spaceSplit } from "@nightshift/db/schema";
 import { migratedDb } from "@nightshift/db/testing";
+import { asDate } from "@nightshift/time";
+import { eq } from "drizzle-orm";
 import { pausedHere } from "./wire-peers-paused";
 
 test("a schedule is paused per project, until a person ends it or a Host keeps the Space", async () => {
@@ -43,6 +45,14 @@ test("a schedule is paused per project, until a person ends it or a Host keeps t
 		name: "Personal",
 		role: "owner",
 		personal: true,
+		leftAt: asDate(),
 	});
+	// A Space this computer left is no Host's: the schedule stays paused.
+	expect([...(await here.of("p2"))]).toEqual(["night"]);
+
+	await db
+		.update(hostSpace)
+		.set({ leftAt: null })
+		.where(eq(hostSpace.spaceId, "own"));
 	expect([...(await here.of("p2"))]).toEqual([]);
 });
