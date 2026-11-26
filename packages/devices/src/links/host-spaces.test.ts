@@ -146,6 +146,22 @@ describe("the Spaces a Host keeps", () => {
 		expect(await roleOf("space-team")).toBe("member");
 	});
 
+	test("a Space another Host keeps stays that Host's, also without its Space row here", async () => {
+		const hostSpaces = createHostSpaces(sandbox.db);
+		await hostSpaces.update(studio, listed, personId);
+		await sandbox.db
+			.delete(organization)
+			.where(eq(organization.id, "space-team"));
+		await hostSpaces.update(
+			attic,
+			[{ id: "space-team", name: "Taken", personal: false, role: "owner" }],
+			personId,
+		);
+
+		expect(await hostSpaces.hostOf("space-team")).toBe(studio.id);
+		expect(await nameOf("space-team")).toBeNull();
+	});
+
 	test("this computer's personal Space, kept by its Host, is named as its own", async () => {
 		const hostSpaces = createHostSpaces(sandbox.db);
 		const own = (await personalSpaceId(sandbox.db, personId)) ?? "";
@@ -231,6 +247,19 @@ describe("the Spaces a Host keeps", () => {
 		expect(await nameOf("space-team")).toBe("Team");
 		expect(await hostSpaces.ofHost(attic.id)).toEqual(["space-attic"]);
 		expect(await roleOf("space-attic")).toBe("member");
+	});
+
+	test("a Space listed twice ends as its last listing, with one membership", async () => {
+		const hostSpaces = createHostSpaces(sandbox.db);
+		const team = listed[1] as ListedSpace;
+		await hostSpaces.update(
+			studio,
+			[team, team, { ...team, role: "admin" }],
+			personId,
+		);
+
+		expect(await roleOf("space-team")).toBe("admin");
+		expect(await membershipsIn("space-team")).toBe(1);
 	});
 
 	test("an empty list ends every membership through that Host, and no other", async () => {

@@ -1,11 +1,15 @@
-import { personalSpaceName, wireSpaces } from "@nightshift/auth";
+import { wireSpaces } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import { hostLink, hostSpace } from "@nightshift/db/schema";
 import { asDate, instantOrNull } from "@nightshift/time";
-import { and, asc, desc, eq, inArray, notInArray } from "drizzle-orm";
+import { asc, desc, eq, inArray, or } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import type { ListedSpace } from "../contract";
 import type { HostLink } from "./host-links";
+import {
+	type HostSpaceMembership,
+	hostSpaceChanges,
+} from "./host-spaces-changes";
 
 /**
  * The Spaces this computer takes part in through its Hosts. A Host lists
@@ -24,7 +28,8 @@ import type { HostLink } from "./host-links";
  * computer's tie to that Host (`keeper`: its link, and whether it is
  * the home Host), and the Space's name here (`personalSpaceName` of
  * `@nightshift/auth` for a personal one). `host_space` is its own table:
- * nothing else writes it.
+ * nothing else writes it. What a list changes is the rule of
+ * `hostSpaceChanges`: `update` reads the state once and applies them.
  */
 
 export type HostSpaces = ReturnType<typeof createHostSpaces>;
@@ -50,89 +55,82 @@ export function createHostSpaces(db: Database) {
 			spaces: readonly ListedSpace[],
 			personId: string,
 		): Promise<void> {
-			const listed = spaces.map((s) => s.id);
 			const bound = wireSpaces({ db });
 			// After a merge (ADR 1), the Person's personal Space here is the
 			// Host's: it is named as their own.
 			const ownPersonal = await bound.personal.findPersonalSpace({
 				personId,
 			});
-			// No transaction: every write is an upsert, and it runs with each
-			// answer of the Host, beside the walk's own writes.
+			const own = new Set<string>();
+			const memberships = new Map<string, HostSpaceMembership>();
 			for (const space of spaces) {
-				const own = await bound.hasSpace({ spaceId: space.id });
-				const [kept] = await db
-					.select()
-					.from(hostSpace)
-					.where(eq(hostSpace.spaceId, space.id));
-				// A Space of this Replica's own is never taken for a Host's.
-				if (own && !kept) continue;
-				if (kept && kept.hostId !== host.id) continue;
-				const name = !space.personal
-					? space.name
-					: personalSpaceName(space.id === ownPersonal ? undefined : host.name);
+				if (await bound.hasSpace({ spaceId: space.id })) own.add(space.id);
 				const membership = await bound.members.findMembership({
 					spaceId: space.id,
 					personId,
 				});
-				if (
-					kept?.name === name &&
-					kept.role === space.role &&
-					kept.personal === space.personal &&
-					membership?.role === space.role
-				) {
-					continue;
-				}
-				await db
-					.insert(hostSpace)
-					.values({
-						spaceId: space.id,
-						hostId: host.id,
-						name,
-						role: space.role,
-						personal: space.personal,
-					})
-					.onConflictDoUpdate({
-						target: hostSpace.spaceId,
-						set: {
-							name,
-							role: space.role,
-							personal: space.personal,
-							updatedAt: asDate(),
-						},
-					});
-				await bound.mirrorHostSpace({ id: space.id, name });
-				if (!membership) {
-					await bound.members.addMembership({
-						spaceId: space.id,
-						personId,
-						role: space.role,
-					});
-				} else if (membership.role !== space.role) {
-					await bound.members.setMembershipRole({
-						membershipId: membership.id,
-						role: space.role,
-					});
-				}
+				if (membership) memberships.set(space.id, membership);
 			}
-			const gone = await db
-				.select({ spaceId: hostSpace.spaceId })
+			const kept = await db
+				.select({
+					spaceId: hostSpace.spaceId,
+					hostId: hostSpace.hostId,
+					name: hostSpace.name,
+					role: hostSpace.role,
+					personal: hostSpace.personal,
+				})
 				.from(hostSpace)
 				.where(
-					and(
+					or(
 						eq(hostSpace.hostId, host.id),
-						listed.length > 0
-							? notInArray(hostSpace.spaceId, listed)
-							: undefined,
+						inArray(
+							hostSpace.spaceId,
+							spaces.map((s) => s.id),
+						),
 					),
 				);
-			const goneIds = gone.map((g) => g.spaceId);
-			if (goneIds.length > 0) {
-				await bound.members.removeMemberships({
-					spaceIds: goneIds,
-					personId,
-				});
-				await db.delete(hostSpace).where(inArray(hostSpace.spaceId, goneIds));
+			const changes = hostSpaceChanges({
+				host,
+				listed: spaces,
+				kept,
+				own,
+				memberships,
+				ownPersonal,
+			});
+			// No transaction: every write is an upsert, and it runs with each
+			// answer of the Host, beside the walk's own writes.
+			for (const change of changes) {
+				if (change.kind === "leave") {
+					await bound.members.removeMemberships({
+						spaceIds: change.spaceIds,
+						personId,
+					});
+					await db
+						.delete(hostSpace)
+						.where(inArray(hostSpace.spaceId, change.spaceIds));
+					continue;
+				}
+				const { spaceId, name, role, personal } = change.space;
+				await db
+					.insert(hostSpace)
+					.values(change.space)
+					.onConflictDoUpdate({
+						target: hostSpace.spaceId,
+						set: { name, role, personal, updatedAt: asDate() },
+					});
+				await bound.mirrorHostSpace({ id: spaceId, name });
+				const { membership } = change;
+				if (membership?.kind === "add") {
+					await bound.members.addMembership({ spaceId, personId, role });
+				} else if (membership?.kind === "role") {
+					// A Space listed twice: the membership its first listing added.
+					const membershipId =
+						membership.membershipId ??
+						(await bound.members.findMembership({ spaceId, personId }))?.id;
+					if (membershipId) {
+						await bound.members.setMembershipRole({ membershipId, role });
+					}
+				}
 			}
 		},
 
