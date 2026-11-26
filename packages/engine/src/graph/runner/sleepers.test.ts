@@ -580,6 +580,110 @@ for (const [saved, order] of [
 		}
 	});
 
+test("two branches ask, the daemon dies as b's Gate opens, and b is answered first: b went on without it, and the person hears that its Gate does not wait anymore", async () => {
+	const harness = fakeHarness((input) =>
+		input.resumeSessionId
+			? reportingScript("pass", "Done.")
+			: reportingScript("needs-input", "Which one?"),
+	);
+	const asks = (id: string) => agent(id, `Do ${id}`, { ask: "person" });
+	const h = await startRun(
+		sandbox,
+		flowOf(
+			[
+				command("start", "true"),
+				asks("a"),
+				asks("b"),
+				{ id: "joined", type: "join", position: at, wait: "all" },
+			],
+			[
+				edge("1", "start", "pass", "a"),
+				edge("2", "start", "pass", "b"),
+				edge("3", "a", "pass", "joined"),
+				edge("4", "b", "pass", "joined"),
+			],
+		),
+		{ harness },
+	);
+	let died = false;
+	let runner = testRunner(h, {
+		overdueSweepMs: 3_600_000,
+		openThread: (row, deps) => {
+			const thread = openThread(row, deps);
+			const { log } = thread.ctx;
+			thread.ctx.log = {
+				...log,
+				append: async (input, rows) => {
+					if (died) throw new Error("the daemon died");
+					const written = await log.append(input, rows);
+					// b's Gate is in the log; its task saves nothing more.
+					const b = [...(await log.state(h.runId)).steps.values()].find(
+						(step) => step.nodeId === "b",
+					);
+					if (input.type === "GateOpened" && input.stepId === b?.id) {
+						died = true;
+						throw new Error("the daemon died");
+					}
+					return written;
+				},
+			};
+			return thread;
+		},
+	});
+	const state = async () => foldRun(await h.events());
+	const answer = async (nodeId: string, note: string) => {
+		const gate = (await state()).gates.find((g) => g.nodeId === nodeId);
+		return runner.take(h.runId, {
+			kind: "answer",
+			stepId: gate?.stepId ?? "",
+			choice: "answer",
+			note,
+		});
+	};
+	try {
+		await runner
+			.take(h.runId, {
+				kind: "start",
+				prepare: async () => ({
+					row: await getRunRow(sandbox.db, h.runId),
+					inputs: {},
+					stopAt: null,
+				}),
+			})
+			.catch(() => {});
+		await waitFor(() => died && !runner.isActive(h.runId));
+		await runner.release();
+		runner = testRunner(h, { overdueSweepMs: 3_600_000 });
+		await closeOpenWork(
+			{
+				log: h.log,
+				bus: h.deps.shared.bus,
+				flowOf: parseRunFlow,
+				calledFlowsOf: parseCalledFlows,
+			},
+			h.runId,
+			{ kind: "interrupted", reason: "Night Shift stopped." },
+		);
+		expect((await state()).gates.map((g) => g.nodeId).sort()).toEqual([
+			"a",
+			"b",
+		]);
+		// The thread goes on to b's Gate first, and b's Agent continues its
+		// session instead: its Gate closes with no answer.
+		await expect(answer("b", "For b.")).rejects.toThrow(
+			"This Gate does not wait anymore.",
+		);
+		await waitFor(() => !runner.isActive(h.runId));
+		await answer("a", "For a.");
+		await waitFor(async () => (await state()).status === "finished");
+		const told = harness.calls.map((call) => call.prompt);
+		expect(told).toContain("For a.");
+		expect(told).not.toContain("For b.");
+	} finally {
+		await runner.release();
+	}
+});
+
 /** A log where `a` sleeps until 400 and `b`, which slept later, until 800. */
 const both = () =>
 	runEvents()

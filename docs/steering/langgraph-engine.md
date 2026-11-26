@@ -263,6 +263,9 @@ packages/engine/src/
                            work and the re-entry (reenter).
     runner/turns.ts        One phase per intent, and turnFor, which reads
                            the row and the log before the phase.
+    runner/answer-plan.ts  planAnswer (pure): where an answer to a Gate
+                           goes. The answer Turn reads the thread and the
+                           log, and does what the plan says.
   testing/graph.ts         The one set of graph test helpers: node builders
                            (agent(), command(), edge(), flowOf()), startRun()
                            for a run row with its log and its Thread (opened
@@ -837,6 +840,11 @@ Gate is open in the log, the answer goes by the id of its interrupt, so a
 Gate whose interrupt is not saved yet cannot take it. When the thread goes
 on past the Gate without an answer, the person reads "This Gate does not
 wait anymore."
+
+`planAnswer` (`graph/runner/answer-plan.ts`, pure) makes these decisions
+from the thread's snapshot and the log. It gives one of four plans: refuse
+with the words, continue the drive, drive to the Gate's interrupt first, or
+resume. After the drive to the interrupt, the Turn asks the plan again.
 
 ## The resume point (`graph/step/resume-point.ts`)
 

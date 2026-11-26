@@ -7,12 +7,12 @@ import {
 	type RunStatus,
 	WALKED_ELSEWHERE,
 } from "../../run-status";
-import type { ResumeValue } from "../state";
+import { type AnswerPlan, planAnswer } from "./answer-plan";
 import { findOverdue } from "./deadlines";
 import type { Drives } from "./drive";
 import type { ReentryRequest } from "./reentry";
 import type { RunnerState, TurnQueue, TurnState } from "./run-slots";
-import { type Interrupt, inputOf, type openThread, resumeEach } from "./thread";
+import { inputOf, type openThread } from "./thread";
 import {
 	type Intent,
 	RestartTooLate,
@@ -36,14 +36,6 @@ const BRANCHES_WORK =
 /** A resume of a sleeping run whose walk is not where the sleep is. */
 const CANNOT_WAKE =
 	"Night Shift could not wake this run. Stop the run, then resume it.";
-
-/** An answer to a Gate whose answer the thread holds already. */
-const ANSWERED =
-	"This Gate has its answer. The run continues when the other branches are done.";
-/** An answer to a Gate whose answer the thread had, and went on with. */
-const CONTINUED = "This Gate has its answer. The run continues with it.";
-/** An answer to a Gate that the walk left behind. */
-const GATE_GONE = "This Gate does not wait anymore.";
 
 const HALTED: Taken = { kind: "halted" };
 const QUEUED: Taken = { kind: "queued" };
@@ -101,6 +93,8 @@ export function createTurns(
 	 * An answer: the thread continues at once, so it needs a slot. A full
 	 * cap leaves the Gate open. A Gate on one of parallel branches opens
 	 * while the other branches still work: the answer waits until they end.
+	 * Where the answer goes is `planAnswer`'s: this Turn reads the thread and
+	 * the log, and does what the plan says.
 	 */
 	async function answerTurn(
 		row: RunRow,
@@ -111,85 +105,53 @@ export function createTurns(
 		if (flow && branchPlaces(flow).size > 0) {
 			throw new RunRefusal("not-now", BRANCHES_WORK);
 		}
-		const isThis = ({ value }: Interrupt) =>
-			value.kind === "gate" && value.stepId === intent.stepId;
-		let snapshot = await threadOf(row).snapshot();
-		// A task of the thread took this Gate's answer already: it goes on
-		// with the other tasks of its super-step. A second answer would go
-		// to one of them.
-		if (snapshot.answered.some(isThis)) {
-			// No step sleeps beside it: the daemon died after the answer, and
-			// recovery ended the steps that ran beside it. Nothing else moves
-			// the thread, so this answer does: the Gate goes on with the first.
-			// The run goes on when the steps beside it are done: a sleeper
-			// wakes, another Gate gets its answer. Then this answer has no use.
-			const other = snapshot.state;
-			if (
-				(await log.state(row.id)).waits.length > 0 ||
-				(other.kind === "interrupted" &&
-					other.interrupts.some(({ value }) => value.kind === "gate"))
-			) {
-				throw new RunRefusal("gate-closed", ANSWERED);
-			}
-			if (!reserve(row.id, intent, options)) return QUEUED;
-			const asked =
-				(await log.state(row.id)).steps.get(intent.stepId)?.gate?.openedSeq ??
-				0;
-			drive(row, inputOf({ kind: "continue" }));
-			await untilGateClosed(row.id, intent.stepId, asked);
-			return DRIVING;
+		const snapshot = await threadOf(row).snapshot();
+		const runState = await log.state(row.id);
+		const plan = planAnswer(snapshot, runState, intent, {
+			afterPreDrive: false,
+		});
+		if (plan.kind !== "pre-drive") return answerBy(row, intent, options, plan);
+		if (!reserve(row.id, intent, options)) return QUEUED;
+		drive(row, inputOf({ kind: "continue" }));
+		await walkOf(row.id)?.done;
+		const after = await threadOf(row).snapshot();
+		return answerBy(
+			row,
+			intent,
+			options,
+			planAnswer(after, await log.state(row.id), intent, {
+				afterPreDrive: true,
+			}),
+		);
+	}
+
+	/** Does what an answer's plan says, except a pre-drive (`answerTurn`). */
+	async function answerBy(
+		row: RunRow,
+		intent: Extract<Intent, { kind: "answer" }>,
+		options: TakeOptions,
+		plan: Exclude<AnswerPlan, { kind: "pre-drive" }>,
+	): Promise<Taken> {
+		if (plan.kind === "refuse") {
+			throw new RunRefusal("gate-closed", plan.words);
 		}
-		const before = snapshot.state;
-		if (
-			(before.kind === "interrupted" && !before.interrupts.some(isThis)) ||
-			before.kind === "pending"
-		) {
-			// The daemon died before the Gate's interrupt was saved: the thread
-			// goes on to it first, so the answer reaches its own Gate and no
-			// other one.
-			if (!reserve(row.id, intent, options)) return QUEUED;
-			drive(row, inputOf({ kind: "continue" }));
-			await walkOf(row.id)?.done;
-			snapshot = await threadOf(row).snapshot();
-			const at = snapshot.state;
-			if (at.kind !== "interrupted" || !at.interrupts.some(isThis)) {
-				// The thread went on past the Gate: with an answer it had, or
-				// without one (its step went on before it asked again).
-				const step = (await log.state(row.id)).steps.get(intent.stepId);
-				const answered = (step?.gateWaits.at(-1)?.answeredBy ?? null) !== null;
-				throw new RunRefusal("gate-closed", answered ? CONTINUED : GATE_GONE);
-			}
-		}
-		const at = snapshot.state;
 		if (!reserve(row.id, intent, options)) return QUEUED;
 		// The Gate's deadline, if it has one, no longer applies.
-		sleeps.forget(row.id);
-		const { choice, note, byDeadline, data, via } = intent;
+		if (plan.kind === "resume") sleeps.forget(row.id);
 		const asked =
 			(await log.state(row.id)).steps.get(intent.stepId)?.gate?.openedSeq ?? 0;
-		const value: ResumeValue = {
-			kind: "gate",
-			choice,
-			note,
-			...(byDeadline ? { byDeadline } : {}),
-			...(data !== undefined ? { data } : {}),
-			...(via ? { via } : {}),
-		};
-		// Parallel branches may hold several Gates: the answer goes to its own,
-		// by the id of its interrupt. Also when the thread holds only this
-		// one while another Gate's task has not reached its interrupt yet:
-		// an answer without an id goes to the first interrupt that asks.
-		const mine = at.kind === "interrupted" ? at.interrupts.find(isThis) : null;
-		const each =
-			resumeEach(at, (parked) =>
-				parked.kind === "gate" && parked.stepId === intent.stepId
-					? value
-					: null,
-			) ??
-			(mine && (await log.state(row.id)).gates.length > 1
-				? { [mine.id]: value }
-				: null);
-		drive(row, inputOf({ kind: "resume", value, ...(each ? { each } : {}) }));
+		drive(
+			row,
+			inputOf(
+				plan.kind === "resume"
+					? {
+							kind: "resume",
+							value: plan.value,
+							...(plan.each ? { each: plan.each } : {}),
+						}
+					: { kind: "continue" },
+			),
+		);
 		// The ask node ends the step on the answer, or an Agent's step opens
 		// again with it. The Turn ends once the Gate closed, so the run no
 		// longer waits when the caller looks again (I8).
