@@ -9,4 +9,5 @@ export {
 	placeOf,
 	type Races,
 	reopenRound,
+	unreachableJoin,
 } from "./branches";

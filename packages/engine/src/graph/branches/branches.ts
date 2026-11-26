@@ -176,6 +176,40 @@ export function reopenRound(
 }
 
 /**
+ * The Join that a jump to `nodeId` cannot bring to go on, or null. That is
+ * the Join of `nodeId`'s branch, or `nodeId` itself, while its round is
+ * open and its rule cannot hold: a branch it waits for has no arrival, the
+ * jump does not run that branch, and none of `onTheirWay` (the nodes whose
+ * writes the walk still goes on from) is on it. A run again leaves the
+ * other branches as they are, so the Join would wait for ever. A closed
+ * round is `reopenRound`'s case, and a jump to a branch of a `first` Join
+ * arrives itself.
+ */
+export function unreachableJoin(
+	flow: Flow,
+	state: Partial<Pick<RunStateValues, "joins">>,
+	nodeId: string,
+	onTheirWay: readonly string[],
+): string | null {
+	const place = placeOf(flow, nodeId);
+	const joinId = place?.fanOut.join ?? nodeId;
+	const join = flow.nodes.find((n) => n.id === joinId);
+	const round = state.joins?.[joinId];
+	const fanOut = place?.fanOut ?? fanOutOf(flow, joinId);
+	if (join?.type !== "join" || !round || round.closed || !fanOut) return null;
+	const reached = new Set(place ? [place.branch] : []);
+	for (const from of [...round.arrived.map((a) => a.from), ...onTheirWay]) {
+		const at = placeOf(flow, from);
+		if (at?.fanOut === fanOut) reached.add(at.branch);
+	}
+	const holds =
+		join.wait === "first"
+			? reached.size > 0
+			: fanOut.branches.every((branch) => reached.has(branch));
+	return holds ? null : joinId;
+}
+
+/**
  * The state a branch writes when it reaches its Join: its arrival in the
  * Join's round. For a `first` Join the first arrival also claims the round
  * and stops the steps that run in the other branches.

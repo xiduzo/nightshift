@@ -92,6 +92,12 @@ export type ThreadSnapshot = {
 	/** The thread still has a task: an interrupt, or a node a stop or a death cut short. */
 	hasTasks: boolean;
 	/**
+	 * The nodes whose task ended in the super-step the thread stopped in,
+	 * beside an interrupt or a node cut short. Their writes are kept: a jump
+	 * leaves them, and the walk goes on from them too.
+	 */
+	endedTasks: string[];
+	/**
 	 * The interrupts whose task took its answer already: the task goes on
 	 * with the other tasks of its super-step. `state` does not list them.
 	 */
@@ -183,6 +189,9 @@ export function openThread(row: RunRow, deps: ThreadDeps): Thread {
 			values,
 			hasCheckpoint,
 			hasTasks: latest.tasks.length > 0,
+			endedTasks: latest.tasks
+				.filter((task) => task.result !== undefined && !task.interrupts.length)
+				.map((task) => task.name),
 			answered: interruptsOf(latest, true),
 		};
 	}

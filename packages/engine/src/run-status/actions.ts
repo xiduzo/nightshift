@@ -197,6 +197,8 @@ export type RefusalRule =
 	| "unknown-node"
 	/** A run again from a step that is not a step of that node. */
 	| "unknown-step"
+	/** A run again that cannot bring a Join to go on: a branch it waits for did not finish. */
+	| "join-unreachable"
 	/** A restart while no step runs. */
 	| "no-step"
 	/** A restart of a step that ended. */
@@ -220,6 +222,7 @@ const RULE_KINDS: Record<RefusalRule, RefusalKind> = {
 	"wrong-signal": "conflict",
 	"unknown-node": "invalid",
 	"unknown-step": "invalid",
+	"join-unreachable": "conflict",
 	"no-step": "conflict",
 	"step-ended": "conflict",
 	"walks-here": "invalid",

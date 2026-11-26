@@ -21,7 +21,7 @@ import {
 	type RunStatus,
 	refuseUnless,
 } from "../../run-status";
-import { placeOf, reopenRound } from "../branches";
+import { placeOf, reopenRound, unreachableJoin } from "../branches";
 import { DEFAULT_RESUME_PROMPT } from "../context";
 import {
 	latestFront,
@@ -202,11 +202,16 @@ export function rerunNodeRefusal(flow: Flow, nodeId: string): string | null {
 		: `This run's flow has no node "${nodeId}". Pick a step of the run's own flow, not one inside a called flow.`;
 }
 
+/** Why a run again cannot bring Join `joinId` to go on: a branch it waits for did not finish. */
+export const joinUnreachable = (joinId: string): string =>
+	`The Join "${joinId}" waits for a branch that did not finish. Run again from a step before the branches. If that branch can still reach the Join, resume the run.`;
+
 /**
  * Pure: what a re-entry records and how the thread moves. Throws a
  * `RunRefusal` when the run refuses the request: it runs, waits or sleeps
  * (the run's own rule, `run-status/`); a rerun node is not a top-level node
- * of the flow; a rerun step is not a step of that node.
+ * of the flow; a rerun cannot bring a Join to go on (`unreachableJoin`); a
+ * rerun step is not a step of that node.
  *
  * A resume continues where the thread is (design rule 9):
  *
@@ -248,6 +253,11 @@ export function planReentry(input: {
 	}
 	refuseLive(request.kind, run.status, run.end?.result ?? null);
 	if (request.kind === "rerun") {
+		const joinId = thread.hasCheckpoint
+			? unreachableJoin(flow, thread.values, request.nodeId, thread.endedTasks)
+			: null;
+		if (joinId)
+			throw new RunRefusal("join-unreachable", joinUnreachable(joinId));
 		return planRerun(flow, run, thread, request, clearStopAt, cleared);
 	}
 	const target = targetOf(flow, run, thread) ?? {

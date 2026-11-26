@@ -291,6 +291,7 @@ function threadAt(
 		values: {},
 		hasCheckpoint: state.kind !== "fresh",
 		hasTasks: state.kind === "interrupted" || state.kind === "pending",
+		endedTasks: [],
 		answered: [],
 		...over,
 	};
