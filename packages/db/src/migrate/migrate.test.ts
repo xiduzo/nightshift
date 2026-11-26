@@ -1,5 +1,11 @@
-import { afterEach, describe, expect, test } from "bun:test";
-import { cpSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { afterEach, describe, expect, spyOn, test } from "bun:test";
+import {
+	cpSync,
+	mkdtempSync,
+	readdirSync,
+	readFileSync,
+	rmSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { sql } from "drizzle-orm";
@@ -432,5 +438,109 @@ describe("migration membership_repair", () => {
 		// And this build again.
 		await migrateDb(db);
 		expect((await old()).splits).toHaveLength(2);
+	});
+});
+
+describe("migration host_space_left", () => {
+	const seed = [
+		// Made here: never a Host's.
+		"INSERT INTO organization (id, name, slug, created_at) VALUES ('own', 'Own', 'own-1a2b3c4d', 1)",
+		// A Host keeps it: its row stays as it is.
+		"INSERT INTO organization (id, name, slug, created_at) VALUES ('kept', 'Kept', 'host-kept', 1)",
+		"INSERT INTO host_space (space_id, host_id, name, role, personal, updated_at) VALUES ('kept', 'host-a', 'Kept there', 'member', 0, 5)",
+		// Left, and one Host exchanged its runs.
+		"INSERT INTO organization (id, name, slug, created_at) VALUES ('left-a', 'Left A', 'host-left-a', 1)",
+		"INSERT INTO sync_cursor (host_id, space_id, walker_id, walker_seq) VALUES ('host-a', 'left-a', 'w1', 3)",
+		"INSERT INTO sync_cursor (host_id, space_id, walker_id, walker_seq) VALUES ('host-a', 'left-a', 'w2', 4)",
+		// Left, and two Hosts exchanged its runs: the Host is not known.
+		"INSERT INTO organization (id, name, slug, created_at) VALUES ('left-two', 'Left two', 'host-left-two', 1)",
+		"INSERT INTO sync_cursor (host_id, space_id, walker_id, walker_seq) VALUES ('host-a', 'left-two', 'w1', 1)",
+		"INSERT INTO sync_cursor (host_id, space_id, walker_id, walker_seq) VALUES ('host-b', 'left-two', 'w1', 1)",
+		// Left, and no Host exchanged its runs.
+		"INSERT INTO organization (id, name, slug, created_at) VALUES ('left-none', 'Left none', 'host-left-none', 1)",
+	];
+	const kept = (db: Database) =>
+		rows<{
+			space_id: string;
+			host_id: string;
+			name: string;
+			role: string;
+			personal: number;
+			left: number;
+		}>(
+			db,
+			"SELECT space_id, host_id, name, role, personal, left_at IS NOT NULL AS left FROM host_space ORDER BY space_id",
+		);
+
+	test("adds a left row for each Space a Host listed before, with its Host when one is known", async () => {
+		const db = await databaseBefore("host_space_left");
+		for (const statement of seed) await db.run(sql.raw(statement));
+		const info = spyOn(console, "info").mockImplementation(() => {});
+		const spaces = () => rows(db, "SELECT * FROM organization ORDER BY id");
+		const spacesBefore = await spaces();
+
+		await migrateDb(db);
+
+		expect(await kept(db)).toEqual([
+			{
+				space_id: "kept",
+				host_id: "host-a",
+				name: "Kept there",
+				role: "member",
+				personal: 0,
+				left: 0,
+			},
+			{
+				space_id: "left-a",
+				host_id: "host-a",
+				name: "Left A",
+				role: "",
+				personal: 0,
+				left: 1,
+			},
+			{
+				space_id: "left-none",
+				host_id: "",
+				name: "Left none",
+				role: "",
+				personal: 0,
+				left: 1,
+			},
+			{
+				space_id: "left-two",
+				host_id: "",
+				name: "Left two",
+				role: "",
+				personal: 0,
+				left: 1,
+			},
+		]);
+		expect(info).toHaveBeenCalledWith(
+			"Migration 20261126093041_host_space_left: added 3 rows for Spaces this computer left (2 with no known Host).",
+		);
+		// Every organization row stays.
+		expect(await spaces()).toEqual(spacesBefore);
+
+		// Again: it adds nothing and changes nothing.
+		info.mockClear();
+		const again = readFileSync(
+			join(migrationsFolder, "20261126093041_host_space_left", "migration.sql"),
+			"utf8",
+		).split("--> statement-breakpoint")[1] as string;
+		const before = await kept(db);
+		await db.run(sql.raw(again));
+		await migrateDb(db);
+		expect(await kept(db)).toEqual(before);
+		expect(info).not.toHaveBeenCalled();
+		info.mockRestore();
+	});
+
+	test("adds nothing to a database without such Spaces", async () => {
+		const db = await databaseBefore("host_space_left");
+		const info = spyOn(console, "info").mockImplementation(() => {});
+		await migrateDb(db);
+		expect(await kept(db)).toEqual([]);
+		expect(info).not.toHaveBeenCalled();
+		info.mockRestore();
 	});
 });
