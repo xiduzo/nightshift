@@ -38,9 +38,11 @@ export function firstCommit(log: string): string | null {
 	return first && isZero(first.old) ? first.now : null;
 }
 
-/** Whether the log of a ref says that it was at `commit` once. */
-export function wasAt(log: string, commit: string): boolean {
-	return linesOf(log).some((line) => line.now === commit);
+/** The moves of a branch's log from one commit to another, as `old>new`. */
+export function movesOf(log: string): string[] {
+	return linesOf(log)
+		.filter((line) => !isZero(line.old) && line.old !== line.now)
+		.map((line) => `${line.old}>${line.now}`);
 }
 
 /**
@@ -48,11 +50,13 @@ export function wasAt(log: string, commit: string): boolean {
  * of the branch to `tip`, by git's own logs. The run made the branch: with a
  * checkout in its copy, at a commit it made there, from a branch of its
  * names, or at a commit that was somewhere else then (`bornOn`). And each move since is one that the copy made: git wrote the same
- * line for the copy's HEAD, or the move is to a commit that the copy made. A
- * move that only the branch has is another person's.
+ * line for the copy's HEAD, the move is to a commit that the copy made, or
+ * the move dropped no commit (`forward`). Another move that only the branch
+ * has is another person's.
  *
- * A commit that the copy did not make (one it pulled or merged) must be on
- * another branch too: none of `only` may be one of them.
+ * A commit that the copy did not make (one it pulled or merged, or that a
+ * move that dropped none brought) must be on another branch too: none of
+ * `only` may be one of them.
  *
  * The log must go on without a gap from `tip` to the first line of the
  * branch, or to `handed`: the tip the run knew before. Else it is not known.
@@ -64,6 +68,8 @@ export function runMade(
 		branch: string;
 		tip: string;
 		handed: string | null;
+		/** The moves (`old>new`) that dropped no commit: `old` is in `new`. */
+		forward: ReadonlySet<string>;
 		/** Its first commit, when another branch, a tag or the remote's branch has it. */
 		bornOn: string | null;
 		/** The commits at `tip` that no branch has that the run does not move. */
@@ -104,7 +110,12 @@ export function runMade(
 		}
 		const renamed = RENAMED.exec(line.why)?.[1];
 		if (renamed !== undefined && line.old === line.now) names.push(renamed);
-		else if (!sameMove.has(line.text) && !made.has(line.now)) return false;
+		else if (
+			!sameMove.has(line.text) &&
+			!made.has(line.now) &&
+			!run.forward.has(`${line.old}>${line.now}`)
+		)
+			return false;
 	}
 	return at === run.handed;
 }

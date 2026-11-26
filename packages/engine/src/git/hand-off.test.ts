@@ -409,6 +409,103 @@ describe("a hand-off of a branch the run made", () => {
 			});
 		}
 
+		test("a pull request's branch that the clone had from the start", async () => {
+			await pr();
+			const clone = join(sandbox.root, "from-start");
+			await mustGit(sandbox.root, [
+				"clone",
+				"-q",
+				join(sandbox.root, "origin.git"),
+				clone,
+			]);
+			const copy = (await createWorktree({ repoPath: clone, shortId }))
+				.worktreePath;
+			// The run's own branch goes there and back first.
+			await commit(copy);
+			await take(b, await pushRunBranch(copy, own));
+			await commit(copyB);
+			await take(clone, await pushRunBranch(copyB, own));
+			await mustGit(copy, ["checkout", "-q", "pr"]);
+			await file(copy, "mine.txt");
+			await take(b, await pushRunBranch(copy, own));
+			await commit(copyB, "--amend");
+			const back = await pushRunBranch(copyB, own);
+			await take(clone, back);
+			expect(await tip(clone, "pr")).toBe(back.commit);
+		});
+
+		test("a commit that the remote's branch had once, but not now, stays", async () => {
+			const { theirs } = await pr();
+			await mustGit(a, ["fetch", "-q", "origin"]);
+			await mustGit(a, ["push", "-q", "-f", "origin", "main:pr"]);
+			await mustGit(a, ["fetch", "-q", "origin"]);
+			await mustGit(a, ["branch", "pr", theirs]);
+			await mustGit(copyA, ["checkout", "-q", "pr"]);
+			await file(copyA, "mine.txt");
+			await take(b, await pushRunBranch(copyA, own));
+			await git(copyB, "reset", "-q", "--hard", `${theirs}~1`);
+			await commit(copyB);
+			await expect(take(a, await pushRunBranch(copyB, own))).rejects.toThrow(
+				branchHasOtherWork("pr"),
+			);
+			expect(await tip(a, "pr")).not.toBe(theirs);
+			expect(await mustGit(a, ["branch", "--contains", theirs])).toContain(
+				"pr",
+			);
+		});
+
+		test("an empty branch moved on to the newest main goes there and back", async () => {
+			await mustGit(copyA, ["checkout", "-q", "-b", "feat"]);
+			await mainMoves();
+			await mustGit(copyA, ["fetch", "-q", "origin"]);
+			await git(copyA, "rebase", "-q", "origin/main");
+			await rewritten("feat");
+		});
+
+		test("a move on to a person's commit is the run's only when another branch has it", async () => {
+			for (const kept of [true, false]) {
+				await mustGit(copyA, ["checkout", "-q", "-B", "feat", own]);
+				await mustGit(copyA, ["checkout", "-q", "--detach"]);
+				await mustGit(a, ["checkout", "-q", "-B", "x", own]);
+				await file(a, `theirs-${kept}.txt`);
+				const theirs = await tip(a, "x");
+				await mustGit(a, ["checkout", "-q", "main"]);
+				// The person moves feat on, from another folder.
+				await mustGit(a, ["branch", "-f", "feat", theirs]);
+				if (!kept) await mustGit(a, ["branch", "-D", "x"]);
+				await mustGit(copyA, ["checkout", "-q", "feat"]);
+				await file(copyA, `mine-${kept}.txt`);
+				await take(b, await pushRunBranch(copyA, own));
+				await git(copyB, "reset", "-q", "--hard", `${theirs}~1`);
+				await commit(copyB);
+				const back = await pushRunBranch(copyB, own);
+				if (kept) {
+					await take(a, back);
+					expect(await tip(a, "x")).toBe(theirs);
+				} else {
+					await expect(take(a, back)).rejects.toThrow(
+						branchHasOtherWork("feat"),
+					);
+				}
+				await mustGit(copyB, ["checkout", "-q", "--detach"]);
+				await mustGit(b, ["branch", "-D", "feat"]);
+			}
+		});
+
+		test("a move by a person that left a commit out is not the run's", async () => {
+			await mustGit(copyA, ["checkout", "-q", "-b", "feat"]);
+			await file(copyA, "one.txt");
+			await mustGit(copyA, ["checkout", "-q", "--detach"]);
+			await mustGit(a, ["branch", "-f", "feat", "main"]);
+			await mustGit(copyA, ["checkout", "-q", "feat"]);
+			await file(copyA, "two.txt");
+			await take(b, await pushRunBranch(copyA, own));
+			await commit(copyB, "--amend");
+			await expect(take(a, await pushRunBranch(copyB, own))).rejects.toThrow(
+				branchHasOtherWork("feat"),
+			);
+		});
+
 		test("a commit that comes to a pull request's branch after it was made stays", async () => {
 			const { there } = await pr();
 			await mustGit(copyA, ["fetch", "-q", "origin"]);

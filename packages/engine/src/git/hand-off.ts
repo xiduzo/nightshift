@@ -4,7 +4,7 @@ import { Refusal } from "@nightshift/refusal";
 import { DirtyWorktreeError } from "./dirty-worktree";
 import { type Git, GitError, gitOrThrow } from "./git";
 import { branchName, objectId } from "./git-names";
-import { firstCommit, runMade, wasAt } from "./run-made";
+import { firstCommit, movesOf, runMade } from "./run-made";
 import {
 	isRunsBranch,
 	KEPT_REFS,
@@ -157,22 +157,26 @@ export function createHandOff(git: Git, parts: HandOffParts) {
 		run: { shortId: string; branch: string; tip: string },
 	): Promise<boolean> {
 		const handed = await handedTip(cwd, run.shortId, run.branch);
-		const [branch, head, remote] = await Promise.all([
+		const [branch, head] = await Promise.all([
 			gitFile(cwd, `logs/refs/heads/${run.branch}`),
 			gitFile(cwd, "logs/HEAD"),
-			gitFile(cwd, `logs/refs/remotes/origin/${run.branch}`),
 		]);
-		// The commit it was made at, when it was somewhere else then.
+		// The commit it was made at, when something else has it now.
 		const first = firstCommit(branch);
 		const bornOn =
 			first !== null &&
-			(wasAt(remote, first) ||
+			((await isAncestor(cwd, first, `refs/remotes/origin/${run.branch}`)) ||
 				(await onlyOn(cwd, { ...run, tip: first }, [])).length === 0)
 				? first
 				: null;
+		const forward = new Set<string>();
+		for (const move of new Set(movesOf(branch))) {
+			const [old = "", now = ""] = move.split(">");
+			if (await isAncestor(cwd, old, now)) forward.add(move);
+		}
 		const known = [handed, bornOn].filter((id) => id !== null);
 		const only = await onlyOn(cwd, run, known);
-		return runMade({ branch, head }, { ...run, handed, bornOn, only });
+		return runMade({ branch, head }, { ...run, handed, forward, bornOn, only });
 	}
 
 	/**

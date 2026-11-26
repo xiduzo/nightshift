@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { firstCommit, runMade, wasAt } from "./run-made";
+import { firstCommit, movesOf, runMade } from "./run-made";
 
 const ZERO = "0".repeat(40);
 /** A commit by a letter. */
@@ -29,6 +29,7 @@ const made = (branch: string[], head: string[], run: Partial<Run> = {}) =>
 		branch: "feat",
 		tip: id("c"),
 		handed: null,
+		forward: new Set(),
 		bornOn: null,
 		only: [],
 		...run,
@@ -54,6 +55,23 @@ describe("the run's", () => {
 					bornOn: id("b"),
 				},
 			),
+		).toBe(false);
+	});
+
+	test("a move that dropped no commit", () => {
+		const theirs = line("b>c", "rebase (finish): refs/heads/feat onto c", THEM);
+		const forward = new Set([`${id("b")}>${id("c")}`]);
+		expect(made([born, theirs], [birth], { forward })).toBe(true);
+		expect(made([born, theirs], [birth])).toBe(false);
+		// What it brought that no other branch has.
+		expect(made([born, theirs], [birth], { forward, only: [id("c")] })).toBe(
+			false,
+		);
+		// A move back is not one.
+		expect(
+			made([born, theirs], [birth], {
+				forward: new Set([`${id("c")}>${id("b")}`]),
+			}),
 		).toBe(false);
 	});
 
@@ -265,6 +283,7 @@ test("the first commit of a branch, and where a ref was", () => {
 	expect(firstCommit(log(born, one))).toBe(id("b"));
 	expect(firstCommit(log(one))).toBeNull();
 	expect(firstCommit("")).toBeNull();
-	expect(wasAt(log(born, one), id("c"))).toBe(true);
-	expect(wasAt(log(born, one), id("d"))).toBe(false);
+	expect(
+		movesOf(log(born, one, line("c>c", "Branch: renamed"), line("c>d", ""))),
+	).toEqual([`${id("b")}>${id("c")}`, `${id("c")}>${id("d")}`]);
 });
