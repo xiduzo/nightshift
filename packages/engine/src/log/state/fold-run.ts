@@ -1,9 +1,4 @@
-import {
-	type EngineEventType,
-	type LoggedEvent,
-	provedEndReason,
-	scopeKey,
-} from "../events";
+import { type EngineEventType, type LoggedEvent, scopeKey } from "../events";
 import { closeLast, type Draft, draftOf, emptyState, logged } from "./draft";
 import { applySessionEvent } from "./fold-session";
 import { applyStepEvent, enterCallers } from "./fold-step";
@@ -14,6 +9,7 @@ import type {
 	RunState,
 	SleepFact,
 } from "./run-state";
+import { unrecordedEndReason } from "./unrecorded-end-reason";
 
 /**
  * The fold of the run state (`run-state.ts`): one event at a time. It
@@ -352,7 +348,7 @@ function applyRunEvent(
 			result: result ?? null,
 			endReason:
 				e.payload.endReason ??
-				provedEndReason({ status, reason, result: result ?? null }),
+				unrecordedEndReason({ status, reason, result: result ?? null }),
 		};
 		run.ends.push({ ...logged(e), openedAt: run.walk?.at ?? e.at });
 		// An ended run holds nothing: the engine let go of it.

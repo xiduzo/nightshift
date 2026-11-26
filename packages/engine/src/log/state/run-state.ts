@@ -319,7 +319,7 @@ export type RunEnd = {
 	reason: string | null;
 	/** The status of the End node that ended the run, else null. */
 	result: RunResult | null;
-	/** Why it ended, as the log proves it (`provedEndReason` for an end logged without one). */
+	/** Why it ended, as the log proves it (`unrecordedEndReason` for an end logged without one). */
 	endReason: RunEndReason;
 };
 
