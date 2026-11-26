@@ -199,7 +199,13 @@ describe("endingOf", () => {
 			"a stopped step",
 			{
 				kind: "parked",
-				parked: { kind: "parked", ...at, status: "stopped", reason: null },
+				parked: {
+					kind: "parked",
+					...at,
+					status: "stopped",
+					reason: null,
+					endReason: "stopped_by_person",
+				},
 				interrupts: [],
 			},
 			{ status: "stopped", reason: null, endReason: "stopped_by_person" },
@@ -208,10 +214,35 @@ describe("endingOf", () => {
 			"a failed step",
 			{
 				kind: "parked",
-				parked: { kind: "parked", ...at, status: "failed", reason: "boom" },
+				parked: {
+					kind: "parked",
+					...at,
+					status: "failed",
+					reason: "boom",
+					endReason: "_OTHER",
+				},
 				interrupts: [],
 			},
 			{ status: "failed", reason: "boom", endReason: "_OTHER" },
+		],
+		[
+			// A checkpoint parked without a code: no cause, and no throw.
+			"a park without a code, whatever its words",
+			{
+				kind: "parked",
+				parked: {
+					kind: "parked",
+					...at,
+					status: "stopped",
+					reason: "Reached the stop time",
+				},
+				interrupts: [],
+			},
+			{
+				status: "stopped",
+				reason: "Reached the stop time",
+				endReason: "_OTHER",
+			},
 		],
 		[
 			"a wait",

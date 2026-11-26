@@ -6,7 +6,7 @@ import {
 	runsEach,
 } from "@nightshift/flows";
 import { messageOf } from "@nightshift/refusal";
-import type { InputValues, StepOutputs } from "../../../log";
+import type { InputValues, RunEndReason, StepOutputs } from "../../../log";
 import type { Climb } from "../../cascade";
 import {
 	endedAtReason,
@@ -127,14 +127,17 @@ async function callOnce(
 		visit,
 	});
 
-	/** Ends the step, then climbs (a try that did not hold, with a try left) or routes. */
+	/**
+	 * Ends the step, then climbs (a try that did not hold, with a try left)
+	 * or routes. `endReason`: why the called flow ended, for a park here.
+	 */
 	const end = (
 		outcome: "pass" | "fail" | "error" | "stopped",
 		outputs: StepOutputs,
 		error: string | null,
-		update?: RunStateUpdate,
+		more: { update?: RunStateUpdate; endReason?: RunEndReason } = {},
 	): Promise<Command> =>
-		step.endAndGo(outcome, all(outcome, outputs), error, { update });
+		step.endAndGo(outcome, all(outcome, outputs), error, more);
 	/** Ends the step and goes nowhere: the run parks on the interrupt that follows. */
 	const close = (
 		outcome: "error" | "stopped",
@@ -204,7 +207,7 @@ async function callOnce(
 			if (ended.atStopTime && hasStoppedEdge(ctx.flow, node)) {
 				// The stop time ended the called flow: wrap the run up along the edge.
 				const outputs = await bodyOutputs(ctx, body);
-				return end("stopped", outputs, null, { wrappingUp: true });
+				return end("stopped", outputs, null, { update: { wrappingUp: true } });
 			}
 			await close("stopped", {}, null);
 			throw ended.interrupt;
@@ -214,7 +217,10 @@ async function callOnce(
 			throw ended.interrupt;
 		case "failed": {
 			const outputs = await bodyOutputs(ctx, body);
-			return end("fail", outputs, ended.reason);
+			// A guard or a cause inside the called flow is the Call's cause.
+			return end("fail", outputs, ended.reason, {
+				endReason: ended.endReason,
+			});
 		}
 		case "finished": {
 			let outputs = await bodyOutputs(ctx, body, ended);

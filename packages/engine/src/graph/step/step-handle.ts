@@ -7,6 +7,7 @@ import type {
 	EnginePayloads,
 	GateChoice,
 	KnowledgeUseEvent,
+	RunEndReason,
 	RunState,
 	RunWarningKind,
 	StandIn,
@@ -182,6 +183,11 @@ export type EndExtra = {
 	harnessSessionId?: string | null;
 	/** The guard that stopped the step. */
 	guard?: StepGuard;
+	/**
+	 * Why a park of the step ends the run, when its end knows a cause that
+	 * is not a guard (`StepEnd.endReason`). Not in the log.
+	 */
+	endReason?: RunEndReason;
 	/** What a Since last run step saw new or changed: saved with `StepEnded`. */
 	memory?: StepMemory;
 };

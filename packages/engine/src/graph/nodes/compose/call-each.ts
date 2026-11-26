@@ -17,6 +17,7 @@ import type {
 	EnginePayloads,
 	InputValues,
 	ItemFacts,
+	RunEndReason,
 	RunState,
 	Scope,
 	StepOutcome,
@@ -190,14 +191,14 @@ export function callEachNode(node: CallEachNode, ctx: StepContext): NodeAction {
 			);
 		}
 		/** The step ends `stopped` and the run parks here with the stop's reason (null for a person's stop). */
-		const parkStopped = async (reason: string | null) => {
+		const parkStopped = async (stop: Stop) => {
 			const end = await endStep("stopped", null);
 			return parkCommand({
 				node,
 				status: "stopped",
-				reason,
+				...stop,
 				step: end,
-				atStopTime: reason === STOP_TIME_REASON,
+				atStopTime: stop.endReason === "stop_time",
 				update: {
 					loops: { [node.id]: null },
 					nodes: { [node.id]: end.outputs },
@@ -289,20 +290,20 @@ export function callEachNode(node: CallEachNode, ctx: StepContext): NodeAction {
 					? null
 					: positionOf(state, runState, scope).cursorBehind(node);
 			if (behind !== null) return next(behind);
-			if (ctx.signal().aborted) return parkStopped(null);
+			if (ctx.signal().aborted) return parkStopped(PERSON_STOP);
 			const stop = stopBeforeNext(
 				ctx,
 				stopAtOf(state, config),
 				await ctx.log.state(runId),
 			);
-			if (stop === STOP_TIME_REASON && wrapsUp) return wrapUp();
+			if (stop?.endReason === "stop_time" && wrapsUp) return wrapUp();
 			if (stop) return parkStopped(stop);
 
 			let items: ListItem[];
 			try {
 				items = await readSource(ctx, node, tctx, step);
 			} catch (error) {
-				if (ctx.signal().aborted) return parkStopped(null);
+				if (ctx.signal().aborted) return parkStopped(PERSON_STOP);
 				return finish("error", messageOf(error));
 			}
 			const ordered = blockersFirst(items);
@@ -511,14 +512,24 @@ type Element = {
 	inputs: InputValues;
 };
 
+/** Why the loop stops and the run parks: the sentence and its code. */
+type Stop = { reason: string | null; endReason: RunEndReason };
+
+/** A person stopped the run: no sentence. */
+const PERSON_STOP: Stop = { reason: null, endReason: "stopped_by_person" };
+
 /** Why the loop must stop before the next element, or null. */
 function stopBeforeNext(
 	ctx: StepContext,
 	stopAt: number | null,
 	runState: RunState,
-): string | null {
-	if (runState.stopAfterStep) return STOP_AFTER_STEP_REASON;
-	if (stopAt !== null && ctx.now() >= stopAt) return STOP_TIME_REASON;
+): Stop | null {
+	if (runState.stopAfterStep) {
+		return { reason: STOP_AFTER_STEP_REASON, endReason: "stopped_by_person" };
+	}
+	if (stopAt !== null && ctx.now() >= stopAt) {
+		return { reason: STOP_TIME_REASON, endReason: "stop_time" };
+	}
 	return null;
 }
 

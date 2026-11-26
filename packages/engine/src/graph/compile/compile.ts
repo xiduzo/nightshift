@@ -125,6 +125,7 @@ function variablesNode(flow: Flow, ctx: StepContext) {
 				node: start,
 				status: "failed",
 				reason: result.error,
+				endReason: "_OTHER",
 				step: null,
 			});
 		}

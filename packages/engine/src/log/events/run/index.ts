@@ -1,7 +1,7 @@
 /** The events of a run, the words their payloads use, and why a run ended, as a code. */
 
 export {
-	provedEndReason,
+	guardEndReason,
 	RUN_END_REASONS,
 	type RunEndReason,
 } from "./end-reason";

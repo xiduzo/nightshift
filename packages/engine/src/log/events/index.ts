@@ -11,8 +11,8 @@ export { type KnowledgeUseEvent, knowledgeUseEvent } from "./knowledge-use";
 export { personFieldTypes } from "./person-fields";
 export {
 	type GateVia,
+	guardEndReason,
 	type PinnedOutput,
-	provedEndReason,
 	type ResumeAction,
 	type ResumedBy,
 	RUN_END_REASONS,

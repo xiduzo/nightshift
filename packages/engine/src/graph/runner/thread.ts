@@ -1,12 +1,7 @@
 import { Command, END } from "@langchain/langgraph";
 import type { Database } from "@nightshift/db";
 import type { Flow, JsonValue } from "@nightshift/flows";
-import {
-	provedEndReason,
-	type RunEnding,
-	type RunEndReason,
-	type RunRow,
-} from "../../log";
+import type { RunEnding, RunEndReason, RunRow } from "../../log";
 import type { RunResult } from "../../run-status";
 import { createRaces } from "../branches";
 import {
@@ -322,18 +317,15 @@ export function endingOf(outcome: DriveOutcome): {
 } | null {
 	switch (outcome.kind) {
 		case "ended": {
-			// An End node's result: `failed` is a failure the flow chose.
+			// An End node's result: `failed` is a failure the flow chose. Its
+			// message is the flow's words: they never name a cause.
 			const { reason, result } = outcome.ended;
-			const status = result === "failed" ? "failed" : "finished";
+			const failed = result === "failed";
 			return {
-				status,
+				status: failed ? "failed" : "finished",
 				reason,
 				...(result !== undefined ? { result } : {}),
-				endReason: provedEndReason({
-					status,
-					reason,
-					result: result ?? null,
-				}),
+				endReason: failed ? "_OTHER" : "finished",
 			};
 		}
 		case "parked":
@@ -341,13 +333,8 @@ export function endingOf(outcome: DriveOutcome): {
 				? {
 						status: outcome.parked.status,
 						reason: outcome.parked.reason,
-						endReason:
-							outcome.parked.endReason ??
-							provedEndReason({
-								status: outcome.parked.status,
-								reason: outcome.parked.reason,
-								atStopTime: outcome.parked.atStopTime,
-							}),
+						// A checkpoint parked without a code has no cause to give.
+						endReason: outcome.parked.endReason ?? "_OTHER",
 					}
 				: null;
 		case "fenced":

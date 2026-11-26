@@ -13,6 +13,7 @@ import {
 	flowScores,
 	type Hold,
 	knowledgeUseEvent,
+	type RunEndReason,
 	type RunState,
 	type Scope,
 	type StepBudget,
@@ -147,10 +148,17 @@ export async function beginStep(
 	const parked = (
 		status: "failed" | "stopped",
 		reason: string | null,
-		atStopTime = false,
+		endReason: RunEndReason,
 	) => ({
 		kind: "parked" as const,
-		command: parkCommand({ node, status, reason, step: null, atStopTime }),
+		command: parkCommand({
+			node,
+			status,
+			reason,
+			endReason,
+			step: null,
+			atStopTime: endReason === "stop_time",
+		}),
 	});
 
 	let stepId: string;
@@ -168,19 +176,22 @@ export async function beginStep(
 		// Only a new visit parks before its step: a continued or reopened step
 		// enters the node body with the aborted signal, so it ends `stopped`
 		// with its session and a later resume can reopen it.
-		if (ctx.signal().aborted) return parked("stopped", null);
+		if (ctx.signal().aborted) {
+			return parked("stopped", null, "stopped_by_person");
+		}
 		if (logged.stopAfterStep) {
-			return parked("stopped", STOP_AFTER_STEP_REASON);
+			return parked("stopped", STOP_AFTER_STEP_REASON, "stopped_by_person");
 		}
 		const stopAt = stopAtOf(state, config);
 		if (stopAt !== null && ctx.now() >= stopAt) {
-			return parked("stopped", STOP_TIME_REASON, true);
+			return parked("stopped", STOP_TIME_REASON, "stop_time");
 		}
 		const limit = ctx.policy().maxSteps ?? ctx.settings().maxStepsPerRun;
 		if (logged.stepsSinceWalk >= limit) {
 			return parked(
 				"failed",
 				`The run reached the limit of ${limit} steps before node "${node.id}". Resume it to continue.`,
+				"guard.max_steps",
 			);
 		}
 		const budgetUsd = runBudget(ctx);
@@ -193,7 +204,7 @@ export async function beginStep(
 					runId,
 					payload: { kind: "budget", message: reason },
 				});
-				return parked("failed", reason);
+				return parked("failed", reason, "guard.budget");
 			}
 		}
 		stepId = randomUUID();
@@ -487,6 +498,10 @@ export async function beginStep(
 				outputs,
 				error,
 				...(written.ok && extra?.guard ? { guard: extra.guard } : {}),
+				// A write that did not fit is the error now: the cause goes with it.
+				...(written.ok && extra?.endReason
+					? { endReason: extra.endReason }
+					: {}),
 				...(extra?.harnessSessionId !== undefined
 					? { harnessSessionId: extra.harnessSessionId }
 					: {}),

@@ -3,8 +3,9 @@ import {
 	type DerivedSession,
 	type DerivedStep,
 	type EnginePayloads,
-	provedEndReason,
+	guardEndReason,
 	type RunBus,
+	type RunEndReason,
 	type RunLog,
 	type RunRow,
 	type RunState,
@@ -226,16 +227,23 @@ export function closingEvents(
 			payload: {
 				status: rule.run,
 				reason,
-				endReason: provedEndReason({
-					status: rule.run,
-					reason,
-					guard:
-						cut.kind === "overdue" && cut.reason === "idle" ? "idle" : null,
-				}),
+				endReason: cutEndReason(cut),
 			},
 		});
 	}
 	return closing;
+}
+
+/**
+ * Why a cut ends the run: a person's stop, the stall guard of a step with
+ * no activity, else no cause of its own (a time budget, a daemon death).
+ */
+function cutEndReason(cut: CutShort): RunEndReason {
+	if (cut.kind === "stopped") return "stopped_by_person";
+	if (cut.kind === "overdue" && cut.reason === "idle") {
+		return guardEndReason("idle");
+	}
+	return "_OTHER";
 }
 
 export type CloseDeps = {

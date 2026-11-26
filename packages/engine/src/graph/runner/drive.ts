@@ -1,11 +1,5 @@
 import { Refusal, wordsFor } from "@nightshift/refusal";
-import {
-	provedEndReason,
-	type RunEnding,
-	type RunEndReason,
-	type RunLog,
-	type RunRow,
-} from "../../log";
+import type { RunEnding, RunEndReason, RunLog, RunRow } from "../../log";
 import type { RunResult } from "../../run-status";
 import { FencedError } from "../checkpoints";
 import type { Parked, RunEvent } from "../state";
@@ -63,11 +57,9 @@ export function createDrives(
 		runId: string,
 		status: RunEnding,
 		reason: string | null,
+		endReason: RunEndReason,
 		result?: RunResult,
-		endReason?: RunEndReason,
 	): Promise<void> {
-		const code =
-			endReason ?? provedEndReason({ status, reason, result: result ?? null });
 		try {
 			await writer.append({
 				type: "RunEnded",
@@ -75,7 +67,7 @@ export function createDrives(
 				payload: {
 					status,
 					reason,
-					endReason: code,
+					endReason,
 					...(result ? { result } : {}),
 				},
 			});
@@ -149,8 +141,8 @@ export function createDrives(
 				runId,
 				ending.status,
 				ending.reason,
-				ending.result,
 				ending.endReason,
+				ending.result,
 			);
 		} catch (error) {
 			// A stop took the run from this drive: it writes nothing more.
@@ -162,6 +154,7 @@ export function createDrives(
 				runId,
 				"failed",
 				error instanceof Refusal ? error.message : ENGINE_FAILED,
+				"_OTHER",
 			);
 		}
 	}
@@ -334,7 +327,7 @@ export function createDrives(
 				payload: {
 					status: "failed",
 					reason,
-					endReason: provedEndReason({ status: "failed", reason }),
+					endReason: "_OTHER",
 				},
 			});
 			await letGo(holds, runId, "failed");

@@ -135,7 +135,10 @@ export async function runStep(
 		const end = await step.end("stopped", await blank("stopped"), null, {
 			harnessSessionId: session,
 		});
-		return parkStopped(node, end, STOP_TIME_REASON);
+		return parkStopped(node, end, {
+			reason: STOP_TIME_REASON,
+			endReason: "stop_time",
+		});
 	}
 
 	let result: BodyResult;
@@ -218,7 +221,12 @@ export async function runStep(
 					aborted.error,
 					{ ...extraOf(result), guard: "budget" },
 				);
-				return parkFailed(node, end, aborted.error ?? "", extra);
+				return parkFailed(
+					node,
+					{ ...end, guard: "budget" },
+					aborted.error ?? "",
+					extra,
+				);
 			}
 			return endAndGo(aborted.outcome, aborted.outputs, aborted.error, {
 				...extraOf(result),
@@ -252,7 +260,8 @@ export async function runStep(
 					null,
 					costs,
 				);
-				return parkStopped(node, end, slept.reason);
+				const { reason, endReason } = slept;
+				return parkStopped(node, end, { reason, endReason });
 			}
 			if (spec.givesUp) {
 				const instead = await spec.givesUp(step, null);
@@ -263,7 +272,10 @@ export async function runStep(
 					{ ...costs, ...extraOf(instead) },
 				);
 			}
-			return endAndGo("error", await blank("error"), slept.error, costs);
+			return endAndGo("error", await blank("error"), slept.error, {
+				...costs,
+				...(slept.endReason ? { endReason: slept.endReason } : {}),
+			});
 		}
 	}
 }

@@ -1,7 +1,7 @@
 import { Command, type LangGraphRunnableConfig } from "@langchain/langgraph";
 import type { FlowNode, WaitUntil } from "@nightshift/flows";
 
-import type { LeaseWait, PolicyWaitReason } from "../../log";
+import type { LeaseWait, PolicyWaitReason, RunEndReason } from "../../log";
 import { type NodeAction, type StepContext, stopAtOf } from "../context";
 import { planWait, type WaitStreak } from "../policy";
 import { commitVisit, heldStep, takenUp } from "../position";
@@ -109,17 +109,27 @@ export type SleepOutcome =
 	| { kind: "asleep"; command: Command }
 	/**
 	 * The network grace is spent: the step ends `error`, or as its
-	 * `StepSpec.givesUp` says.
+	 * `StepSpec.givesUp` says. `endReason`: the code a park of the step
+	 * gives, for a network wait. A Device that stayed offline has none.
 	 */
-	| { kind: "give-up"; error: string }
+	| { kind: "give-up"; error: string; endReason?: RunEndReason }
 	/** The wait would pass the stop time: the step ends `stopped` and the run parks. */
-	| { kind: "stop-time"; reason: string };
+	| { kind: "stop-time"; reason: string; endReason: RunEndReason };
 
 /** Why the run stopped instead of waiting: the wait would end after the stop time. */
-function stopTimeWaitReason(request: WaitRequest): string {
+function stopTimeWait(request: WaitRequest): {
+	reason: string;
+	endReason: RunEndReason;
+} {
 	return request.reason === "usage-limit"
-		? `Usage limit: ${request.message}. It resets after the stop time, so the run stopped. Resume the run to continue.`
-		: `The network is down: ${request.message}. The next try is after the stop time, so the run stopped. Resume the run to continue.`;
+		? {
+				reason: `Usage limit: ${request.message}. It resets after the stop time, so the run stopped. Resume the run to continue.`,
+				endReason: "agent.usage_limit",
+			}
+		: {
+				reason: `The network is down: ${request.message}. The next try is after the stop time, so the run stopped. Resume the run to continue.`,
+				endReason: "agent.network",
+			};
 }
 
 /**
@@ -199,12 +209,14 @@ export async function sleep(
 			now,
 			minuteMs: ctx.minuteMs,
 		});
-		if (plan.kind === "give-up") return { kind: "give-up", error: plan.error };
+		if (plan.kind === "give-up") {
+			return { kind: "give-up", error: plan.error, endReason: plan.endReason };
+		}
 		// A wait that ends after the stop time would only continue the step
 		// past it: the run stops now, and a resume continues the step.
 		const stopAt = stopAtOf(state, config);
 		if (stopAt !== null && plan.until >= stopAt) {
-			return { kind: "stop-time", reason: stopTimeWaitReason(request) };
+			return { kind: "stop-time", ...stopTimeWait(request) };
 		}
 		until = plan.until;
 		message = plan.message;

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { FLOW_VERSION, type FlowNodeType } from "@nightshift/flows";
-import { foldRun, provedEndReason } from "../../log";
+import { foldRun, type RunEndReason } from "../../log";
 
 import type {
 	EngineEventType,
@@ -177,13 +177,12 @@ const stepEnded = (
 const runEnded = (
 	status: "stopped" | "failed" | "interrupted",
 	reason: string | null = null,
+	endReason: RunEndReason = status === "stopped"
+		? "stopped_by_person"
+		: "_OTHER",
 ): ClosingEvent => ({
 	type: "RunEnded",
-	payload: {
-		status,
-		reason,
-		endReason: provedEndReason({ status, reason }),
-	},
+	payload: { status, reason, endReason },
 });
 
 describe("closingEvents: a stop", () => {
@@ -305,6 +304,35 @@ describe("closingEvents: a missed deadline", () => {
 			stepEnded("w", { visit: 1 }, "error", cut.error),
 			stepEnded("c", { ended: "", visit: 1 }, "error", reason),
 			runEnded("failed", reason),
+		]);
+	});
+
+	test("a step with no activity for its idle limit: the stall guard's warning, and the run ends guard.idle", () => {
+		const { events } = log()
+			.started()
+			.step("w", "w", "agent")
+			.session("w", "x");
+		const cut: CutShort = {
+			kind: "overdue",
+			stepId: "w",
+			nodeId: "w",
+			reason: "idle",
+			error: "Nothing came for a while.",
+		};
+		const reason = 'Node "w" failed: Nothing came for a while.';
+		expect(closingEvents(foldRun(events), cut, FLOWS)).toEqual([
+			sessionEnded("w", "x", {
+				outcome: "failed",
+				error: "The step was stopped.",
+				errorKind: "aborted",
+			}),
+			stepEnded("w", { visit: 1 }, "error", cut.error),
+			{
+				type: "RunWarned",
+				stepId: "w",
+				payload: { kind: "stalled", message: cut.error },
+			},
+			runEnded("failed", reason, "guard.idle"),
 		]);
 	});
 });

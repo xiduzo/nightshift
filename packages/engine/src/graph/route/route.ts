@@ -13,8 +13,9 @@ import {
 import { messageOf } from "@nightshift/refusal";
 import type { Device } from "../../device";
 import {
+	guardEndReason,
 	leavingHolds,
-	provedEndReason,
+	type RunEndReason,
 	type Scope,
 	type StepGuard,
 	type StepOutcome,
@@ -57,6 +58,13 @@ export type StepEnd = {
 	error: string | null;
 	/** The guard that stopped the step, when one did. */
 	guard?: StepGuard;
+	/**
+	 * Why a park of the step ends the run, when its end knows a cause that
+	 * is not a guard: the network past its grace, or the cause of the end of
+	 * a Call's flow. Not in the log: a step whose route a daemon lost has
+	 * only its guard.
+	 */
+	endReason?: RunEndReason;
 	/** Agent steps: the harness session the step has, for a reopen. */
 	harnessSessionId?: string | null;
 	/** The variables the step's writes changed (`StepEnded.variables`). */
@@ -66,13 +74,15 @@ export type StepEnd = {
 /**
  * Parks the run at the node's park node (design rule 2): `pending` keeps
  * the step so a resume reopens it, and the park node interrupts with the
- * status and reason `RunEnded` records. `step` is null when the run parks
- * before the node's step started (stop after step, stop time, step cap).
+ * status, reason and code `RunEnded` records. `step` is null when the run
+ * parks before the node's step started (stop after step, stop time, step
+ * cap). The caller knows the cause: it gives the code (`endReason`).
  */
 export function parkCommand(input: {
 	node: FlowNode;
 	status: "failed" | "stopped";
 	reason: string | null;
+	endReason: RunEndReason;
 	step: StepEnd | null;
 	update?: RunStateUpdate;
 	/** The stop time stopped the run (`PendingParked.atStopTime`). */
@@ -87,12 +97,7 @@ export function parkCommand(input: {
 		harnessSessionId: step?.harnessSessionId ?? null,
 		status: input.status,
 		reason: input.reason,
-		endReason: provedEndReason({
-			status: input.status,
-			reason: input.reason,
-			atStopTime: input.atStopTime,
-			guard: step?.guard,
-		}),
+		endReason: input.endReason,
 		...(input.atStopTime ? { atStopTime: true } : {}),
 	};
 	return new Command({
@@ -104,17 +109,18 @@ export function parkCommand(input: {
 /**
  * Parks the run as stopped on a step that ended `stopped`, with the step's
  * outputs and visit in the state: the stop time came while it was open.
+ * `why` says so, or why a wait would have passed it.
  */
 export function parkStopped(
 	node: FlowNode,
 	end: StepEnd,
-	reason: string,
+	why: { reason: string; endReason: RunEndReason },
 	update?: RunStateUpdate,
 ): Command {
 	return parkCommand({
 		node,
 		status: "stopped",
-		reason,
+		...why,
 		step: end,
 		atStopTime: true,
 		update: {
@@ -127,12 +133,12 @@ export function parkStopped(
 
 /**
  * Parks the run as failed on a step that a guard of the run policy ended
- * (the budget), with the step's outputs and visit in the state: a resume
- * reopens the step.
+ * (the budget, `end.guard`), with the step's outputs and visit in the
+ * state: a resume reopens the step.
  */
 export function parkFailed(
 	node: FlowNode,
-	end: StepEnd,
+	end: StepEnd & { guard: StepGuard },
 	reason: string,
 	update?: RunStateUpdate,
 ): Command {
@@ -140,6 +146,7 @@ export function parkFailed(
 		node,
 		status: "failed",
 		reason,
+		endReason: guardEndReason(end.guard),
 		step: end,
 		update: {
 			...update,
@@ -205,6 +212,7 @@ export function routeDone(
 		outcome: ended.outcome,
 		outputs: ended.outputs,
 		error: ended.error,
+		...(ended.guard ? { guard: ended.guard } : {}),
 		...(ended.variables ? { variables: ended.variables } : {}),
 	};
 	return routeOn(ctx, state, node, end, config, extra, done.edges);
@@ -231,7 +239,14 @@ async function routeOn(
 	// stopped. Every other way on ends it.
 	const kept = { ...update };
 	const park = (status: "failed" | "stopped", reason: string | null) =>
-		parkCommand({ node, status, reason, step: end, update: kept });
+		parkCommand({
+			node,
+			status,
+			reason,
+			endReason: parkedFor(end, status),
+			step: end,
+			update: kept,
+		});
 	if (state.cascades?.[node.id]) {
 		update.cascades = { [node.id]: null };
 	}
@@ -348,6 +363,17 @@ async function routeOn(
 		},
 		goto: edge.to,
 	});
+}
+
+/**
+ * Why a park on the step's own end ends the run: the guard that stopped
+ * the step, else the cause its end knows. A stop with neither is a
+ * person's stop. A failure with neither has no code of its own.
+ */
+function parkedFor(end: StepEnd, status: "failed" | "stopped"): RunEndReason {
+	if (end.guard) return guardEndReason(end.guard);
+	if (end.endReason) return end.endReason;
+	return status === "stopped" ? "stopped_by_person" : "_OTHER";
 }
 
 /** `EdgeTaken` in the log, in the flow's scope. */

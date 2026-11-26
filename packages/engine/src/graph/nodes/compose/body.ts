@@ -14,6 +14,7 @@ import {
 } from "@nightshift/flows";
 import {
 	type InputValues,
+	type RunEndReason,
 	type Scope,
 	type StepOutputs,
 	scopeKey,
@@ -48,7 +49,8 @@ import type { OpenStep } from "../../step";
  *   gives its `result` and its message as `reason`: a `failed` End fails
  *   the Call step (`fail`) or the element (`ItemEnded failed`).
  * - `failed`: a body step ended `fail`/`needs-input` with no edge, errored,
- *   or exhausted its edge: the body parked at that step (rule 2). The park
+ *   or exhausted its edge: the body parked at that step (rule 2), with
+ *   the code of its park (`_OTHER` for a checkpoint without one). The park
  *   is swallowed here, because today a failed body fails the Call step
  *   (`fail`) or the element (`ItemEnded failed`) and the walk goes on; the
  *   body's namespace is left parked and is never invoked again (the next
@@ -86,7 +88,7 @@ export type BodyEnd =
 			/** The body's variables, from its final state. */
 			vars: Record<string, JsonValue>;
 	  }
-	| { kind: "failed"; reason: string }
+	| { kind: "failed"; reason: string; endReason: RunEndReason }
 	| {
 			kind: "stopped";
 			reason: string | null;
@@ -189,7 +191,11 @@ export async function runBody(input: {
 				interrupt: error,
 			};
 		}
-		return { kind: "failed", reason: value.reason ?? "unknown error" };
+		return {
+			kind: "failed",
+			reason: value.reason ?? "unknown error",
+			endReason: value.endReason ?? "_OTHER",
+		};
 	}
 	const ended = result.ended;
 	if (!ended) {

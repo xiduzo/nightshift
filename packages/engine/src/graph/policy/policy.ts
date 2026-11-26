@@ -1,6 +1,6 @@
 import type { Policy, ResolvedPolicy } from "@nightshift/flows";
 import type { WalkSettings } from "../../contract";
-import type { PolicyWaitReason } from "../../log";
+import type { PolicyWaitReason, RunEndReason } from "../../log";
 
 /** The flow's own policy numbers, else the daemon's settings. */
 export function resolvePolicy(
@@ -34,7 +34,8 @@ export const NETWORK_WAITS_MINUTES = [1, 2, 5, 10, 15] as const;
 
 export type WaitPlan =
 	| { kind: "wait"; until: number; since: number; message: string }
-	| { kind: "give-up"; error: string };
+	/** The network grace is spent: the step ends with `error`, and a park of it with `endReason`. */
+	| { kind: "give-up"; error: string; endReason: RunEndReason };
 
 /** The earlier waits of a step for one reason: how many, and when the first began. */
 export type WaitStreak = { count: number; since: number };
@@ -83,6 +84,7 @@ export function planWait(input: {
 		return {
 			kind: "give-up",
 			error: `The network was down for more than ${policy.networkGraceMinutes} min: ${input.message}`,
+			endReason: "agent.network",
 		};
 	}
 	return {
