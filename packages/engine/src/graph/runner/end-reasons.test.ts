@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import {
 	failingScript,
 	fakeHarness,
+	reportingScript,
 	usageLimitScript,
 } from "@nightshift/agents/testing";
 import type {
@@ -122,14 +123,14 @@ const callNode = (flow: string) =>
 		inputs: {},
 	}) as const;
 
-const callEachNode = (flow: string): CallEachNode => ({
+const callEachNode = (flow: string, ids = ["one"]): CallEachNode => ({
 	id: "call",
 	type: "call",
 	position: { x: 0, y: 0 },
 	flow,
 	inputs: {},
 	each: {
-		source: { kind: "json", value: JSON.stringify([{ id: "one" }]) },
+		source: { kind: "json", value: JSON.stringify(ids.map((id) => ({ id }))) },
 		as: "item",
 		branch: "shared",
 		haltOn: ["halt"],
@@ -249,6 +250,29 @@ const ROWS: Row[] = [
 		code: { own: "guard.budget", call: "guard.budget", each: "finished" },
 	},
 	{
+		cause: "the budget before a step",
+		inner: () =>
+			withPolicy(
+				flowOf(
+					[agent("first"), agent("second")],
+					[edge("e1", "first", "pass", "second")],
+				),
+				{ budgetUsd: 2 },
+			),
+		// The first step spends $3 and ends on its own: the second never starts.
+		options: () => ({
+			harness: fakeHarness({
+				...reportingScript("pass"),
+				model: "claude-sonnet-4-6",
+				outcome: {
+					type: "finished",
+					usage: { inputTokens: 1_000_000, outputTokens: 0 },
+				},
+			}),
+		}),
+		code: { own: "guard.budget", call: "guard.budget", each: "guard.budget" },
+	},
+	{
 		cause: "a usage limit past the stop time",
 		inner: () => flowOf([agent("worker")]),
 		options: () => ({
@@ -289,6 +313,95 @@ describe("each cause gives its code", () => {
 	}
 });
 
+describe("a stop between the elements of a Call with each", () => {
+	/**
+	 * A loop over two elements whose body is one Command. Right after the
+	 * first element ends, `between` runs: it stops the run before the second.
+	 */
+	async function stopBetween(
+		between: () => void,
+		options: StartOptions & { stopAt?: number; wrapUp?: true } = {},
+	) {
+		const loop = callEachNode("inner", ["one", "two"]);
+		const inner = flowOf([command("work", "true")], [], {
+			inputs: [{ name: "item", type: "json", required: true }],
+		});
+		const flow = options.wrapUp
+			? flowOf(
+					[loop, command("wrap", "true")],
+					[edge("e1", "call", "stopped", "wrap")],
+				)
+			: flowOf([loop]);
+		const h = await startRun(sandbox, flow, {
+			...options,
+			flows: { inner },
+		});
+		const { log } = h.ctx;
+		h.ctx.log = {
+			...log,
+			append: async (input, writes) => {
+				const appended = await log.append(input, writes);
+				if (input.type === "ItemEnded") between();
+				return appended;
+			},
+		};
+		const driven = await drive(h, {
+			inputs: {},
+			stopAt: options.stopAt ?? null,
+		});
+		const events = await h.events();
+		return {
+			code: endingOf(driven.outcome)?.endReason,
+			items: payloads(events, "ItemStarted").map((p) => p.item.id),
+			steps: payloads(events, "StepStarted").map((p) => p.nodeId),
+		};
+	}
+
+	test("a person's stop gives stopped_by_person", async () => {
+		const controller = new AbortController();
+		const stopped = await stopBetween(() => controller.abort(), {
+			signal: controller.signal,
+		});
+		expect(stopped.items).toEqual(["one"]);
+		expect(stopped.code).toBe("stopped_by_person");
+	});
+
+	/** A clock that jumps past the stop time when `between` runs. */
+	const lateClock = () => {
+		const stopAt = now() + 60 * MINUTE;
+		let late = false;
+		return {
+			stopAt,
+			now: () => (late ? stopAt + 1 : now()),
+			pass: () => {
+				late = true;
+			},
+		};
+	};
+
+	test("the stop time gives stop_time", async () => {
+		const clock = lateClock();
+		const stopped = await stopBetween(clock.pass, {
+			now: clock.now,
+			stopAt: clock.stopAt,
+		});
+		expect(stopped.items).toEqual(["one"]);
+		expect(stopped.code).toBe("stop_time");
+	});
+
+	test("the stop time with a stopped edge wraps the run up along it", async () => {
+		const clock = lateClock();
+		const stopped = await stopBetween(clock.pass, {
+			now: clock.now,
+			stopAt: clock.stopAt,
+			wrapUp: true,
+		});
+		expect(stopped.items).toEqual(["one"]);
+		expect(stopped.steps).toEqual(["call", "work", "wrap"]);
+		expect(stopped.code).toBe("finished");
+	});
+});
+
 describe("a step whose route the daemon lost", () => {
 	let quiet: ReturnType<typeof spyOn>;
 	beforeEach(() => {
@@ -297,16 +410,13 @@ describe("a step whose route the daemon lost", () => {
 	});
 	afterEach(() => quiet.mockRestore());
 
-	test("a guard's end keeps its code when the commit after it never landed", async () => {
-		const harness = fakeHarness({
-			steps: [{ type: "text", text: "Still working." }],
-			outcome: { type: "finished", limit: "turns" },
-		});
-		const h = await startRun(
-			sandbox,
-			flowOf([agent("worker", { maxTurns: 4 })]),
-			{ harness },
-		);
+	/**
+	 * Runs the flow on a daemon that dies right after the step's `StepEnded`,
+	 * before the commit after it. Recovery closes the run, and a resume
+	 * routes the step from the log. Gives the run's log.
+	 */
+	async function afterLostCommit(flow: Flow, harness: StartOptions["harness"]) {
+		const h = await startRun(sandbox, flow, { harness });
 		let ended = false;
 		let dead = false;
 		/** Every write after `StepEnded` fails: the daemon died before the commit. */
@@ -376,15 +486,48 @@ describe("a step whose route the daemon lost", () => {
 					? true
 					: null,
 			);
-			const events = await h.events();
-			expect(payloads(events, "StepEnded")).toHaveLength(1);
-			expect(payloads(events, "RunEnded").at(-1)).toMatchObject({
-				status: "failed",
-				endReason: "guard.turns",
-			});
-			expect(foldRun(events).end?.endReason).toBe("guard.turns");
+			return await h.events();
 		} finally {
 			await next.release();
 		}
+	}
+
+	test("a guard's end keeps its code when the commit after it never landed", async () => {
+		const events = await afterLostCommit(
+			flowOf([agent("worker", { maxTurns: 4 })]),
+			fakeHarness({
+				steps: [{ type: "text", text: "Still working." }],
+				outcome: { type: "finished", limit: "turns" },
+			}),
+		);
+		expect(payloads(events, "StepEnded")).toHaveLength(1);
+		expect(payloads(events, "RunEnded").at(-1)).toMatchObject({
+			status: "failed",
+			endReason: "guard.turns",
+		});
+		expect(foldRun(events).end?.endReason).toBe("guard.turns");
+	});
+
+	test("an Agent that gave up on the network runs again when the commit after it never landed, and keeps the network code", async () => {
+		// A step that ended `error` is cut short: the resume reopens it and
+		// runs it again. The log has no code for its first end, so the code
+		// comes from the run again, never from a guess at the first end.
+		const events = await afterLostCommit(
+			withPolicy(flowOf([agent("worker")]), { networkGraceMinutes: 0.5 }),
+			fakeHarness({
+				steps: [{ type: "text", text: "Starting." }],
+				outcome: { type: "error", kind: "network", message: "offline" },
+			}),
+		);
+		expect(payloads(events, "StepEnded").map((p) => p.outcome)).toEqual([
+			"error",
+			"error",
+		]);
+		expect(payloads(events, "StepReopened")).toHaveLength(1);
+		expect(payloads(events, "RunEnded").at(-1)).toMatchObject({
+			status: "failed",
+			endReason: "agent.network",
+		});
+		expect(foldRun(events).end?.endReason).toBe("agent.network");
 	});
 });
