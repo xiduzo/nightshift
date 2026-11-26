@@ -5,6 +5,7 @@ import { join } from "node:path";
 
 import {
 	type DaemonServe,
+	ListenError,
 	listeners,
 	PortTakenError,
 	portOf,
@@ -101,6 +102,18 @@ describe("serveDaemon", () => {
 		} finally {
 			other.stop(true);
 		}
+	});
+
+	test("given an address that is not this computer's, when the daemon listens, then it names the address, not the port", () => {
+		// TEST-NET-1 (RFC 5737): never an address of this computer.
+		const listen = () =>
+			serveDaemon({ ...plainDaemon, hostname: "192.0.2.1" }, { port: 0 });
+
+		expect(listen).toThrow(ListenError);
+		expect(listen).not.toThrow(PortTakenError);
+		expect(listen).toThrow(
+			"Night Shift cannot listen on 192.0.2.1: this computer has no such address. Use an address of this computer, for example 127.0.0.1.",
+		);
 	});
 
 	test.skipIf(!Bun.which("openssl"))(

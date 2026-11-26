@@ -28,8 +28,9 @@ export type RunningDaemon = Daemon & { servers: Bun.Server<SocketData>[] };
  * listeners in place, with the new daemon's handlers.
  *
  * When it cannot listen, it stops the daemon it made (the lease, the
- * engine, the timers) and throws: a `PortTakenError` when the port is
- * taken. The caller says so and exits.
+ * engine, the timers) and throws: a `ListenError` when the port is
+ * taken or the address is not this computer's. The caller says so and
+ * exits.
  */
 export async function startDaemon(
 	options: StartOptions,

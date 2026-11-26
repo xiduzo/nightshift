@@ -6,7 +6,7 @@ import {
 	directoryWeb,
 	embeddedWeb,
 	guardProcess,
-	PortTakenError,
+	ListenError,
 	portOf,
 	prepareDaemonEnv,
 	startDaemon,
@@ -200,7 +200,7 @@ async function serve(options: ServeOptions): Promise<undefined> {
 	}).catch((error: unknown) => {
 		// The daemon already stopped. Exit with code 1, as the process guard
 		// does, with the message only.
-		if (!(error instanceof PortTakenError)) throw error;
+		if (!(error instanceof ListenError)) throw error;
 		console.error(error.message);
 		process.exit(1);
 	});

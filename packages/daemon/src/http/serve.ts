@@ -57,12 +57,11 @@ export function listeners(options: {
  */
 const REQUEST_TIMEOUT_S = 5 * 60;
 
-/**
- * The daemon cannot listen on `port`: another program uses it. Bun says
- * EADDRINUSE for every failed listen, so an address that is not this
- * computer's gets this error too.
- */
-export class PortTakenError extends Error {
+/** The daemon cannot listen. Its message says why, in words for the person. */
+export class ListenError extends Error {}
+
+/** The daemon cannot listen on `port`: another program uses it. */
+export class PortTakenError extends ListenError {
 	readonly port: number;
 
 	constructor(port: number, options?: { cause?: unknown }) {
@@ -75,10 +74,41 @@ export class PortTakenError extends Error {
 	}
 }
 
+/** The daemon cannot listen on `hostname`: it is no address of this computer, or a name without one. */
+class AddressUnavailableError extends ListenError {
+	constructor(hostname: string, options?: { cause?: unknown }) {
+		super(
+			`Night Shift cannot listen on ${hostname}: this computer has no such address. Use an address of this computer, for example 127.0.0.1.`,
+			options,
+		);
+		this.name = "AddressUnavailableError";
+	}
+}
+
+/**
+ * Why a listen failed. Bun says EADDRINUSE for every failed listen, also
+ * for an address that is not this computer's and for a name without an
+ * address. So the port counts as taken only when the address takes a
+ * free port.
+ */
+function listenErrorOf(hostname: string, port: number, error: unknown): Error {
+	if ((error as { code?: unknown }).code !== "EADDRINUSE") {
+		// Another error (a certificate Bun refuses) stays as it is.
+		return error as Error;
+	}
+	try {
+		Bun.serve({ hostname, port: 0, fetch: () => new Response() }).stop(true);
+	} catch {
+		return new AddressUnavailableError(hostname, { cause: error });
+	}
+	return new PortTakenError(port, { cause: error });
+}
+
 /**
  * Starts the daemon's listeners. `fetch` wraps the daemon's own (the web
  * UI of the binary). When one does not start, it stops the ones that
- * started, and throws: a `PortTakenError` when the port is taken.
+ * started, and throws: a `ListenError` when the port is taken
+ * (`PortTakenError`) or the address is not this computer's.
  */
 export function serveDaemon(
 	daemon: DaemonServe,
@@ -116,9 +146,7 @@ export function serveDaemon(
 			);
 		} catch (error) {
 			for (const server of servers) server.stop(true);
-			// Another error (a certificate Bun refuses) stays as it is.
-			if ((error as { code?: unknown }).code !== "EADDRINUSE") throw error;
-			throw new PortTakenError(listener.port, { cause: error });
+			throw listenErrorOf(listener.hostname, listener.port, error);
 		}
 	}
 	return servers;

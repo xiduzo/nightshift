@@ -2,6 +2,7 @@ export { createHttp } from "./app";
 export { authOriginsOf, hostAuthOrigins, trustedOriginsOf } from "./origins";
 export {
 	type DaemonServe,
+	ListenError,
 	PortTakenError,
 	portOf,
 	serveDaemon,

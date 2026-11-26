@@ -18,6 +18,7 @@ export type {
 export {
 	directoryWeb,
 	embeddedWeb,
+	ListenError,
 	PortTakenError,
 	portOf,
 	type WebFiles,
