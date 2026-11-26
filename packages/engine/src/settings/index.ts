@@ -19,7 +19,6 @@ export {
 	effectiveDecider,
 	HARNESS_BIN,
 	isHostAddress,
-	isLoopbackHost,
 	type RunSettings,
 	reachesPrivateNetwork,
 	type SettingField,

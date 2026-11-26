@@ -1,4 +1,5 @@
-import { isHostAddress, isLoopbackHost } from "@nightshift/engine/settings";
+import { isLoopbackHost } from "@nightshift/engine";
+import { isHostAddress } from "@nightshift/engine/settings";
 import { Refusal } from "@nightshift/refusal";
 import { now } from "@nightshift/time";
 import {

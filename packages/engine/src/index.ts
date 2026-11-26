@@ -47,6 +47,7 @@ export type {
 export {
 	COMMAND_KINDS,
 	HostUnreachableError,
+	isLoopbackHost,
 	NIGHT_SHIFT,
 	OlderHostError,
 	OtherVersionError,

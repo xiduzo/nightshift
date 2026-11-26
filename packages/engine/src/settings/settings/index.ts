@@ -6,7 +6,6 @@ export {
 } from "./domain/effective-decider";
 export {
 	isHostAddress,
-	isLoopbackHost,
 	reachesPrivateNetwork,
 } from "./domain/host-address";
 export { defaultRunSettings, type RunSettings } from "./domain/run-settings";

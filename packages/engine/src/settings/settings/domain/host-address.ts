@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isLoopbackHost } from "../../../contract";
 
 /**
  * A Host's address: an `https://` origin. A loopback `http://` one is
@@ -22,16 +23,6 @@ export function isHostAddress(value: string): boolean {
 	}
 	if (url.protocol === "https:") return true;
 	return url.protocol === "http:" && isLoopbackHost(url.hostname);
-}
-
-/** `localhost`, `127.x.x.x` or `[::1]`. */
-export function isLoopbackHost(hostname: string): boolean {
-	return (
-		hostname === "localhost" ||
-		hostname === "[::1]" ||
-		hostname === "::1" ||
-		/^127\.\d+\.\d+\.\d+$/.test(hostname)
-	);
 }
 
 /** An `http://` or `https://` address. */
