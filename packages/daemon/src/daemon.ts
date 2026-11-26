@@ -25,7 +25,7 @@ import {
 } from "./keep-awake";
 import type { DesktopScreen } from "./notifications";
 import {
-	boundedStop,
+	afterStops,
 	type DaemonEnv,
 	daemonAuthSecret,
 	daemonPort,
@@ -33,6 +33,7 @@ import {
 	holdLease,
 	hot,
 	hotSlots,
+	lastingStop,
 	oneStartAtATime,
 	onProcessCrashed,
 	processDatabase,
@@ -137,7 +138,7 @@ export function createDaemon(
 	return oneStartAtATime(hot, async () => {
 		// A stop that gave up at its bound goes on, and would end this start's
 		// slots (its lease too): wait until it ended.
-		await hot.nightshiftStopping;
+		await afterStops();
 		// No lease in this process yet: no listener of a daemon before answers.
 		const first = hot.nightshiftLease === undefined;
 		try {
@@ -179,11 +180,7 @@ async function makeDaemon(
 	await migrateDb(db, { migrationsFolder: options.migrationsFolder });
 
 	const slots = hotSlots(hot);
-	const stop = () =>
-		boundedStop(() => {
-			hot.nightshiftStopping = slots.stop();
-			return hot.nightshiftStopping;
-		});
+	const stop = lastingStop(() => slots.stop());
 	stopOnSignals(stop);
 	const lease = await slots.keep(
 		"nightshiftLease",

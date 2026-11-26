@@ -26,5 +26,5 @@ export {
 } from "./lease";
 export { DEFAULT_PORT, DESKTOP_PORT, daemonPort } from "./port";
 export { guardProcess, onProcessCrashed } from "./process-guard";
-export { boundedStop, stopOnSignals } from "./signals";
+export { afterStops, lastingStop, stopOnSignals } from "./signals";
 export { notifySystemd } from "./systemd";

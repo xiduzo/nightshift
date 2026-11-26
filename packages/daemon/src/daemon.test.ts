@@ -363,11 +363,18 @@ describe("the daemon, wired in one process", () => {
 		await expect(start(env)).rejects.toThrow("A start that fails late.");
 		failing.mockRestore();
 
+		const said = spyOn(console, "log");
 		const next = start(env);
 		const first = await Promise.race([
 			next.then(() => "started" as const),
-			Bun.sleep(3_000).then(() => "waits" as const),
+			Bun.sleep(6_500).then(() => "waits" as const),
 		]);
+		const waits = said.mock.calls.filter(
+			([line]) =>
+				line ===
+				"Night Shift waits until the Night Shift before it has stopped.",
+		);
+		said.mockRestore();
 		finish();
 		const daemon = await next;
 		await Bun.sleep(100);
@@ -378,6 +385,40 @@ describe("the daemon, wired in one process", () => {
 		expect(row?.owner).toBe(daemon.info.leaseOwner);
 		expect((await call(daemon, "/health"))?.status).toBe(200);
 		expect(first).toBe("waits");
+		// One line while it waits.
+		expect(waits).toHaveLength(1);
+	}, 30_000);
+
+	test("a second stop waits for a slow first one: the lease stays until the first ended", async () => {
+		dir = await mkdtemp(join(tmpdir(), "nightshift-daemon-"));
+		const daemon = await start(envIn(dir));
+		started.splice(started.indexOf(daemon), 1);
+		let finish = () => {};
+		const slow = new Promise<void>((resolve) => {
+			finish = resolve;
+		});
+		const made = hot.nightshiftTelemetry;
+		if (!made) throw new Error("The daemon made no telemetry.");
+		const stop = made.stop.bind(made);
+		made.stop = async () => {
+			await slow;
+			await stop();
+		};
+		const lease = async () => {
+			const [row] = await processDatabase(daemon.info.databaseUrl)
+				.select()
+				.from(daemonLease);
+			return row?.owner ?? null;
+		};
+
+		// Each stop gives up at its bound: the first still waits for the telemetry.
+		await daemon.stop();
+		await daemon.stop();
+		expect(await lease()).toBe(daemon.info.leaseOwner);
+
+		finish();
+		await hot.nightshiftStopping;
+		expect(await lease()).toBeNull();
 	}, 30_000);
 
 	test("a reload that fails keeps the lease: the daemon before it still holds the database", async () => {

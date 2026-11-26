@@ -8,8 +8,47 @@ export const STOP_WITHIN_MS = 2_000;
  * timers never fire it. The writes of a stop need no timer, so a stop
  * still ends when they do. Never throws.
  */
-export async function boundedStop(stop: () => Promise<unknown>): Promise<void> {
+async function boundedStop(stop: () => Promise<unknown>): Promise<void> {
 	await Promise.race([stop(), Bun.sleep(STOP_WITHIN_MS)]).catch(() => {});
+}
+
+/** How long a start waits for the stop before it before it says so. */
+const STOP_WAIT_SAID_AFTER_MS = 3_000;
+
+/**
+ * The stop of a daemon's slots, bounded by STOP_WITHIN_MS. What the bound
+ * cut goes on in `hot.nightshiftStopping`, after any stop before it: a
+ * second stop never ends the slots while the first still stops them.
+ */
+export function lastingStop(
+	stopSlots: () => Promise<void>,
+): () => Promise<void> {
+	return () =>
+		boundedStop(() => {
+			const before = hot.nightshiftStopping ?? Promise.resolve();
+			hot.nightshiftStopping = before.then(stopSlots);
+			return hot.nightshiftStopping;
+		});
+}
+
+/**
+ * Waits until every stop of this process ended: a stop that gave up at its
+ * bound still ends the slots by name, the lease too. Says so once when it
+ * waits long.
+ */
+export async function afterStops(): Promise<void> {
+	const stopping = hot.nightshiftStopping;
+	if (!stopping) return;
+	const said = setTimeout(() => {
+		console.log(
+			"Night Shift waits until the Night Shift before it has stopped.",
+		);
+	}, STOP_WAIT_SAID_AFTER_MS);
+	try {
+		await stopping;
+	} finally {
+		clearTimeout(said);
+	}
 }
 
 /**
