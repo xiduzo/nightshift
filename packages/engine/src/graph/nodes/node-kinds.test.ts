@@ -230,9 +230,9 @@ describe("aux: the auxiliary graph nodes compile.ts adds", () => {
 	});
 });
 
-describe("endReason and endResult: what route() says of a chosen end", () => {
+describe("endSentence and endResult: what route() says of a chosen end", () => {
 	const reason = (n: FlowNode, outcome: Outcome) =>
-		kindOf(n).endReason(n, outcome, {});
+		kindOf(n).endSentence(n, outcome, {});
 	const result = (n: FlowNode, outcome: Outcome) =>
 		kindOf(n).endResult(n, outcome);
 	const endedAt = (outcome: string) => `Ended at node "n" with "${outcome}".`;
@@ -308,7 +308,7 @@ describe("endReason and endResult: what route() says of a chosen end", () => {
 			expect(result(end(status), status)).toBe(status);
 			expect(reason(end(status), status)).toBeNull();
 			expect(
-				kindOf(end(status)).endReason(end(status), status, {
+				kindOf(end(status)).endSentence(end(status), status, {
 					message: "No open issues",
 				}),
 			).toBe("No open issues");

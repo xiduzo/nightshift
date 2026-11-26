@@ -32,7 +32,7 @@ import { interruptNode } from "./interrupt";
  * end, or the node's park node. Ported from `walkScope` in engine.ts. Which
  * ends are chosen is a fact of the node type (`endsFlow` of
  * `@nightshift/flows`), and what `RunEnded` says is the node kind's
- * (`ctx.kindOf(node).endReason`): this module switches on no node type.
+ * (`ctx.kindOf(node).endSentence`): this module switches on no node type.
  *
  * Node naming in the compiled graph: the step node is the flow node's id;
  * its park node is `park__<id>`; the wait node of an Agent node or a
@@ -307,7 +307,7 @@ async function routeOn(
 						status: "finished",
 						nodeId: node.id,
 						outcome,
-						reason: kind.endReason(node, outcome, end.outputs),
+						reason: kind.endSentence(node, outcome, end.outputs),
 						...(result !== null ? { result } : {}),
 						...(report !== null ? { report } : {}),
 					},

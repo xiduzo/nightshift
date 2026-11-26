@@ -78,7 +78,7 @@ export const LEASE: NodeKind<LeaseNode> = {
 	make: leaseStepNode,
 	resumeRules: () => RESUME_RULES.wait,
 	aux: () => [{ kind: "wait" }],
-	endReason: () => null,
+	endSentence: () => null,
 	timeBudget: () => ({ timeoutMinutes: undefined, idleMinutes: undefined }),
 };
 

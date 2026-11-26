@@ -70,7 +70,7 @@ export const SINCE_LAST_RUN: NodeKind<SinceLastRunNode> = {
 	type: "since-last-run",
 	make: sinceLastRunStepNode,
 	resumeRules: () => RESUME_RULES.fresh,
-	endReason: (node, outcome) => endedAtReason(node, outcome),
+	endSentence: (node, outcome) => endedAtReason(node, outcome),
 };
 
 /** The longest scope a node remembers under. */

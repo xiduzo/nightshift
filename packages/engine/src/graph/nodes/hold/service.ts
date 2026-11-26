@@ -72,7 +72,7 @@ export const SERVICE: NodeKind<ServiceNode> = {
 	// A wait node: the step sleeps while its Device is offline.
 	aux: () => [{ kind: "wait" }],
 	resumeRules: () => RESUME_RULES.fresh,
-	endReason: (node, outcome) =>
+	endSentence: (node, outcome) =>
 		outcome === "ready" ? null : endedAtReason(node, outcome),
 	timeBudget: () => ({ timeoutMinutes: undefined, idleMinutes: undefined }),
 };

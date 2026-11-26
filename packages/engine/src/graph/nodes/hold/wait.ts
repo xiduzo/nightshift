@@ -118,7 +118,7 @@ export const WAIT: NodeKind<WaitNode> = {
 				: null,
 	resumeRules: () => RESUME_RULES.wait,
 	aux: () => [{ kind: "wait" }],
-	endReason: (node, outcome) =>
+	endSentence: (node, outcome) =>
 		outcome === "pass" || outcome === "done"
 			? null
 			: endedAtReason(node, outcome),

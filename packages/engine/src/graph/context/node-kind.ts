@@ -82,7 +82,7 @@ export type NodeKind<N extends FlowNode = FlowNode> = {
 	 * else which node and outcome, or what the node says (`outputs`, the
 	 * step's outputs: an End node's message).
 	 */
-	endReason(node: N, outcome: Outcome, outputs: StepOutputs): string | null;
+	endSentence(node: N, outcome: Outcome, outputs: StepOutputs): string | null;
 	/**
 	 * The result a chosen end gives the run (`RunEnded.result`): an End
 	 * node's status. Null for every other end.
@@ -153,7 +153,7 @@ export function endedAtReason(node: FlowNode, outcome: Outcome): string {
  */
 export const PLAIN_KIND = {
 	aux: () => [],
-	endReason: (node, outcome) =>
+	endSentence: (node, outcome) =>
 		outcome === "pass" ? null : endedAtReason(node, outcome),
 	endResult: () => null,
 	endReport: () => null,

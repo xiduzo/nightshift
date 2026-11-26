@@ -122,7 +122,7 @@ packages/engine/src/
     route/route.ts         route(): picks the edge with `nextEdge`, logs
                            EdgeTaken and returns `new Command({ update,
                            goto })`; or ends the flow (`endsFlow` of
-                           the node type, the kind's endReason); or parks
+                           the node type, the endSentence of the kind); or parks
                            (parkCommand). parkNode, the node ids, scopeOf.
     context/context.ts     StepShared (what a step may touch, the same for
                            every run) and StepContext (below, with kindOf:
@@ -1180,7 +1180,7 @@ module. Now the engine asks the descriptor:
 | `make` | `compile.ts` | the `switch (node.type)` that picked the factory |
 | `aux(node)` | `compile.ts` | the same switch deciding wait and ask nodes, per `by` |
 | `resumeRules(node)` | the kind's own factory | the `RESUME_RULES` entry each factory named |
-| `endReason(node, outcome)` | `route()` | `finishedReason` in route.ts |
+| `endSentence(node, outcome)` | `route()` | `finishedReason` in route.ts |
 | `logsCommandOutput(node)` | `beginStep` | the three-kind `logPath` rule |
 | `timeBudget(node)` | `beginStep`, `abortEnd` | the Gate and Wait timeout rule, the Agent idle rule |
 | `cutShortOutputs(open, node, outcome)` | `closingEvents` (`graph/runner/open-work.ts`) | the `nodeType` ternary of the stop, and recovery's raw outputs |

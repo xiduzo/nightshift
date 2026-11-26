@@ -81,7 +81,7 @@ export const COMMAND: NodeKind<CommandNode> = {
 	// A wait node: the step sleeps while its Device is offline.
 	aux: () => [{ kind: "wait" }],
 	resumeRules: () => RESUME_RULES.fresh,
-	endReason: (node, outcome) =>
+	endSentence: (node, outcome) =>
 		isChosenExit(node, outcome) ? null : endedAtReason(node, outcome),
 	logsCommandOutput: () => true,
 };

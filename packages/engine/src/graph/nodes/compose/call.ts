@@ -285,7 +285,7 @@ export const CALL: NodeKind<CallNode> = {
 			: null,
 	resumeRules: (node) =>
 		runsEach(node) ? RESUME_RULES.callEach : RESUME_RULES.call,
-	endReason: (node, outcome) =>
+	endSentence: (node, outcome) =>
 		outcome === (runsEach(node) ? "done" : "pass")
 			? null
 			: endedAtReason(node, outcome),

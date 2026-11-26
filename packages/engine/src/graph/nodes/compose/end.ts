@@ -273,7 +273,7 @@ export const END: NodeKind<EndNode> = {
 	followsWork: readsFile,
 	aux: (node) => (readsFile(node) ? [{ kind: "wait" }] : []),
 	resumeRules: () => RESUME_RULES.fresh,
-	endReason: (_node, _outcome, outputs) => messageOf(outputs),
+	endSentence: (_node, _outcome, outputs) => messageOf(outputs),
 	endResult: (node) => node.status satisfies RunResult,
 	endReport: (_node, outputs) => reportTextOf(outputs),
 };
