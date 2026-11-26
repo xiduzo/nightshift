@@ -157,6 +157,58 @@ describe("a replaced slot that is still made (a make that is not awaited)", () =
 		expect(registry.worker).toBeUndefined();
 	});
 
+	test("a later start aborts an earlier make of the slot: a reload ends the fetch of the start before it", async () => {
+		const registry: Registry = {};
+		const slow = slowWorker(1);
+		const earlier = hotSlots(registry).replace("worker", slow.make, stopWorker);
+		await Bun.sleep(0);
+		const later = hotSlots(registry).replace(
+			"worker",
+			() => ({ id: 2, stopped: false }),
+			stopWorker,
+		);
+
+		const [first, second] = await Promise.all([earlier, later]);
+		expect(slow.signal()?.aborted).toBe(true);
+		expect(first.stopped).toBe(true);
+		expect(registry.worker).toBe(second);
+	});
+
+	test("an earlier make that ends keeps the entry of the later one, which is still in flight", async () => {
+		const registry: Registry = {};
+		const first = slowWorker(1);
+		const second = slowWorker(2);
+		const earlier = hotSlots(registry).replace(
+			"worker",
+			first.make,
+			stopWorker,
+		);
+		await Bun.sleep(0);
+		const later = hotSlots(registry).replace("worker", second.make, stopWorker);
+		await earlier;
+		await Bun.sleep(0);
+		const making = (registry as Record<symbol, Map<unknown, unknown>>)[
+			Symbol.for("nightshiftMaking")
+		];
+		expect(making?.size).toBe(1);
+		second.done();
+		await later;
+		expect(making?.size).toBe(0);
+	});
+
+	test("a make that ended leaves no entry among the makes in flight", async () => {
+		const registry: Registry = {};
+		await hotSlots(registry).replace(
+			"worker",
+			async () => ({ id: 1, stopped: false }),
+			stopWorker,
+		);
+		const making = (registry as Record<symbol, Map<unknown, unknown>>)[
+			Symbol.for("nightshiftMaking")
+		];
+		expect(making?.size).toBe(0);
+	});
+
 	test("a later start waits for an earlier make of the slot, and stops what it made first", async () => {
 		const registry: Registry = {};
 		const slow = slowWorker(1);

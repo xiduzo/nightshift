@@ -455,6 +455,32 @@ describe("the daemon, wired in one process", () => {
 		warned.mockRestore();
 	});
 
+	test("a reload aborts the price list fetch of the daemon before it", async () => {
+		dir = await mkdtemp(join(tmpdir(), "nightshift-daemon-"));
+		let asked: AbortSignal | undefined;
+		const before = await createDaemon(envIn(dir), {
+			port: PORT,
+			outside: {
+				// A fetch that answers only when it is aborted.
+				fetch: (_url, init) =>
+					new Promise<Response>((_resolve, reject) => {
+						asked = init?.signal ?? undefined;
+						asked?.addEventListener("abort", () =>
+							reject(new DOMException("The fetch was aborted.", "AbortError")),
+						);
+					}),
+				sleepLock: null,
+			},
+		});
+		started.push(before);
+		for (let i = 0; i < 100 && !asked; i++) await Bun.sleep(10);
+		expect(asked?.aborted).toBe(false);
+
+		await start(envIn(dir));
+		for (let i = 0; i < 100 && !asked?.aborted; i++) await Bun.sleep(10);
+		expect(asked?.aborted).toBe(true);
+	});
+
 	test("a reload that fails keeps the lease: the daemon before it still holds the database", async () => {
 		dir = await mkdtemp(join(tmpdir(), "nightshift-daemon-"));
 		const env = envIn(dir);
