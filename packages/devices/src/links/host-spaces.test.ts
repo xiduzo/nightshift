@@ -3,7 +3,7 @@ import { testSpaces } from "@nightshift/auth/testing";
 
 import { device, hostSpace, member, organization } from "@nightshift/db/schema";
 import { createSandbox, type Sandbox } from "@nightshift/engine/testing";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import type { ListedSpace } from "../contract";
 import { createHostLinks } from "./host-links";
 import { createHostSpaces } from "./host-spaces";
@@ -204,6 +204,32 @@ describe("the Spaces a Host keeps", () => {
 		expect(await nameOf("space-team")).toBe("Platform");
 		expect(await roleOf("space-team")).toBe("admin");
 		expect(await membershipsIn("space-team")).toBe(1);
+		const [kept] = await sandbox.db
+			.select({
+				name: hostSpace.name,
+				role: hostSpace.role,
+				personal: hostSpace.personal,
+			})
+			.from(hostSpace)
+			.where(eq(hostSpace.spaceId, "space-team"));
+		expect(kept).toEqual({ name: "Platform", role: "admin", personal: false });
+	});
+
+	test("a Space the Host stops listing ends the membership before its row goes", async () => {
+		const hostSpaces = createHostSpaces(sandbox.db);
+		await hostSpaces.update(studio, listed, personId);
+		// The row cannot go: what was written before it stays.
+		await sandbox.db.run(
+			sql.raw(
+				"CREATE TRIGGER keep_row BEFORE DELETE ON host_space BEGIN SELECT RAISE(ABORT, 'kept'); END",
+			),
+		);
+
+		await expect(
+			hostSpaces.update(studio, [listed[0] as ListedSpace], personId),
+		).rejects.toThrow("host_space");
+		expect(await roleOf("space-team")).toBeNull();
+		expect(await hostSpaces.hostOf("space-team")).toBe(studio.id);
 	});
 
 	test("a Space listed as before is left as it is", async () => {
