@@ -226,9 +226,8 @@ export function wireOffers(ground: { now?: () => number } = {}) {
 
 		/** This computer's Offers, as its owner makes and withdraws them. */
 		createOffers(deps: OwnerDeps): Offers {
-			const hostSpaces: HostSpaces = {
-				hostOf: (spaceId) => createHostSpaces(deps.db).hostOf(spaceId),
-			};
+			const { hostOf } = createHostSpaces(deps.db);
+			const hostSpaces: HostSpaces = { hostOf };
 			const registry: Pick<Registry, "get" | "homePersons"> = {
 				get: (id) => deps.engine.devices.get(id),
 				homePersons: () => deps.engine.devices.homePersons(),
@@ -341,7 +340,7 @@ export function wireOffers(ground: { now?: () => number } = {}) {
 				selfOwnerId: deps.selfOwnerId,
 				device: deps.device,
 				documents: deps.documents,
-				hostOf: (spaceId) => createHostSpaces(deps.db).hostOf(spaceId),
+				hostOf: createHostSpaces(deps.db).hostOf,
 				personInSpace: (spaceId, personId) =>
 					personInSpace(deps.db, spaceId, personId),
 				personOnHost: (spaceId) => personOnHost(deps.db, spaceId),
