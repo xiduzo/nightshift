@@ -1,4 +1,11 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import {
+	afterEach,
+	beforeEach,
+	describe,
+	expect,
+	setDefaultTimeout,
+	test,
+} from "bun:test";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -12,6 +19,10 @@ import { systemGit } from "./git";
 import { branchHasOtherWork, branchInUse, notOnRemote } from "./hand-off";
 import { createRunBranches } from "./run-branches";
 import { keptRefsOf, worktreeLocation } from "./worktree-places";
+
+// Each case runs real git in two copies; on a busy computer one takes over 5 s.
+setDefaultTimeout(30_000);
+
 import {
 	createWorktree,
 	createWorktrees,
