@@ -142,8 +142,8 @@ export type OfferAdmission = {
 		signal: AbortSignal,
 	): AsyncGenerator<WorkReply>;
 	/**
-	 * This computer as the Device of a run it walks itself
-	 * (`PlacementDeps.localFor`): as is for its owner's run, else every
+	 * This computer as the Device of a run it walks itself: as is for its
+	 * owner's run, else every
 	 * call through the admission, as if it came over the wire.
 	 */
 	deviceFor(
