@@ -45,6 +45,15 @@ export function isHostUnreachable(error: unknown): boolean {
 	);
 }
 
+/**
+ * Whether Night Shift answered the call, with its own words: a refusal
+ * says what to do. A call that never got an answer (the phone or the
+ * computer is offline) did not.
+ */
+export function answeredByNightShift(error: unknown): boolean {
+	return error instanceof ORPCError;
+}
+
 /** What a person reads when the Host does not have a procedure. */
 export const HOST_OUTDATED = hostVersionWords("older");
 

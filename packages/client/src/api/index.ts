@@ -8,6 +8,7 @@ export {
 } from "./client";
 export { createQueryClient } from "./query-client";
 export {
+	answeredByNightShift,
 	HOST_OUTDATED,
 	isHostUnreachable,
 	isMissingOnHost,

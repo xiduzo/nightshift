@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { ORPCError } from "@orpc/client";
 
 import {
+	answeredByNightShift,
 	isHostUnreachable,
 	isSignInRequired,
 	isTwoFactorRequired,
@@ -48,4 +49,13 @@ describe("the refusal of an action while the Host cannot be reached", () => {
 		expect(isHostUnreachable(new TypeError("Failed to fetch"))).toBe(false);
 		expect(isHostUnreachable(null)).toBe(false);
 	});
+});
+
+test("Night Shift answered a call with its words, or no answer came", () => {
+	expect(
+		answeredByNightShift(new ORPCError("CONFLICT", { message: "Not now." })),
+	).toBe(true);
+	expect(answeredByNightShift(new TypeError("Network request failed"))).toBe(
+		false,
+	);
 });

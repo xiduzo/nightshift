@@ -1,4 +1,5 @@
 import {
+	answeredByNightShift,
 	hasEnded,
 	type RerunStart,
 	type RunActing,
@@ -232,12 +233,16 @@ export function failedAction(act: RunAct): Action | undefined {
 
 /** Why the last action did not work, and how to fix it. Nothing when none failed. */
 export function RunActionFailure({ act }: { act: RunAct }) {
-	if (act.signal.error) {
+	const signalError = act.signal.error;
+	if (signalError) {
+		// Night Shift's own words say what to do. No answer: the phone is offline.
 		return (
 			<ErrorAlert
 				title="The signal did not go"
-				message={act.signal.error.message}
-				fix="Check that this phone is online, then try again."
+				message={signalError.message}
+				{...(answeredByNightShift(signalError)
+					? {}
+					: { fix: "Check that this phone is online, then try again." })}
 			/>
 		);
 	}
