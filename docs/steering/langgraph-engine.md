@@ -819,9 +819,11 @@ interrupt that keeps waiting with a **hold** (`ResumeValue` `hold`,
   a hold moves the branches inside the body, not the branches beside the
   Subflow. A wake of a sleep beside a Subflow that waits at a Gate would
   write `WaitEnded` and then stall. `planWake` refuses it (`blocked`,
-  `heldBack`): a person reads "Answer the Gate beside this step first.
-  Then try again.", and a timer fires again once the drive after the
-  answer parks.
+  `heldBack`): a person reads "Answer the Gate in the Subflow beside this
+  step first. Then try again.". Such a sleep does not count for the run's
+  timer (`nextTimer`), so a deadline or another sleep still fires at its
+  time. The sleep's own timer comes once the drive after the answer
+  parks.
 - A drive that ends with a parked branch ends the run, also when another
   branch waits.
 - An answer to a Gate while another branch's step still runs is refused,
@@ -1120,7 +1122,8 @@ The daemon side is the runner's wake Turn over the three parts of
   Subflow beside the step holds it back (`blocked`). It gives the resume
   value (`{ kind: "wake" }` or `{ kind: "signal" }`).
 - `nextTimer(runState)` (pure): the run's one timer, the first of its
-  sleeps and its Gates' deadlines, a deadline first on a tie. The timer
+  sleeps and its Gates' deadlines, a deadline first on a tie. A sleep that
+  a Gate in a Subflow beside it holds back does not count. The timer
   Turn of a run that waits at a Gate (`timerTurn`) asks it what is due: a
   deadline answers its Gate, a sleep wakes.
 - `recordWake` appends `WaitEnded` (with the prompt of a person who gave

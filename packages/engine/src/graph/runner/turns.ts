@@ -37,7 +37,8 @@ const BRANCHES_WORK =
 const CANNOT_WAKE =
 	"Night Shift could not wake this run. Stop the run, then resume it.";
 /** An early wake or a signal that a Gate in a Subflow beside the sleep holds back (`planWake`). */
-const GATE_FIRST = "Answer the Gate beside this step first. Then try again.";
+const GATE_FIRST =
+	"Answer the Gate in the Subflow beside this step first. Then try again.";
 
 const HALTED: Taken = { kind: "halted" };
 const QUEUED: Taken = { kind: "queued" };
@@ -226,6 +227,8 @@ export function createTurns(
 			if (how.early && how.by !== "daemon") {
 				throw new RunRefusal("not-now", GATE_FIRST);
 			}
+			// The next timer that can fire: a deadline, or a sleep that can go on.
+			sleeps.restore(runId, runState);
 			return UNCHANGED;
 		}
 		// The timer goes; a wake the cap holds stays queued.

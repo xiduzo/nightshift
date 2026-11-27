@@ -11,12 +11,7 @@ import {
 import { firstDeadline, wakesNext } from "../../read";
 import type { Recorder } from "../recorders";
 import type { Parked, ResumeValue } from "../state";
-import {
-	type Interrupt,
-	resumeEach,
-	type ThreadEntry,
-	type ThreadState,
-} from "./thread";
+import { resumeEach, type ThreadEntry, type ThreadState } from "./thread";
 
 /**
  * The runner's side of a sleep (`step/sleep.ts` has the step's side).
@@ -91,7 +86,11 @@ export function planWake(
 	now: number,
 ): WakePlan {
 	if (!asleepIn(run, at)) return { kind: "not-sleeping" };
-	const sleeping = wakesNext(run, how.signal);
+	// A timer or a person wakes the first sleep that can go on now.
+	const sleeping =
+		how.signal === undefined
+			? (firstWake(freeWaits(run)) ?? wakesNext(run))
+			: wakesNext(run, how.signal);
 	const step = run.steps.get(sleeping?.stepId ?? "");
 	if (!sleeping || !step) return { kind: "not-sleeping" };
 	const { until } = sleeping.payload;
@@ -116,7 +115,7 @@ export function planWake(
 		if (value.stepId === step.id) return resume;
 		return asleep.has(value.stepId) ? null : { kind: "wake", early: false };
 	};
-	if (heldBack(run, step, interrupts, pick)) return { kind: "blocked" };
+	if (heldBack(run, step.id)) return { kind: "blocked" };
 	const [only] = interrupts.filter(({ value }) => pick(value) !== null);
 	if (!only) return { kind: "wake", step, entry: { kind: "continue" } };
 	const each = resumeEach(at, pick);
@@ -132,22 +131,21 @@ export function planWake(
 }
 
 /**
- * Whether a Gate or a sleep that keeps its wait holds back the step that
- * wakes: it waits inside a Call at the step's own level. The step goes on
- * in the next super-step of that level, and the Call ends no task while
- * its body waits (`driveGraph`). The thread may not even hold the step's
- * wait yet: the step slept in the super-step the Call held back.
+ * Whether a Gate or a sleep beside the step holds it back: it waits inside
+ * a Call at the step's own level. The step goes on in the next super-step
+ * of that level, and the Call ends no task while its body waits
+ * (`driveGraph`). Pure, from the log: its open Gates and its sleeps. The
+ * thread may not even hold the step's wait yet: the step slept in the
+ * super-step the Call held back.
  */
-function heldBack(
-	run: RunState,
-	step: DerivedStep,
-	interrupts: readonly Interrupt[],
-	pick: (value: Parked) => ResumeValue | null,
-): boolean {
-	const level = scopeKey(step.scope);
-	return interrupts.some(({ value }) => {
-		if (pick(value) !== null || value.stepId === null) return false;
-		let at = run.steps.get(value.stepId)?.scope ?? null;
+function heldBack(run: RunState, stepId: string): boolean {
+	const level = scopeKey(run.steps.get(stepId)?.scope ?? null);
+	const others = [
+		...run.gates.map((gate) => gate.stepId),
+		...run.waits.flatMap((wait) => wait.stepId ?? []),
+	].filter((id) => id !== stepId);
+	return others.some((id) => {
+		let at = run.steps.get(id)?.scope ?? null;
 		while (at) {
 			const caller = run.steps.get(at.parentStepId);
 			if (!caller) return false;
@@ -156,6 +154,20 @@ function heldBack(
 		}
 		return false;
 	});
+}
+
+/** The sleeps of the run that no Gate or sleep beside them holds back (`heldBack`). */
+function freeWaits(run: RunState): RunState["waits"] {
+	return run.waits.filter(
+		(wait) => wait.stepId === null || !heldBack(run, wait.stepId),
+	);
+}
+
+/** Of `waits`, the one that wakes first: a wait with no time comes last. */
+function firstWake(waits: RunState["waits"]): RunState["waits"][number] | null {
+	const at = (wait: RunState["waits"][number]) =>
+		wait.payload.until ?? Number.POSITIVE_INFINITY;
+	return [...waits].sort((a, b) => at(a) - at(b))[0] ?? null;
 }
 
 /**
@@ -179,12 +191,16 @@ export type NextTimer = {
 /**
  * Pure: the run's one timer, from its log. It is the first of the wake
  * time of its sleeps and the deadlines of its open Gates: a Gate and a
- * sleep can wait at once on parallel branches. A deadline goes first when
- * both are at the same time. Null when nothing waits for a time (a signal
- * with no timeout, a Gate with no deadline).
+ * sleep can wait at once on parallel branches. A sleep that a Gate in a
+ * Call beside it holds back (`heldBack`) counts only once that Gate is
+ * answered, so it does not hide the timers after it. A deadline goes
+ * first when both are at the same time. Null when nothing waits for a
+ * time (a signal with no timeout, a Gate with no deadline).
  */
 export function nextTimer(run: RunState): NextTimer | null {
-	const until = run.sleep ? (wakesNext(run)?.payload.until ?? null) : null;
+	const until = run.sleep
+		? (firstWake(freeWaits(run))?.payload.until ?? null)
+		: null;
 	const gate = firstDeadline(run);
 	if (gate && (until === null || gate.deadline.at <= until)) {
 		return { at: gate.deadline.at, gate };

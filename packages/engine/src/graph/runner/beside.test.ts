@@ -373,11 +373,74 @@ test("a Wait beside a Subflow that waits at a Gate wakes only after the answer: 
 	const before = (await h.events()).length;
 	await expect(
 		runner.take(h.runId, { kind: "wake", early: true, signal: "go" }),
-	).rejects.toThrow("Answer the Gate beside this step first. Then try again.");
+	).rejects.toThrow(
+		"Answer the Gate in the Subflow beside this step first. Then try again.",
+	);
 	expect((await h.events()).length).toBe(before);
 	await answer(h, runner);
 	await wentOn(h, runner, "sub");
 	expect((await stateOf(h)).status).toBe("sleeping");
 	await runner.take(h.runId, { kind: "wake", early: true, signal: "go" });
+	await waitFor(async () => (await stateOf(h)).status === "finished");
+});
+
+test("a sleep that a Subflow's Gate holds back hides no timer: the Gate's deadline still answers it, then the sleep wakes", async () => {
+	const inner = flowOf([gate("keep", { minutes: 300, choose: "keep" })]);
+	const { h, runner, clock } = await setup(beside(call("sub"), wait(NAP)), {
+		flows: { body: inner },
+		parked: gateAndSleep,
+	});
+	// The sleep is due, but the Gate holds it back: nothing changes.
+	clock.now = T0 + 100 * MINUTE;
+	expect(await runner.take(h.runId, { kind: "wake", early: false })).toEqual({
+		kind: "unchanged",
+	});
+	expect(await count(h, "WaitEnded")).toBe(0);
+	clock.now = T0 + 300 * MINUTE;
+	await runner.take(h.runId, { kind: "wake", early: false });
+	await waitFor(async () => (await stateOf(h)).status === "finished");
+	expect((await stepOf(h, "keep"))?.outputs).toMatchObject({
+		outcome: "keep",
+		note: 'Nobody answered by the deadline, so Night Shift chose "keep".',
+	});
+	expect((await stepOf(h, "nap"))?.outcome).toBe("done");
+});
+
+test("a sleep that a Subflow's Gate holds back hides no timer: a sleep in another Subflow wakes at its own time", async () => {
+	const flow = flowOf(
+		[
+			command("start", "true"),
+			call("sub"),
+			wait(NAP),
+			{ ...call("later"), flow: "later" },
+			{ id: "joined", type: "join", position: at, wait: "all" },
+		],
+		[
+			edge("1", "start", "pass", "sub"),
+			edge("2", "start", "pass", "nap"),
+			edge("3", "start", "pass", "later"),
+			edge("4", "sub", "pass", "joined"),
+			edge("5", "nap", "done", "joined"),
+			edge("6", "later", "pass", "joined"),
+		],
+	);
+	const { h, runner, clock } = await setup(flow, {
+		flows: { body: flowOf([gate()]), later: flowOf([wait(LONG_NAP, "rest")]) },
+		parked: async (h) => {
+			const run = await stateOf(h);
+			return run.gates.length === 1 && run.waits.length === 2;
+		},
+	});
+	clock.now = T0 + 100 * MINUTE;
+	await runner.take(h.runId, { kind: "wake", early: false });
+	clock.now = T0 + 300 * MINUTE;
+	await runner.take(h.runId, { kind: "wake", early: false });
+	await waitFor(
+		async () =>
+			!runner.isActive(h.runId) && (await stepOf(h, "rest"))?.endedAt != null,
+	);
+	expect((await stepOf(h, "rest"))?.outcome).toBe("done");
+	expect((await stepOf(h, "nap"))?.endedAt).toBeNull();
+	await answer(h, runner);
 	await waitFor(async () => (await stateOf(h)).status === "finished");
 });
