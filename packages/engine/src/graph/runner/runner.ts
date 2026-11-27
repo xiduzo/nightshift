@@ -296,6 +296,9 @@ export function createRunner(deps: RunnerDeps) {
 						},
 					});
 					bus.publish(runId, { kind: "step-changed", stepId: intent.stepId });
+					// The Gate waits again: its deadline, which left it to the
+					// answer, counts again.
+					sleeps.restore(runId, await log.state(runId));
 				} catch (failed) {
 					console.error(`[engine] could not warn run ${runId}`, failed);
 				}
@@ -340,9 +343,24 @@ export function createRunner(deps: RunnerDeps) {
 		}
 	}
 
-	/** A new daemon's timer, and the answers that wait for the run's drive (`AnswerQueued`). */
+	/**
+	 * A new daemon's timer from `runState`, and the answers that wait for
+	 * the run's drive (`AnswerQueued`). Those come from the run's whole log:
+	 * a caller may fold only the events that open or close work (startup
+	 * recovery). A full run cap queues them: none is dropped.
+	 */
 	function restore(runId: string, runState: RunState): void {
 		sleeps.restore(runId, runState);
+		log
+			.state(runId)
+			.then((full) => passOnQueued(runId, full))
+			.catch((error) => {
+				console.error(`[engine] could not read run ${runId}`, error);
+			});
+	}
+
+	/** Passes on each answer that waits for the run's drive (`AnswerQueued`). */
+	function passOnQueued(runId: string, runState: RunState): void {
 		for (const step of runState.steps.values()) {
 			const queued = step.endedAt === null ? step.gate?.queued : null;
 			if (!queued) continue;
@@ -358,7 +376,7 @@ export function createRunner(deps: RunnerDeps) {
 					...(via ? { via } : {}),
 					queued: true,
 				},
-				{},
+				{ whenFull: "queue" },
 			);
 		}
 	}

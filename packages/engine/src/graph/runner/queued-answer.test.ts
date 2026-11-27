@@ -5,6 +5,8 @@ import { foldRun } from "../../log";
 import { getRunRow } from "../../log/run-row/run-row";
 import { deriveSteps, parseCalledFlows, parseRunFlow } from "../../read";
 import { RunRefusal } from "../../run-status";
+import { wireRecovery } from "../../runs";
+import { runnerTurns } from "../../runs/walk/adapters/out/runner-turns";
 import { defaultRunSettings } from "../../settings/settings";
 import {
 	command,
@@ -20,7 +22,6 @@ import {
 	type Sandbox,
 	waitFor,
 } from "../../testing/test-support";
-import { closeOpenWork } from "./open-work";
 import type { Runner } from "./runner";
 
 /**
@@ -215,24 +216,43 @@ test("a full run cap does not stop the branch after a Turn that moved nothing", 
 	});
 });
 
-test("an answer that waits when Night Shift stops is passed on by the next one", async () => {
+test("an answer that waits when Night Shift stops is passed on by the next one's startup recovery", async () => {
 	quiet = spyOn(console, "error").mockImplementation(() => {});
 	const { h, runner, clock, answer } = await setup();
 	await answer("First.");
 	await runner.release();
-	await closeOpenWork(
-		{
+	// The next daemon: its startup recovery, over a runner of its own.
+	const next = runnerOf(h, clock);
+	const recovery = wireRecovery({
+		openWork: {
+			db: sandbox.db,
 			log: h.log,
 			bus: h.deps.shared.bus,
 			flowOf: parseRunFlow,
 			calledFlowsOf: parseCalledFlows,
+			runHolds: {
+				ended: async () => {},
+				notContinuing: async () => {},
+				resuming: async () => {},
+			},
 		},
-		h.runId,
-		{ kind: "interrupted", reason: "Night Shift stopped." },
-	);
-	expect((await stateOf(h)).gate?.answerQueued).toBe(true);
-	const next = runnerOf(h, clock);
-	next.restore(h.runId, await stateOf(h));
+		waits: { db: sandbox.db, log: h.log },
+		facts: h.log,
+		turns: runnerTurns(next),
+		holds: { start: (_spaceId, work) => work() },
+		openRun: async (_actor, { runId }) => ({
+			run: await h.log.row(runId),
+			walkedHere: true,
+		}),
+		now: () => clock.now,
+		settings: () => ({
+			...defaultRunSettings(),
+			resumeInterruptedRuns: false,
+		}),
+		schedulerOn: true,
+		resumeGraceMs: 0,
+	});
+	await recovery.recoverRuns();
 	await waitFor(async () => (await stepOf(h, "keep"))?.endedAt != null, {
 		timeoutMs: 10_000,
 		label: "the new daemon to pass the answer on",
@@ -303,4 +323,29 @@ test("a stop while an answer waits: a warning on the Gate's step says the run st
 	expect(warning?.payload.message).toBe(
 		"Your answer did not reach the Gate. The run stopped before the Gate took it.",
 	);
+});
+
+test("a deadline that left the Gate to an answer counts again once that answer did not reach it", async () => {
+	const { h, runner, clock, stepId } = await setup({
+		keep: gate({ minutes: 10, choose: "drop" }),
+	});
+	let looks = 0;
+	const check = () => {
+		if (looks++ > 0) {
+			throw new RunRefusal("gate-closed", "Someone else answered it.");
+		}
+	};
+	await runner.take(
+		h.runId,
+		{ kind: "answer", stepId, choice: "keep", note: "Mine." },
+		{ check },
+	);
+	// The deadline comes while the answer waits: it leaves the Gate to it.
+	clock.now = T0 + 10 * MINUTE;
+	await runner.take(h.runId, { kind: "wake", early: false });
+	await waitFor(async () => (await stepOf(h, "keep"))?.endedAt != null, {
+		timeoutMs: 10_000,
+		label: "the deadline to answer the Gate after the warning",
+	});
+	expect((await stepOf(h, "keep"))?.outcome).toBe("drop");
 });
