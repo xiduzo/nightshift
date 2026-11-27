@@ -787,8 +787,10 @@ watch the Subflow step's signal. The Subflow step ends `stopped` with the
 same words, and the walk continues. A Subflow with `each` starts no next
 element after its branch lost. A Subflow that runs past its time budget
 stops its called flow the same way and ends `error`.
-After a restart the claim is gone, and the Join picks the earliest
-arrival from the state.
+A Gate or a sleep on such a branch ends at its next hold: its step ends
+`stopped` with the same words, so its Gate closes and the run does not
+wait for it. After a restart the claim is gone, and the Join picks the
+earliest arrival from the state.
 
 **Interrupts.** A branch that parks, sleeps or opens a Gate interrupts
 its own task. The other tasks of the super-step finish. LangGraph ends a

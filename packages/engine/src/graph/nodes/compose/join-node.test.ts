@@ -223,6 +223,34 @@ describe("variables set on parallel branches", () => {
 });
 
 describe("a Join that waits for the first", () => {
+	test("a Gate on the branch that lost closes: its step ends as outrun, and the run goes on to its end", async () => {
+		const h = await startRun(
+			sandbox,
+			fanOut(
+				[
+					{
+						id: "keep",
+						type: "decision",
+						position: { x: 0, y: 0 },
+						prompt: "Keep?",
+						by: "person",
+						options: [{ name: "pass" }],
+					},
+					command("work", "true"),
+				],
+				"first",
+			),
+		);
+		const driven = await drive(h, { inputs: {} });
+		expect(driven.outcome.kind).toBe("ended");
+		expect(driven.state.ended).toMatchObject({ nodeId: "after" });
+		const run = foldRun(await h.events());
+		expect(run.gates).toEqual([]);
+		const keep = deriveSteps(run).find((s) => s.nodeId === "keep");
+		expect(keep).toMatchObject({ outcome: "stopped", error: OUTRUN_ERROR });
+		expect(payloads(await h.events(), "GateOpened")).toHaveLength(1);
+	});
+
 	test("the first branch goes on; the step that still runs in the other branch stops", async () => {
 		const h = await startRun(
 			sandbox,

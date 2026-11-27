@@ -335,7 +335,7 @@ export async function sleep(
  */
 export function waitNode(
 	nodeId: string,
-	ctx: Pick<StepContext, "log" | "run">,
+	ctx: Pick<StepContext, "log" | "run" | "bus" | "flow" | "races">,
 ): NodeAction {
 	const letGo = async (pending: PendingWait): Promise<Command> => {
 		const run = await ctx.log.state(ctx.run.id);
