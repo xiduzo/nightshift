@@ -112,6 +112,7 @@ export function openGate(
 		form: null,
 		walker: { id: "device", name: "test", thisDevice: true },
 		answerPending: false,
+		answerDropped: null,
 		branchesWork: false,
 	};
 }

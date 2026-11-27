@@ -236,6 +236,13 @@ export type DerivedStep = {
 		deadline: GateDeadline | null;
 		/** An Ask (ADR 10): the form the answer fills in. Null on every other Gate. */
 		form: AskForm | null;
+		/**
+		 * An answer that waits for the drive (`AnswerQueued`), until the Gate
+		 * takes it or a `RunWarned` `answer-dropped` says it did not.
+		 */
+		queued: EnginePayloads["AnswerQueued"] | null;
+		/** Why the latest answer that waited did not reach this Gate (`answer-dropped`). Null until one did not. */
+		dropped: string | null;
 	} | null;
 	/** When the step slept (a Wait node, a usage limit, the network), oldest first. */
 	sleeps: readonly SleepSpan[];
@@ -342,10 +349,14 @@ export type OpenGateFact = {
 	/** An Ask (ADR 10): the form the answer fills in. Null on every other Gate. */
 	form: AskForm | null;
 	/**
-	 * A step on another branch of the run still works. The run takes no
-	 * answer until that step ends.
+	 * A step on another branch of the run still works. An answer waits
+	 * until that step ends (`AnswerQueued`).
 	 */
 	branchesWork: boolean;
+	/** An answer waits for the drive: the Gate takes no second one. */
+	answerQueued: boolean;
+	/** Why the latest answer that waited did not reach this Gate, while it still waits. */
+	answerDropped: string | null;
 };
 
 /** The wait the run sleeps in, as the log tells it. */

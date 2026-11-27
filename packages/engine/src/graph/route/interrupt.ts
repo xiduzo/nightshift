@@ -5,7 +5,7 @@ import {
 	type LangGraphRunnableConfig,
 } from "@langchain/langgraph";
 
-import { OUTRUN_ERROR } from "../../read";
+import { ANSWER_DROPPED, OUTRUN_ERROR } from "../../read";
 import { outrun } from "../branches";
 import type { NodeAction, StepContext } from "../context";
 import { commitVisit, heldStep, holdEnded } from "../position";
@@ -138,6 +138,19 @@ async function endOutrun(
 			error: OUTRUN_ERROR,
 		},
 	});
+	// An answer that waited for the drive goes with the Gate.
+	const run = await ctx.log.state(ctx.run.id);
+	if (run.steps.get(held.stepId)?.gate?.queued) {
+		await ctx.log.append({
+			type: "RunWarned",
+			runId: ctx.run.id,
+			stepId: held.stepId,
+			payload: {
+				kind: "answer-dropped",
+				message: `${ANSWER_DROPPED} ${OUTRUN_ERROR}`,
+			},
+		});
+	}
 	ctx.bus.publish(ctx.run.id, { kind: "step-changed", stepId: held.stepId });
 	return new Command({
 		update: {

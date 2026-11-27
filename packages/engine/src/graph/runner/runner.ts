@@ -1,6 +1,8 @@
-import { Refusal } from "@nightshift/refusal";
+import { Refusal, wordsFor } from "@nightshift/refusal";
 import { type RunState, runsArriving } from "../../log";
+import { ANSWER_DROPPED } from "../../read";
 import { ARRIVING, RunRefusal, WALKED_ELSEWHERE } from "../../run-status";
+import { CONTINUED } from "./answer-plan";
 import { createDrives } from "./drive";
 import { NO_HOLDS } from "./holds";
 import type { CloseDeps } from "./open-work";
@@ -172,7 +174,7 @@ export function createRunner(deps: RunnerDeps) {
 			held.map(async ([runId, slot]) => {
 				// An answer that waits for its step lets go.
 				bus.publish(runId, { kind: "status-changed" });
-				if (slot === "starting") return;
+				if (slot === "starting" || slot === "handed") return;
 				const settled = slot.thread?.fence.close() ?? Promise.resolve();
 				slot.controller.abort();
 				await settled;
@@ -217,57 +219,147 @@ export function createRunner(deps: RunnerDeps) {
 	): Promise<Taken> {
 		refuseTurn(runId);
 		const walk = walkOf(runId);
+		if (walk && intent.kind === "answer" && !intent.queued) {
+			return queueAnswer(runId, intent, options);
+		}
 		if (
 			walk &&
-			(intent.kind === "answer" ||
-				intent.kind === "wake" ||
+			(intent.kind === "wake" ||
 				(intent.kind === "resume" &&
 					(await log.state(runId)).status === "sleeping"))
 		) {
-			// The drive parks at its next hold, after the step that runs on
-			// each branch now, and the Turn comes then. An answer does not
-			// wait for that step: it is queued.
-			if (intent.kind === "answer") {
-				// The caller's check refuses now what its Turn would refuse: a
-				// Gate that closed, a choice it does not have.
-				options.check?.(await log.state(runId));
-				walk.yielding = true;
-				void walk.done.then(() =>
-					outside(() =>
-						afterYield(runId, intent, options).catch((error) => {
-							if (error instanceof Refusal) return;
-							console.error(`[engine] could not answer run ${runId}`, error);
-						}),
-					),
-				);
-				return { kind: "queued" };
-			}
-			walk.yielding = true;
-			await walk.done;
 			return afterYield(runId, intent, options);
 		}
 		return inTurn(runId, (turn) => turnFor(runId, intent, options, turn));
 	}
 
 	/**
-	 * The Turn a drive parked for (`Walk.yielding`). When it moved nothing
-	 * (a refusal, a wake too soon), the drive goes on, so the branches
-	 * beside the interrupts do not stop there.
+	 * An answer while a drive holds the run. What is known now is refused
+	 * now: the caller's check, and a second answer while one waits. The
+	 * answer becomes a fact (`AnswerQueued`): the Gate shows it as on its
+	 * way, and a new daemon passes it on (`restore`). Its Turn comes at the
+	 * drive's next hold (`passOn`).
+	 */
+	async function queueAnswer(
+		runId: string,
+		intent: Extract<Intent, { kind: "answer" }>,
+		options: TakeOptions,
+	): Promise<Taken> {
+		const runState = await log.state(runId);
+		options.check?.(runState);
+		const step = runState.steps.get(intent.stepId);
+		if (step?.endedAt === null && step.gate?.queued) {
+			throw new RunRefusal("gate-closed", CONTINUED);
+		}
+		const { stepId, choice, note, data, via } = intent;
+		await log.append({
+			type: "AnswerQueued",
+			runId,
+			stepId,
+			payload: {
+				choice,
+				note,
+				...(data !== undefined ? { data } : {}),
+				...(via ? { via } : {}),
+			},
+		});
+		bus.publish(runId, { kind: "step-changed", stepId });
+		passOn(runId, { ...intent, queued: true }, options);
+		return { kind: "queued" };
+	}
+
+	/**
+	 * The Turn of an answer that waits (`AnswerQueued`), in the background.
+	 * When the Gate no longer takes it, a warning on the Gate's step says
+	 * why (`answer-dropped`), so the screens show it. A runner that lets go
+	 * writes nothing: the next one passes the answer on.
+	 */
+	function passOn(
+		runId: string,
+		intent: Extract<Intent, { kind: "answer" }>,
+		options: TakeOptions,
+	): void {
+		outside(() => {
+			afterYield(runId, intent, options).catch(async (error) => {
+				if (state.released) return;
+				if (!(error instanceof Refusal)) {
+					console.error(`[engine] could not answer run ${runId}`, error);
+				}
+				try {
+					await log.append({
+						type: "RunWarned",
+						runId,
+						stepId: intent.stepId,
+						payload: {
+							kind: "answer-dropped",
+							message: `${ANSWER_DROPPED} ${wordsFor(error)}`,
+						},
+					});
+					bus.publish(runId, { kind: "step-changed", stepId: intent.stepId });
+				} catch (failed) {
+					console.error(`[engine] could not warn run ${runId}`, failed);
+				}
+			});
+		});
+	}
+
+	/**
+	 * A Turn for a run a drive holds: the drive parks at its next hold and
+	 * keeps its slot for the Turn (`hand-over`), so a full run cap cannot
+	 * hold the Turn back. A drive another Turn began meanwhile is waited for
+	 * the same way. When the Turn moved nothing (a refusal, a wake too
+	 * soon), the drive goes on in the same Turn (`go-on`), so the branches
+	 * beside the interrupts do not stop there. A slot left over goes.
 	 */
 	async function afterYield(
 		runId: string,
 		intent: Intent,
 		options: TakeOptions,
 	): Promise<Taken> {
-		try {
-			return await take(runId, intent, options);
-		} finally {
-			outside(() => {
-				take(runId, { kind: "go-on" }).catch((error) => {
-					if (error instanceof Refusal) return;
-					console.error(`[engine] could not drive run ${runId} on`, error);
-				});
+		for (;;) {
+			for (let walk = walkOf(runId); walk; walk = walkOf(runId)) {
+				walk.yielding = "hand-over";
+				await walk.done;
+			}
+			const taken = await inTurn(runId, async (turn) => {
+				if (walkOf(runId)) return null;
+				try {
+					return await turnFor(runId, intent, options, turn);
+				} finally {
+					await turnFor(runId, { kind: "go-on" }, {}, turn).catch((error) => {
+						if (error instanceof Refusal) return;
+						console.error(`[engine] could not drive run ${runId} on`, error);
+					});
+					if (slots.get(runId) === "handed") {
+						slots.delete(runId);
+						turn.freed = true;
+					}
+				}
 			});
+			if (taken) return taken;
+		}
+	}
+
+	/** A new daemon's timer, and the answers that wait for the run's drive (`AnswerQueued`). */
+	function restore(runId: string, runState: RunState): void {
+		sleeps.restore(runId, runState);
+		for (const step of runState.steps.values()) {
+			const queued = step.endedAt === null ? step.gate?.queued : null;
+			if (!queued) continue;
+			const { choice, note, data, via } = queued;
+			passOn(
+				runId,
+				{
+					kind: "answer",
+					stepId: step.id,
+					choice,
+					note,
+					...(data !== undefined ? { data } : {}),
+					...(via ? { via } : {}),
+					queued: true,
+				},
+				{},
+			);
 		}
 	}
 
@@ -334,9 +426,11 @@ export function createRunner(deps: RunnerDeps) {
 		hold,
 		/** Whether a drive or a Turn holds a slot of the run. */
 		isActive: (runId: string): boolean => slots.has(runId),
-		/** A new daemon's wake timer from the log, or a moved-in run's (`graph/runner/wake.ts`). */
-		restore: (runId: string, runState: RunState): void =>
-			sleeps.restore(runId, runState),
+		/**
+		 * A new daemon's wake timer from the log, or a moved-in run's
+		 * (`graph/runner/wake.ts`), and the answers that wait for its drive.
+		 */
+		restore,
 		/**
 		 * Drops what this runner keeps of a run that another Device walks
 		 * now: its compiled thread, its wake timer and its place in the cap

@@ -50,6 +50,7 @@ export const PERSON_FIELDS = {
 	StepEnded: [],
 	VariablesSet: [],
 	GateOpened: [],
+	AnswerQueued: [],
 	SessionStarted: [],
 	HarnessSessionAssigned: [],
 	SessionUsage: [],

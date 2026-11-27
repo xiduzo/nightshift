@@ -23,6 +23,7 @@ import { Textarea } from "@nightshift/ui-native/components/ui/textarea";
 import { useQuery } from "@tanstack/react-query";
 import { type Href, router } from "expo-router";
 import {
+	CircleAlert,
 	CircleCheck,
 	CircleDot,
 	CirclePlay,
@@ -281,6 +282,15 @@ export function GateBriefing({
 					</NativeSection>
 				) : (
 					<>
+						{gate.answerDropped ? (
+							<NativeSection>
+								<NativeTextRow
+									icon={{ sf: "exclamationmark.circle", lucide: CircleAlert }}
+									text="**Answer again**"
+									note={gate.answerDropped}
+								/>
+							</NativeSection>
+						) : null}
 						{gate.branchesWork ? (
 							<NativeSection>
 								<NativeTextRow

@@ -21,6 +21,7 @@ import { Spinner } from "@nightshift/ui/components/spinner";
 import { cn } from "@nightshift/ui/lib/utils";
 import {
 	CheckIcon,
+	CircleAlertIcon,
 	CornerDownLeftIcon,
 	LoaderIcon,
 	LockIcon,
@@ -132,6 +133,7 @@ export function FocusAnswer({
 	if (gate.canAnswer && gate.form) {
 		return (
 			<AnswerSection id={id}>
+				<DroppedNotice dropped={gate.answerDropped} />
 				<BusyNotice held={held} />
 				<AskForm
 					runId={gate.runId}
@@ -147,6 +149,7 @@ export function FocusAnswer({
 
 	return (
 		<AnswerSection id={id}>
+			<DroppedNotice dropped={gate.answerDropped} />
 			{gate.canAnswer ? null : (
 				<Alert>
 					<LockIcon />
@@ -283,6 +286,18 @@ function AnswerSection({
 			</h2>
 			{children}
 		</section>
+	);
+}
+
+/** Your last answer did not reach the Gate: why, and that it waits for a new one. */
+function DroppedNotice({ dropped }: { dropped: string | null }) {
+	if (dropped === null) return null;
+	return (
+		<Alert variant="destructive">
+			<CircleAlertIcon />
+			<AlertTitle>Answer again</AlertTitle>
+			<AlertDescription>{dropped}</AlertDescription>
+		</Alert>
 	);
 }
 

@@ -57,6 +57,8 @@ export type Intent =
 			data?: JsonValue;
 			/** Where the answer came from. Absent: the score stores `_OTHER`. */
 			via?: GateVia;
+			/** The answer that waited for the drive (`AnswerQueued`): its own Turn now. */
+			queued?: true;
 	  }
 	/** Ends the sleep of a sleeping run (`planWake`): its timer, a person early, or a signal. */
 	| ({ kind: "wake" } & Wake)

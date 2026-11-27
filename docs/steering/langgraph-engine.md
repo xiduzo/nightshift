@@ -831,10 +831,21 @@ interrupt that keeps waiting with a **hold** (`ResumeValue` `hold`,
 - An answer, a wake or a signal that comes while a drive holds the run
   sets `Walk.yielding`: the drive parks at its next hold instead of
   holding again, so the Turn waits for the step that runs now on each
-  branch, not for the whole branch. An answer is queued (`take` gives
-  `queued`) and comes as its own Turn then. A Turn that moved nothing
-  after that (a refusal, a timer too soon) is followed by `go-on`, which
-  drives on a thread left with a finished task beside its interrupts.
+  branch, not for the whole branch. The drive keeps its slot for that
+  Turn (`hand-over`, slot "handed"), so a full run cap cannot hold it
+  back. A Turn that moved nothing (a refusal, a timer too soon) drives on
+  in the same Turn (`go-on`), from a thread left with a finished task
+  beside its interrupts.
+- Such an answer is a fact first: `AnswerQueued` on the Gate's step. The
+  caller's check and a second answer are refused at once ("This Gate has
+  its answer."), the Gate shows the answer as on its way
+  (`answerPending`), and its deadline leaves the Gate to it. `take` gives
+  `queued`, and the answer comes as its own Turn at the drive's next
+  hold. A new daemon passes it on (`runner.restore`). When the Gate no
+  longer takes it (a refusal in its Turn, a stop, a restart that ends the
+  step, a `first` Join that another branch won), `RunWarned`
+  `answer-dropped` on the step says why: "Your answer did not reach the
+  Gate. ...". The Gate that still waits shows it (`answerDropped`).
 - `RunResumed` names one Agent step, and the prompt goes to its session.
   One rule picks it from the log (`waitingSession` in `read/`): the step
   that started last of those whose sessions wait. Of two branches that

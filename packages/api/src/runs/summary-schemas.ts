@@ -44,6 +44,7 @@ const runWarningKindSchema = z.enum([
 	"device-fallback",
 	"shape",
 	"report",
+	"answer-dropped",
 ]);
 
 /** How the End node that ended a run says it came out. */

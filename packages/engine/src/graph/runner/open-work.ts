@@ -12,6 +12,7 @@ import {
 	type StepOutputs,
 } from "../../log";
 import {
+	ANSWER_DROPPED,
 	deriveSteps,
 	isOpenStatus,
 	parkedSteps,
@@ -218,6 +219,19 @@ export function closingEvents(
 				type: "RunWarned",
 				stepId: step.id,
 				payload: { kind: "stalled", message: cut.error },
+			});
+		}
+		// An answer that waited for the drive (`AnswerQueued`) goes with its Gate.
+		if (step.gate?.queued) {
+			const stopped =
+				cut.kind === "interrupted" ? "Night Shift stopped" : "The run stopped";
+			closing.push({
+				type: "RunWarned",
+				stepId: step.id,
+				payload: {
+					kind: "answer-dropped",
+					message: `${ANSWER_DROPPED} ${stopped} before the Gate took it.`,
+				},
 			});
 		}
 	}

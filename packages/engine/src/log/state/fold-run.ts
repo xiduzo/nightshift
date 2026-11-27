@@ -222,7 +222,8 @@ function apply(
 /**
  * The events after which the run's folded facts (`status`, `gates`,
  * `sleep`) can differ: a run event, an opening or end of a step, a Gate
- * opened, a wait begun or ended. Any other event changes none of them.
+ * opened, an answer that waits for it or a warning that it did not reach
+ * it, a wait begun or ended. Any other event changes none of them.
  */
 const RUN_FACT_EVENTS: ReadonlySet<EngineEventType> = new Set<EngineEventType>([
 	"RunStarted",
@@ -232,6 +233,8 @@ const RUN_FACT_EVENTS: ReadonlySet<EngineEventType> = new Set<EngineEventType>([
 	"StepReopened",
 	"StepEnded",
 	"GateOpened",
+	"AnswerQueued",
+	"RunWarned",
 	"WaitStarted",
 	"WaitEnded",
 ]);
@@ -292,6 +295,8 @@ function openGatesOf(run: Draft): OpenGateFact[] {
 				deadline: gate.deadline,
 				form: gate.form,
 				branchesWork,
+				answerQueued: gate.queued !== null,
+				answerDropped: gate.dropped,
 			});
 		}
 	}

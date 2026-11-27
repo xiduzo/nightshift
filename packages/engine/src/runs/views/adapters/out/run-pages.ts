@@ -403,9 +403,11 @@ export function openGatesOf(
 		const gate = open.get(row.id);
 		if (!gate) continue;
 		const walker = walkerOf(walkers, row.walkerId);
-		const answerPending = (pending.get(row.id) ?? []).some(
-			(c) => c.kind === "gate.resolve",
-		);
+		// An answer on its way to another Walker, or one that waits for
+		// this Walker's drive (`AnswerQueued`).
+		const answerPending =
+			gate.answerQueued ||
+			(pending.get(row.id) ?? []).some((c) => c.kind === "gate.resolve");
 		gates.push({
 			spaceId: row.spaceId,
 			runId: row.id,
@@ -425,6 +427,7 @@ export function openGatesOf(
 			form: gate.form,
 			walker,
 			answerPending,
+			answerDropped: gate.answerDropped,
 			branchesWork: gate.branchesWork,
 		});
 	}

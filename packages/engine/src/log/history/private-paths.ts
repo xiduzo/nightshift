@@ -58,6 +58,7 @@ export const PATH_FIELDS = {
 	StepEnded: [],
 	VariablesSet: [],
 	GateOpened: [],
+	AnswerQueued: [],
 	SessionStarted: [],
 	HarnessSessionAssigned: [],
 	SessionUsage: [],

@@ -14,6 +14,7 @@ import type {
 	OutcomeColor,
 } from "@nightshift/flows";
 import type { StepMemory } from "../../../memory";
+import type { GateVia } from "../run";
 import type { RunEndReason, StepGuard } from "./end-reason";
 
 /**
@@ -266,6 +267,20 @@ export type StepPayloads = {
 		 * step's `data`. Absent on every other Gate.
 		 */
 		form?: AskForm;
+	};
+	/**
+	 * A person answered the step's Gate while a drive walked a branch beside
+	 * it. The answer waits for the drive's next hold, then goes to the Gate
+	 * in its own Turn (`take`). It stays a fact, so a new daemon passes it
+	 * on. While it waits, the Gate takes no second answer. When the Gate no
+	 * longer takes it, a `RunWarned` `answer-dropped` on the step says why.
+	 */
+	AnswerQueued: {
+		choice: string;
+		note: string;
+		/** The answer to an Ask (ADR 10): the data of its form. */
+		data?: JsonValue;
+		via?: GateVia;
 	};
 	SessionStarted: {
 		prompt: string;

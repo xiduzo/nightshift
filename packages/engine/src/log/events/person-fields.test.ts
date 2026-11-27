@@ -93,6 +93,7 @@ const samples: { [T in EngineEventType]: EnginePayloads[T] } = {
 	StepReopened: { prompt: null },
 	StepEnded: { outcome: "pass", outputs: {}, error: null },
 	VariablesSet: { values: {}, scope: null },
+	AnswerQueued: { choice: "approve", note: "Yes." },
 	GateOpened: { question: "Go?", choices: [{ name: "yes" }] },
 	SessionStarted: {
 		prompt: "Go",

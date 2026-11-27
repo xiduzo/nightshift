@@ -84,11 +84,13 @@ export const openGateSchema = exact<OpenGate>()(
 		 */
 		form: askFormSchema.nullable(),
 		walker: runWalkerSchema,
-		/** An answer is on its way to the Walker. */
+		/** An answer is on its way to the Walker, or waits for its drive. */
 		answerPending: z.boolean(),
+		/** Why the latest answer that waited did not reach this Gate. Null when none did not. */
+		answerDropped: z.string().nullable(),
 		/**
-		 * A step on another branch of the run still works. The run takes
-		 * no answer until that step ends.
+		 * A step on another branch of the run still works. An answer waits
+		 * until that step ends.
 		 */
 		branchesWork: z.boolean(),
 	}),

@@ -452,6 +452,8 @@ describe("gates", () => {
 			deadline: null,
 			form: null,
 			branchesWork: false,
+			answerQueued: false,
+			answerDropped: null,
 		});
 		expect(deriveSteps(foldRun(b.events))[0]?.gate?.question).toBe(
 			"Ship PR 12?",

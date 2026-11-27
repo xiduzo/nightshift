@@ -539,12 +539,11 @@ export type OpenGate = {
 	 */
 	form: AskForm | null;
 	walker: RunWalker;
-	/** An answer is on its way to the Walker. */
+	/** An answer is on its way to the Walker, or waits for its drive. */
 	answerPending: boolean;
-	/**
-	 * A step on another branch of the run still works. The run takes no
-	 * answer until that step ends.
-	 */
+	/** Why the last answer that waited did not reach this Gate. Null when none did not. */
+	answerDropped: string | null;
+	/** A step on another branch still works: an answer waits until it ends. */
 	branchesWork: boolean;
 };
 

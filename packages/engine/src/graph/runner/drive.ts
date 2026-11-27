@@ -100,6 +100,17 @@ export function createDrives(
 		// The drive outlives the Turn that began it: it is not part of it.
 		walk.done = outside(() =>
 			driveThread(row, walk, input).finally(() => {
+				// A Turn waits for this slot: it keeps it, and no other run
+				// takes it from the cap queue in between.
+				if (
+					walk.yielding === "hand-over" &&
+					slots.get(runId) === walk &&
+					!state.released
+				) {
+					slots.set(runId, "handed");
+					bus.publish(runId, { kind: "status-changed" });
+					return;
+				}
 				if (slots.get(runId) === walk) slots.delete(runId);
 				slotFreed(runId);
 			}),
@@ -124,7 +135,7 @@ export function createDrives(
 			const outcome = await thread.drive(input, {
 				controller: walk.controller,
 				onEvent: (event) => onCustom(runId, event),
-				shouldYield: () => walk.yielding,
+				shouldYield: () => walk.yielding !== false,
 			});
 			// The run waits or sleeps: its timer comes from the log, the first
 			// of its sleeps and its Gates' deadlines (`nextTimer`).

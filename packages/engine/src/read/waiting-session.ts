@@ -5,6 +5,12 @@ import { deriveSteps } from "./run-views";
 export const OUTRUN_ERROR = "Another branch reached the Join first.";
 
 /**
+ * What a warning (`answer-dropped`) says first when an answer that waited
+ * for the drive (`AnswerQueued`) did not reach its Gate. Why comes after.
+ */
+export const ANSWER_DROPPED = "Your answer did not reach the Gate.";
+
+/**
  * The Agent step whose harness session gets the prompt of a resume, from the
  * log of a run that ended. Null: no session waits. The resume itself
  * (`planReentry`) and the run page ask this one rule, so the person reads

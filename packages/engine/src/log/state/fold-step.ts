@@ -247,7 +247,8 @@ export function applyStepEvent(
 					? undefined
 					: deciderCost(e.payload.briefCostUsd, e.payload.briefCostSource);
 			// Asked again while the Gate waits (a new daemon): the same wait.
-			if (!wait || wait.to !== null) {
+			const again = wait !== undefined && wait.to === null;
+			if (!again) {
 				step = {
 					...step,
 					gateWaits: [
@@ -291,10 +292,29 @@ export function applyStepEvent(
 					openedSeq: e.seq,
 					deadline: e.payload.deadline ?? null,
 					form: e.payload.form ?? null,
+					// The same wait keeps the answer that waits for it.
+					queued: again ? (step.gate?.queued ?? null) : null,
+					dropped: again ? (step.gate?.dropped ?? null) : null,
 				},
 			};
 			break;
 		}
+		case "AnswerQueued":
+			if (step.gate && step.endedAt === null) {
+				step = {
+					...step,
+					gate: { ...step.gate, queued: e.payload, dropped: null },
+				};
+			}
+			break;
+		case "RunWarned":
+			if (e.payload.kind === "answer-dropped" && step.gate) {
+				step = {
+					...step,
+					gate: { ...step.gate, queued: null, dropped: e.payload.message },
+				};
+			}
+			break;
 		case "StepReopened":
 			step = enteredAt(
 				{

@@ -224,7 +224,9 @@ export type RunPayloads = {
  * (`scores.ts`). `shape`: a step's data does not match the output schema
  * Night Shift inferred from an earlier run (`outputVerdict`): no person
  * confirmed it, so the step goes on. `report`: an End step's report was
- * longer than the cap, so Night Shift kept only its start (ADR 26). A
+ * longer than the cap, so Night Shift kept only its start (ADR 26).
+ * `answer-dropped`: an answer that waited for the drive (`AnswerQueued`)
+ * did not reach its Gate, on the Gate's step, with why. A
  * reader treats the kinds as an open list: a later build may add one.
  */
 export type RunWarningKind =
@@ -237,7 +239,8 @@ export type RunWarningKind =
 	| "score"
 	| "device-fallback"
 	| "shape"
-	| "report";
+	| "report"
+	| "answer-dropped";
 
 /**
  * The names Night Shift scores itself (`scores.ts` says what each means).

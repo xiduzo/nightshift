@@ -2000,6 +2000,7 @@ function openGate(spaceId: string, runId: string, openedAt: number): OpenGate {
 		openedAt,
 		walker: { id: "device", name: "test", thisDevice: true },
 		answerPending: false,
+		answerDropped: null,
 		branchesWork: false,
 		lockScreen: false,
 		deadline: null,

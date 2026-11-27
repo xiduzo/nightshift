@@ -6,7 +6,7 @@ import {
 	type RunStatus,
 	WALKED_ELSEWHERE,
 } from "../../run-status";
-import { type AnswerPlan, planAnswer } from "./answer-plan";
+import { type AnswerPlan, CONTINUED, planAnswer } from "./answer-plan";
 import { findOverdue } from "./deadlines";
 import type { Drives } from "./drive";
 import type { ReentryRequest } from "./reentry";
@@ -98,8 +98,13 @@ export function createTurns(
 		intent: Extract<Intent, { kind: "answer" }>,
 		options: TakeOptions,
 	): Promise<Taken> {
-		const snapshot = await threadOf(row).snapshot();
 		const runState = await log.state(row.id);
+		// An answer waits for the drive already: the Gate takes no second one.
+		const step = runState.steps.get(intent.stepId);
+		if (!intent.queued && step?.endedAt === null && step.gate?.queued) {
+			throw new RunRefusal("gate-closed", CONTINUED);
+		}
+		const snapshot = await threadOf(row).snapshot();
 		const plan = planAnswer(snapshot, runState, intent, {
 			afterPreDrive: false,
 		});
@@ -109,7 +114,7 @@ export function createTurns(
 		// The drive goes only as far as the Gate's interrupt: it parks at
 		// its first hold, and the answer's drive takes the branches on.
 		const pre = walkOf(row.id);
-		if (pre) pre.yielding = true;
+		if (pre) pre.yielding = "park";
 		await pre?.done;
 		const after = await threadOf(row).snapshot();
 		return answerBy(
@@ -176,6 +181,9 @@ export function createTurns(
 			return UNCHANGED;
 		}
 		if (!next.gate) return wakeTurn(row, runState, intent, intent, options);
+		// A person's answer waits for the drive (`AnswerQueued`): it came
+		// first, so the deadline leaves the Gate to it.
+		if (runState.steps.get(next.gate.stepId)?.gate?.queued) return UNCHANGED;
 		return answerTurn(
 			row,
 			{
@@ -361,7 +369,8 @@ export function createTurns(
 	 * goes on holds them (`driveGraph`) and the branches walk on.
 	 */
 	async function goOnTurn(row: RunRow, runState: RunState): Promise<Taken> {
-		if (slots.has(row.id)) return UNCHANGED;
+		const slot = slots.get(row.id);
+		if (slot !== undefined && slot !== "handed") return UNCHANGED;
 		if (runState.status !== "waiting" && runState.status !== "sleeping") {
 			return UNCHANGED;
 		}

@@ -29,12 +29,18 @@ export type Walk = {
 	/**
 	 * A Turn waits for the run: the drive parks at its next hold instead of
 	 * holding again (`driveGraph`), so the Turn can answer or wake there.
+	 * `hand-over`: the drive's slot goes to that Turn ("handed"), so a full
+	 * run cap cannot hold it back.
 	 */
-	yielding: boolean;
+	yielding: false | "park" | "hand-over";
 };
 
-/** "starting": reserved by the Turn that holds it, before its drive began (I3). */
-export type Slot = Walk | "starting";
+/**
+ * "starting": reserved by the Turn that holds it, before its drive began
+ * (I3). "handed": a drive that parked for a Turn kept it for that Turn
+ * (`Walk.yielding`); the Turn takes it with `reserve`, or lets it go.
+ */
+export type Slot = Walk | "starting" | "handed";
 
 /** What a Turn of a run did to its slot, for the end of the Turn. */
 export type TurnState = { freed: boolean };
@@ -109,7 +115,7 @@ export function createTurnQueue(
 	/** The drive that holds the run's slot, if one does. */
 	function walkOf(runId: string): Walk | undefined {
 		const slot = slots.get(runId);
-		return slot === "starting" ? undefined : slot;
+		return slot === "starting" || slot === "handed" ? undefined : slot;
 	}
 
 	/** Throws when no Turn of `runId` may be asked for here: released (I7), or inside one (I11). */
@@ -182,6 +188,11 @@ export function createTurnQueue(
 		intent: Intent,
 		options: TakeOptions,
 	): boolean {
+		// The slot a drive kept for this run's Turn: it counts in the cap already.
+		if (slots.get(runId) === "handed") {
+			slots.set(runId, "starting");
+			return true;
+		}
 		if (slots.has(runId)) throw new RunRefusal("not-now", STILL_RUNNING);
 		const runCap = shared.settings().maxConcurrentRuns;
 		if (slots.size >= runCap) {

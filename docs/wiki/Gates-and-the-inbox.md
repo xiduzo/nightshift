@@ -109,7 +109,7 @@ A Gate sends a notification only for the levels that you choose. Go to **Setting
 
 ### Parallel branches
 
-In a run with parallel branches, a Gate can open while a step on another branch still works. The inbox then shows that the run is busy. You can send your answer now. The Gate takes it when that step ends, and the other branch goes on.
+In a run with parallel branches, a Gate can open while a step on another branch still works. The inbox then shows that the run is busy. You can send your answer now. It shows as sent, and the Gate takes it when that step ends. If the Gate cannot take it, Night Shift says why on the Gate or on the run page.
 
 While a Gate waits for you, the other branches go on. A Wait on another branch wakes at its time, or when its signal comes. To send that signal, choose **Send signal** on the run page. When you answer one of two Gates, its branch goes on, and the other Gate keeps waiting. One exception: a Wait beside a Subflow that waits at a Gate wakes after you answer that Gate.
 

@@ -61,6 +61,7 @@ export type {
 } from "./views";
 export { NIGHT_RANGES } from "./views";
 export {
+	ANSWER_DROPPED,
 	OUTRUN_ERROR,
 	takesPrompt,
 	waitingSession,
