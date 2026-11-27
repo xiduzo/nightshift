@@ -1,11 +1,10 @@
-import { mkdir, stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { iso, now } from "@nightshift/time";
+import { now } from "@nightshift/time";
 import { sql } from "drizzle-orm";
 import { migrate } from "drizzle-orm/libsql/migrator";
 
-import type { Database } from "../client";
+import { copyDatabase, type Database } from "../client";
 
 /** The SQL migrations that drizzle-kit generates from the schema (`../schema`). */
 export const migrationsFolder = fileURLToPath(
@@ -40,7 +39,7 @@ export async function migrateDb(
 		: await eventsWithoutCodes(db);
 	const copy =
 		endCodes && endCodes.ends + endCodes.removals > 0
-			? await copyDatabase(db, "run-end-codes")
+			? await copyBeside(db, "run-end-codes")
 			: null;
 	await migrate(db, {
 		migrationsFolder: options.migrationsFolder ?? migrationsFolder,
@@ -91,25 +90,20 @@ async function eventsWithoutCodes(
 }
 
 /**
- * A copy of the whole database in `backups/` beside its file, made in one
- * statement (`VACUUM INTO`) through the client of this process. Returns
- * its path. A database in memory has no file to copy beside: it says so.
+ * A copy of the whole database in `backups/` beside its file. Returns its
+ * path. A database in memory has no file to copy beside: it says so. Any
+ * other database that is not a file refuses before it writes.
  */
-async function copyDatabase(db: Database, before: string): Promise<string> {
+async function copyBeside(db: Database, before: string): Promise<string> {
+	// Not a file: `copyDatabase` refuses it before it reads or writes.
+	if (db.$client.protocol !== "file") {
+		return copyDatabase(db, "backups", before, now());
+	}
 	const [main] = await db.all<{ name: string; file: string | null }>(
 		sql.raw("PRAGMA database_list"),
 	);
-	if (!main?.file) return "none, the database is not a file";
-	const folder = join(dirname(main.file), "backups");
-	await mkdir(folder, { recursive: true });
-	const stamp = iso(now()).replace(/[:.]/g, "-");
-	const path = join(folder, `before-${before}-${stamp}.db`);
-	await db.run(sql.raw(`VACUUM INTO '${path.replaceAll("'", "''")}'`));
-	const copy = await stat(path).catch(() => null);
-	if (!copy || copy.size === 0) {
-		throw new Error(`The copy of the database at ${path} was not made.`);
-	}
-	return path;
+	if (!main?.file) return "none, the database is in memory";
+	return copyDatabase(db, join(dirname(main.file), "backups"), before, now());
 }
 
 /** The names of the migrations this database has, none before the first. */
