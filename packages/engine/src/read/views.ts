@@ -237,7 +237,7 @@ export type RunSummary = {
 	result: RunResult | null;
 	/** When a sleeping run continues. Null while it waits for a signal with no timeout. */
 	wakeAt: number | null;
-	/** The signal a sleeping run waits for (a Wait node), else null. */
+	/** The signal a Wait node of the run sleeps for, also beside a Gate, else null. */
 	signal: string | null;
 	/** The values of the top-level flow's inputs, defaults applied. */
 	inputs: Record<string, JsonValue>;

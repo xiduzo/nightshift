@@ -43,6 +43,10 @@ export function useRunAct(runId: string, status: RunStatus) {
 	const rerun = useMutation(
 		host.orpc.runs.rerun.mutationOptions({ onSuccess: refetch }),
 	);
+	/** Sends the signal a Wait of the run sleeps for. */
+	const signal = useMutation(
+		host.orpc.runs.signal.mutationOptions({ onSuccess: refetch }),
+	);
 	const onItsWay = !hasEnded(status);
 	const resumed = resume.isSuccess && onItsWay;
 	const reran = rerun.isSuccess && onItsWay;
@@ -68,7 +72,7 @@ export function useRunAct(runId: string, status: RunStatus) {
 			if (other !== action) mutations[other].reset();
 		}
 	};
-	return { stop, resume, restart, rerun, acting, only };
+	return { stop, resume, restart, rerun, signal, acting, only };
 }
 
 export type RunAct = ReturnType<typeof useRunAct>;
@@ -228,6 +232,15 @@ export function failedAction(act: RunAct): Action | undefined {
 
 /** Why the last action did not work, and how to fix it. Nothing when none failed. */
 export function RunActionFailure({ act }: { act: RunAct }) {
+	if (act.signal.error) {
+		return (
+			<ErrorAlert
+				title="The signal did not go"
+				message={act.signal.error.message}
+				fix="Check that this phone is online, then try again."
+			/>
+		);
+	}
 	const failed = failedAction(act);
 	if (!failed) return null;
 	return (

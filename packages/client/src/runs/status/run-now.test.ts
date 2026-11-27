@@ -232,6 +232,22 @@ describe("what a waiting run needs", () => {
 		});
 	});
 
+	test("a signal too, when a Wait beside its Gate sleeps for one", () => {
+		expect(notice("waiting", { steps, signal: "deployed" })).toMatchObject({
+			kind: "gate",
+			body: [
+				"The run waits at the gate ",
+				{ code: "node-review" },
+				" until someone answers it.",
+				" A step beside it waits for the signal ",
+				{ code: "deployed" },
+				". Send it here, or from another system through the API.",
+			],
+			actions: ["answer", "open-inbox", "send-signal"],
+			signal: "deployed",
+		});
+	});
+
 	test("an answer sent to the computer that walks the run applies when it is online", () => {
 		const commands = [
 			{ id: "c", kind: "gate.resolve", createdAt: 1 },

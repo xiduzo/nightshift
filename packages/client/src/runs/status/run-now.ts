@@ -85,7 +85,7 @@ export type RunNotice = {
 	resumable: boolean;
 	/** When a sleeping run wakes: a screen counts down to it. Null otherwise. */
 	wakeAt: number | null;
-	/** The signal the run waits for, which "send-signal" sends. */
+	/** The signal the run waits for, which "send-signal" sends: also beside a Gate. */
 	signal: string | null;
 };
 
@@ -275,6 +275,10 @@ function noticeOf(
 					],
 				);
 			}
+			// A Wait beside the Gate may sleep for a signal: it takes one now.
+			const signal = allows.signal
+				? (run.signal ?? wait?.signal ?? null)
+				: null;
 			return notice(
 				"gate",
 				["Waiting for your answer"],
@@ -283,8 +287,21 @@ function noticeOf(
 					"The run waits at the gate ",
 					{ code: gate.nodeId },
 					" until someone answers it.",
+					...(signal !== null
+						? [
+								" A step beside it waits for the signal ",
+								{ code: signal },
+								". Send it here, or from another system through the API.",
+							]
+						: []),
 				],
-				{ actions: ["answer", "open-inbox"] },
+				{
+					actions:
+						signal !== null
+							? ["answer", "open-inbox", "send-signal"]
+							: ["answer", "open-inbox"],
+					signal,
+				},
 			);
 		}
 		case "sleeping": {

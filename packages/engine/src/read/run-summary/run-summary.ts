@@ -152,7 +152,11 @@ export function runFacts(run: RunState) {
 		endReason: end?.endReason ?? null,
 		result: end?.result ?? null,
 		wakeAt: sleep?.until ?? null,
-		signal: sleep?.signal ?? null,
+		// A Wait for a signal may sleep beside a Gate or beside another sleep.
+		signal: end
+			? null
+			: (run.waits.find((wait) => wait.payload.signal !== undefined)?.payload
+					.signal ?? null),
 		/** What the run sleeps for. Only `RunHere` carries it, not the summary. */
 		waitReason: sleep?.reason ?? null,
 		inputs: deriveInputs(run),

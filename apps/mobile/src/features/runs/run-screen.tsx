@@ -37,6 +37,7 @@ import {
 	Hand,
 	History,
 	Play,
+	Radio,
 	RotateCcw,
 	Share as ShareIcon,
 	SquareTerminal,
@@ -276,6 +277,7 @@ function RunBody({
 	const stepIds = steps.map((step) => step.id);
 	const changed = stepChangedFiles(live.entries.changes, stepIds).length > 0;
 	const look = runStatusLook(status, shown.result);
+	const signal = shown.notice?.signal ?? null;
 	const reconnecting = live.connection === "reconnecting" && !ended;
 	const canFollow = follow.available && !ended;
 
@@ -300,6 +302,23 @@ function RunBody({
 		primary: primary ? primaryItem(primary, run.id, runAction) : null,
 		menu: [
 			...more.map((kind) => runAction(kind, ACTION_LABEL[kind])),
+			// A Wait of the run sleeps for a signal: also beside a Gate.
+			...(signal !== null
+				? [
+						{
+							key: "signal",
+							label: act.signal.isPending
+								? "Sending…"
+								: `Send signal ${signal}`,
+							icon: {
+								sf: "dot.radiowaves.left.and.right" as const,
+								lucide: Radio,
+							},
+							disabled: act.signal.isPending,
+							onPress: () => act.signal.mutate({ runId: run.id, name: signal }),
+						},
+					]
+				: []),
 			...(canFollow
 				? [
 						{
