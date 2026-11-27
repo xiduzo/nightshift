@@ -479,6 +479,7 @@ export async function beginStep(
 					...(written.ok && extra?.endReason
 						? { endReason: extra.endReason }
 						: {}),
+					// No `written.ok` here: a failed hand-off has no writes to fail.
 					...(extra?.handOffFailed
 						? { handOffFailed: extra.handOffFailed }
 						: {}),

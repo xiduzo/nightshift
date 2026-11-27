@@ -178,8 +178,8 @@ export type RunPayloads = {
 		 */
 		endReason?: RunEndReason;
 		/**
-		 * The node whose step ended the run as failed: the node the reason
-		 * names. Absent when no step's failure ended the run (it finished,
+		 * The node whose step's end failed the run, also when the run's
+		 * budget parked it at that step. Absent when no step's failure ended the run (it finished,
 		 * a person or the stop time stopped it, the step cap, the engine
 		 * failed), and in logs written before it was stored: not known.
 		 */
