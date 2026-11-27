@@ -790,13 +790,21 @@ a restart (`outrun` reads the run state, not the checkpoint).
   Thread, `AbortReason` `outrun`). Those steps end `stopped` with
   "Another branch reached the Join first.".
 - A step of a branch that lost and that the log has already ends with
-  the same words when a hold, a resume or a new daemon takes it up
-  (`beginStep`, `endOutrun`). So does each open step of its called flows:
-  a Gate in a Subflow closes, and a sleep there ends. A step that a new
-  daemon ended `interrupted` stays so. A Subflow with `each` starts no
-  next element after its branch lost.
-- A held Gate or sleep on such a branch ends at its next hold, in the
-  same way. Its Gate closes, and the run does not wait for it.
+  the same words when a hold, a resume or a new daemon takes it up once
+  the winner reached the Join (`beginStep`, `endOutrun`). So does each
+  open step of its called flows: a Gate in a Subflow closes, and a sleep
+  there ends. A step that a new daemon ended `interrupted` stays so. A
+  Subflow with `each` starts no next element after its branch lost.
+- A held Gate or sleep on such a branch ends at its next hold once the
+  winner reached the Join, in the same way. Its Gate closes, and the run
+  does not wait for it.
+- Two branches can reach the Join in one super-step. The earliest
+  `EdgeTaken` wins, and only the later branch lost.
+- A race against a Subflow that waits at a Gate is decided only after
+  that Gate is answered, unless the other branch reaches the Join in the
+  super-step in which the Subflow began to wait. The body interrupts
+  again on each hold, so the branch beside it takes no next step (see
+  **Interrupts**: "A Subflow whose body waits ends no task").
 - A Subflow on such a branch stops the steps of its called flow too: they
   watch the Subflow step's signal, and a step inside a nested Subflow
   aborts with `cut`. The Subflow step ends `stopped` with the same words,

@@ -89,8 +89,8 @@ const scopeOfConfig = (config: LangGraphRunnableConfig) =>
 
 /**
  * Whether `nodeId`, in `scope`, is on a branch that lost its `first` Join:
- * the log has an `EdgeTaken` into the Join from another branch since the
- * round began. The round begins at the latest edge of the fan-out, or at
+ * the earliest `EdgeTaken` into the Join since the round began is from
+ * another branch. The round begins at the latest edge of the fan-out, or at
  * a run again from a node of its branches. A branch of an `all` Join loses
  * nothing: the Join waits for it.
  */
@@ -122,11 +122,13 @@ export function outrun(
 			began = Math.max(began, resume.seq);
 		}
 	}
-	return taken.some((edge) => {
+	// The earliest arrival wins: two branches may both reach the Join in
+	// one super-step, and the later one lost.
+	const first = taken.find((edge) => {
 		if (edge.seq <= began || edge.payload.to !== join.id) return false;
-		const from = placeOf(flow, edge.payload.from);
-		return from?.fanOut === fanOut && from.branch !== place.branch;
+		return placeOf(flow, edge.payload.from)?.fanOut === fanOut;
 	});
+	return !!first && placeOf(flow, first.payload.from)?.branch !== place.branch;
 }
 
 /** The state a fan-out writes with its edges: a new round of its Join. */

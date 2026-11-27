@@ -91,7 +91,7 @@ import { readSource } from "./each-source";
  * budget ran out), the step ends as `abortEnd` says and the walk
  * continues; a wait or a Gate inside the body propagates with the step
  * open. Between two elements, and when a hold or a resume takes the step
- * up, `beginStep` ends it once its branch lost (`endOutrun`). Everything before the body runs again on the resume
+ * up once the winner reached the Join, `beginStep` ends it (`endOutrun`). Everything before the body runs again on the resume
  * and after a daemon death (rule 4), so the node continues the open element it
  * finds in the log (no `ItemStarted` or branch twice) and the body resumes
  * under the same namespace; an ended step (stopped, or `interrupted` by
