@@ -56,7 +56,10 @@ export function compileFlow(flow: Flow, ctx: StepContext) {
 				case "wait": {
 					const wait = waitNodeId(node.id);
 					own.push(wait);
-					graph.addNode(wait, waitNode(node.id, ctx), { ends: [node.id] });
+					// A hold sends each interrupting node to itself (`interruptNode`).
+					graph.addNode(wait, waitNode(node.id, ctx), {
+						ends: [node.id, wait],
+					});
 					break;
 				}
 				case "ask": {
@@ -65,7 +68,7 @@ export function compileFlow(flow: Flow, ctx: StepContext) {
 					const ask = askNodeId(node.id);
 					own.push(ask);
 					graph.addNode(ask, aux.make(node, ctx), {
-						ends: [...ends, park, node.id],
+						ends: [...ends, park, node.id, ask],
 					});
 					break;
 				}
@@ -81,7 +84,7 @@ export function compileFlow(flow: Flow, ctx: StepContext) {
 				: made,
 			{ ends: [...ends, ...own] },
 		);
-		graph.addNode(park, parkNode(node, ctx), { ends: [node.id] });
+		graph.addNode(park, parkNode(node, ctx), { ends: [node.id, park] });
 	}
 	if ((flow.variables ?? []).length > 0) {
 		graph.addNode(VARIABLES_NODE, variablesNode(flow, ctx), {

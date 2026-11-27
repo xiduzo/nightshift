@@ -333,10 +333,7 @@ describe("the sleep module: an Agent step's usage-limit wait", () => {
 		const at = await h.thread.state();
 		const stepId = deriveSteps(foldRun(events))[0]?.id as string;
 		expect(planWake(foldRun(events), at, { early: false }, time.now())).toEqual(
-			{
-				kind: "too-soon",
-				until: resetAt + MINUTE,
-			},
+			{ kind: "too-soon" },
 		);
 		expect(
 			planWake(

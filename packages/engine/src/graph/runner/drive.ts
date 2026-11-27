@@ -2,7 +2,7 @@ import { Refusal, wordsFor } from "@nightshift/refusal";
 import type { RunEnding, RunEndReason, RunLog, RunRow } from "../../log";
 import type { RunResult } from "../../run-status";
 import { FencedError } from "../checkpoints";
-import type { Parked, RunEvent } from "../state";
+import type { RunEvent } from "../state";
 import { letGo, type RunHolds } from "./holds";
 import { type CloseDeps, type CutShort, closeOpenWork } from "./open-work";
 import { planReentry, type ReentryRequest } from "./reentry";
@@ -124,7 +124,11 @@ export function createDrives(
 				controller: walk.controller,
 				onEvent: (event) => onCustom(runId, event),
 			});
-			if (outcome.kind === "parked") onInterrupt(runId, outcome.interrupts);
+			// The run waits or sleeps: its timer comes from the log, the first
+			// of its sleeps and its Gates' deadlines (`nextTimer`).
+			if (outcome.kind === "parked") {
+				sleeps.restore(runId, await log.state(runId));
+			}
 			const ending = endingOf(outcome);
 			if (!ending) {
 				// A run that waits or holds a Gate keeps only what its resume
@@ -197,27 +201,6 @@ export function createDrives(
 		if (event.type === "step-started" || event.type === "step-ended") {
 			bus.publish(runId, { kind: "status-changed" });
 		}
-	}
-
-	/**
-	 * The root's interrupts ended the drive. A stop that came in while the
-	 * wait began or the Gate opened closed the drive's fence, so the drive
-	 * never gets here: the stop closed the parked step itself. A `parked`
-	 * step ends the run (`endingOf`); a Gate needs nothing. Parallel
-	 * branches may sleep at once: the timer is for the earliest wake.
-	 */
-	function onInterrupt(runId: string, interrupts: readonly Parked[]): void {
-		// A wait with no time (a signal with no timeout) has no timer.
-		// A Gate with a deadline: the timer answers it then (`deadlineTurn`).
-		// Parallel branches may wait at once: the timer is for the earliest.
-		const wakes = interrupts.flatMap((parked) =>
-			parked.kind === "wait" && parked.until !== null
-				? [parked.until]
-				: parked.kind === "gate" && parked.deadline
-					? [parked.deadline.at]
-					: [],
-		);
-		if (wakes.length > 0) sleeps.schedule(runId, Math.min(...wakes));
 	}
 
 	/**

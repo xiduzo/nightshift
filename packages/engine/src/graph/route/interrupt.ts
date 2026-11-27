@@ -36,6 +36,13 @@ import type {
  * waiting the node lets the step go (`letGo`) instead of waiting forever:
  * a Gate opens its visit again (`openAgain`), a sleep parks as stopped. An
  * answer that waits is taken as always.
+ *
+ * The resume value `hold` is taken here, for every such node: the node
+ * jumps to itself and interrupts again in the next super-step, with the
+ * same `pending`. Nothing runs before its `interrupt()`, so a held Gate
+ * opens no second time and sends no second push, and a held sleep keeps
+ * its time. The runner holds each interrupt it does not answer, so the
+ * super-step ends and the answered branch goes on (`driveGraph`).
  */
 export function interruptNode<K extends Pending["kind"]>(spec: {
 	kind: K;
@@ -44,10 +51,10 @@ export function interruptNode<K extends Pending["kind"]>(spec: {
 	missing: string;
 	/** What the interrupt carries: a copy of the pending step, as the runner reads it. */
 	value(pending: Extract<Pending, { kind: K }>): Parked;
-	/** What the resume does: the `Command` the node returns. */
+	/** What the resume does: the `Command` the node returns. A hold never gets here. */
 	answer(
 		pending: Extract<Pending, { kind: K }>,
-		answer: ResumeValue | undefined,
+		answer: Answer | undefined,
 		state: RunStateValues,
 		config: LangGraphRunnableConfig,
 	): Command | Promise<Command>;
@@ -82,8 +89,24 @@ export function interruptNode<K extends Pending["kind"]>(spec: {
 			}
 			throw error;
 		}
+		// A hold: the node waits again, with the same state, in the next
+		// super-step. It writes nothing, so its step, its Gate and its timer
+		// stay as they are.
+		if (answer?.kind === "hold") return holdAgain(config);
 		return spec.answer(own, answer, state, config);
 	};
+}
+
+/** What an interrupting node's answer can be: anything but a hold, which `interruptNode` takes. */
+type Answer = Exclude<ResumeValue, { kind: "hold" }>;
+
+/** The interrupting node runs again in the next super-step and interrupts with what it holds. */
+function holdAgain(config: LangGraphRunnableConfig): Command {
+	const self = config.metadata?.langgraph_node;
+	if (typeof self !== "string") {
+		throw new Error("A held node does not know its own name.");
+	}
+	return new Command({ goto: self });
 }
 
 type GateSpec = Parameters<typeof interruptNode<"gate">>[0];

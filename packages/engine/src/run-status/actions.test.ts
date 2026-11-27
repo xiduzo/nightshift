@@ -20,7 +20,13 @@ const allowed = (status: RunStatus, walkedHere: boolean): RunAction[] =>
 describe("the actions a run allows", () => {
 	test("on the computer that walks it", () => {
 		expect(allowed("running", true)).toEqual(["stop", "restart"]);
-		expect(allowed("waiting", true)).toEqual(["stop", "answer", "move"]);
+		// A Wait beside the Gate takes its signal (`refuseSignal` says which).
+		expect(allowed("waiting", true)).toEqual([
+			"stop",
+			"answer",
+			"signal",
+			"move",
+		]);
 		expect(allowed("sleeping", true)).toEqual([
 			"stop",
 			"signal",
@@ -54,7 +60,12 @@ describe("the actions a run allows", () => {
 
 	test("on another computer: a stop, an answer, a signal, a move and a resume travel to the Walker, nothing else", () => {
 		expect(allowed("running", false)).toEqual(["stop"]);
-		expect(allowed("waiting", false)).toEqual(["stop", "answer", "move"]);
+		expect(allowed("waiting", false)).toEqual([
+			"stop",
+			"answer",
+			"signal",
+			"move",
+		]);
 		expect(allowed("sleeping", false)).toEqual([
 			"stop",
 			"signal",

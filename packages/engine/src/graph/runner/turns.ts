@@ -1,6 +1,6 @@
 import { branchPlaces } from "@nightshift/flows";
 import type { RunRow, RunState } from "../../log";
-import { deriveSteps, firstDeadline } from "../../read";
+import { deriveSteps } from "../../read";
 import {
 	ARRIVING,
 	RunRefusal,
@@ -22,7 +22,7 @@ import {
 } from "./turn";
 import {
 	type createSleeps,
-	holdsGate,
+	nextTimer,
 	planWake,
 	recordWake,
 	type Wake,
@@ -36,6 +36,8 @@ const BRANCHES_WORK =
 /** A resume of a sleeping run whose walk is not where the sleep is. */
 const CANNOT_WAKE =
 	"Night Shift could not wake this run. Stop the run, then resume it.";
+/** An early wake or a signal that a Gate in a Subflow beside the sleep holds back (`planWake`). */
+const GATE_FIRST = "Answer the Gate beside this step first. Then try again.";
 
 const HALTED: Taken = { kind: "halted" };
 const QUEUED: Taken = { kind: "queued" };
@@ -160,30 +162,31 @@ export function createTurns(
 	}
 
 	/**
-	 * A timer fired on a run that waits at a Gate with a deadline: the Gate
-	 * takes the deadline's option, as an answer would, with a note that says
-	 * the deadline chose it. A timer before the deadline is set again. A
-	 * Gate a person answered first, or one without a deadline, is left as it
-	 * is.
+	 * A timer fired on a run that waits at a Gate: the run's next timer
+	 * (`nextTimer`) says what is due. A Gate's deadline: the Gate takes the
+	 * deadline's option, as an answer would, with a note that says the
+	 * deadline chose it. A sleep beside the Gate: it wakes (`wakeTurn`),
+	 * and the Gate keeps its wait. A timer before its time is set again.
 	 */
-	async function deadlineTurn(
+	async function timerTurn(
 		row: RunRow,
 		runState: RunState,
+		intent: Extract<Intent, { kind: "wake" }>,
 		options: TakeOptions,
 	): Promise<Taken> {
-		// Parallel branches may wait at several Gates: the first deadline is due.
-		const gate = firstDeadline(runState);
-		if (!gate) return UNCHANGED;
-		if (shared.now() < gate.deadline.at) {
-			sleeps.schedule(row.id, gate.deadline.at);
+		const next = nextTimer(runState);
+		if (!next) return UNCHANGED;
+		if (shared.now() < next.at) {
+			sleeps.restore(row.id, runState);
 			return UNCHANGED;
 		}
+		if (!next.gate) return wakeTurn(row, runState, intent, intent, options);
 		return answerTurn(
 			row,
 			{
 				kind: "answer",
-				stepId: gate.stepId,
-				choice: gate.deadline.choose,
+				stepId: next.gate.stepId,
+				choice: next.gate.deadline.choose,
 				note: "",
 				byDeadline: true,
 			},
@@ -193,8 +196,10 @@ export function createTurns(
 
 	/**
 	 * A wake (`planWake`): `WaitEnded` and the transcript `wake`
-	 * (`recordWake`), then the resume into the wait node. A timer before
-	 * its time is set again.
+	 * (`recordWake`), then the resume into the wait node, which holds each
+	 * other interrupt. A timer before its time is set again. A wake that a
+	 * Gate in a Call beside it holds back changes nothing: a person hears
+	 * why, and the timer fires again once the drive after the answer parks.
 	 */
 	async function wakeTurn(
 		row: RunRow,
@@ -214,7 +219,13 @@ export function createTurns(
 			return UNCHANGED;
 		}
 		if (plan.kind === "too-soon") {
-			sleeps.schedule(runId, plan.until);
+			sleeps.restore(runId, runState);
+			return UNCHANGED;
+		}
+		if (plan.kind === "blocked") {
+			if (how.early && how.by !== "daemon") {
+				throw new RunRefusal("not-now", GATE_FIRST);
+			}
 			return UNCHANGED;
 		}
 		// The timer goes; a wake the cap holds stays queued.
@@ -382,15 +393,10 @@ export function createTurns(
 			case "answer":
 				return answerTurn(row, intent, options);
 			case "wake":
-				// The timer of a Gate's deadline: the run waits, it does not
-				// sleep. A Gate whose answer the thread holds waits no more: the
-				// timer is a sleeper's beside it (`planWake`).
-				if (
-					!intent.early &&
-					runState.status === "waiting" &&
-					holdsGate(await threadOf(row).state())
-				) {
-					return deadlineTurn(row, runState, options);
+				// The timer of a run that waits at a Gate: its deadline or a
+				// sleep beside it, whichever is due (`timerTurn`).
+				if (!intent.early && runState.status === "waiting") {
+					return timerTurn(row, runState, intent, options);
 				}
 				return wakeTurn(row, runState, intent, intent, options);
 			case "resume": {

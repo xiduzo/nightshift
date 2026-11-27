@@ -191,8 +191,8 @@ async function walk(name: keyof typeof SHAPES, crash: number) {
 
 /** Each shape, its first write in a sleep, and the number of its writes. The last one is `RunEnded`. */
 const WALKS = [
-	["two Agents", 16, 50],
-	["an Agent and a Wait", 11, 44],
+	["two Agents", 16, 62],
+	["an Agent and a Wait", 11, 56],
 	["one Agent", 4, 22],
 ] as const;
 for (const [name, from, total] of WALKS) {
@@ -220,7 +220,7 @@ for (const [name, from, total] of WALKS) {
 	);
 }
 
-test("a Gate beside a sleeper: the answer goes on when the sleeper wakes, and a second answer is refused", async () => {
+test("a Gate beside a sleeper: the answer goes on at once while the sleeper sleeps on, and a second answer is refused", async () => {
 	let now = T0;
 	const harness = fakeHarness((input) =>
 		input.resumeSessionId
@@ -257,16 +257,21 @@ test("a Gate beside a sleeper: the answer goes on when the sleeper wakes, and a 
 			});
 		await answer();
 		await still();
-		// The Agent goes on with the answer in the super-step after it, which
-		// comes once the sleeper beside it woke.
-		await expect(answer()).rejects.toThrow("This Gate has its answer.");
-		// A new daemon: recovery keeps the sleeper beside the open Gate.
+		// The Agent goes on with the answer at once: the sleeper beside it
+		// is held, and sleeps on.
+		expect(
+			harness.calls.filter((call) => call.prompt === "The red one."),
+		).toHaveLength(1);
+		expect((await state()).status).toBe("sleeping");
+		await expect(answer()).rejects.toThrow(
+			"This Gate has its answer. The run continues with it.",
+		);
+		// A new daemon: recovery keeps the sleeper.
 		await runner.release();
 		runner = testRunner(h, { overdueSweepMs: 3_600_000 });
 		const open = openWork(await state(), { kind: "interrupted" });
 		expect(open).toMatchObject({ steps: [], endsRun: false });
 		runner.restore(h.runId, await state());
-		await expect(answer()).rejects.toThrow("This Gate has its answer.");
 		now = RESET.a as number;
 		await runner.take(h.runId, { kind: "wake", early: false });
 		await waitFor(async () => (await state()).status === "finished");
@@ -279,10 +284,10 @@ test("a Gate beside a sleeper: the answer goes on when the sleeper wakes, and a 
 });
 
 for (const [where, before] of [
-	["before the checkpoint of the wake", "checkpoint"],
+	["before the checkpoint after the answer", "checkpoint"],
 	["as the answered Agent goes on", "StepReopened"],
 ] as const)
-	test(`the daemon dies ${where}, after the sleeper beside an answered Gate woke: the next answer moves the run, and the Agent gets the first one`, async () => {
+	test(`the daemon dies ${where}, beside a sleeper: the next answer moves the run, and the Agent gets the first one`, async () => {
 		let now = T0;
 		const harness = fakeHarness((input) =>
 			input.resumeSessionId
@@ -297,6 +302,7 @@ for (const [where, before] of [
 			{ harness, now: () => now },
 		);
 		let died = false;
+		let answered = false;
 		let runner = testRunner(h, {
 			overdueSweepMs: 3_600_000,
 			openThread: (row, deps) => {
@@ -315,9 +321,8 @@ for (const [where, before] of [
 				};
 				const put = thread.saver.put.bind(thread.saver);
 				thread.saver.put = async (...args) => {
-					// The checkpoint of the wake's super-step: its writes are saved.
-					const woke = (await h.events()).some((e) => e.type === "WaitEnded");
-					if (died || (before === "checkpoint" && woke)) {
+					// The first checkpoint after the answer: its writes are saved.
+					if (died || (before === "checkpoint" && answered)) {
 						died = true;
 						throw new Error("the daemon died");
 					}
@@ -346,10 +351,8 @@ for (const [where, before] of [
 					choice: "answer",
 					note,
 				});
-			await answer("The red one.");
-			await still();
-			now = RESET.a as number;
-			await runner.take(h.runId, { kind: "wake", early: false });
+			answered = true;
+			await answer("The red one.").catch(() => {});
 			await waitFor(() => died && !runner.isActive(h.runId));
 			await runner.release();
 			runner = testRunner(h, { overdueSweepMs: 3_600_000 });
@@ -364,7 +367,7 @@ for (const [where, before] of [
 				{ kind: "interrupted", reason: "Night Shift stopped." },
 			);
 			runner.restore(h.runId, await state());
-			// The log still waits at the Gate, and nothing else wakes the run.
+			// The log still waits at the Gate, beside the sleeper.
 			expect((await state()).status).toBe("waiting");
 			// The thread had the first answer: it goes on with it.
 			await answer("The blue one.").catch((error: Error) => {
@@ -372,6 +375,9 @@ for (const [where, before] of [
 					"This Gate has its answer. The run continues with it.",
 				);
 			});
+			await still();
+			now = RESET.a as number;
+			await runner.take(h.runId, { kind: "wake", early: false });
 			await waitFor(async () => (await state()).status === "finished");
 			const told = harness.calls.map((call) => call.prompt);
 			expect(told.filter((p) => p === "The red one.")).toHaveLength(1);
@@ -431,8 +437,9 @@ test("a second answer to an answered ask, while another branch waits at its Gate
 		await still();
 		await answer("a", "For a.");
 		await still();
+		// a went on at once with its answer: its Gate is gone.
 		await expect(answer("a", "Again for a.")).rejects.toThrow(
-			"This Gate has its answer. The run continues when the other branches are done.",
+			"This Gate does not wait anymore.",
 		);
 		await answer("b", "For b.");
 		await waitFor(async () => (await state()).status === "finished");

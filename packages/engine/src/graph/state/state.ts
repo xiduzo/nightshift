@@ -478,8 +478,13 @@ export type Parked =
  *   deadline took its option. `data`: the answer to an Ask (ADR 10), the
  *   data of its form.
  * - `signal`: someone sent the run a signal; a Wait node on it ends `done`.
+ * - `hold`: the interrupt keeps waiting. Its node interrupts again with the
+ *   same state and writes nothing (`interruptNode`). A resume gives every
+ *   interrupt it does not answer a hold, so the super-step ends and the
+ *   branch that was answered goes on at once.
  */
 export type ResumeValue =
+	| { kind: "hold" }
 	| { kind: "wake"; early: boolean }
 	| { kind: "resume" }
 	| { kind: "reopen" }

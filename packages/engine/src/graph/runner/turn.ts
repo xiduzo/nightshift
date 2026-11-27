@@ -51,7 +51,7 @@ export type Intent =
 			stepId: string;
 			choice: string;
 			note: string;
-			/** Nobody answered: the Gate's deadline chose (`deadlineTurn`). */
+			/** Nobody answered: the Gate's deadline chose (`timerTurn`). */
 			byDeadline?: true;
 			/** The answer to an Ask (ADR 10): the data of its form. */
 			data?: JsonValue;

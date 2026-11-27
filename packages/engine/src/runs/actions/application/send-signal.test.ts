@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { SleepFact } from "../../../log";
+import type { RunState } from "../../../log";
 import { RunRefusal } from "../../../run-status";
 import {
 	ADA,
@@ -20,11 +20,16 @@ const refusalOf = (work: Promise<unknown>) =>
 		(error: unknown) => error,
 	);
 
+/** A Wait node's sleep for the Signal `go`, as the log folds it. */
+const waits = [
+	{ stepId: "step-1", payload: { signal: "go" } },
+] as unknown as RunState["waits"];
+
 /** A run that sleeps in a Wait node for the Signal `go`. */
-const sleeping = stateOf({
-	status: "sleeping",
-	sleep: { stepId: "step-1", signal: "go" } as SleepFact,
-});
+const sleeping = stateOf({ status: "sleeping", waits });
+
+/** A run that waits at a Gate, beside a Wait node for the Signal `go`. */
+const waitingBeside = stateOf({ status: "waiting", waits });
 
 function setup() {
 	const ports = inMemoryActionPorts();
@@ -35,6 +40,18 @@ describe("a Signal to a run this computer walks", () => {
 	test("wakes it early, as a Turn of the runner", async () => {
 		const { ports, signal } = setup();
 		ports.put({ id: "run-1" }, sleeping);
+		await signal(ADA, { runId: "run-1", spaceId: SPACE, name: "go" });
+		expect(ports.turns.taken).toEqual([
+			{
+				runId: "run-1",
+				intent: { kind: "wake", early: true, signal: "go" },
+			},
+		]);
+	});
+
+	test("wakes the Wait beside an open Gate, as a Turn of the runner", async () => {
+		const { ports, signal } = setup();
+		ports.put({ id: "run-1" }, waitingBeside);
 		await signal(ADA, { runId: "run-1", spaceId: SPACE, name: "go" });
 		expect(ports.turns.taken).toEqual([
 			{
@@ -72,7 +89,14 @@ describe("a Signal to a run another Device walks", () => {
 		]);
 	});
 
-	test("is refused here, before it travels, when the log says the run waits at a Gate", async () => {
+	test("travels when the run waits at a Gate beside a Wait for it", async () => {
+		const { ports, signal } = setup();
+		ports.put({ id: "run-1", walkerId: FAR }, waitingBeside);
+		await signal(ADA, { runId: "run-1", name: "go" });
+		expect(ports.walkers.sent).toHaveLength(1);
+	});
+
+	test("is refused here, before it travels, when the log says the run waits only at a Gate", async () => {
 		const { ports, signal } = setup();
 		ports.put({ id: "run-1", walkerId: FAR }, stateOf({ status: "waiting" }));
 		const refused = await refusalOf(

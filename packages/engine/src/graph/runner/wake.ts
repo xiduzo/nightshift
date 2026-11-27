@@ -1,16 +1,22 @@
 import type { JsonValue } from "@nightshift/flows";
 
-import type {
-	DerivedStep,
-	ResumedBy,
-	RunBus,
-	RunLog,
-	RunState,
+import {
+	type DerivedStep,
+	type ResumedBy,
+	type RunBus,
+	type RunLog,
+	type RunState,
+	scopeKey,
 } from "../../log";
 import { firstDeadline, wakesNext } from "../../read";
 import type { Recorder } from "../recorders";
-import type { ResumeValue } from "../state";
-import type { ThreadEntry, ThreadState } from "./thread";
+import type { Parked, ResumeValue } from "../state";
+import {
+	type Interrupt,
+	resumeEach,
+	type ThreadEntry,
+	type ThreadState,
+} from "./thread";
 
 /**
  * The runner's side of a sleep (`step/sleep.ts` has the step's side).
@@ -44,8 +50,15 @@ export type Wake = {
 export type WakePlan =
 	/** The run no longer sleeps (a stop ended the sleep, or it woke already): nothing happens. */
 	| { kind: "not-sleeping" }
-	/** A timer that fired before its time: it is set again for `until`. */
-	| { kind: "too-soon"; until: number }
+	/** A timer that fired before its time: it is set again. */
+	| { kind: "too-soon" }
+	/**
+	 * The step cannot go on before a Gate is answered: the Gate waits in a
+	 * Call beside it, and a Call whose body waits ends no task
+	 * (`driveGraph`). The step sleeps on, and its timer fires again after
+	 * the answer.
+	 */
+	| { kind: "blocked" }
 	/** The wait ends: `WaitEnded` on `step`, then `entry` into the thread. */
 	| { kind: "wake"; step: Pick<DerivedStep, "id">; entry: ThreadEntry };
 
@@ -62,8 +75,10 @@ export type WakePlan =
  * - A task with no interrupt (the daemon died before it was saved): the
  *   drive runs it again, and its node goes on from the log.
  *
- * Every other sleeper keeps its wait. A timer's wake (`early` false) before
- * the wait's time is too soon.
+ * Every other interrupt, a sleeper or a Gate, gets a hold (`resumeEach`):
+ * it keeps its wait, and the step that wakes goes on at once. A timer's
+ * wake (`early` false) before the wait's time is too soon. A wake that a
+ * Gate in a Call beside it holds back is `blocked` (`heldBack`).
  *
  * `early`: a person resumed the run before its time, with `prompt` as the
  * step's follow-up. `signal`: someone sent the run that signal; the resume
@@ -81,7 +96,7 @@ export function planWake(
 	if (!sleeping || !step) return { kind: "not-sleeping" };
 	const { until } = sleeping.payload;
 	if (!how.early && until !== null && now < until) {
-		return { kind: "too-soon", until };
+		return { kind: "too-soon" };
 	}
 	const resume: ResumeValue =
 		how.signal !== undefined
@@ -96,47 +111,85 @@ export function planWake(
 				};
 	const asleep = new Set(run.waits.map((wait) => wait.stepId));
 	const interrupts = at.kind === "interrupted" ? at.interrupts : [];
-	const each: Record<string, ResumeValue> = {};
-	for (const { id, value } of interrupts) {
-		if (value.kind !== "wait") continue;
-		if (value.stepId === step.id) each[id] = resume;
-		else if (!asleep.has(value.stepId)) {
-			each[id] = { kind: "wake", early: false };
-		}
-	}
-	const answers = Object.values(each);
-	const [only] = answers;
+	const pick = (value: Parked): ResumeValue | null => {
+		if (value.kind !== "wait") return null;
+		if (value.stepId === step.id) return resume;
+		return asleep.has(value.stepId) ? null : { kind: "wake", early: false };
+	};
+	if (heldBack(run, step, interrupts, pick)) return { kind: "blocked" };
+	const [only] = interrupts.filter(({ value }) => pick(value) !== null);
 	if (!only) return { kind: "wake", step, entry: { kind: "continue" } };
+	const each = resumeEach(at, pick);
 	return {
 		kind: "wake",
 		step,
 		entry: {
 			kind: "resume",
-			value: only,
-			...(interrupts.length > 1 ? { each } : {}),
+			value: pick(only.value) ?? resume,
+			...(each ? { each } : {}),
 		},
 	};
 }
 
 /**
- * Whether the run sleeps for a wake: the log says it sleeps, or it says a
- * Gate waits while the thread holds the Gate's answer already. An Agent's
- * Gate closes in the log only when its step goes on, in the super-step
- * after the answer, and that super-step comes only once the sleepers beside
- * it woke. So the log still reads "waiting" while the run sleeps.
+ * Whether a Gate or a sleep that keeps its wait holds back the step that
+ * wakes: it waits inside a Call at the step's own level. The step goes on
+ * in the next super-step of that level, and the Call ends no task while
+ * its body waits (`driveGraph`). The thread may not even hold the step's
+ * wait yet: the step slept in the super-step the Call held back.
+ */
+function heldBack(
+	run: RunState,
+	step: DerivedStep,
+	interrupts: readonly Interrupt[],
+	pick: (value: Parked) => ResumeValue | null,
+): boolean {
+	const level = scopeKey(step.scope);
+	return interrupts.some(({ value }) => {
+		if (pick(value) !== null || value.stepId === null) return false;
+		let at = run.steps.get(value.stepId)?.scope ?? null;
+		while (at) {
+			const caller = run.steps.get(at.parentStepId);
+			if (!caller) return false;
+			if (scopeKey(caller.scope) === level) return true;
+			at = caller.scope;
+		}
+		return false;
+	});
+}
+
+/**
+ * Whether the run sleeps for a wake: the log holds a sleep, while the run
+ * sleeps or waits at a Gate beside it. The wake holds the Gate
+ * (`planWake`), so the Gate keeps its wait.
  */
 function asleepIn(run: RunState, at: ThreadState): boolean {
 	if (at.kind === "fresh" || at.kind === "ended") return false;
 	if (run.status === "sleeping") return true;
-	return run.status === "waiting" && run.waits.length > 0 && !holdsGate(at);
+	return run.status === "waiting" && run.waits.length > 0;
 }
 
-/** Whether the thread sits at a Gate that waits for its answer. */
-export function holdsGate(at: ThreadState): boolean {
-	return (
-		at.kind === "interrupted" &&
-		at.interrupts.some(({ value }) => value.kind === "gate")
-	);
+/** The run's next timer (`nextTimer`): when it fires, and the Gate whose deadline it is. */
+export type NextTimer = {
+	at: number;
+	/** The open Gate whose deadline is due first. Null: a sleep wakes. */
+	gate: ReturnType<typeof firstDeadline>;
+};
+
+/**
+ * Pure: the run's one timer, from its log. It is the first of the wake
+ * time of its sleeps and the deadlines of its open Gates: a Gate and a
+ * sleep can wait at once on parallel branches. A deadline goes first when
+ * both are at the same time. Null when nothing waits for a time (a signal
+ * with no timeout, a Gate with no deadline).
+ */
+export function nextTimer(run: RunState): NextTimer | null {
+	const until = run.sleep ? (wakesNext(run)?.payload.until ?? null) : null;
+	const gate = firstDeadline(run);
+	if (gate && (until === null || gate.deadline.at <= until)) {
+		return { at: gate.deadline.at, gate };
+	}
+	return until === null ? null : { at: until, gate: null };
 }
 
 /** What `recordWake` writes to. */
@@ -230,23 +283,15 @@ export function createSleeps(deps: SleepDeps) {
 	}
 
 	/**
-	 * A new daemon's timer for a run that slept when the last one died, from
-	 * the log (`deriveSleep`: the latest `WaitStarted` with no `WaitEnded`,
-	 * on an open step of a run that has not ended). A wait with no time (a
-	 * signal with no timeout) gets no timer. A run that waits at a Gate with
-	 * a deadline gets the deadline's timer: the runner answers the Gate when
-	 * it fires.
+	 * Sets the run's timer from its log (`nextTimer`), or drops it when
+	 * nothing waits for a time. A drive that parks sets it, a timer that
+	 * fired too soon sets it again, and a new daemon gives each run its
+	 * timer with it (the log stays the restart source).
 	 */
 	function restore(runId: string, run: RunState): void {
-		// One timer per run: the first of a sleep and a Gate's deadline. A
-		// Gate and a sleep can wait at once on parallel branches.
-		const until = run.sleep ? wakesNext(run)?.payload.until : null;
-		const deadline = firstDeadline(run)?.deadline.at;
-		const first = Math.min(
-			until ?? Number.POSITIVE_INFINITY,
-			deadline ?? Number.POSITIVE_INFINITY,
-		);
-		if (first !== Number.POSITIVE_INFINITY) schedule(runId, first);
+		const next = nextTimer(run);
+		if (next) schedule(runId, next.at);
+		else forget(runId);
 	}
 
 	return { schedule, restore, forget, dispose };

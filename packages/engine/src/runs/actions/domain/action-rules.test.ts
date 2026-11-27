@@ -24,18 +24,44 @@ function refusalOf(rule: () => void): RunRefusal | null {
 }
 
 describe("a Signal", () => {
+	/** The waits of a run: one per name, `{}` for a wait on no signal. */
+	const waits = (...signals: (string | undefined)[]) =>
+		signals.map((signal) => ({
+			payload: signal === undefined ? {} : { signal },
+		}));
+
 	test("goes to a run that sleeps for a Signal of that name", () => {
 		expect(
 			refusalOf(() =>
-				refuseSignal({ status: "sleeping", sleep: { signal: "go" } }, "go"),
+				refuseSignal({ status: "sleeping", waits: waits("go") }, "go"),
 			),
 		).toBeNull();
 	});
 
-	test("to a run that waits for another name, or for none, is the wrong Signal", () => {
-		for (const sleep of [{ signal: "stop" }, { signal: null }, null]) {
+	test("goes to a run that waits at a Gate beside a Wait for that Signal, or sleeps beside another sleep", () => {
+		expect(
+			refusalOf(() =>
+				refuseSignal({ status: "waiting", waits: waits("go") }, "go"),
+			),
+		).toBeNull();
+		expect(
+			refusalOf(() =>
+				refuseSignal(
+					{ status: "sleeping", waits: waits("go", undefined) },
+					"go",
+				),
+			),
+		).toBeNull();
+	});
+
+	test("to a run that waits for another name, for none, or only at a Gate, is the wrong Signal", () => {
+		for (const [status, sleeping] of [
+			["sleeping", waits("stop")],
+			["sleeping", waits(undefined)],
+			["waiting", waits()],
+		] as const) {
 			const refused = refusalOf(() =>
-				refuseSignal({ status: "sleeping", sleep }, "go"),
+				refuseSignal({ status, waits: sleeping }, "go"),
 			);
 			expect(refused?.rule).toBe("wrong-signal");
 			expect(refused?.message).toBe("This run does not wait for that signal.");
@@ -44,7 +70,7 @@ describe("a Signal", () => {
 
 	test("to a run whose status takes none is refused by the status rule", () => {
 		const refused = refusalOf(() =>
-			refuseSignal({ status: "waiting", sleep: null }, "go"),
+			refuseSignal({ status: "running", waits: waits("go") }, "go"),
 		);
 		expect(refused?.rule).toBe("not-now");
 	});

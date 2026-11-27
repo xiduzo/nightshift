@@ -109,9 +109,10 @@ const NOT_NOW: Record<RunAction, Partial<Record<RunStatus, string>>> = {
 		failed: NO_GATE,
 		interrupted: NO_GATE,
 	},
+	// A run that waits at a Gate may sleep beside it: its Wait takes the
+	// signal (`refuseSignal` reads which).
 	signal: {
 		running: NO_SIGNAL,
-		waiting: NO_SIGNAL,
 		finished: NO_SIGNAL,
 		stopped: NO_SIGNAL,
 		failed: NO_SIGNAL,

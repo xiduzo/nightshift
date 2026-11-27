@@ -432,9 +432,10 @@ packages/engine/src/
    3. `sleep()` appends `WaitStarted`, records the transcript `wait`
       entry and parks at `wait__<nodeId>`.
    4. The wait node interrupts `{ kind: "wait", until, reason }`.
-   5. The runner gives the interrupt to `sleeps.schedule` for the wake
-      timer. At startup, recovery rebuilds the timers from the run state's
-      `sleep` through `runner.restore`.
+   5. The drive that parks sets the run's one timer from the log
+      (`sleeps.restore`, `nextTimer`): the first of its sleeps and its
+      Gates' deadlines. At startup, recovery sets the same timer through
+      `runner.restore`.
    6. A wake is a Turn (`runner.take(runId, { kind: "wake", ... })`):
       `WaitEnded`, the transcript `wake`, then
       `Command({ resume: { kind: "wake", early } })`.
@@ -790,14 +791,37 @@ After a restart the claim is gone, and the Join picks the earliest
 arrival from the state.
 
 **Interrupts.** A branch that parks, sleeps or opens a Gate interrupts
-its own task. The other tasks of the super-step finish. Then the walk
-halts until a person or a wake answers: the other branches pause after
-their running step. The thread can sit at several interrupts
+its own task. The other tasks of the super-step finish. LangGraph ends a
+super-step only when each of its tasks ends, so an interrupt holds back
+the branches beside it. The engine does not let it: it resumes each
+interrupt that keeps waiting with a **hold** (`ResumeValue` `hold`,
+`HOLD`). The thread can sit at several interrupts
 (`ThreadState.interrupted.interrupts`).
 
+- A hold is taken by `interruptNode`, for every wait, park and ask node:
+  the node jumps to itself and interrupts again in the next super-step,
+  with the same `pending`. Nothing runs before its `interrupt()` (rule 4),
+  so a held Gate opens no second time and sends no second push, and a
+  held sleep keeps its time. A hold is stored in the checkpoint writes
+  like any resume value.
+- `driveGraph` holds every interrupt when a drive parks while a task
+  beside an interrupt ended in the same super-step (a branch that just
+  ended a step, or was answered or woke). It watches the `tasks` and
+  `checkpoints` stream of every namespace for that, and the root's
+  snapshot for a task a death left saved. It holds again while a round
+  moves a branch, so the branches beside an open Gate or a sleep walk on
+  until they wait too.
 - A resume answers each interrupt by its id (`ThreadEntry.each`,
-  `resumeEach`). Every parked branch resumes, and a Gate asks again. An
-  answer or a wake goes to its own step only.
+  `resumeEach`), and holds each one it does not answer. Every parked
+  branch resumes, and a Gate asks again. An answer or a wake goes to its
+  own step only, and its branch goes on at once.
+- A Subflow whose body waits ends no task: its body interrupts again. So
+  a hold moves the branches inside the body, not the branches beside the
+  Subflow. A wake of a sleep beside a Subflow that waits at a Gate would
+  write `WaitEnded` and then stall. `planWake` refuses it (`blocked`,
+  `heldBack`): a person reads "Answer the Gate beside this step first.
+  Then try again.", and a timer fires again once the drive after the
+  answer parks.
 - A drive that ends with a parked branch ends the run, also when another
   branch waits.
 - An answer to a Gate while another branch's step still runs is refused,
@@ -823,18 +847,18 @@ once).
   and the checks warn about two Agents that can edit files.
 - A Gate answered while the other branches run (the "Turn" question). The
   engine refuses the answer until their steps end.
+- A sleep beside a Subflow that waits at a Gate wakes only after that
+  Gate's answer (see "Interrupts").
 
 Two branches may each hold a Gate or an Agent's ask at once, and each
-answer goes to its own step. An Agent's ask closes in the log when its
-step reopens, in the super-step after the answer. So while another
-branch still waits, the answered ask looks open. The thread lists no interrupt
-for an answered task (`ThreadState`, `ThreadSnapshot.answered`). So the
-timer of a sleeper beside the answered ask wakes the run, though the log
-still reads `waiting`. The Agent goes on with the answer when that sleeper
-wakes: a super-step ends only when all its tasks end. A second answer is
-refused while a step sleeps beside it, or another Gate waits beside it. When none sleeps (the daemon died
-after the wake), the second answer drives the thread on, and the Agent
-goes on with the first answer.
+answer goes to its own step. The other interrupts are held, so the
+answered branch goes on at once: an Agent's ask closes in the log when its
+step reopens, in the super-step right after the answer. The thread lists
+no interrupt for an answered task (`ThreadState`,
+`ThreadSnapshot.answered`). That is left only when the daemon died before
+the answer's super-step ended: a second answer then drives the thread on,
+the drive holds what waits beside it, and the Agent goes on with the first
+answer.
 
 An answer to a Gate whose interrupt the thread does not hold (the daemon
 died before it was saved) first drives the thread on to that interrupt.
@@ -1074,7 +1098,8 @@ The module:
    `pending` and the node's visit.
 
 `waitNode(nodeId)` is the one wait node (`interruptNode`). It interrupts
-with the sleep and answers three things:
+with the sleep and answers three things (a hold is `interruptNode`'s: the
+sleep keeps its time):
 
 - a `wake`: the step continues
 - a `signal`: `pending.signal` is set, and the Wait node reads it
@@ -1088,16 +1113,23 @@ The daemon side is the runner's wake Turn over the three parts of
   steps sleep. The thread says only where each task is. So a wake moves
   each task that the log does not hold asleep: the step it wakes, an
   interrupt whose sleep the log ended, and a task whose interrupt was lost
-  in a crash. Every other sleeper keeps its wait. A wait node with no
-  answer goes on when the log ended its sleep (`holdEnded`). It says when a timer fired before its time. It gives the resume
+  in a crash. Every other interrupt, a sleeper or a Gate, gets a hold and
+  keeps its wait, so the run may sleep or wait at a Gate beside it. A wait
+  node with no answer goes on when the log ended its sleep (`holdEnded`).
+  It says when a timer fired before its time, and when a Gate in a
+  Subflow beside the step holds it back (`blocked`). It gives the resume
   value (`{ kind: "wake" }` or `{ kind: "signal" }`).
+- `nextTimer(runState)` (pure): the run's one timer, the first of its
+  sleeps and its Gates' deadlines, a deadline first on a tie. The timer
+  Turn of a run that waits at a Gate (`timerTurn`) asks it what is due: a
+  deadline answers its Gate, a sleep wakes.
 - `recordWake` appends `WaitEnded` (with the prompt of a person who gave
   one) and the transcript `wake` once the run holds a slot.
 - `createSleeps(deps)`, one per runner, holds the timers.
   `schedule(runId, until)` sets one. A timer that fires gives the run to
   the runner's wake Turn. `restore(runId, runState)` sets the timer from
-  the run state's `sleep` for a run that slept when the last daemon died (the log
-  stays the restart source). `forget(runId)` drops it. The runner calls it
+  the log (`nextTimer`): a drive that parks, a timer that fired too soon,
+  and a new daemon for each run (the log stays the restart source). `forget(runId)` drops it. The runner calls it
   before `closeOpenWork`.
 
 A full run cap queues a timer's wake in the runner's cap queue, and

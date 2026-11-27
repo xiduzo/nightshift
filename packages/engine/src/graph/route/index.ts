@@ -3,6 +3,7 @@
 export { askAgain, gateNode, interruptNode, openAgain } from "./interrupt";
 export {
 	askNodeId,
+	isInterruptNode,
 	parkCommand,
 	parkFailed,
 	parkNode,

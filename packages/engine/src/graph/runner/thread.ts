@@ -13,6 +13,7 @@ import {
 import { compileFlow } from "../compile";
 import type { StepContext, StepShared } from "../context";
 import { resolvePolicy } from "../policy";
+import { isInterruptNode } from "../route";
 import type {
 	Ended,
 	Parked,
@@ -38,7 +39,9 @@ import type {
  *   walk's own, from the log). Only the root namespace's `__interrupt__`
  *   counts: one interrupt repeats once per level. A drive ends parked at
  *   an interrupt, ended at END with `ended` set, or fenced off by a stop.
- *   A graph that stops without either throws.
+ *   A graph that stops without either throws. A drive that parks while a
+ *   branch beside the interrupt could go on holds each interrupt (`HOLD`)
+ *   and streams again, so no interrupt holds back another branch.
  * - `endingOf` says what the runner appends for an outcome, and
  *   `inputOf` builds the LangGraph input of an entry into the thread.
  */
@@ -255,11 +258,24 @@ function interruptsOf(snapshot: GraphSnapshot, answered: boolean): Interrupt[] {
 		.map((i) => ({ id: i.id as string, value: i.value as Parked }));
 }
 
+/** The resume of an interrupt that keeps waiting (`interruptNode`). */
+export const HOLD: ResumeValue = { kind: "hold" };
+
 /**
  * Streams one drive of `graph` (thread id `runId`) and says how it ended.
  * Throws for an engine failure, and for a graph that stops without an end
  * or an interrupt. A drive whose fence closed reports `fenced`, whatever
  * it threw: the stop took the run and wrote its end.
+ *
+ * LangGraph ends a super-step only when each of its tasks ends. A task
+ * that interrupts holds back every task beside it: a branch that was
+ * answered or woke, or that just ended a step, goes on only in the next
+ * super-step. So when a drive parks while a task beside an interrupt ended
+ * (`Round.blocked`), the drive resumes each interrupt with a hold (`HOLD`):
+ * each interrupting node waits again in the next super-step, and the
+ * branches beside it go on. It holds again while a round moves a branch.
+ * A Call whose body waits ends no task, so a hold cannot move the
+ * branches beside the Call: the round moves nothing, and the drive parks.
  */
 export async function driveGraph(
 	graph: RunGraph,
@@ -269,48 +285,119 @@ export async function driveGraph(
 ): Promise<DriveOutcome> {
 	const { fence, onEvent } = options;
 	try {
-		const stream = await graph.stream(input, {
-			...configOf(runId),
-			streamMode: ["updates", "custom"],
-			subgraphs: true,
-			durability: "sync",
-			// Every node visit, park, wait and Call element is one
-			// super-step, and LangGraph's default stops a drive at 25. The
-			// step cap is the walk's own (`beginStep`, from the log), so the
-			// graph's limit is out of the way. Bodies inherit it through the
-			// config `runBody` passes on.
-			recursionLimit: Number.MAX_SAFE_INTEGER,
-		});
-		const interrupts: Parked[] = [];
-		for await (const chunk of stream) {
-			const [namespace, mode, data] = chunk as [string[], string, unknown];
-			if (mode === "custom") {
-				onEvent?.(data as RunEvent);
+		let next = input;
+		for (let holding = false; ; holding = true) {
+			const round = await streamRound(graph, runId, next, onEvent);
+			if (fence.closed) return { kind: "fenced" };
+			const { interrupts } = round;
+			// A parked branch ends the run, even when another branch waits.
+			const parked = interrupts.find((i) => i.kind === "parked");
+			const last = parked ?? interrupts[interrupts.length - 1];
+			if (last) {
+				const latest = await graph.getState(configOf(runId));
+				const held = interruptsOf(latest, false);
+				const blocked =
+					round.blocked ||
+					latest.tasks.some(
+						(task) => task.result !== undefined && held.length > 0,
+					);
+				if (parked || !blocked || (holding && !round.moved)) {
+					return { kind: "parked", parked: last, interrupts };
+				}
+				next = new Command({
+					resume: Object.fromEntries(held.map(({ id }) => [id, HOLD])),
+				});
 				continue;
 			}
-			if (namespace.length > 0) continue;
-			const root = (data as Record<string, unknown>).__interrupt__ as
-				| { value: Parked }[]
-				| undefined;
-			for (const each of root ?? []) interrupts.push(each.value);
+			const latest = await graph.getState(configOf(runId));
+			const ended = (latest.values as Partial<RunStateValues>).ended;
+			if (!ended) {
+				throw new Error("The graph stopped without an end or an interrupt.");
+			}
+			if (fence.closed) return { kind: "fenced" };
+			return { kind: "ended", ended };
 		}
-		if (fence.closed) return { kind: "fenced" };
-		// A parked branch ends the run, even when another branch waits.
-		const parked =
-			interrupts.find((i) => i.kind === "parked") ??
-			interrupts[interrupts.length - 1];
-		if (parked) return { kind: "parked", parked, interrupts };
-		const latest = await graph.getState(configOf(runId));
-		const ended = (latest.values as Partial<RunStateValues>).ended;
-		if (!ended) {
-			throw new Error("The graph stopped without an end or an interrupt.");
-		}
-		if (fence.closed) return { kind: "fenced" };
-		return { kind: "ended", ended };
 	} catch (error) {
 		if (fence.closed) return { kind: "fenced" };
 		throw error;
 	}
+}
+
+/** What one stream of a drive saw. */
+type Round = {
+	/** The root's interrupts, in order. */
+	interrupts: Parked[];
+	/** A task that is not an interrupting node ended: a branch moved. */
+	moved: boolean;
+	/** In some namespace, the super-step that interrupted also ended such a task: it waits for the next one. */
+	blocked: boolean;
+};
+
+/**
+ * Streams the graph once. Only the root namespace's `__interrupt__`
+ * counts: one interrupt repeats once per level. A namespace's super-step
+ * runs from its checkpoint to the next one, so the tasks that end after
+ * its last checkpoint are those of the super-step that interrupted.
+ */
+async function streamRound(
+	graph: RunGraph,
+	runId: string,
+	input: StreamInput,
+	onEvent: ((event: RunEvent) => void) | undefined,
+): Promise<Round> {
+	const stream = await graph.stream(input, {
+		...configOf(runId),
+		streamMode: ["updates", "custom", "tasks", "checkpoints"],
+		subgraphs: true,
+		durability: "sync",
+		// Every node visit, park, wait and Call element is one super-step,
+		// and LangGraph's default stops a drive at 25. The step cap is the
+		// walk's own (`beginStep`, from the log), so the graph's limit is
+		// out of the way. Bodies inherit it through the config `runBody`
+		// passes on.
+		recursionLimit: Number.MAX_SAFE_INTEGER,
+	});
+	const interrupts: Parked[] = [];
+	let moved = false;
+	/** Per namespace, since its last checkpoint: a task interrupted, a task moved. */
+	const steps = new Map<string, { interrupted: boolean; moved: boolean }>();
+	for await (const chunk of stream) {
+		const [namespace, mode, data] = chunk as [string[], string, unknown];
+		const key = namespace.join("|");
+		if (mode === "custom") {
+			onEvent?.(data as RunEvent);
+			continue;
+		}
+		if (mode === "checkpoints") {
+			steps.set(key, { interrupted: false, moved: false });
+			continue;
+		}
+		if (mode === "tasks") {
+			const task = data as {
+				name: string;
+				result?: unknown;
+				error?: unknown;
+				interrupts?: unknown[];
+			};
+			// A task's start has no result: only its end counts.
+			if (!("result" in task)) continue;
+			const step = steps.get(key) ?? { interrupted: false, moved: false };
+			steps.set(key, step);
+			if ((task.interrupts?.length ?? 0) > 0) step.interrupted = true;
+			else if (!task.error && !isInterruptNode(task.name)) {
+				step.moved = true;
+				moved = true;
+			}
+			continue;
+		}
+		if (namespace.length > 0) continue;
+		const root = (data as Record<string, unknown>).__interrupt__ as
+			| { value: Parked }[]
+			| undefined;
+		for (const each of root ?? []) interrupts.push(each.value);
+	}
+	const blocked = [...steps.values()].some((s) => s.interrupted && s.moved);
+	return { interrupts, moved, blocked };
 }
 
 /**
@@ -372,7 +459,8 @@ export type ThreadEntry =
 	/**
 	 * Answers the interrupt the thread sits at. `update` writes state before
 	 * the node goes on. `each`: when parallel branches sit at several, the
-	 * answer per interrupt id; one left out keeps waiting.
+	 * answer per interrupt id (`resumeEach`): each one that keeps waiting
+	 * gets a hold.
 	 */
 	| {
 			kind: "resume";
@@ -384,9 +472,11 @@ export type ThreadEntry =
 	| { kind: "goto"; nodeId: string; update: RunStateUpdate };
 
 /**
- * The answer to one interrupt among several (`ThreadEntry.each`): the
- * resume for every interrupt `pick` gives a value, by id. Null when the
- * thread sits at one interrupt or none: the plain resume answers it.
+ * The answer to each interrupt when the thread sits at several
+ * (`ThreadEntry.each`), by id: what `pick` gives, and a hold (`HOLD`) for
+ * each one it gives nothing, so that one keeps waiting while the super-step
+ * ends. Null when the thread sits at one interrupt or none, or `pick`
+ * answers none: the plain resume answers it.
  */
 export function resumeEach(
 	state: ThreadState,
@@ -394,11 +484,13 @@ export function resumeEach(
 ): Record<string, ResumeValue> | null {
 	if (state.kind !== "interrupted" || state.interrupts.length < 2) return null;
 	const each: Record<string, ResumeValue> = {};
+	let answers = 0;
 	for (const { id, value } of state.interrupts) {
 		const answer = pick(value);
-		if (answer) each[id] = answer;
+		if (answer) answers++;
+		each[id] = answer ?? HOLD;
 	}
-	return Object.keys(each).length > 0 ? each : null;
+	return answers > 0 ? each : null;
 }
 
 /** The LangGraph input of an entry: the one place that builds a `Command`. */

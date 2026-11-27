@@ -111,6 +111,8 @@ A Gate sends a notification only for the levels that you choose. Go to **Setting
 
 In a run with parallel branches, a Gate can open while a step on another branch still works. The inbox then shows that the run is busy. You can pick your answer now. Night Shift sends it when that step ends.
 
+While a Gate waits for you, the other branches go on. A Wait on another branch wakes at its time, or when its signal comes. When you answer one of two Gates, its branch goes on, and the other Gate keeps waiting. One exception: a Wait beside a Subflow that waits at a Gate wakes after you answer that Gate.
+
 ## Advanced: answer from a terminal
 
 An agent in a terminal reads the same inbox with the `needs_me` tool, and answers a Gate with `answer_gate`. See [Terminal and MCP](Terminal-and-MCP.md).

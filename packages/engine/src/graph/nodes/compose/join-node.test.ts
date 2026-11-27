@@ -343,7 +343,7 @@ describe("a failing branch", () => {
 });
 
 describe("an Agent that asks a person, on each of two branches", () => {
-	test("both ask at once; each answer goes on in its own session, and the Join goes on after both", async () => {
+	test("both ask at once; each answer goes on in its own session at once, and the Join goes on after both", async () => {
 		// Each session asks first, then passes once it has the answer.
 		const harness = fakeHarness((input) =>
 			input.resumeSessionId
@@ -388,9 +388,17 @@ describe("an Agent that asks a person, on each of two branches", () => {
 			]);
 			await answer("right", "the red one");
 			await settle(runner, h, "waiting");
-			// The answer is kept; the right session goes on once the left
-			// Gate no longer holds the walk (branches pause while one waits).
-			expect(harness.calls.filter((call) => call.resumeSessionId)).toEqual([]);
+			// The right session goes on at once: the left Gate is held, so it
+			// holds back no branch, and it stays open.
+			expect(
+				harness.calls
+					.filter((call) => call.resumeSessionId)
+					.map((call) => call.prompt),
+			).toEqual(["the red one"]);
+			expect((await ended(h)).filter(([id]) => id === "right")).toEqual([
+				["right", "pass"],
+			]);
+			expect((await openGates()).map((s) => s.nodeId)).toEqual(["left"]);
 			await answer("left", "the blue one");
 			await settle(runner, h, "finished");
 			const resumed = harness.calls

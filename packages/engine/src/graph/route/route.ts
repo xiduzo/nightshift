@@ -44,6 +44,12 @@ export const parkNodeId = (nodeId: string) => `park__${nodeId}`;
 export const waitNodeId = (nodeId: string) => `wait__${nodeId}`;
 export const askNodeId = (nodeId: string) => `ask__${nodeId}`;
 
+/** Whether a graph node is one of the interrupting nodes: a park, wait or ask node. */
+export const isInterruptNode = (name: string) =>
+	name.startsWith("park__") ||
+	name.startsWith("wait__") ||
+	name.startsWith("ask__");
+
 /** The scope of the flow this graph runs in: null at the top level. */
 export function scopeOf(config: LangGraphRunnableConfig): Scope | null {
 	return (config.configurable?.scope as Scope | null | undefined) ?? null;

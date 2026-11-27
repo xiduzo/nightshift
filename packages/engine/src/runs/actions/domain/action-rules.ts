@@ -27,13 +27,20 @@ export function refusePrompt(takesPrompt: boolean): void {
 	);
 }
 
-/** Throws unless the run sleeps in a Wait node that waits for the Signal `name`. */
+/**
+ * Throws unless a step of the run sleeps in a Wait node that waits for the
+ * Signal `name`. The Wait may sleep beside a Gate or another sleep: the run
+ * then reads "waiting" or "sleeping", and the signal wakes only that Wait.
+ */
 export function refuseSignal(
-	run: { status: RunStatus; sleep: { signal: string | null } | null },
+	run: {
+		status: RunStatus;
+		waits: readonly { payload: { signal?: string } }[];
+	},
 	name: string,
 ): void {
 	refuseUnless("signal", run.status, true);
-	if (run.sleep?.signal !== name) {
+	if (!run.waits.some((wait) => wait.payload.signal === name)) {
 		throw new RunRefusal(
 			"wrong-signal",
 			"This run does not wait for that signal.",

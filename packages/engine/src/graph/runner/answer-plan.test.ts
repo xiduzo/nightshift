@@ -2,7 +2,6 @@ import { expect, test } from "bun:test";
 import { runEvents } from "../../testing/run-events";
 import type { Parked } from "../state";
 import {
-	ANSWERED,
 	type AnswerPlan,
 	CONTINUED,
 	GATE_GONE,
@@ -65,10 +64,14 @@ const ENDED: ThreadState = { kind: "ended", ended: null };
 
 const VALUE = { kind: "gate", choice: "approve", note: "Yes." } as const;
 const RESUME: AnswerPlan = { kind: "resume", value: VALUE };
-const byId = (...ids: string[]): AnswerPlan => ({
+/** The answer goes to `id`, and each interrupt in `held` keeps waiting. */
+const byId = (id: string, ...held: string[]): AnswerPlan => ({
 	kind: "resume",
 	value: VALUE,
-	each: Object.fromEntries(ids.map((id) => [id, VALUE])),
+	each: {
+		[id]: VALUE,
+		...Object.fromEntries(held.map((other) => [other, { kind: "hold" }])),
+	},
 });
 const refuse = (words: string): AnswerPlan => ({ kind: "refuse", words });
 
@@ -82,11 +85,11 @@ type Row = [
 ];
 // biome-ignore format: a table reads one case per line.
 const TABLE: Row[] = [
-	// The thread took g's answer already.
+	// The thread took g's answer already (the daemon died before its super-step ended): the drive goes on and holds the rest.
 	["answered, nothing beside", PENDING, [gate("g")], "none", false, { kind: "drive-on" }],
-	["answered, a sleeper beside", sits(wait("s")), [gate("g")], "sleeper", false, refuse(ANSWERED)],
-	["answered, a sleeper in the log only", PENDING, [gate("g")], "sleeper", false, refuse(ANSWERED)],
-	["answered, another Gate the thread holds", sits(gate("h")), [gate("g")], "gate", false, refuse(ANSWERED)],
+	["answered, a sleeper beside", sits(wait("s")), [gate("g")], "sleeper", false, { kind: "drive-on" }],
+	["answered, a sleeper in the log only", PENDING, [gate("g")], "sleeper", false, { kind: "drive-on" }],
+	["answered, another Gate the thread holds", sits(gate("h")), [gate("g")], "gate", false, { kind: "drive-on" }],
 	["answered, another Gate in the log only", PENDING, [gate("g")], "gate", false, { kind: "drive-on" }],
 	// The thread does not hold g's interrupt: it goes on to it first.
 	["pending", PENDING, [], "none", false, { kind: "pre-drive" }],
@@ -96,15 +99,15 @@ const TABLE: Row[] = [
 	["at a sleeper", sits(wait("s")), [], "sleeper", false, { kind: "pre-drive" }],
 	// The thread holds g's interrupt.
 	["held alone", sits(gate("g")), [], "none", false, RESUME],
-	["held, another Gate beside", sits(gate("g"), gate("h")), [], "gate", false, byId("i-g")],
+	["held, another Gate beside", sits(gate("g"), gate("h")), [], "gate", false, byId("i-g", "i-h")],
 	["held, another Gate in the log only", sits(gate("g")), [], "gate", false, byId("i-g")],
-	["held, a sleeper beside", sits(gate("g"), wait("s")), [], "sleeper", false, byId("i-g")],
+	["held, a sleeper beside", sits(gate("g"), wait("s")), [], "sleeper", false, byId("i-g", "i-s")],
 	["held, a sleeper in the log only", sits(gate("g")), [], "sleeper", false, RESUME],
 	["a thread that never ran", { kind: "fresh" }, [], "none", false, RESUME],
 	["an ended thread", ENDED, [], "none", false, RESUME],
 	// After the drive to g's interrupt.
 	["after the drive: held", sits(gate("g")), [], "none", true, RESUME],
-	["after the drive: held, another Gate beside", sits(gate("g"), gate("h")), [], "gate", true, byId("i-g")],
+	["after the drive: held, another Gate beside", sits(gate("g"), gate("h")), [], "gate", true, byId("i-g", "i-h")],
 	["after the drive: held, another Gate in the log only", sits(gate("g")), [], "gate", true, byId("i-g")],
 	["after the drive: gone with its answer", ENDED, [], "answered", true, refuse(CONTINUED)],
 	["after the drive: gone with its answer, at another Gate", sits(gate("h")), [gate("g")], "answered", true, refuse(CONTINUED)],
