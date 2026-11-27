@@ -270,6 +270,21 @@ describe("what a waiting run needs", () => {
 		expect(notice("waiting", { steps, commands })?.kind).toBe("gate");
 	});
 
+	test("an answer that waits for a step on another branch is sent, as the inbox shows it", () => {
+		const queued = [
+			{
+				...gateStep("review", 1),
+				gate: { ...gateStep("review", 1).gate, answerQueued: true },
+			},
+		] as StepSummary[];
+		expect(notice("waiting", { steps: queued })).toMatchObject({
+			kind: "answer-sent",
+			title: ["Answer sent"],
+			gist: "The Gate takes it when the other branch's step ends.",
+			actions: [],
+		});
+	});
+
 	test("nothing while no open Gate is known yet", () => {
 		expect(notice("waiting")).toBeNull();
 	});

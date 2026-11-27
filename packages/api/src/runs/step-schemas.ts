@@ -87,6 +87,8 @@ export const stepSummarySchema = z.object({
 			deadline: gateDeadlineSchema.nullable(),
 			/** An Ask: the form the answer fills in. Absent on every other Gate. */
 			form: askFormSchema.optional(),
+			/** An answer waits for the drive. Absent: none waits. */
+			answerQueued: z.literal(true).optional(),
 		})
 		.nullable(),
 	sleeps: z.array(sleepSchema),

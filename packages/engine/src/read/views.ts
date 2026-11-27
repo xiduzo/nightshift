@@ -114,6 +114,8 @@ export type StepSummary = {
 		deadline: GateDeadline | null;
 		/** An Ask (ADR 10): the form the answer fills in. Absent on every other Gate. */
 		form?: AskForm;
+		/** An answer waits for the drive (`AnswerQueued`). Absent: none waits. */
+		answerQueued?: true;
 	} | null;
 	/**
 	 * When the step slept (a Wait node, a usage limit, the network), oldest

@@ -279,6 +279,19 @@ function noticeOf(
 			const signal = allows.signal
 				? (run.signal ?? wait?.signal ?? null)
 				: null;
+			// An answer waits for the step that runs on another branch.
+			if (gate.gate?.answerQueued) {
+				return notice(
+					"answer-sent",
+					["Answer sent"],
+					"The Gate takes it when the other branch's step ends.",
+					[
+						"Your answer is on its way to the gate ",
+						{ code: gate.nodeId },
+						". The Gate takes it when the step on another branch of the run ends.",
+					],
+				);
+			}
 			return notice(
 				"gate",
 				["Waiting for your answer"],

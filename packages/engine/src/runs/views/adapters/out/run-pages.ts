@@ -187,6 +187,7 @@ export function toStepSummary(
 					openedAt: derived.gate.openedAt,
 					deadline: derived.gate.deadline,
 					...(derived.gate.form ? { form: derived.gate.form } : {}),
+					...(derived.gate.queued ? { answerQueued: true as const } : {}),
 				}
 			: null,
 		sleeps: derived.sleeps.map(({ from, to }) => ({ from, to })),
