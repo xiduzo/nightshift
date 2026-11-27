@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import {
 	cpSync,
+	existsSync,
 	mkdtempSync,
 	readdirSync,
 	readFileSync,
@@ -540,6 +541,208 @@ describe("migration host_space_left", () => {
 		const info = spyOn(console, "info").mockImplementation(() => {});
 		await migrateDb(db);
 		expect(await kept(db)).toEqual([]);
+		expect(info).not.toHaveBeenCalled();
+		info.mockRestore();
+	});
+});
+
+describe("migration run_end_codes", () => {
+	/**
+	 * Run ends as the engine logged them before `endReason` existed, and the
+	 * code each one gets: the words of its sentence. A run that finished is
+	 * `finished`, whatever its message says.
+	 */
+	const OLD_ENDS: [string, string | null, string | null, string][] = [
+		["finished", null, null, "finished"],
+		["finished", "Usage limit: 5 users", null, "finished"],
+		["finished", "The server showed no activity", "done", "finished"],
+		["finished", "The check failed.", "failed", "_OTHER"],
+		[
+			"stopped",
+			"Usage limit: You've hit your limit. It resets after the stop time, so the run stopped. Resume the run to continue.",
+			null,
+			"agent.usage_limit",
+		],
+		[
+			"stopped",
+			"The network is down: offline. The next try is after the stop time, so the run stopped. Resume the run to continue.",
+			null,
+			"agent.network",
+		],
+		[
+			"failed",
+			'Node "w" failed: The network was down for more than 5 min: offline',
+			null,
+			"agent.network",
+		],
+		["stopped", "Reached the stop time", null, "stop_time"],
+		[
+			"failed",
+			"The run spent $3.00 of its $1.00 budget, so it stopped. Resume it to spend up to $1.00 more.",
+			null,
+			"guard.budget",
+		],
+		[
+			"failed",
+			'Node "w" failed: The agent reached its limit of 4 turns, so the step stopped.',
+			null,
+			"guard.turns",
+		],
+		[
+			"failed",
+			'Node "w" failed: The agent called Read 3 times in a row with the same input, so the step stopped.',
+			null,
+			"guard.looping",
+		],
+		[
+			"failed",
+			'Node "w" failed: The agent showed no activity for 1 min, so the step stopped.',
+			null,
+			"guard.idle",
+		],
+		[
+			"failed",
+			'The run reached the limit of 10 steps before node "w". Resume it to continue.',
+			null,
+			"guard.max_steps",
+		],
+		["stopped", null, null, "stopped_by_person"],
+		[
+			"stopped",
+			"Stopped after the running step, as asked.",
+			null,
+			"stopped_by_person",
+		],
+		["failed", null, "failed", "_OTHER"],
+		["failed", "Something else.", null, "_OTHER"],
+		["interrupted", "Night Shift stopped.", null, "_OTHER"],
+	];
+
+	/** Events in the current shape: the migration leaves each one as it is. */
+	const CURRENT: [string, string][] = [
+		// Its words would give another code: the stored one stays.
+		[
+			"RunEnded",
+			'{"status":"failed","reason":"Usage limit: soon","endReason":"_OTHER"}',
+		],
+		["RunEnded", '{"status":"finished","reason":null,"endReason":"finished"}'],
+		[
+			"WorktreeRemoved",
+			'{"projectId":"p","runId":"r","worktreePath":null,"branches":["b"]}',
+		],
+		// Another event's `by` is not a removal's.
+		["OfferWithdrawn", '{"deviceId":"d","profile":"p","by":"person-1"}'],
+		// Not valid JSON: never read, never changed.
+		["RunEnded", "{not json"],
+	];
+
+	async function seed(db: Database): Promise<void> {
+		let seq = 0;
+		const add = (type: string, payload: string) =>
+			db.run(
+				sql`INSERT INTO event (space_id, run_id, type, payload, walker_id, walker_seq) VALUES ('s', 'r', ${type}, ${payload}, 'd', ${++seq})`,
+			);
+		for (const [status, reason, result] of OLD_ENDS) {
+			await add(
+				"RunEnded",
+				JSON.stringify({ status, reason, ...(result ? { result } : {}) }),
+			);
+		}
+		for (const by of ["cleanup", "person"]) {
+			await add(
+				"WorktreeRemoved",
+				JSON.stringify({
+					projectId: "p",
+					runId: "r",
+					worktreePath: "/work/r",
+					branches: [],
+					by,
+				}),
+			);
+		}
+		for (const [type, payload] of CURRENT) await add(type, payload);
+	}
+
+	const events = (db: Database) =>
+		rows<{ seq: number; type: string; payload: string }>(
+			db,
+			"SELECT seq, type, payload FROM event ORDER BY seq",
+		);
+
+	async function folderOf(db: Database): Promise<string> {
+		const [main] = await rows<{ file: string }>(db, "PRAGMA database_list");
+		return join(main?.file as string, "..");
+	}
+
+	test("gives each old run end its code and takes who removed it out of each removal, after a copy of the database", async () => {
+		const db = await databaseBefore("run_end_codes");
+		await seed(db);
+		const before = await events(db);
+		const info = spyOn(console, "info").mockImplementation(() => {});
+
+		await migrateDb(db);
+
+		const after = await events(db);
+		const ends = after.slice(0, OLD_ENDS.length);
+		expect(ends.map((e) => JSON.parse(e.payload).endReason)).toEqual(
+			OLD_ENDS.map(([, , , code]) => code),
+		);
+		// Only the code is added: every other field stays.
+		for (const [i, end] of ends.entries()) {
+			const { endReason: _, ...rest } = JSON.parse(end.payload);
+			expect(rest).toEqual(JSON.parse(before[i]?.payload as string));
+		}
+		const removals = after.slice(OLD_ENDS.length, OLD_ENDS.length + 2);
+		expect(removals.map((e) => JSON.parse(e.payload))).toEqual([
+			{ projectId: "p", runId: "r", worktreePath: "/work/r", branches: [] },
+			{ projectId: "p", runId: "r", worktreePath: "/work/r", branches: [] },
+		]);
+		// Rows in the current shape stay byte for byte.
+		expect(after.slice(OLD_ENDS.length + 2)).toEqual(
+			before.slice(OLD_ENDS.length + 2),
+		);
+
+		// The copy came first: it holds the events as they were.
+		const backups = join(await folderOf(db), "backups");
+		const [name, ...more] = readdirSync(backups);
+		expect(more).toEqual([]);
+		expect(name).toStartWith("before-run-end-codes-");
+		const copy = createDb(
+			{ DATABASE_URL: `file:${join(backups, name as string)}` },
+			{ singleFile: true },
+		);
+		expect(await events(copy)).toEqual(before);
+		copy.$client.close();
+		expect(info).toHaveBeenCalledWith(
+			`Migration 20261127112537_run_end_codes: gave ${OLD_ENDS.length} run ends their code and took who removed them out of 2 removals of run files. The copy of the database: ${join(backups, name as string)}`,
+		);
+
+		// Again: it changes nothing, copies nothing and logs nothing.
+		info.mockClear();
+		const again = readFileSync(
+			join(migrationsFolder, "20261127112537_run_end_codes", "migration.sql"),
+			"utf8",
+		).split("--> statement-breakpoint");
+		for (const statement of again) await db.run(sql.raw(statement));
+		await migrateDb(db);
+		expect(await events(db)).toEqual(after);
+		expect(readdirSync(backups)).toEqual([name as string]);
+		expect(info).not.toHaveBeenCalled();
+		info.mockRestore();
+	});
+
+	test("a database with nothing to change gets no copy and no line", async () => {
+		const db = await databaseBefore("run_end_codes");
+		for (const [i, [type, payload]] of CURRENT.slice(0, 4).entries()) {
+			await db.run(
+				sql`INSERT INTO event (space_id, type, payload, walker_id, walker_seq) VALUES ('s', ${type}, ${payload}, 'd', ${i + 1})`,
+			);
+		}
+		const before = await events(db);
+		const info = spyOn(console, "info").mockImplementation(() => {});
+		await migrateDb(db);
+		expect(await events(db)).toEqual(before);
+		expect(existsSync(join(await folderOf(db), "backups"))).toBe(false);
 		expect(info).not.toHaveBeenCalled();
 		info.mockRestore();
 	});
