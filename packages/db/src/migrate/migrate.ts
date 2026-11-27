@@ -67,7 +67,8 @@ export async function migrateDb(
 /**
  * The events the migration of run end codes changes: run ends without a
  * code, and removals of run files that say who removed them. The same
- * conditions as its SQL. None in a database without events yet.
+ * conditions as its SQL: only a JSON object changes, and a null code is
+ * none. None in a database without events yet.
  */
 async function eventsWithoutCodes(
 	db: Database,
@@ -83,7 +84,7 @@ async function eventsWithoutCodes(
 		removals: number | null;
 	}>(
 		sql.raw(
-			"SELECT sum(type = 'RunEnded' AND json_type(payload, '$.endReason') IS NULL) AS ends, sum(type = 'WorktreeRemoved' AND json_type(payload, '$.by') IS NOT NULL) AS removals FROM event WHERE type IN ('RunEnded', 'WorktreeRemoved') AND json_valid(payload)",
+			"SELECT sum(type = 'RunEnded' AND coalesce(json_type(payload, '$.endReason'), 'null') = 'null') AS ends, sum(type = 'WorktreeRemoved' AND json_type(payload, '$.by') IS NOT NULL) AS removals FROM (SELECT type, payload FROM event WHERE type IN ('RunEnded', 'WorktreeRemoved') AND CASE WHEN NOT json_valid(payload) THEN 0 ELSE json_type(payload) = 'object' END)",
 		),
 	);
 	return { ends: found?.ends ?? 0, removals: found?.removals ?? 0 };

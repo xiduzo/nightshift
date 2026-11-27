@@ -1,8 +1,10 @@
 -- A run end logged without its code (RunEnded before 2026-11-02 had no
 -- `endReason`) gets the code its sentence gives: these are the words the
 -- engine wrote then. Every end logged since has its code, and the code is
--- required from this migration on. A payload that has a code, or that is
--- not valid JSON, stays as it is.
+-- required from this migration on. A code that is missing or null counts
+-- as none. A payload that has a code, or that is not a JSON object, stays
+-- as it is. The CASE keeps that order: json_type fails on text that is not
+-- valid JSON.
 UPDATE `event`
 SET `payload` = json_set(
 	`payload`,
@@ -38,12 +40,18 @@ SET `payload` = json_set(
 	END
 )
 WHERE `type` = 'RunEnded'
-	AND json_valid(`payload`)
-	AND json_type(`payload`, '$.endReason') IS NULL;--> statement-breakpoint
+	AND CASE
+		WHEN NOT json_valid(`payload`) THEN 0
+		WHEN json_type(`payload`) <> 'object' THEN 0
+		ELSE coalesce(json_type(`payload`, '$.endReason'), 'null') = 'null'
+	END;--> statement-breakpoint
 -- A removal of a run's files no longer says who removed it: since
 -- 2026-11-12 only the scheduled cleanup removes them.
 UPDATE `event`
 SET `payload` = json_remove(`payload`, '$.by')
 WHERE `type` = 'WorktreeRemoved'
-	AND json_valid(`payload`)
-	AND json_type(`payload`, '$.by') IS NOT NULL;
+	AND CASE
+		WHEN NOT json_valid(`payload`) THEN 0
+		WHEN json_type(`payload`) <> 'object' THEN 0
+		ELSE json_type(`payload`, '$.by') IS NOT NULL
+	END;

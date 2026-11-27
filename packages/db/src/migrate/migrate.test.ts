@@ -632,6 +632,10 @@ describe("migration run_end_codes", () => {
 		],
 		// Another event's `by` is not a removal's.
 		["OfferWithdrawn", '{"deviceId":"d","profile":"p","by":"person-1"}'],
+		// Not an object: no code can go in, so it is not counted.
+		["RunEnded", "[1]"],
+		["RunEnded", '"Reached the stop time"'],
+		["WorktreeRemoved", '["by"]'],
 		// Not valid JSON: never read, never changed.
 		["RunEnded", "{not json"],
 	];
@@ -642,10 +646,16 @@ describe("migration run_end_codes", () => {
 			db.run(
 				sql`INSERT INTO event (space_id, run_id, type, payload, walker_id, walker_seq) VALUES ('s', 'r', ${type}, ${payload}, 'd', ${++seq})`,
 			);
-		for (const [status, reason, result] of OLD_ENDS) {
+		// Every other one says its code is null: also no code.
+		for (const [i, [status, reason, result]] of OLD_ENDS.entries()) {
 			await add(
 				"RunEnded",
-				JSON.stringify({ status, reason, ...(result ? { result } : {}) }),
+				JSON.stringify({
+					status,
+					reason,
+					...(result ? { result } : {}),
+					...(i % 2 ? { endReason: null } : {}),
+				}),
 			);
 		}
 		for (const by of ["cleanup", "person"]) {
@@ -690,7 +700,10 @@ describe("migration run_end_codes", () => {
 		// Only the code is added: every other field stays.
 		for (const [i, end] of ends.entries()) {
 			const { endReason: _, ...rest } = JSON.parse(end.payload);
-			expect(rest).toEqual(JSON.parse(before[i]?.payload as string));
+			const { endReason: __, ...was } = JSON.parse(
+				before[i]?.payload as string,
+			);
+			expect(rest).toEqual(was);
 		}
 		const removals = after.slice(OLD_ENDS.length, OLD_ENDS.length + 2);
 		expect(removals.map((e) => JSON.parse(e.payload))).toEqual([
