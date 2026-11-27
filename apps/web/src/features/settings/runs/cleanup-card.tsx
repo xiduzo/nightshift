@@ -15,7 +15,8 @@ const CLEANUP_KEYS = ["cleanUpAfterDays"] as const;
 /**
  * The scheduled cleanup of what ended runs left on this computer: their
  * copies of the project and branches a day after the run, the work it
- * kept of them, and the files of runs without a project folder.
+ * kept of them (30 days, a fixed rule of the engine), and the files of runs
+ * without a project folder (the days of `cleanUpAfterDays`).
  */
 export function CleanupCard({ data }: { data: SettingsView }) {
 	const form = useSettingsForm(data, CLEANUP_KEYS, {
@@ -34,7 +35,7 @@ export function CleanupCard({ data }: { data: SettingsView }) {
 				<SettingRows>
 					<SwitchSetting
 						label="Clean up old runs"
-						description="A day after a run ends, Night Shift removes its copy of the project and its branches. Branches on origin stay, and work saved nowhere else stays hidden for the days below, then goes."
+						description="A day after a run ends, Night Shift removes its copy of the project and its branches. Branches on the remote stay. Work saved nowhere else stays hidden for 30 days, then goes."
 						checked={data.values.cleanUpRuns}
 						disabled={toggle.isPending}
 						onCheckedChange={(checked) =>
@@ -46,7 +47,7 @@ export function CleanupCard({ data }: { data: SettingsView }) {
 						settingKey="cleanUpAfterDays"
 						label="Clean up after"
 						unit="days"
-						description="How long hidden work, and the files of a run without a project folder, stay after the run ends."
+						description="How long the files of a run without a project folder stay after the run ends."
 						inputMode="numeric"
 					/>
 					<SaveErrorRow error={form.saveError} />

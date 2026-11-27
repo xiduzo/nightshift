@@ -5,6 +5,7 @@ import type { RunLog } from "../../log";
 import type { RunFolders } from "../../run-folders";
 import { startCleanupJob } from "./adapters/in/cleanup-timer";
 import { drizzleRemovalLog } from "./adapters/out/drizzle-removal-log";
+import { keptWorkGone } from "./application/kept-work-gone";
 import { listRunFiles } from "./application/list-run-files";
 import type {
 	CleanupGround,
@@ -53,6 +54,8 @@ export type Cleanup = {
 	listRunFiles: ReturnType<typeof listRunFiles>;
 	/** Gives one file of a run's folder on this computer, and where it is. */
 	readRunFile: ReturnType<typeof readRunFile>;
+	/** The words for the person when the cleanup freed the work it kept of a run, else null. */
+	keptWorkGone: ReturnType<typeof keptWorkGone>;
 };
 
 export function wireCleanup(deps: CleanupDeps): Cleanup {
@@ -70,6 +73,7 @@ export function wireCleanup(deps: CleanupDeps): Cleanup {
 		sweepRunFolders: sweepRunFolders(ports),
 		listRunFiles: listRunFiles(ports),
 		readRunFile: readRunFile(ports),
+		keptWorkGone: keptWorkGone(ports),
 	};
 	const { timer } = deps;
 	startCleanupJob({

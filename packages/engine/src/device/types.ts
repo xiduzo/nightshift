@@ -95,7 +95,8 @@ export type Device = {
 	 * folder `cwd` (where the run's log says it is) is gone: the cleanup
 	 * removed it a day after the run ended. From its branch here, the work
 	 * the cleanup kept, its branch on origin, or `run.baseRef`, the commit
-	 * it started from. Null when `cwd` is there: nothing changes.
+	 * it started from. Null when `cwd` is there: nothing changes. Refused
+	 * when only the start is left and the cleanup freed the work it kept.
 	 */
 	restoreWorktree(input: {
 		run: RunRef;

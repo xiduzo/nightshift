@@ -1,5 +1,6 @@
 import { mkdir, stat } from "node:fs/promises";
 import { dirname } from "node:path";
+import { Refusal } from "@nightshift/refusal";
 import { type Git, gitOrThrow } from "./git";
 import {
 	BASE_FETCH_TIMEOUT_MS,
@@ -63,13 +64,16 @@ export function createWorktreeRestore(git: Git, parts: RestoreParts) {
 	 * 3. The run's branch on origin, fetched first: the cleanup kept
 	 *    nothing because the work was pushed. A Hand-off pushed it too.
 	 * 4. The commit the run started from: the work was merged, or there was
-	 *    none. The fetch failed, or origin has no such branch.
+	 *    none. The fetch failed, or origin has no such branch. When the
+	 *    cleanup freed the work it kept (`workGone`), that start would lose
+	 *    it: refused with those words.
 	 */
 	async function restoreStart(input: {
 		repoPath: string;
 		branch: string;
 		keptCopy: string | null;
 		baseRef: string;
+		workGone: string | null;
 	}): Promise<{ commit: string; from: RestoredFrom }> {
 		const { repoPath, branch, keptCopy } = input;
 		if (await branchExists(repoPath, branch)) {
@@ -105,6 +109,7 @@ export function createWorktreeRestore(git: Git, parts: RestoreParts) {
 		if (await refExists(repoPath, `${origin}^{commit}`)) {
 			return { commit: await resolveCommit(repoPath, origin), from: "origin" };
 		}
+		if (input.workGone !== null) throw new Refusal("conflict", input.workGone);
 		return {
 			commit: await resolveCommit(repoPath, input.baseRef),
 			from: "base",
@@ -129,6 +134,8 @@ export function createWorktreeRestore(git: Git, parts: RestoreParts) {
 		/** The commit the run started from. */
 		baseRef: string;
 		author?: { name: string; email: string };
+		/** The words for the person when the cleanup freed the work it kept of the run, else null. */
+		workGone: string | null;
 	}): Promise<{
 		worktreePath: string;
 		branch: string;
@@ -158,6 +165,7 @@ export function createWorktreeRestore(git: Git, parts: RestoreParts) {
 			branch,
 			keptCopy: keptRefs.get(kept.copy) ?? null,
 			baseRef: input.baseRef,
+			workGone: input.workGone,
 		});
 		await mkdir(dirname(worktreePath), { recursive: true });
 		await gitOrThrow(

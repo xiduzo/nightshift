@@ -246,6 +246,7 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 				was: cwd,
 				baseRef: run.baseRef ?? "HEAD",
 				...(run.author ? { author: run.author } : {}),
+				workGone: (await deps.keptWorkGone?.(run)) ?? null,
 			});
 		},
 		...(deps.runFolders ? { runFolder: runFolderOf(deps.runFolders) } : {}),

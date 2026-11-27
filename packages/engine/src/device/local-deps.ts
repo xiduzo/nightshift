@@ -77,6 +77,16 @@ export type LocalDeviceDeps = {
 	 */
 	clonePath?: (projectId: string) => Promise<string | null>;
 	/**
+	 * What the person reads when the cleanup of this computer freed the
+	 * work it kept of the run, or null (`Engine.keptWorkGone`). Then a copy
+	 * that would start again from where the run started is refused with
+	 * these words. Without it: never.
+	 */
+	keptWorkGone?: (run: {
+		id: string;
+		projectId: string;
+	}) => Promise<string | null>;
+	/**
 	 * The runs' own folders on this computer (ADR 22): a run of a project
 	 * without a folder works in its folder here. Without it, this computer
 	 * cannot run such a project.

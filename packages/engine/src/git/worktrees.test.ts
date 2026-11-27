@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { Refusal } from "@nightshift/refusal";
 import { itemBranchName } from "../contract";
 import {
 	commitFile,
@@ -380,11 +381,12 @@ describe("restoreWorktree", () => {
 		base = await mustGit(sandbox.repoPath, ["rev-parse", "HEAD"]);
 	});
 
-	const restore = () =>
+	const restore = (workGone: string | null = null) =>
 		restoreWorktree({
 			repoPath: sandbox.repoPath,
 			shortId: "abcd1234",
 			baseRef: base,
+			workGone,
 		});
 
 	/** A run's copy with one commit, then gone: its folder and git's record of it. */
@@ -486,6 +488,25 @@ describe("restoreWorktree", () => {
 		expect((await restore())?.from).toBe("base");
 		expect(await mustGit(gone.worktreePath, ["rev-parse", "HEAD"])).toBe(base);
 		expect(await currentBranch(gone.worktreePath)).toBe(gone.branch);
+	});
+
+	test("refuses to start again from nothing when the cleanup freed the kept work", async () => {
+		const gone = await goneCopy({ deleteBranch: true });
+		const words = "The work of this run is gone.";
+		const refused = await restore(words).catch((error: unknown) => error);
+		expect(refused).toBeInstanceOf(Refusal);
+		expect((refused as Refusal).message).toBe(words);
+		expect(existsSync(gone.worktreePath)).toBe(false);
+	});
+
+	test("starts again from the run's branch on origin when the cleanup freed the kept work", async () => {
+		const gone = await goneCopy({ push: true, deleteBranch: true });
+		expect((await restore("The work of this run is gone."))?.from).toBe(
+			"origin",
+		);
+		expect(await mustGit(gone.worktreePath, ["rev-parse", "HEAD"])).toBe(
+			gone.tip,
+		);
 	});
 });
 

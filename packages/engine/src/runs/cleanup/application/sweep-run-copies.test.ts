@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 import { cleanupPorts } from "../test-support";
 import { sweepRunCopies } from "./sweep-run-copies";
 
@@ -46,8 +46,6 @@ describe("sweepRunCopies", () => {
 
 	test("keeps changes that are not committed and commits only here before the copy goes", async () => {
 		const { ports, sweep } = await setup();
-		// The kept work stays: its run ended less than `cleanUpAfterDays` ago.
-		ports.ground.cleanUpAfterDays = 30;
 		ports.branches.leave(REPO, SHORT, {
 			changes: 2,
 			head: { commit: "c1", branch: `nightshift/${SHORT}`, unsaved: 1 },
@@ -121,8 +119,11 @@ describe("sweepRunCopies", () => {
 		]);
 	});
 
-	test("deletes the kept work of a run that ended cleanUpAfterDays ago, and keeps a younger one", async () => {
+	test("frees the kept work of a run that ended 30 days ago, keeps a younger one, and logs how many went", async () => {
 		const { ports, sweep } = await setup();
+		// Kept work does not follow the days of run folders.
+		ports.ground.cleanUpAfterDays = 90;
+		ports.ground.at = 31 * DAY_MS;
 		ports.runs.add({ id: "young000-run", endedAt: 5 * DAY_MS });
 		const refs = ports.branches.keptRefs(SHORT);
 		await ports.branches.keep(REPO, refs.copy, "c1");
@@ -132,7 +133,15 @@ describe("sweepRunCopies", () => {
 			"c2",
 		);
 		ports.branches.done.length = 0;
-		expect(await sweep()).toEqual({ removed: [], expired: [RUN], left: 0 });
+		const log = spyOn(console, "log").mockImplementation(() => {});
+		try {
+			expect(await sweep()).toEqual({ removed: [], expired: [RUN], left: 0 });
+			expect(log.mock.calls).toEqual([
+				["[cleanup] freed the kept work of 1 run (30 days after each ended)"],
+			]);
+		} finally {
+			log.mockRestore();
+		}
 		expect(ports.branches.done).toEqual([`delete-ref ${refs.copy}`]);
 		expect(await ports.removed()).toEqual([
 			{
@@ -144,5 +153,41 @@ describe("sweepRunCopies", () => {
 				by: "cleanup",
 			},
 		]);
+	});
+
+	test("frees the kept work of a run this computer does not know 30 days after it was kept", async () => {
+		const { ports, sweep } = await setup();
+		const gone = "gone0000-run";
+		await ports.removalLog.removed({
+			projectId: "project-1",
+			runId: gone,
+			worktreePath: null,
+			branches: [],
+			kept: [ports.branches.keptRefs("gone0000").copy],
+			by: "cleanup",
+		});
+		await ports.removedAt(2 * DAY_MS);
+		const refs = ports.branches.keptRefs("gone0000");
+		await ports.branches.keep(REPO, refs.copy, "c1");
+		await ports.branches.keep(
+			REPO,
+			ports.branches.keptRefs("nolog000").copy,
+			"c2",
+		);
+		ports.branches.done.length = 0;
+		expect((await sweep()).expired).toEqual([]);
+		ports.ground.at = 32 * DAY_MS;
+		expect((await sweep()).expired).toEqual([gone]);
+		expect(ports.branches.done).toEqual([`delete-ref ${refs.copy}`]);
+	});
+
+	test("keeps the kept work of a run that is open again", async () => {
+		const { ports, sweep } = await setup();
+		ports.ground.at = 40 * DAY_MS;
+		ports.runs.add({ id: RUN, status: "running", endedAt: DAY_MS });
+		await ports.branches.keep(REPO, ports.branches.keptRefs(SHORT).copy, "c1");
+		ports.branches.done.length = 0;
+		expect((await sweep()).expired).toEqual([]);
+		expect(ports.branches.done).toEqual([]);
 	});
 });

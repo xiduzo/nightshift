@@ -66,6 +66,12 @@ export interface Engine {
 	 */
 	logMemberChange(change: MemberChange): Promise<void>;
 	/**
+	 * What the person reads when the cleanup of this computer freed the
+	 * work it kept of the run, else null. This computer as a Device asks
+	 * it before it makes the run's copy again from where the run started.
+	 */
+	keptWorkGone(run: { id: string; projectId: string }): Promise<string | null>;
+	/**
 	 * Calls `listener` with what each run event that lands in this Replica
 	 * from now on means (the landed facts): appended here, or brought by
 	 * the exchange from another Walker. Each carries its Space, with no
@@ -336,6 +342,9 @@ export type EngineParts = {
 	// --- views (R2, `wire-views.ts`) ---
 	views: { cases: Pick<Views, "readRunHere" | "readRunTrace">; runs: ViewRuns };
 
+	// --- cleanup (`wire-cleanup.ts`) ---
+	keptWorkGone: Engine["keptWorkGone"];
+
 	// --- recovery (R7, `wire-recovery.ts`) ---
 	/** The runs here that wait for a lease ask again. It does not wait, and it never throws. */
 	wakeLeaseSleeps(): void;
@@ -378,6 +387,10 @@ export function engineOf(parts: EngineParts): Engine {
 			await parts.answerCosts.keep(cost);
 		},
 		logMemberChange: (change) => logMemberChange(runLog, change),
+		async keptWorkGone(run) {
+			await ready;
+			return parts.keptWorkGone(run);
+		},
 		async moveProjects(move) {
 			await ready;
 			return spaceMove.moveProjects(move);

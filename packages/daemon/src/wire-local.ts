@@ -31,6 +31,8 @@ export function wireLocalDevice(
 		LocalDeviceDeps,
 		"id" | "name" | "toolLaunchers" | "clonePath" | "knowledge"
 	> & {
+		/** Whose kept work the cleanup freed (`Engine.keptWorkGone`). */
+		keptWorkGone: NonNullable<LocalDeviceDeps["keptWorkGone"]>;
 		config: ConfigStores;
 		/** Who may ask of this computer: its owner. */
 		computerAccess: Parameters<typeof wireSetup>[0]["computerAccess"];
@@ -92,6 +94,8 @@ export function wireLocalDevice(
 		checkProject: wireSetup({ computerAccess: deps.computerAccess }),
 		toolLaunchers: deps.toolLaunchers,
 		clonePath: deps.clonePath,
+		// A run whose kept work the cleanup freed is not made again from nothing.
+		keptWorkGone: deps.keptWorkGone,
 		// A run of a project without a folder works in a folder of its own
 		// here, next to the run history (ADR 22).
 		runFolders: createRunFolders(dataDir),

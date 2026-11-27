@@ -1,3 +1,4 @@
+import { KEPT_WORK_DAYS, keptWorkFate } from "../domain/kept-work";
 import { keepsWork } from "../domain/run-files";
 import {
 	cleanupTime,
@@ -21,7 +22,7 @@ export type SweepRunCopiesPorts = {
 	projects: CleanupProjects;
 	runs: Pick<CleanupRuns, "listRuns" | "runStatus" | "flowUnread" | "isActive">;
 	ground: CleanupGround;
-	removalLog: Pick<RemovalLog, "removed">;
+	removalLog: RemovalLog;
 };
 
 /** What a sweep did: the runs whose copy and branches went, those whose kept work went, and how many it left. */
@@ -49,8 +50,10 @@ const shortIdOf = (runId: string) => runId.slice(0, 8);
  * first: changes that are not committed become one commit, and the copy
  * and each branch with commits only here get a kept ref
  * (`refs/nightshift/kept/<short>/…`), which `git branch` does not list.
- * The kept refs go `cleanUpAfterDays` after the run ended. A resume or a
- * rerun makes the copy again from them (`restoreWorktree`).
+ * The kept refs go `KEPT_WORK_DAYS` after the run ended (`keptWorkFate`).
+ * Until then, a resume or a rerun makes the copy again from them
+ * (`restoreWorktree`). After, a copy that would start from the run's base
+ * is refused (`keptWorkGone`).
  *
  * A run that is still open (running, waiting at a Gate, asleep) is never
  * touched, nor is one Night Shift cut short whose flow this version cannot
@@ -61,8 +64,9 @@ const shortIdOf = (runId: string) => runId.slice(0, 8);
  *
  * One round: in every project with a clone here, the copy and branches of
  * each run that ended a day ago, then the kept work of each run that ended
- * `cleanUpAfterDays` ago. Idempotent: a run with nothing left is skipped.
- * An error in one project or run is logged and skipped.
+ * `KEPT_WORK_DAYS` ago. One line logs how many runs' kept work went.
+ * Idempotent: a run with nothing left is skipped. An error in one project
+ * or run is logged and skipped.
  */
 export const sweepRunCopies =
 	(ports: SweepRunCopiesPorts) => async (): Promise<SweepResult> => {
@@ -165,14 +169,13 @@ export const sweepRunCopies =
 		}
 
 		/**
-		 * Deletes the kept refs of each run that ended `afterDays` ago. Kept
-		 * work of a run this computer does not know stays: nothing tells when
-		 * that run ended.
+		 * Deletes the kept refs of each run whose kept work is due
+		 * (`keptWorkFate`): by the run's end, or for a run this computer does
+		 * not know, by when the cleanup last kept its work.
 		 */
 		async function expire(
 			project: { id: string; repoPath: string },
 			projectRuns: readonly EndedRun[],
-			afterDays: number,
 			result: SweepResult,
 		): Promise<void> {
 			const kept = await branches.listKept(project.repoPath);
@@ -180,26 +183,46 @@ export const sweepRunCopies =
 			const byShortId = new Map(
 				projectRuns.map((run) => [shortIdOf(run.id), run]),
 			);
+			const keptAt = new Map<string, { runId: string; at: number }>();
+			if ([...kept.keys()].some((shortId) => !byShortId.has(shortId))) {
+				for (const removal of await ports.removalLog.removals(project.id)) {
+					if (removal.kept) {
+						keptAt.set(shortIdOf(removal.runId), {
+							runId: removal.runId,
+							at: removal.at,
+						});
+					}
+				}
+			}
 			const now = ground.now();
 			for (const [shortId, refs] of kept) {
 				const run = byShortId.get(shortId);
-				if (!run || cleanupTime(run, afterDays) > now) continue;
-				if (await keeps(run.id)) continue;
+				const runId = run?.id ?? keptAt.get(shortId)?.runId;
+				if (runId === undefined) continue;
+				const facts = {
+					endedAt: run ? (run.endedAt ?? run.createdAt) : null,
+					keptAt: keptAt.get(shortId)?.at ?? null,
+					now,
+				};
+				// Only a due run is asked whether it goes on.
+				if (keptWorkFate({ ...facts, open: false }) === "keep") continue;
+				const open = run ? await keeps(runId) : runs.isActive(runId);
+				if (keptWorkFate({ ...facts, open }) === "keep") continue;
 				const expired: string[] = [];
 				try {
 					for (const ref of refs) {
 						await branches.deleteRef(project.repoPath, ref);
 						expired.push(ref);
 					}
-					result.expired.push(run.id);
+					result.expired.push(runId);
 				} catch (error) {
 					console.warn(
-						`[cleanup] kept the work of run ${run.id}:`,
+						`[cleanup] kept the work of run ${runId}:`,
 						error instanceof Error ? error.message : error,
 					);
 				} finally {
 					if (expired.length > 0) {
-						await record(project.id, run.id, {
+						await record(project.id, runId, {
 							worktreePath: null,
 							branches: [],
 							expired,
@@ -210,8 +233,7 @@ export const sweepRunCopies =
 		}
 
 		const result: SweepResult = { removed: [], expired: [], left: 0 };
-		const { cleanUpRuns, cleanUpAfterDays } = ground.settings();
-		if (!cleanUpRuns) return result;
+		if (!ground.settings().cleanUpRuns) return result;
 		for (const project of await ports.projects.list()) {
 			try {
 				const projectRuns = await runs.listRuns(project.spaceId, project.id);
@@ -253,7 +275,7 @@ export const sweepRunCopies =
 						);
 					}
 				}
-				await expire(project, projectRuns, cleanUpAfterDays, result);
+				await expire(project, projectRuns, result);
 			} catch (error) {
 				console.warn(
 					`[cleanup] skipped project ${project.id}:`,
@@ -261,5 +283,9 @@ export const sweepRunCopies =
 				);
 			}
 		}
+		const freed = result.expired.length;
+		console.log(
+			`[cleanup] freed the kept work of ${freed} run${freed === 1 ? "" : "s"} (${KEPT_WORK_DAYS} days after each ended)`,
+		);
 		return result;
 	};

@@ -19,7 +19,8 @@ import { type Cleanup, wireCleanup } from "./runs";
  * branches and run folders.
  *
  * It gives `runFiles`: the Space view lists and reads the files of a run
- * folder.
+ * folder. And `keptWorkGone`: the engine tells this computer as a Device
+ * whose kept work the cleanup freed.
  */
 export function wireEngineCleanup(deps: {
 	db: Database;
@@ -38,9 +39,12 @@ export function wireEngineCleanup(deps: {
 		EngineInternals,
 		"cleanupDelayMs" | "cleanupEveryMs" | "cleanupSwept"
 	>;
-}): { runFiles: Pick<Cleanup, "listRunFiles" | "readRunFile"> } {
+}): {
+	runFiles: Pick<Cleanup, "listRunFiles" | "readRunFile">;
+	keptWorkGone: Cleanup["keptWorkGone"];
+} {
 	const { db, log, views, runner, internals } = deps;
-	const runFiles = wireCleanup({
+	const cleanup = wireCleanup({
 		access: deps.access,
 		runs: {
 			listRuns: views.reads.listRuns,
@@ -69,5 +73,5 @@ export function wireEngineCleanup(deps: {
 			...(internals.cleanupSwept ? { swept: internals.cleanupSwept } : {}),
 		},
 	});
-	return { runFiles };
+	return { runFiles: cleanup, keptWorkGone: cleanup.keptWorkGone };
 }

@@ -92,7 +92,7 @@ export type SpacePayloads = {
 	 * (`worktreePath`, null when it stayed), local branches, or both. The
 	 * work that was only here went to the kept refs in `kept` first
 	 * (`refs/nightshift/kept/<short>/…`). `expired`: the kept refs it
-	 * deleted once the run was `cleanUpAfterDays` old. `by: "cleanup"` is
+	 * deleted once the run was `KEPT_WORK_DAYS` (30) old. `by: "cleanup"` is
 	 * the scheduled cleanup, `person` a person's action (the Branches page,
 	 * until 2026-11-12). A fact of this computer, not of the run: the event
 	 * has no run, names the run in its payload, and the exchange does not

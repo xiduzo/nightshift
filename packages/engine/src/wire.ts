@@ -431,8 +431,8 @@ export function createEngine(
 	});
 
 	// --- cleanup (phase 3): `wire-cleanup.ts` ---
-	// gives: runFiles (the Space view)
-	const { runFiles } = wireEngineCleanup({
+	// gives: runFiles (the Space view), keptWorkGone (the engine)
+	const { runFiles, keptWorkGone } = wireEngineCleanup({
 		db,
 		log: runLog,
 		git,
@@ -534,6 +534,8 @@ export function createEngine(
 		pullRequestWatch: sched.pullRequestWatch,
 		// views (R2)
 		views,
+		// cleanup
+		keptWorkGone,
 		// recovery (R7)
 		wakeLeaseSleeps: recovery.wakeLeaseSleeps,
 		wakeOfflineSleeps: recovery.wakeOfflineSleeps,

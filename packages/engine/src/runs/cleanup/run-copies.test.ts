@@ -25,8 +25,8 @@ import { createEngine } from "../../wire";
 
 /**
  * What runs leave in the clone, through the engine: the scheduled cleanup a
- * day after a run ends, the work it keeps out of sight until
- * `cleanUpAfterDays`, and the copy a rerun or a resume makes again.
+ * day after a run ends, the work it keeps out of sight for 30 days
+ * (`KEPT_WORK_DAYS`), and the copy a rerun or a resume makes again.
  */
 
 const DAY_MS = 24 * 60 * 60_000;
@@ -296,14 +296,15 @@ describe("the scheduled cleanup", () => {
 		]);
 	}, 60_000);
 
-	test("the kept work goes cleanUpAfterDays after the run ended", async () => {
+	test("the kept work goes 30 days after the run ended, whatever the days of run folders", async () => {
 		const engine = startDaemon();
 		const project = await engine.addProject({ repoPath: sandbox.repoPath });
 		const run = await runCommand(engine, project.id, COMMIT);
 
-		await sweptLater(30);
+		const settings = { ...defaultRunSettings(), cleanUpAfterDays: 90 };
+		await sweptLater(29, settings);
 		expect(await keptRefs()).toHaveLength(2);
-		await sweptLater(91);
+		await sweptLater(31, settings);
 		expect(await keptRefs()).toEqual([]);
 		const expired = (await removals()).find((e) => e.payload.expired);
 		expect(expired?.payload).toMatchObject({
@@ -400,6 +401,23 @@ describe("a run whose copy went", () => {
 		expect(await workCommits(run.branch)).toBe(2);
 		expect(JSON.stringify(again)).toContain(
 			"Night Shift made it again from the run's branch on the remote.",
+		);
+	}, 60_000);
+
+	test("a rerun after the kept work went says so, and does not start again from nothing", async () => {
+		const engine = startDaemon();
+		const project = await engine.addProject({ repoPath: sandbox.repoPath });
+		const run = await runCommand(engine, project.id, COMMIT);
+		await sweptLater(2);
+		const later = await sweptLater(31);
+		expect(await keptRefs()).toEqual([]);
+
+		await later.act(run.id, { kind: "rerun", nodeId: "work" });
+		const again = await ended(later, run.id);
+		expect(again.status).toBe("failed");
+		expect(existsSync(run.worktreePath)).toBe(false);
+		expect(JSON.stringify(again)).toContain(
+			"could not make the run's copy of the project again. The work of this run is gone. Night Shift keeps it for 30 days after the run ends. Start a new run to do the work again.",
 		);
 	}, 60_000);
 

@@ -57,6 +57,7 @@ export type CleanupProjects = {
  */
 export type CleanupGround = {
 	now(): number;
+	/** `cleanUpAfterDays` counts for run folders. Kept work goes after `KEPT_WORK_DAYS`. */
 	settings(): { cleanUpRuns: boolean; cleanUpAfterDays: number };
 };
 
@@ -120,8 +121,14 @@ export type RunFolderFiles = {
 export type RemovalLog = {
 	/** Logs one removal, its fields in their order. */
 	removed(removal: WorktreeRemoved): Promise<void>;
-	/** The project's removals on this computer, oldest first. */
-	removals(
-		projectId: string,
-	): Promise<{ at: number; runId: string; by: "person" | "cleanup" }[]>;
+	/** The project's removals on this computer, oldest first: whether each kept work, or freed it. */
+	removals(projectId: string): Promise<
+		{
+			at: number;
+			runId: string;
+			by: "person" | "cleanup";
+			kept: boolean;
+			expired: boolean;
+		}[]
+	>;
 };

@@ -5,8 +5,8 @@
  *
  * A run's copy of the project and its local branches go a day after the
  * run ended (`RUN_COPY_DAYS`). Work that is only on this computer stays
- * first, out of sight (`workToKeep`), until `cleanUpAfterDays` after the
- * run ended. A worktree git does not know is never removed: only git
+ * first, out of sight (`workToKeep`), until `KEPT_WORK_DAYS` after the
+ * run ended (`kept-work.ts`). A worktree git does not know is never removed: only git
  * removes a worktree, and git would not.
  */
 

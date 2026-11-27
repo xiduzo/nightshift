@@ -1022,6 +1022,7 @@ describe("a hand-off of a branch the run made", () => {
 			repoPath: b,
 			shortId,
 			baseRef: await mustGit(b, ["rev-parse", "HEAD"]),
+			workGone: null,
 		});
 		expect((await listKept(b)).get(shortId)).toEqual(noted);
 		for (const ref of noted) await deleteRef(b, ref);

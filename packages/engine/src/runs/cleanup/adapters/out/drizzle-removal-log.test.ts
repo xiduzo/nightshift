@@ -27,7 +27,7 @@ describe("RemovalLog over drizzle", () => {
 		expect(await under.removalLog.removals("p1")).toEqual([]);
 	});
 
-	test("gives the project's removals oldest first, each with its run and who removed it", async () => {
+	test("gives the project's removals oldest first, each with its run and who removed it, and whether it kept or freed work", async () => {
 		const { removalLog } = under;
 		await removalLog.removed({
 			projectId: "p1",
@@ -53,9 +53,16 @@ describe("RemovalLog over drizzle", () => {
 			by: "person",
 		});
 		const removals = await removalLog.removals("p1");
-		expect(removals.map(({ runId, by }) => ({ runId, by }))).toEqual([
-			{ runId: "run-1", by: "cleanup" },
-			{ runId: "run-3", by: "person" },
+		expect(
+			removals.map(({ runId, by, kept, expired }) => ({
+				runId,
+				by,
+				kept,
+				expired,
+			})),
+		).toEqual([
+			{ runId: "run-1", by: "cleanup", kept: true, expired: false },
+			{ runId: "run-3", by: "person", kept: false, expired: true },
 		]);
 		for (const removal of removals) {
 			expect(typeof removal.at).toBe("number");

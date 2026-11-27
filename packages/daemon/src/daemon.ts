@@ -339,6 +339,8 @@ async function makeDaemon(
 	});
 	const { harnesses, decider, local } = wireLocalDevice({
 		computerAccess,
+		// The engine (made below, before a run can ask).
+		keptWorkGone: (run) => engine.keptWorkGone(run),
 		id: device.id,
 		name: device.name,
 		config,

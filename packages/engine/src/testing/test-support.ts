@@ -38,6 +38,8 @@ import { wireSetup } from "../projects";
 import { clonePathOf } from "../projects/keep/adapters/out/drizzle-project-store";
 import type { RunDetail } from "../read/views";
 import { createRunFolders } from "../run-folders/run-folders";
+import { drizzleRemovals } from "../runs/cleanup/adapters/out/drizzle-removal-log";
+import { keptWorkGone } from "../runs/cleanup/application/kept-work-gone";
 import type { SpaceEngine } from "../space-engine";
 import { aloneDirectory, ownDevice } from "./alone-directory";
 import { alonePeers } from "./alone-peers";
@@ -134,6 +136,10 @@ export function withDevice(options: TestEngineOptions): EngineOptions {
 				which,
 				// The Clones of the database's own Device, as the daemon wires it.
 				clonePath: clonePath ?? clonePathOf(engine.db, directory.selfId),
+				// A run whose kept work the cleanup freed, as on the daemon.
+				keptWorkGone: keptWorkGone({
+					removalLog: drizzleRemovals(engine.db),
+				}),
 				// The runs' own folders in the engine's data folder, as on the daemon.
 				runFolders: runFolders ?? createRunFolders(engine.dataDir),
 				git,

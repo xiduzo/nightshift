@@ -258,12 +258,12 @@ An End node can read the report from a file that a step wrote, such as `report.m
 Night Shift removes old runs for you. **Clean up old runs** in **Settings** turns this on or off. It is on by default.
 
 - A day after a run ends, Night Shift removes the copy of your project for that run, and its branches on this computer.
-- Work that is saved nowhere else stays hidden first. That is changes that are not committed, and commits that are not on the remote or in your main branch. Your list of branches does not show it. **Clean up after** sets how long it stays, 90 days by default. Then it goes too.
+- Work that is saved nowhere else stays hidden first. That is changes that are not committed, and commits that are not on the remote or in your main branch. Your list of branches does not show it. Night Shift keeps this work for 30 days after the run ends. Then it goes too.
 - Work that you merged counts as saved, also with a squash merge or a rebase merge.
 - Branches on the remote stay. Night Shift does not delete or push them.
 - A run that runs, waits at a Gate, or sleeps keeps all of it.
 
-To get the work of a run back, resume it or run it again from a step. When the copy is gone, **Resume** and **Run again from here** make it again first. The run page tells you where the work comes from. That is the branch of the run, the work that Night Shift kept, or the branch on the remote. Without any of them, the copy starts where the run started.
+To get the work of a run back, resume it or run it again from a step. When the copy is gone, **Resume** and **Run again from here** make it again first. The run page tells you where the work comes from. That is the branch of the run, the work that Night Shift kept, or the branch on the remote. Without any of them, the copy starts where the run started. When the 30 days of kept work are over, the step fails and tells you that the work is gone. Start a new run to do the work again.
 
 ### Branches and the remote
 

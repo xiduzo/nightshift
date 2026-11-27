@@ -2,11 +2,26 @@ import type { Database } from "@nightshift/db";
 import { type RunLog, worktreeRemovals } from "../../../../log";
 import type { RemovalLog } from "../../application/ports";
 
+/** The read of `RemovalLog`: the log's own query of a project's removals (`worktreeRemovals`). */
+export function drizzleRemovals(db: Database): Pick<RemovalLog, "removals"> {
+	return {
+		async removals(projectId) {
+			const removals = await worktreeRemovals(db, projectId);
+			return removals.map((removal) => ({
+				at: removal.at,
+				runId: removal.payload.runId,
+				by: removal.payload.by,
+				kept: (removal.payload.kept?.length ?? 0) > 0,
+				expired: (removal.payload.expired?.length ?? 0) > 0,
+			}));
+		},
+	};
+}
+
 /**
  * `RemovalLog` over the event log: a removal is appended through the run
  * log as `WorktreeRemoved`, a fact of this computer with no run. The read
- * is the log's own query of a project's removals (`worktreeRemovals`).
- * `wireCleanup` builds it.
+ * is `drizzleRemovals`. `wireCleanup` builds it.
  */
 export function drizzleRemovalLog(deps: {
 	db: Database;
@@ -16,13 +31,6 @@ export function drizzleRemovalLog(deps: {
 		async removed(removal) {
 			await deps.log.append({ type: "WorktreeRemoved", payload: removal });
 		},
-		async removals(projectId) {
-			const removals = await worktreeRemovals(deps.db, projectId);
-			return removals.map((removal) => ({
-				at: removal.at,
-				runId: removal.payload.runId,
-				by: removal.payload.by,
-			}));
-		},
+		...drizzleRemovals(deps.db),
 	};
 }
