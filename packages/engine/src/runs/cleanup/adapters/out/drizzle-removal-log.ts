@@ -13,6 +13,7 @@ export function drizzleRemovals(db: Database): Pick<RemovalLog, "removals"> {
 				by: removal.payload.by,
 				kept: (removal.payload.kept?.length ?? 0) > 0,
 				expired: (removal.payload.expired?.length ?? 0) > 0,
+				copy: removal.payload.worktreePath !== null,
 			}));
 		},
 	};

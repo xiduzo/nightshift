@@ -64,14 +64,20 @@ describe("keptWorkFate", () => {
 });
 
 describe("keptWorkGone", () => {
-	const kept = { kept: true, expired: false };
-	const freed = { kept: false, expired: true };
-	const copyOnly = { kept: false, expired: false };
+	const kept = { kept: true, expired: false, copy: true };
+	const freed = { kept: false, expired: true, copy: false };
+	const copyOnly = { kept: false, expired: false, copy: true };
+	const branchesOnly = { kept: false, expired: false, copy: false };
 	test.each([
 		["no removal", [], false],
 		["kept", [kept], false],
 		["kept, then freed", [kept, freed], true],
-		["freed, then a removal that kept nothing", [kept, freed, copyOnly], true],
+		[
+			"freed, then a copy made again and removed with nothing to keep",
+			[kept, freed, copyOnly],
+			false,
+		],
+		["freed, then only branches removed", [kept, freed, branchesOnly], true],
 		["freed, then kept again", [kept, freed, kept], false],
 	] as const)("%s", (_, removals, gone) => {
 		expect(keptWorkGone(removals)).toBe(gone);

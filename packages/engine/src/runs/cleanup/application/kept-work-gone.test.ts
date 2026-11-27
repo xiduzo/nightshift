@@ -36,4 +36,27 @@ describe("keptWorkGone", () => {
 		expect(await gone({ id: "other-run", projectId: "project-1" })).toBeNull();
 		expect(await gone({ id: "freed-run", projectId: "project-2" })).toBeNull();
 	});
+
+	test("has none once a copy made again from elsewhere was removed after the work went", async () => {
+		const ports = await cleanupPorts();
+		const run = { id: "back-run", projectId: "project-1" };
+		await ports.removalLog.removed({
+			...removal,
+			runId: run.id,
+			kept: ["refs/nightshift/kept/back-run/copy"],
+		});
+		await ports.removalLog.removed({
+			...removal,
+			runId: run.id,
+			expired: ["refs/nightshift/kept/back-run/copy"],
+		});
+		expect(await keptWorkGone(ports)(run)).toBe(KEPT_WORK_GONE);
+		// A rerun made the copy from origin, and its work was merged: nothing to keep.
+		await ports.removalLog.removed({
+			...removal,
+			runId: run.id,
+			worktreePath: "/work/app.nightshift/back-run",
+		});
+		expect(await keptWorkGone(ports)(run)).toBeNull();
+	});
 });

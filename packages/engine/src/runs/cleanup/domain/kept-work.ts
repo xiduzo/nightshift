@@ -41,14 +41,23 @@ export function keptWorkFate(facts: KeptWorkFacts): "free" | "keep" {
 }
 
 /** One `WorktreeRemoved` of a run, as far as its kept work goes. */
-export type KeptWorkRemoval = { kept: boolean; expired: boolean };
+export type KeptWorkRemoval = {
+	kept: boolean;
+	expired: boolean;
+	/** It removed a copy of the run here (`worktreePath`). */
+	copy: boolean;
+};
 
 /**
  * Whether the work the cleanup kept of a run is gone: of the run's
- * removals, oldest first, the last that kept or freed work freed it.
+ * removals, oldest first, the last that kept work, freed it or removed a
+ * copy freed it. A copy removed after the work went was made again from
+ * somewhere else (the run's branch, origin): the run has its work again.
  */
 export function keptWorkGone(removals: readonly KeptWorkRemoval[]): boolean {
-	const last = removals.findLast((removal) => removal.kept || removal.expired);
+	const last = removals.findLast(
+		(removal) => removal.kept || removal.expired || removal.copy,
+	);
 	return last?.expired ?? false;
 }
 

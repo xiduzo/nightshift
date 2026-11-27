@@ -54,15 +54,28 @@ describe("RemovalLog over drizzle", () => {
 		});
 		const removals = await removalLog.removals("p1");
 		expect(
-			removals.map(({ runId, by, kept, expired }) => ({
+			removals.map(({ runId, by, kept, expired, copy }) => ({
 				runId,
 				by,
 				kept,
 				expired,
+				copy,
 			})),
 		).toEqual([
-			{ runId: "run-1", by: "cleanup", kept: true, expired: false },
-			{ runId: "run-3", by: "person", kept: false, expired: true },
+			{
+				runId: "run-1",
+				by: "cleanup",
+				kept: true,
+				expired: false,
+				copy: true,
+			},
+			{
+				runId: "run-3",
+				by: "person",
+				kept: false,
+				expired: true,
+				copy: false,
+			},
 		]);
 		for (const removal of removals) {
 			expect(typeof removal.at).toBe("number");

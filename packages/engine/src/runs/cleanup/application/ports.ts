@@ -121,7 +121,7 @@ export type RunFolderFiles = {
 export type RemovalLog = {
 	/** Logs one removal, its fields in their order. */
 	removed(removal: WorktreeRemoved): Promise<void>;
-	/** The project's removals on this computer, oldest first: whether each kept work, or freed it. */
+	/** The project's removals on this computer, oldest first: whether each kept work, freed it or removed a copy. */
 	removals(projectId: string): Promise<
 		{
 			at: number;
@@ -129,6 +129,8 @@ export type RemovalLog = {
 			by: "person" | "cleanup";
 			kept: boolean;
 			expired: boolean;
+			/** It removed a copy of the run (`worktreePath`). */
+			copy: boolean;
 		}[]
 	>;
 };
