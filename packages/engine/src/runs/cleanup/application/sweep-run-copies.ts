@@ -64,7 +64,7 @@ const shortIdOf = (runId: string) => runId.slice(0, 8);
  *
  * One round: in every project with a clone here, the copy and branches of
  * each run that ended a day ago, then the kept work of each run that ended
- * `KEPT_WORK_DAYS` ago. One line logs how many runs' kept work went.
+ * `KEPT_WORK_DAYS` ago. One line logs how many runs' kept work went, when any did.
  * Idempotent: a run with nothing left is skipped. An error in one project
  * or run is logged and skipped.
  */
@@ -284,8 +284,10 @@ export const sweepRunCopies =
 			}
 		}
 		const freed = result.expired.length;
-		console.log(
-			`[cleanup] freed the kept work of ${freed} run${freed === 1 ? "" : "s"} (${KEPT_WORK_DAYS} days after each ended)`,
-		);
+		if (freed > 0) {
+			console.log(
+				`[cleanup] freed the kept work of ${freed} run${freed === 1 ? "" : "s"} (${KEPT_WORK_DAYS} days after each ended)`,
+			);
+		}
 		return result;
 	};

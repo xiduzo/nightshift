@@ -175,7 +175,14 @@ describe("sweepRunCopies", () => {
 			"c2",
 		);
 		ports.branches.done.length = 0;
-		expect((await sweep()).expired).toEqual([]);
+		const log = spyOn(console, "log").mockImplementation(() => {});
+		try {
+			expect((await sweep()).expired).toEqual([]);
+			// A pass that frees nothing stays quiet.
+			expect(log).not.toHaveBeenCalled();
+		} finally {
+			log.mockRestore();
+		}
 		ports.ground.at = 32 * DAY_MS;
 		expect((await sweep()).expired).toEqual([gone]);
 		expect(ports.branches.done).toEqual([`delete-ref ${refs.copy}`]);
