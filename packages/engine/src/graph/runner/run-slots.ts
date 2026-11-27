@@ -55,13 +55,23 @@ export type RunnerState = {
 	queues: Map<string, Promise<void>>;
 	/** The Turns that began and have not ended, for `release`. */
 	inFlight: Set<Promise<void>>;
-	/** Turns a full run cap holds, by run id, in order: what each runs when a slot frees (I10). */
-	capQueue: Map<string, () => void>;
+	/**
+	 * Turns a full run cap holds, by run id, in order: what each runs when a
+	 * slot frees (I10). Per run, one Turn of each kind (`capKey`): a later
+	 * Turn of the same kind replaces the earlier one, so it retries once,
+	 * and no Turn of another kind (a timer) pushes out an answer.
+	 */
+	capQueue: Map<string, Map<string, () => void>>;
 	/** The runs whose Turn the current async context is in (I11). */
 	turnOf: AsyncLocalStorage<ReadonlySet<string>>;
 	/** Set once by `release` (I7). */
 	released: boolean;
 };
+
+/** What a Turn waits in the cap queue as: its kind, and an answer by its Gate's step. */
+function capKey(intent: Intent): string {
+	return intent.kind === "answer" ? `answer:${intent.stepId}` : intent.kind;
+}
 
 /** The state of a new runner: no run walks, nothing is queued. */
 export function createRunnerState(): RunnerState {
@@ -197,8 +207,9 @@ export function createTurnQueue(
 		const runCap = shared.settings().maxConcurrentRuns;
 		if (slots.size >= runCap) {
 			if (options.whenFull === "queue") {
-				capQueue.set(
-					runId,
+				const queued = capQueue.get(runId) ?? new Map<string, () => void>();
+				queued.set(
+					capKey(intent),
 					options.retry ??
 						(() => {
 							take(runId, intent, options).catch((error) => {
@@ -206,6 +217,7 @@ export function createTurnQueue(
 							});
 						}),
 				);
+				capQueue.set(runId, queued);
 				return false;
 			}
 			throw new Refusal(
@@ -221,7 +233,9 @@ export function createTurnQueue(
 	function slotFreed(runId: string): void {
 		bus.publish(runId, { kind: "status-changed" });
 		if (state.released) return;
-		const retries = [...capQueue.values()];
+		const retries = [...capQueue.values()].flatMap((queued) => [
+			...queued.values(),
+		]);
 		capQueue.clear();
 		for (const retry of retries) outside(retry);
 	}

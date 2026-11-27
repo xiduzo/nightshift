@@ -376,7 +376,25 @@ export function createRunner(deps: RunnerDeps) {
 					...(via ? { via } : {}),
 					queued: true,
 				},
-				{ whenFull: "queue" },
+				{
+					whenFull: "queue",
+					// Once a slot frees, the answer goes on if it still waits.
+					retry: () => {
+						log
+							.state(runId)
+							.then((now) => {
+								const still = now.steps.get(step.id);
+								if (still?.endedAt !== null || !still.gate?.queued) return;
+								passOnQueued(runId, {
+									...now,
+									steps: new Map([[step.id, still]]),
+								});
+							})
+							.catch((error) => {
+								console.error(`[engine] could not read run ${runId}`, error);
+							});
+					},
+				},
 			);
 		}
 	}

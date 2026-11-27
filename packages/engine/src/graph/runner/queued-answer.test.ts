@@ -349,3 +349,83 @@ test("a deadline that left the Gate to an answer counts again once that answer d
 	});
 	expect((await stepOf(h, "keep"))?.outcome).toBe("drop");
 });
+
+test("on a full run cap, a timer of the same run does not push out an answer that waits for a slot", async () => {
+	const clock = { now: T0 };
+	let cap = 4;
+	const h = await startRun(
+		sandbox,
+		flowOf(
+			[
+				command("start", "true"),
+				gate(),
+				{
+					id: "nap",
+					type: "wait",
+					position: at,
+					until: { kind: "duration", minutes: 100 },
+				},
+				{ id: "joined", type: "join", position: at, wait: "all" },
+			],
+			[
+				edge("1", "start", "pass", "keep"),
+				edge("2", "start", "pass", "nap"),
+				edge("3", "keep", "keep", "joined"),
+				edge("4", "nap", "done", "joined"),
+			],
+		),
+		{ now: () => clock.now },
+	);
+	const runner = testRunner(h, {
+		overdueSweepMs: 3_600_000,
+		shared: {
+			now: () => clock.now,
+			settings: () => ({ ...defaultRunSettings(), maxConcurrentRuns: cap }),
+		},
+	});
+	runners.push(runner);
+	await start(runner, h.runId);
+	await waitFor(async () => {
+		const run = await stateOf(h);
+		return (
+			!runner.isActive(h.runId) &&
+			run.gates.length === 1 &&
+			run.waits.length === 1
+		);
+	});
+	// Another run holds the one slot for a while.
+	cap = 1;
+	const other = (
+		await startRun(sandbox, flowOf([command("x", "sleep 1")]), {
+			now: () => clock.now,
+		})
+	).runId;
+	await start(runner, other);
+	// An answer waits (as a new daemon finds it), and its Turn waits for a slot.
+	const stepId = (await stateOf(h)).gate?.stepId as string;
+	await h.log.append({
+		type: "AnswerQueued",
+		runId: h.runId,
+		stepId,
+		payload: { choice: "keep", note: "Mine." },
+	});
+	runner.restore(h.runId, await stateOf(h));
+	await Bun.sleep(200);
+	// The sleep is due: its timer waits for a slot too.
+	clock.now = T0 + 100 * MINUTE;
+	expect(
+		await runner.take(
+			h.runId,
+			{ kind: "wake", early: false },
+			{ whenFull: "queue" },
+		),
+	).toEqual({ kind: "queued" });
+	await waitFor(async () => (await stepOf(h, "keep"))?.endedAt != null, {
+		timeoutMs: 10_000,
+		label: "the answer to reach the Gate once a slot frees",
+	});
+	expect((await stepOf(h, "keep"))?.outputs).toMatchObject({
+		outcome: "keep",
+		note: "Mine.",
+	});
+});
