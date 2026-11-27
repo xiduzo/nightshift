@@ -165,9 +165,13 @@ describe("maySend", () => {
 		);
 	});
 
-	test("not for a Gate you may only read, that someone answered, or while another branch works", () => {
+	test("not for a Gate you may only read, or that someone answered", () => {
 		expect(maySend({ ...open, canAnswer: false }, ship)).toBe(false);
 		expect(maySend({ ...open, answerPending: true }, ship)).toBe(false);
-		expect(maySend({ ...open, branchesWork: true }, ship)).toBe(false);
+	});
+
+	test("while another branch of the run works: the Gate takes it when that step ends", () => {
+		const busy = { ...open, branchesWork: true };
+		expect(maySend(busy, ship)).toBe(true);
 	});
 });

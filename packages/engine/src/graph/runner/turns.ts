@@ -1,4 +1,3 @@
-import { branchPlaces } from "@nightshift/flows";
 import type { RunRow, RunState } from "../../log";
 import { deriveSteps } from "../../read";
 import {
@@ -29,10 +28,6 @@ import {
 } from "./wake";
 
 const DRIVING: Taken = { kind: "driving" };
-/** An answer to a Gate on one branch while another branch's step still runs. */
-const BRANCHES_WORK =
-	"Another branch of this run is still working. Answer the Gate when its step ends.";
-
 /** A resume of a sleeping run whose walk is not where the sleep is. */
 const CANNOT_WAKE =
 	"Night Shift could not wake this run. Stop the run, then resume it.";
@@ -94,9 +89,8 @@ export function createTurns(
 
 	/**
 	 * An answer: the thread continues at once, so it needs a slot. A full
-	 * cap leaves the Gate open. A Gate on one of parallel branches opens
-	 * while the other branches still work: the answer waits until they end.
-	 * Where the answer goes is `planAnswer`'s: this Turn reads the thread and
+	 * cap leaves the Gate open. An answer that comes while a drive holds the
+	 * run waits for its next hold (`take`). Where the answer goes is `planAnswer`'s: this Turn reads the thread and
 	 * the log, and does what the plan says.
 	 */
 	async function answerTurn(
@@ -104,10 +98,6 @@ export function createTurns(
 		intent: Extract<Intent, { kind: "answer" }>,
 		options: TakeOptions,
 	): Promise<Taken> {
-		const flow = walkOf(row.id)?.thread?.ctx.flow;
-		if (flow && branchPlaces(flow).size > 0) {
-			throw new RunRefusal("not-now", BRANCHES_WORK);
-		}
 		const snapshot = await threadOf(row).snapshot();
 		const runState = await log.state(row.id);
 		const plan = planAnswer(snapshot, runState, intent, {
@@ -116,7 +106,11 @@ export function createTurns(
 		if (plan.kind !== "pre-drive") return answerBy(row, intent, options, plan);
 		if (!reserve(row.id, intent, options)) return QUEUED;
 		drive(row, inputOf({ kind: "continue" }));
-		await walkOf(row.id)?.done;
+		// The drive goes only as far as the Gate's interrupt: it parks at
+		// its first hold, and the answer's drive takes the branches on.
+		const pre = walkOf(row.id);
+		if (pre) pre.yielding = true;
+		await pre?.done;
 		const after = await threadOf(row).snapshot();
 		return answerBy(
 			row,
@@ -361,6 +355,24 @@ export function createTurns(
 		return HALTED;
 	}
 
+	/**
+	 * Drives on a run whose drive parked for a Turn that then moved nothing
+	 * (`Walk.yielding`): a task beside its interrupts ended, so a drive that
+	 * goes on holds them (`driveGraph`) and the branches walk on.
+	 */
+	async function goOnTurn(row: RunRow, runState: RunState): Promise<Taken> {
+		if (slots.has(row.id)) return UNCHANGED;
+		if (runState.status !== "waiting" && runState.status !== "sleeping") {
+			return UNCHANGED;
+		}
+		const { state: at, endedTasks, answered } = await threadOf(row).snapshot();
+		if (at.kind !== "interrupted") return UNCHANGED;
+		if (endedTasks.length === 0 && answered.length === 0) return UNCHANGED;
+		if (!reserve(row.id, { kind: "go-on" }, {})) return QUEUED;
+		drive(row, inputOf({ kind: "continue" }));
+		return DRIVING;
+	}
+
 	/** One Turn: the row and the walker (I9), the log, the caller's check, then the intent. */
 	async function turnFor(
 		runId: string,
@@ -371,8 +383,13 @@ export function createTurns(
 		if (intent.kind === "start") return startTurn(runId, intent);
 		const row = await log.row(runId);
 		if (!(await log.walkedHere(row))) {
-			// The sweep and startup recovery look at runs; they refuse nothing.
-			if (intent.kind === "overdue" || intent.kind === "prune") {
+			// The sweep, startup recovery and a drive that goes on look at
+			// runs; they refuse nothing.
+			if (
+				intent.kind === "overdue" ||
+				intent.kind === "prune" ||
+				intent.kind === "go-on"
+			) {
 				return UNCHANGED;
 			}
 			throw new RunRefusal("walked-elsewhere", WALKED_ELSEWHERE);
@@ -380,7 +397,11 @@ export function createTurns(
 		// A drive holds a run that arrived. One without a drive may still
 		// arrive: it has no Checkpoint here yet (I12).
 		if (!slots.has(runId) && (await arriving(runId))) {
-			if (intent.kind === "overdue" || intent.kind === "prune") {
+			if (
+				intent.kind === "overdue" ||
+				intent.kind === "prune" ||
+				intent.kind === "go-on"
+			) {
 				return UNCHANGED;
 			}
 			throw new RunRefusal("arriving", ARRIVING);
@@ -436,6 +457,8 @@ export function createTurns(
 				return stopTurn(row, intent, turn);
 			case "overdue":
 				return overdueTurn(row, runState, intent.graceMs, turn);
+			case "go-on":
+				return goOnTurn(row, runState);
 		}
 	}
 

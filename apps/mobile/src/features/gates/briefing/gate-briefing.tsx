@@ -286,7 +286,7 @@ export function GateBriefing({
 								<NativeTextRow
 									icon={{ sf: "hourglass", lucide: Loader }}
 									text="**The run is still busy**"
-									note="Another branch of this run still works. You can sign off when its step ends."
+									note="Another branch of this run still works. The Gate takes your answer when its step ends."
 								/>
 							</NativeSection>
 						) : null}

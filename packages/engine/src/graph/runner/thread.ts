@@ -139,7 +139,12 @@ export type Thread = {
 	 */
 	drive(
 		input: StreamInput,
-		options: { controller: AbortController; onEvent?(event: RunEvent): void },
+		options: {
+			controller: AbortController;
+			onEvent?(event: RunEvent): void;
+			/** True when a Turn waits for the run: the drive parks at its next hold. */
+			shouldYield?(): boolean;
+		},
 	): Promise<DriveOutcome>;
 	/** Where the thread is, from its latest checkpoint. */
 	state(): Promise<ThreadState>;
@@ -210,6 +215,7 @@ export function openThread(row: RunRow, deps: ThreadDeps): Thread {
 			return driveGraph(graph, runId, input, {
 				fence,
 				...(options.onEvent ? { onEvent: options.onEvent } : {}),
+				...(options.shouldYield ? { shouldYield: options.shouldYield } : {}),
 			});
 		},
 		state: async () => (await snapshot()).state,
@@ -276,14 +282,22 @@ export const HOLD: ResumeValue = { kind: "hold" };
  * branches beside it go on. It holds again while a round moves a branch.
  * A Call whose body waits ends no task, so a hold cannot move the
  * branches beside the Call: the round moves nothing, and the drive parks.
+ * A Turn that waits for the run (`shouldYield`) parks the drive at the
+ * next hold instead: one round is one step of the branches that go on, so
+ * an answer or a wake waits for that step only.
  */
 export async function driveGraph(
 	graph: RunGraph,
 	runId: string,
 	input: StreamInput,
-	options: { fence: Fence; onEvent?(event: RunEvent): void },
+	options: {
+		fence: Fence;
+		onEvent?(event: RunEvent): void;
+		/** A Turn waits for the run: park at the next hold instead (`Walk.yielding`). */
+		shouldYield?(): boolean;
+	},
 ): Promise<DriveOutcome> {
-	const { fence, onEvent } = options;
+	const { fence, onEvent, shouldYield } = options;
 	try {
 		let next = input;
 		for (let holding = false; ; holding = true) {
@@ -301,7 +315,12 @@ export async function driveGraph(
 					latest.tasks.some(
 						(task) => task.result !== undefined && held.length > 0,
 					);
-				if (parked || !blocked || (holding && !round.moved)) {
+				if (
+					parked ||
+					!blocked ||
+					(holding && !round.moved) ||
+					shouldYield?.()
+				) {
 					return { kind: "parked", parked: last, interrupts };
 				}
 				next = new Command({

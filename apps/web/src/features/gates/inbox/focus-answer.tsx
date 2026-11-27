@@ -140,7 +140,6 @@ export function FocusAnswer({
 					deadline={gate.deadline}
 					runTitle={gate.runTitle}
 					filesHere={gate.walker.thisDevice}
-					held={held}
 				/>
 			</AnswerSection>
 		);
@@ -287,7 +286,7 @@ function AnswerSection({
 	);
 }
 
-/** Another branch of the run still works: you can pick and write, the send waits. */
+/** Another branch of the run still works: your answer goes now, and the Gate takes it when that step ends. */
 function BusyNotice({ held }: { held: boolean }) {
 	if (!held) return null;
 	return (
@@ -295,7 +294,7 @@ function BusyNotice({ held }: { held: boolean }) {
 			<LoaderIcon />
 			<AlertTitle>The run is still busy</AlertTitle>
 			<AlertDescription>
-				Another branch of this run still works. You can send your answer when
+				Another branch of this run still works. The Gate takes your answer when
 				its step ends.
 			</AlertDescription>
 		</Alert>

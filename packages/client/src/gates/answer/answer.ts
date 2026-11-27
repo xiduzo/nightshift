@@ -10,21 +10,18 @@ export type GateAnswer = ApiInputs["gates"]["resolve"];
 export type AnswerDraft = { choice: string | null; note: string };
 
 /**
- * Your answer may go now: you may answer the Gate, no other branch of its
- * run still works, you picked one of its choices, and you wrote the note
- * that choice needs. An Ask checks its form with `askAnswerOf`.
+ * Your answer may go now: you may answer the Gate, you picked one of its
+ * choices, and you wrote the note that choice needs. While another branch
+ * of its run works, the answer goes too: the Gate takes it when the step
+ * of that branch ends. An Ask checks its form with `askAnswerOf`.
  */
 export function maySend(
-	gate: Pick<
-		OpenGate,
-		"canAnswer" | "answerPending" | "branchesWork" | "choices"
-	>,
+	gate: Pick<OpenGate, "canAnswer" | "answerPending" | "choices">,
 	draft: AnswerDraft,
 ): boolean {
 	const chosen = gate.choices.find((choice) => choice.name === draft.choice);
 	return (
 		mayAnswer(gate) &&
-		!gate.branchesWork &&
 		chosen !== undefined &&
 		(!chosen.needsNote || draft.note.trim() !== "")
 	);

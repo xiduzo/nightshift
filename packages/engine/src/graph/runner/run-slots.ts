@@ -26,6 +26,11 @@ export type Walk = {
 	done: Promise<void>;
 	/** The thread the drive streams; null until the drive compiled it. */
 	thread: Thread | null;
+	/**
+	 * A Turn waits for the run: the drive parks at its next hold instead of
+	 * holding again (`driveGraph`), so the Turn can answer or wake there.
+	 */
+	yielding: boolean;
 };
 
 /** "starting": reserved by the Turn that holds it, before its drive began (I3). */

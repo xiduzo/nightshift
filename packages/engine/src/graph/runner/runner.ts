@@ -1,3 +1,4 @@
+import { Refusal } from "@nightshift/refusal";
 import { type RunState, runsArriving } from "../../log";
 import { ARRIVING, RunRefusal, WALKED_ELSEWHERE } from "../../run-status";
 import { createDrives } from "./drive";
@@ -218,13 +219,56 @@ export function createRunner(deps: RunnerDeps) {
 		const walk = walkOf(runId);
 		if (
 			walk &&
-			(intent.kind === "wake" ||
+			(intent.kind === "answer" ||
+				intent.kind === "wake" ||
 				(intent.kind === "resume" &&
 					(await log.state(runId)).status === "sleeping"))
 		) {
+			// The drive parks at its next hold, after the step that runs on
+			// each branch now, and the Turn comes then. An answer does not
+			// wait for that step: it is queued.
+			if (intent.kind === "answer") {
+				// The caller's check refuses now what its Turn would refuse: a
+				// Gate that closed, a choice it does not have.
+				options.check?.(await log.state(runId));
+				walk.yielding = true;
+				void walk.done.then(() =>
+					outside(() =>
+						afterYield(runId, intent, options).catch((error) => {
+							if (error instanceof Refusal) return;
+							console.error(`[engine] could not answer run ${runId}`, error);
+						}),
+					),
+				);
+				return { kind: "queued" };
+			}
+			walk.yielding = true;
 			await walk.done;
+			return afterYield(runId, intent, options);
 		}
 		return inTurn(runId, (turn) => turnFor(runId, intent, options, turn));
+	}
+
+	/**
+	 * The Turn a drive parked for (`Walk.yielding`). When it moved nothing
+	 * (a refusal, a wake too soon), the drive goes on, so the branches
+	 * beside the interrupts do not stop there.
+	 */
+	async function afterYield(
+		runId: string,
+		intent: Intent,
+		options: TakeOptions,
+	): Promise<Taken> {
+		try {
+			return await take(runId, intent, options);
+		} finally {
+			outside(() => {
+				take(runId, { kind: "go-on" }).catch((error) => {
+					if (error instanceof Refusal) return;
+					console.error(`[engine] could not drive run ${runId} on`, error);
+				});
+			});
+		}
 	}
 
 	/**

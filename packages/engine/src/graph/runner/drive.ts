@@ -93,6 +93,7 @@ export function createDrives(
 			controller: new AbortController(),
 			done: Promise.resolve(),
 			thread: null,
+			yielding: false,
 		};
 		slots.set(runId, walk);
 		bus.publish(runId, { kind: "status-changed" });
@@ -123,6 +124,7 @@ export function createDrives(
 			const outcome = await thread.drive(input, {
 				controller: walk.controller,
 				onEvent: (event) => onCustom(runId, event),
+				shouldYield: () => walk.yielding,
 			});
 			// The run waits or sleeps: its timer comes from the log, the first
 			// of its sleeps and its Gates' deadlines (`nextTimer`).

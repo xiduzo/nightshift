@@ -505,7 +505,7 @@ describe("a Gate on a branch", () => {
 		}
 	});
 
-	test("the other branch's step ends first; an answer while it runs is refused; then the answer goes on to the Join", async () => {
+	test("an answer while the other branch's step runs is queued: the Gate takes it when that step ends, and the run goes on to the Join", async () => {
 		const h = await startRun(
 			sandbox,
 			fanOut([
@@ -534,25 +534,18 @@ describe("a Gate on a branch", () => {
 				async () => foldRun(await h.events()).gate ?? false,
 				{ label: "the Gate to open" },
 			);
-			if (runner.isActive(h.runId)) {
-				await expect(
-					runner.take(h.runId, {
-						kind: "answer",
-						stepId: gate.stepId,
-						choice: "pass",
-						note: "",
-					}),
-				).rejects.toThrow("Another branch of this run is still working");
-			}
-			await settle(runner, h, "waiting");
-			await runner.take(h.runId, {
-				kind: "answer",
-				stepId: gate.stepId,
-				choice: "pass",
-				note: "",
-			});
+			expect(runner.isActive(h.runId)).toBe(true);
+			expect(
+				await runner.take(h.runId, {
+					kind: "answer",
+					stepId: gate.stepId,
+					choice: "pass",
+					note: "",
+				}),
+			).toEqual({ kind: "queued" });
 			await settle(runner, h, "finished");
 			expect(await ended(h)).toContainEqual(["joined", "done"]);
+			expect(await ended(h)).toContainEqual(["ask", "pass"]);
 		} finally {
 			await runner.release();
 		}

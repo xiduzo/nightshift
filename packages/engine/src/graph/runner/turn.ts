@@ -81,7 +81,13 @@ export type Intent =
 	 * Drops the checkpoint history of a run that ended without a drive here
 	 * (startup recovery: the daemon died), as a drive's end drops it.
 	 */
-	| { kind: "prune" };
+	| { kind: "prune" }
+	/**
+	 * Drives on a run whose drive stopped between two holds for another
+	 * Turn (`Walk.yielding`), when that Turn moved nothing: the branches
+	 * beside its interrupts go on.
+	 */
+	| { kind: "go-on" };
 
 /** What a Turn did. */
 export type Taken =
@@ -89,7 +95,10 @@ export type Taken =
 	| { kind: "driving" }
 	/** A stop or an overdue step ended the run's open work. */
 	| { kind: "halted" }
-	/** The run cap is full and the caller asked to queue: the Turn comes again when a slot frees. */
+	/**
+	 * The Turn comes again later: the run cap is full and the caller asked
+	 * to queue, or an answer waits for the drive to reach its next hold.
+	 */
 	| { kind: "queued" }
 	/** Nothing to do: the run no longer sleeps, is not going, or its step is within its limits. */
 	| { kind: "unchanged" };
