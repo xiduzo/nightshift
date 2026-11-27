@@ -85,7 +85,11 @@ describe("runTrace", () => {
 			.at(1110)
 			.push("StepEnded", ended("pass"), { stepId: "s1" })
 			.at(1200)
-			.push("RunEnded", { status: "finished", reason: null });
+			.push("RunEnded", {
+				status: "finished",
+				reason: null,
+				endReason: "finished",
+			});
 
 		const trace = runTrace(foldRun(events));
 		expect(trace).not.toBeNull();
@@ -250,7 +254,11 @@ describe("runTrace", () => {
 			.at(1100)
 			.push("StepEnded", ended("stopped"), { stepId: "g" })
 			.at(1101)
-			.push("RunEnded", { status: "stopped", reason: "Stopped" })
+			.push("RunEnded", {
+				status: "stopped",
+				reason: "Stopped",
+				endReason: "stopped_by_person",
+			})
 			.at(2000)
 			.push("RunResumed", { nodeId: "ask", stepId: null, prompt: null })
 			.at(2001)
@@ -258,7 +266,11 @@ describe("runTrace", () => {
 			.at(2500)
 			.push("StepEnded", ended("yes"), { stepId: "g" })
 			.at(2600)
-			.push("RunEnded", { status: "finished", reason: null });
+			.push("RunEnded", {
+				status: "finished",
+				reason: null,
+				endReason: "finished",
+			});
 
 		const trace = runTrace(foldRun(events));
 		expect(

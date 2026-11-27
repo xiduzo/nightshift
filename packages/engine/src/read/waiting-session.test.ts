@@ -42,6 +42,7 @@ const ended = (
 	log.push("RunEnded", {
 		status,
 		reason,
+		endReason: status === "finished" ? "finished" : "_OTHER",
 		...(node !== undefined ? { node } : {}),
 	});
 const NO_EDGE = 'Node "a" ended with "fail" and no edge leaves it.';

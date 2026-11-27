@@ -59,7 +59,7 @@ export type TracedRunEnd = {
 	at: number;
 	status: string;
 	reason: string | null;
-	endReason?: string | null;
+	endReason: string;
 	first: boolean;
 	neededYou: boolean;
 };

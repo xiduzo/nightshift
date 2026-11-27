@@ -50,7 +50,11 @@ function inStep(nodeType: FlowNodeType) {
 export const endedIn = (nodeType: FlowNodeType): RunState =>
 	inStep(nodeType)
 		.stepEnded("s1", "stopped")
-		.push("RunEnded", { status: "stopped", reason: null })
+		.push("RunEnded", {
+			status: "stopped",
+			reason: null,
+			endReason: "stopped_by_person",
+		})
 		.state();
 /** The state of a run that sleeps in a step of `nodeType`. */
 export const asleep = (nodeType: FlowNodeType): RunState =>

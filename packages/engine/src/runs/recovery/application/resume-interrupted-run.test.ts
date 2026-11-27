@@ -25,10 +25,11 @@ const started = {
 
 /** A run that recovery ended interrupted. */
 const interrupted = () =>
-	eventsOf(RUN_ID)
-		.push("RunStarted", started)
-		.push("RunEnded", { status: "interrupted", reason: "Night Shift stopped." })
-		.events;
+	eventsOf(RUN_ID).push("RunStarted", started).push("RunEnded", {
+		status: "interrupted",
+		reason: "Night Shift stopped.",
+		endReason: "_OTHER",
+	}).events;
 
 let warned: unknown[][] = [];
 let failed: unknown[][] = [];
@@ -113,6 +114,7 @@ describe("resumeInterruptedRun", () => {
 			.push("RunEnded", {
 				status: "interrupted",
 				reason: "Night Shift stopped.",
+				endReason: "_OTHER",
 			})
 			.push("RunResumed", {
 				nodeId: "a",

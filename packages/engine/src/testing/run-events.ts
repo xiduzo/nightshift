@@ -4,6 +4,7 @@ import {
 	type EnginePayloads,
 	foldRun,
 	type LoggedEvent,
+	type RunEndReason,
 	type RunState,
 	type Scope,
 	type SessionOutcome,
@@ -190,11 +191,23 @@ export function runEvents(runId = "run-1") {
 				outcome: "pass",
 				...(scope ? { scope } : {}),
 			}),
+		/** The code is `finished`, `stopped_by_person` or `_OTHER` by its status, unless a test gives one. */
 		ended: (
 			status: EnginePayloads["RunEnded"]["status"],
 			reason: string | null = null,
 			result?: EnginePayloads["RunEnded"]["result"],
-		) => push("RunEnded", { status, reason, ...(result ? { result } : {}) }),
+			endReason: RunEndReason = status === "finished"
+				? "finished"
+				: status === "stopped"
+					? "stopped_by_person"
+					: "_OTHER",
+		) =>
+			push("RunEnded", {
+				status,
+				reason,
+				endReason,
+				...(result ? { result } : {}),
+			}),
 	};
 	return builder;
 }

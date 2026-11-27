@@ -82,7 +82,7 @@ describe("landedFacts", () => {
 	test("a run's end carries its status and seq", () => {
 		const event = landed(
 			"RunEnded",
-			{ status: "failed", reason: "boom" },
+			{ status: "failed", reason: "boom", endReason: "_OTHER" },
 			null,
 		);
 		expect(landedFacts([event])).toEqual([

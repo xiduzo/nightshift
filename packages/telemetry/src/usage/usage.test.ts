@@ -67,6 +67,7 @@ function trace(): RunTrace {
 				at: 65_000,
 				status: "finished",
 				reason: `see ${SECRET_EMAIL} at ${SECRET_PATH}`,
+				endReason: "finished",
 				first: true,
 				neededYou: false,
 			},

@@ -9,7 +9,6 @@ import type {
 	RunState,
 	SleepFact,
 } from "./run-state";
-import { unrecordedEndReason } from "./unrecorded-end-reason";
 
 /**
  * The fold of the run state (`run-state.ts`): one event at a time. It
@@ -339,16 +338,14 @@ function applyRunEvent(
 	run.latest = { seq: e.seq, at: e.at };
 	run.waits = [];
 	if (e.type === "RunEnded") {
-		const { status, reason, result } = e.payload;
+		const { status, reason, result, endReason } = e.payload;
 		run.end = {
 			seq: e.seq,
 			at: e.at,
 			status,
 			reason,
 			result: result ?? null,
-			endReason:
-				e.payload.endReason ??
-				unrecordedEndReason({ status, reason, result: result ?? null }),
+			endReason,
 		};
 		run.ends.push({ ...logged(e), openedAt: run.walk?.at ?? e.at });
 		// An ended run holds nothing: the engine let go of it.

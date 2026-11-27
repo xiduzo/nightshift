@@ -396,7 +396,7 @@ describe("RunViews over the database and the run log", () => {
 		await under.append({
 			type: "RunEnded",
 			runId: "r2",
-			payload: { status: "finished", reason: null },
+			payload: { status: "finished", reason: null, endReason: "finished" },
 		});
 		const counts = await views.projectRuns(under.spaceId);
 		expect(counts.get("p")).toMatchObject({
@@ -437,7 +437,7 @@ describe("RunViews over the database and the run log", () => {
 		await under.append({
 			type: "RunEnded",
 			runId: "r2",
-			payload: { status: "failed", reason: "It broke." },
+			payload: { status: "failed", reason: "It broke.", endReason: "_OTHER" },
 		});
 		const counted = (await views.projectRuns(under.spaceId)).get("p");
 		// The run list shows it: the total and the statuses count it.
@@ -567,7 +567,7 @@ describe("RunViews over the database and the run log", () => {
 		await under.append({
 			type: "RunEnded",
 			runId: "r1",
-			payload: { status: "finished", reason: null },
+			payload: { status: "finished", reason: null, endReason: "finished" },
 		});
 		under.changed("r1");
 		expect(await next()).toEqual({ kind: "status", status: "finished" });

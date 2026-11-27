@@ -172,11 +172,8 @@ export type RunPayloads = {
 		status: RunEnding;
 		/** The sentence a person reads. Null when the run finished with nothing to say. */
 		reason: string | null;
-		/**
-		 * Why it ended, as a code. Absent in logs written before the code
-		 * was stored: a reader proves one from the sentence, or `_OTHER`.
-		 */
-		endReason?: RunEndReason;
+		/** Why it ended, as a code. */
+		endReason: RunEndReason;
 		/**
 		 * The node whose step's end failed the run, also when the run's
 		 * budget parked it at that step. Absent when no step's failure ended the run (it finished,

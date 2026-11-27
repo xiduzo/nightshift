@@ -45,6 +45,7 @@ const run = (over: Partial<TracedRun> = {}): TracedRun => ({
 			at: 4_000,
 			status: "finished",
 			reason: null,
+			endReason: "finished",
 			first: true,
 			neededYou: false,
 		},

@@ -148,9 +148,11 @@ describe("recoverRuns", () => {
 		await ports.addRun("slept", slept("slept"));
 		await ports.addRun(
 			"ended",
-			eventsOf("ended")
-				.push("RunStarted", started)
-				.push("RunEnded", { status: "finished", reason: null }).events,
+			eventsOf("ended").push("RunStarted", started).push("RunEnded", {
+				status: "finished",
+				reason: null,
+				endReason: "finished",
+			}).events,
 		);
 		await ports.addRun("new", ran("new"));
 		expect(await recover()).toEqual(["new"]);
@@ -185,9 +187,11 @@ describe("recoverRuns", () => {
 		const { ports, recover } = await setup();
 		await ports.addRun(
 			"run-1",
-			eventsOf("run-1")
-				.push("RunStarted", started)
-				.push("RunEnded", { status: "finished", reason: null }).events,
+			eventsOf("run-1").push("RunStarted", started).push("RunEnded", {
+				status: "finished",
+				reason: null,
+				endReason: "finished",
+			}).events,
 		);
 		expect(await recover()).toEqual([]);
 		expect(ports.openWork.closed).toEqual([]);

@@ -5,6 +5,7 @@ import {
 	type DerivedSession,
 	type DerivedStep,
 	type RunEnding,
+	type RunEndReason,
 	type RunState,
 	type RunTrigger,
 	type StepOutcome,
@@ -48,8 +49,8 @@ export type TraceRunEnd = {
 	at: number;
 	status: RunEnding;
 	reason: string | null;
-	/** The stored code. Absent on a trace a caller built by hand. */
-	endReason?: string | null;
+	/** Why it ended, as its code. */
+	endReason: RunEndReason;
 	/** The run's first end. A resumed run ends again. */
 	first: boolean;
 	/** A person stepped in by this end: answered a Gate or an Ask, resumed, stopped, or took the run over. */
@@ -179,7 +180,7 @@ export function runTrace(run: RunState): RunTrace | null {
 			at: end.at,
 			status: end.payload.status,
 			reason: end.payload.reason,
-			endReason: end.payload.endReason ?? null,
+			endReason: end.payload.endReason,
 			first: i === 0,
 			neededYou: neededYou.some((act) => act.at <= end.at),
 		})),

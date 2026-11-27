@@ -26,21 +26,6 @@ function whole(value: number): number {
 	return Math.max(0, Math.round(value));
 }
 
-function endReason(end: {
-	status: string;
-	reason: string | null;
-	endReason?: string | null;
-}): string {
-	if (end.endReason) {
-		const exact = known(RUN, "run.end_reason", end.endReason);
-		if (exact) return exact;
-	}
-	if ((end.reason === null || end.reason === "") && end.status === "finished") {
-		return known(RUN, "run.end_reason", "finished") ?? "_OTHER";
-	}
-	return "_OTHER";
-}
-
 function nodeKinds(trace: RunTrace): string[] {
 	const kinds: string[] = [];
 	for (const step of trace.steps) {
@@ -84,7 +69,7 @@ export function runEndedEvent(
 		"flow.id": hashId(key, `${trace.projectId ?? ""}\n${trace.flowName ?? ""}`),
 		"run.cost_usd": runCost(trace),
 		"run.duration": secondsOf(end.at - end.openedAt),
-		"run.end_reason": endReason(end),
+		"run.end_reason": listed(RUN, "run.end_reason", end.endReason, "_OTHER"),
 		"run.needed_you": end.neededYou,
 		"run.node_kinds": nodeKinds(trace),
 		"run.status": status,

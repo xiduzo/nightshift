@@ -53,7 +53,7 @@ const started = (nodeId: string) =>
 	});
 
 const ended = (status: EnginePayloads["RunEnded"]["status"]) =>
-	logged("RunEnded", { status, reason: null });
+	logged("RunEnded", { status, reason: null, endReason: "_OTHER" });
 
 /** A run that started the services `db` and `web`, stopped `db`, then ended. */
 function runState(status: EnginePayloads["RunEnded"]["status"]): RunState {

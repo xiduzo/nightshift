@@ -120,7 +120,7 @@ const started = (runId: string): EventInput<"RunStarted"> => ({
 const ended = (runId: string): EventInput<"RunEnded"> => ({
 	type: "RunEnded",
 	runId,
-	payload: { status: "finished", reason: null },
+	payload: { status: "finished", reason: null, endReason: "finished" },
 });
 const edge = (runId: string, n: number): EventInput<"EdgeTaken"> => ({
 	type: "EdgeTaken",

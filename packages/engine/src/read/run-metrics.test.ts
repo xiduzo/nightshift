@@ -162,7 +162,11 @@ describe("stepMetrics", () => {
 			.at(20)
 			.gateOpened("s1")
 			.at(70)
-			.push("RunEnded", { status: "stopped", reason: null });
+			.push("RunEnded", {
+				status: "stopped",
+				reason: null,
+				endReason: "stopped_by_person",
+			});
 		const [step] = deriveSteps(l.state());
 		if (!step) throw new Error("no step");
 		expect(stepMetrics(step).gateWaitMs).toBe(50);
