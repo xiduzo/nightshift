@@ -291,83 +291,52 @@ function ownPorts(path: string, useCase: FunctionNode): string[] {
 	return [...found].sort();
 }
 
-/** What breaks a rule of ADR 41: the rule, as the debt list names it, and the file. */
-export type Offence = {
-	rule:
-		| "forward"
-		| "actor"
-		| "request"
-		| "empty-test"
-		| "database"
-		| "port"
-		| "suite"
-		| "twin";
-	file: string;
-	message: string;
-};
-
 /** What breaks "a use case decides" in the `application/` of one slice. */
-export function decisionOffences(root: string, slice: Slice): Offence[] {
+export function decisionOffences(root: string, slice: Slice): string[] {
 	const rel = (path: string) => relative(root, path).split(sep).join("/");
-	const offences: Offence[] = [];
+	const offences: string[] = [];
 	for (const { path, name, fn } of useCasesOf(slice)) {
 		const file = rel(path);
 		if (isForward(fn))
-			offences.push({
-				rule: "forward",
-				file,
-				message: `${file}: passes its request to one port call and decides nothing. The wire.ts of the slice gives that call.`,
-			});
+			offences.push(
+				`${file}: passes its request to one port call and decides nothing. The wire.ts of the slice gives that call.`,
+			);
 		for (const actor of unreadActors(path))
-			offences.push({
-				rule: "actor",
-				file,
-				message: `${file}: takes the actor (${actor}) and does not read it. Ask who may act, or take no actor.`,
-			});
+			offences.push(
+				`${file}: takes the actor (${actor}) and does not read it. Ask who may act, or take no actor.`,
+			);
 		if (requestHasActor(path, fn))
-			offences.push({
-				rule: "request",
-				file,
-				message: `${file}: has the actor in its request. The actor is an argument of its own, before the request (P3).`,
-			});
+			offences.push(
+				`${file}: has the actor in its request. The actor is an argument of its own, before the request (P3).`,
+			);
 		for (const port of ownPorts(path, fn))
-			offences.push({
-				rule: "port",
-				file,
-				message: `${file}: declares the port ${port}. A port sits in application/ports.ts, with its adapters.`,
-			});
+			offences.push(
+				`${file}: declares the port ${port}. A port sits in application/ports.ts, with its adapters.`,
+			);
 		const test = path.replace(/\.ts$/, ".test.ts");
 		if (existsSync(test) && !assertsOutcome(test, name))
-			offences.push({
-				rule: "empty-test",
-				file: rel(test),
-				message: `${rel(test)}: asserts no outcome of ${name}. Expect what it returns, refuses or changes.`,
-			});
+			offences.push(
+				`${rel(test)}: asserts no outcome of ${name}. Expect what it returns, refuses or changes.`,
+			);
 		if (existsSync(test) && namesDatabase(test))
-			offences.push({
-				rule: "database",
-				file: rel(test),
-				message: `${rel(test)}: names the database. A use-case test reaches it only through a port: give the rows a function of test-support.ts.`,
-			});
+			offences.push(
+				`${rel(test)}: names the database. A use-case test reaches it only through a port: give the rows a function of test-support.ts.`,
+			);
 	}
 	const out = join(slice.dir, "adapters", "out");
 	for (const name of existsSync(out) ? readdirSync(out).sort() : []) {
 		const path = join(out, name);
 		const file = rel(path);
 		if (name.endsWith(".contract.ts") && !assertsOutcome(path))
-			offences.push({
-				rule: "suite",
-				file,
-				message: `${file}: a contract suite without an expect() proves nothing. Expect what the port gives.`,
-			});
+			offences.push(
+				`${file}: a contract suite without an expect() proves nothing. Expect what the port gives.`,
+			);
 		if (!/^in-memory-.*(?<!\.test)\.ts$/.test(name)) continue;
 		for (const target of valueImports(path))
 			if (isRealAdapter(target))
-				offences.push({
-					rule: "twin",
-					file,
-					message: `${file}: takes code of a real adapter (${rel(target)}). The contract suite then runs that code twice. Move a value that both need to domain/.`,
-				});
+				offences.push(
+					`${file}: takes code of a real adapter (${rel(target)}). The contract suite then runs that code twice. Move a value that both need to domain/.`,
+				);
 	}
 	return offences;
 }

@@ -23,19 +23,15 @@ const OUT = `${SLICE}/adapters/out`;
 const USE_CASE = `${APP}/list-schedules.ts`;
 const TEST = `${APP}/list-schedules.test.ts`;
 
-/** The problems of the repository with `files`, and with `useCaseDebt`. */
-const check = (files: Files, useCaseDebt = "") =>
-	checkFiles({ ...repository, ...files }, roots, { useCaseDebt });
+/** The problems of the repository with `files`. */
+const check = (files: Files) => checkFiles({ ...repository, ...files }, roots);
 
 /** The problems of a use case `listSchedules` with these lines. */
-const ofUseCase = (lines: string[], useCaseDebt?: string) =>
-	check(
-		{
-			[USE_CASE]: lines,
-			[TEST]: asserting("list-schedules", "listSchedules"),
-		},
-		useCaseDebt,
-	);
+const ofUseCase = (lines: string[]) =>
+	check({
+		[USE_CASE]: lines,
+		[TEST]: asserting("list-schedules", "listSchedules"),
+	});
 
 const FORWARD = `${USE_CASE}: passes its request to one port call and decides nothing. The wire.ts of the slice gives that call.`;
 
@@ -168,14 +164,11 @@ describe("the actor is no field of the request", () => {
 
 describe("a use-case test asserts an outcome", () => {
 	const lines = ["export const listSchedules = (ports: any) => [ports];"];
-	const ofTest = (text: string, debt?: string) =>
-		check(
-			{
-				[USE_CASE]: lines,
-				[TEST]: `import { listSchedules } from "./list-schedules";\n${text}\n`,
-			},
-			debt,
-		);
+	const ofTest = (text: string) =>
+		check({
+			[USE_CASE]: lines,
+			[TEST]: `import { listSchedules } from "./list-schedules";\n${text}\n`,
+		});
 	const message = `${TEST}: asserts no outcome of listSchedules. Expect what it returns, refuses or changes.`;
 	for (const text of [
 		"",
@@ -194,14 +187,6 @@ describe("a use-case test asserts an outcome", () => {
 				'expect(typeof listSchedules).toBe("function");\nexpect(listSchedules({})).toEqual([{}]);',
 			),
 		).toEqual([]);
-	});
-
-	test("the list names it, until it asserts", async () => {
-		const debt = `empty-test ${TEST}\n`;
-		expect(await ofTest("", debt)).toEqual([]);
-		expect(await ofTest("expect(listSchedules({}));", debt)).toEqual([
-			`scripts/use-case-debt.txt: empty-test ${TEST} breaks no rule. Remove it.`,
-		]);
 	});
 });
 
@@ -259,18 +244,15 @@ describe("a contract suite asserts, and a twin takes no code of a real adapter",
 		expect(await suite("expect(make().save({} as never));")).toEqual([]);
 	});
 
-	const twin = (line: string, debt = "") =>
-		check(
-			{
-				[`${OUT}/rows.ts`]: "export const rows = [];\nexport type Row = 1;\n",
-				[TWIN]: [
-					'import type { ScheduleStore } from "../../application/ports";',
-					line,
-					"export const inMemoryScheduleStore = (): ScheduleStore => ({ save: async () => {} });",
-				],
-			},
-			debt,
-		);
+	const twin = (line: string) =>
+		check({
+			[`${OUT}/rows.ts`]: "export const rows = [];\nexport type Row = 1;\n",
+			[TWIN]: [
+				'import type { ScheduleStore } from "../../application/ports";',
+				line,
+				"export const inMemoryScheduleStore = (): ScheduleStore => ({ save: async () => {} });",
+			],
+		});
 
 	test("a value fails, a type passes", async () => {
 		const problems = [
@@ -283,14 +265,6 @@ describe("a contract suite asserts, and a twin takes no code of a real adapter",
 		expect(await twin('import * as all from "./rows";')).toEqual(problems);
 		expect(await twin('import type { Row } from "./rows";')).toEqual([]);
 		expect(await twin('import { type Row } from "./rows";')).toEqual([]);
-	});
-
-	test("the list names it, until it takes no code", async () => {
-		const debt = `twin ${TWIN}\n`;
-		expect(await twin('import { rows } from "./rows";', debt)).toEqual([]);
-		expect(await twin("", debt)).toEqual([
-			`scripts/use-case-debt.txt: twin ${TWIN} breaks no rule. Remove it.`,
-		]);
 	});
 });
 
@@ -374,43 +348,5 @@ describe("a twin has a reader (H7)", () => {
 				],
 			}),
 		).toEqual([]);
-	});
-});
-
-describe("the list of the use cases", () => {
-	const lines = [
-		"export const listSchedules = (ports: any) => (id: any) => ports.find(id);",
-	];
-
-	test("a listed forward passes", async () => {
-		expect(await ofUseCase(lines, `# why\nforward ${USE_CASE}\n`)).toEqual([]);
-	});
-
-	test("a line of a file that breaks no rule, twice, or of another rule fails", async () => {
-		expect(
-			await ofUseCase(
-				lines,
-				[
-					`forward ${USE_CASE}`,
-					`forward ${USE_CASE}`,
-					`forward ${APP}/gone.ts`,
-					`actor ${USE_CASE}`,
-				].join("\n"),
-			),
-		).toEqual([
-			`scripts/use-case-debt.txt: forward ${USE_CASE} is listed twice.`,
-			`scripts/use-case-debt.txt: forward ${APP}/gone.ts breaks no rule. Remove it.`,
-			`scripts/use-case-debt.txt: actor ${USE_CASE} is not <forward, empty-test or twin> <file>. Remove it.`,
-		]);
-	});
-
-	test("an actor that is not read has no list", async () => {
-		const problems = await ofUseCase(
-			[
-				"export const listSchedules = (ports: any) => (_actor: any) => [ports];",
-			],
-			`actor ${USE_CASE}\n`,
-		);
-		expect(problems).toHaveLength(2);
 	});
 });

@@ -921,21 +921,14 @@ describe("the command", () => {
 			join(import.meta.dir, "hexagon-debt.txt"),
 			"utf8",
 		);
-		const useCaseDebt = readFileSync(
-			join(import.meta.dir, "use-case-debt.txt"),
-			"utf8",
-		);
 		const mechanisms = mechanismsOf();
-		expect(await checkRings(root, { mechanisms, debt, useCaseDebt })).toEqual(
-			[],
-		);
+		expect(await checkRings(root, { mechanisms, debt })).toEqual([]);
 		const listed = debt
 			.split("\n")
 			.some((line) => line.trim() !== "" && !line.trim().startsWith("#"));
 		const withoutDebt = await checkRings(root, {
 			mechanisms,
 			debt: "",
-			useCaseDebt,
 		});
 		// With a non-empty debt list, clearing it must surface the debtors.
 		// With none left, empty debt is the green state.

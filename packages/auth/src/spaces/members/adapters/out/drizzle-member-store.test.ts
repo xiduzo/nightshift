@@ -107,8 +107,18 @@ describe("MemberStore over drizzle", () => {
 			id: "m-1",
 			role: "admin",
 		});
+		await under.memberStore.add({
+			id: "m-3",
+			spaceId: "platform",
+			personId: "ada",
+			role: "member",
+		});
 		await under.memberStore.remove(["platform", "nowhere"], "bo");
 		expect(await under.memberStore.membershipOf("platform", "bo")).toBeNull();
+		expect(await under.memberStore.membershipOf("platform", "ada")).toEqual({
+			id: "m-3",
+			role: "member",
+		});
 		expect(await under.memberStore.membershipOf("other", "bo")).toEqual({
 			id: "m-2",
 			role: "member",

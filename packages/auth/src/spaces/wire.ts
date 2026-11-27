@@ -1,7 +1,6 @@
 import type { Database } from "@nightshift/db";
 import { drizzleSpaceStore } from "./adapters/out/drizzle-space-store";
 import { findActiveSpace } from "./application/find-active-space";
-import { mirrorHostSpace } from "./application/mirror-host-space";
 import type { SpaceStore } from "./application/ports";
 import { type Members, wireMembers } from "./members";
 import { type Personal, wirePersonal } from "./personal";
@@ -44,8 +43,11 @@ export type Spaces = {
 	hasSpace: (request: { spaceId: string }) => Promise<boolean>;
 	/** The id of every Space on this Replica. */
 	listSpaceIds: () => Promise<string[]>;
-	/** Keeps a Space that a Host lists as this Replica's copy. */
-	mirrorHostSpace: ReturnType<typeof mirrorHostSpace>;
+	/**
+	 * Keeps a Space that a Host lists as this Replica's copy: makes its row
+	 * (slug `host-<id>`), or gives the row the Host's name.
+	 */
+	mirrorHostSpace: SpaceStore["mirror"];
 };
 
 export function wireSpaces(deps: SpacesDeps): Spaces {
@@ -67,6 +69,6 @@ export function wireSpaces(deps: SpacesDeps): Spaces {
 		findActiveSpace: findActiveSpace(ports),
 		hasSpace: ({ spaceId }) => ports.spaceStore.exists(spaceId),
 		listSpaceIds: () => ports.spaceStore.ids(),
-		mirrorHostSpace: mirrorHostSpace(ports),
+		mirrorHostSpace: (space) => ports.spaceStore.mirror(space),
 	};
 }

@@ -82,7 +82,6 @@ pre-commit:
         - ".dependency-cruiser.mjs"
         - "biome.json"
         - "scripts/hexagon-debt.txt"
-        - "scripts/use-case-debt.txt"
       run: bun run check:rings
     # The reference tables of the docs match the code.
     - name: docs reference
@@ -123,7 +122,6 @@ pre-commit:
         - "scripts/rings/**"
         - ".dependency-cruiser.mjs"
         - "scripts/hexagon-debt.txt"
-        - "scripts/use-case-debt.txt"
         - "scripts/capabilities.ts"
         - "scripts/capabilities/**"
         - "scripts/capability-debt.txt"

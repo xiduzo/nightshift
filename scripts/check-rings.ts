@@ -142,10 +142,8 @@
  * pure yet. It fails once the file is pure, and a file that is not listed
  * fails.
  *
- * `scripts/use-case-debt.txt` names the files that broke a rule of ADR 41 on
- * the day it started: `forward <file>`, `empty-test <file>` or `twin
- * <file>`. No line is added, and a line fails once its file breaks no rule.
- * The other rules of ADR 41 have no list.
+ * The rules of ADR 41 (a forward, a test without an outcome, a twin that
+ * takes code of a real adapter) have no list: each offender fails.
  *
  *   bun run check:rings          (or: bun scripts/check-rings.ts)
  *
@@ -185,8 +183,6 @@ export type Options = {
 	 * `<package>/<vertical>`. The ring rules do not cover them.
 	 */
 	mechanisms?: Iterable<string>;
-	/** The text of `scripts/use-case-debt.txt`. */
-	useCaseDebt?: string;
 };
 
 /** The globals that only `adapters/out/` uses (H4). */
@@ -250,9 +246,6 @@ export function biomeProblems(text: string): string[] {
 /** A line of the debt list for a file of a kernel: `kernel <file>`. */
 const KERNEL_LINE = /^kernel\s+(\S+)$/;
 
-/** A line of `scripts/use-case-debt.txt`: one of its rules, and a file. */
-const USE_CASE_LINE = /^(forward|empty-test|twin) (\S+)$/;
-
 /**
  * The problems of the server packages under `root` (the repository root),
  * as messages.
@@ -294,22 +287,12 @@ export async function checkRings(
 		}
 	}
 
-	const useCaseLines = debtOf(options.useCaseDebt ?? "");
-	const used = new Set<string>();
 	const twinReaders = twinReadersOf(slices.flatMap(filesOf));
 	for (const slice of slices) {
 		const key = keyOf(slice);
 		if (mechanisms.has(key)) continue;
 		const parts = withSubs(slice);
-		const offences = parts.flatMap((part) =>
-			decisionOffences(root, part).filter(({ rule, file }) => {
-				const line = `${rule} ${file}`;
-				if (!USE_CASE_LINE.test(line) || !useCaseLines.includes(line))
-					return true;
-				used.add(line);
-				return false;
-			}),
-		);
+		const offences = parts.flatMap((part) => decisionOffences(root, part));
 		const own = [
 			...shapeProblems(root, slice),
 			...parts.flatMap((part) => [
@@ -317,7 +300,7 @@ export async function checkRings(
 				...useCaseProblems(root, part),
 				...portProblems(root, part, VERTICALS, twinReaders),
 			]),
-			...offences.map((offence) => offence.message),
+			...offences,
 			...violations.filter((v) => v.vertical === key).map((v) => v.message),
 		];
 		if (!listed.includes(key)) problems.push(...own);
@@ -354,16 +337,6 @@ export async function checkRings(
 		}
 	}
 
-	for (const [index, line] of useCaseLines.entries()) {
-		if (useCaseLines.indexOf(line) !== index) {
-			problems.push(`scripts/use-case-debt.txt: ${line} is listed twice.`);
-		} else if (!used.has(line)) {
-			problems.push(
-				`scripts/use-case-debt.txt: ${line} ${USE_CASE_LINE.test(line) ? "breaks no rule" : "is not <forward, empty-test or twin> <file>"}. Remove it.`,
-			);
-		}
-	}
-
 	return problems;
 }
 
@@ -385,14 +358,10 @@ if (import.meta.main) {
 	const started = performance.now();
 	const root = join(import.meta.dir, "..");
 	const debt = readFileSync(join(import.meta.dir, "hexagon-debt.txt"), "utf8");
-	const useCaseDebt = readFileSync(
-		join(import.meta.dir, "use-case-debt.txt"),
-		"utf8",
-	);
 	const mechanisms = mechanismsOf();
 	const problems = [
 		...biomeProblems(readFileSync(join(root, "biome.json"), "utf8")),
-		...(await checkRings(root, { debt, mechanisms, useCaseDebt })),
+		...(await checkRings(root, { debt, mechanisms })),
 	];
 	if (problems.length) {
 		console.error("Ring check failed (scripts/check-rings.ts):\n");

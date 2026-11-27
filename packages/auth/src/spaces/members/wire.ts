@@ -11,8 +11,6 @@ import { isHostAdmin } from "./application/is-host-admin";
 import { listMembers } from "./application/list-members";
 import { listPersonNames } from "./application/list-person-names";
 import type { MemberStore, PersonStore } from "./application/ports";
-import { removeMemberships } from "./application/remove-memberships";
-import { setMembershipRole } from "./application/set-membership-role";
 import { viewInvitation } from "./application/view-invitation";
 
 /**
@@ -51,9 +49,15 @@ export type Members = {
 	/** Makes the Person a Member of the Space in that role. */
 	addMembership: ReturnType<typeof addMembership>;
 	/** Gives a membership another role. */
-	setMembershipRole: ReturnType<typeof setMembershipRole>;
+	setMembershipRole: (request: {
+		membershipId: string;
+		role: string;
+	}) => ReturnType<MemberStore["setRole"]>;
 	/** Ends the Person's memberships of these Spaces. */
-	removeMemberships: ReturnType<typeof removeMemberships>;
+	removeMemberships: (request: {
+		spaceIds: readonly string[];
+		personId: string;
+	}) => ReturnType<MemberStore["remove"]>;
 	/** The names of these Persons, by id. A Person this Replica does not know is missing. */
 	listPersonNames: ReturnType<typeof listPersonNames>;
 	/** The name and email of a Person, or null for one this Replica does not know. */
@@ -80,8 +84,10 @@ export function wireMembers(deps: MembersDeps): Members {
 		findMembership: ({ spaceId, personId }) =>
 			ports.memberStore.membershipOf(spaceId, personId),
 		addMembership: addMembership(ports),
-		setMembershipRole: setMembershipRole(ports),
-		removeMemberships: removeMemberships(ports),
+		setMembershipRole: ({ membershipId, role }) =>
+			ports.memberStore.setRole(membershipId, role),
+		removeMemberships: ({ spaceIds, personId }) =>
+			ports.memberStore.remove(spaceIds, personId),
 		listPersonNames: listPersonNames(ports),
 		findPersonContact: ({ personId }) => ports.personStore.contact(personId),
 	};

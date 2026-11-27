@@ -88,11 +88,6 @@ export async function membersPorts() {
 	let ids = 0;
 	return {
 		seed: drizzleMembersSeed(db),
-		/** The ids of the memberships, in order. */
-		membershipIds: async () =>
-			(await db.select({ id: member.id }).from(member).orderBy(member.id)).map(
-				(row) => row.id,
-			),
 		newId: () => `id-${++ids}`,
 		personStore: drizzlePersonStore(db),
 		invitationStore: drizzleInvitationStore(db),

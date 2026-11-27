@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { member, organization, user } from "@nightshift/db/schema";
 import { asDate } from "@nightshift/time";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { memoryDb } from "../../../testing/memory-db";
 import type { SpaceStore } from "../../application/ports";
 import { drizzleSpaceStore } from "./drizzle-space-store";
@@ -24,6 +24,14 @@ const make = async () => {
 	};
 	return {
 		spaceStore: drizzleSpaceStore(db),
+		/** The slug of the Space of that id. */
+		slugOf: async (id: string) =>
+			(
+				await db
+					.select({ slug: organization.slug })
+					.from(organization)
+					.where(eq(organization.id, id))
+			)[0]?.slug,
 		seed: {
 			person: async (id: string) => {
 				await db.insert(user).values({ id, name: id, email: `${id}@x.org` });
@@ -104,6 +112,7 @@ describe("SpaceStore over drizzle", () => {
 		await store.mirror({ id: "host", name: "Platform" });
 		expect(await store.exists("host")).toBe(true);
 		await store.mirror({ id: "host", name: "Platform 2" });
+		expect(await under.slugOf("host")).toBe("host-host");
 		await under.seed.membership({
 			spaceId: "host",
 			personId: "ada",
