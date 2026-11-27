@@ -202,6 +202,8 @@ describe("the Call node", () => {
 			outputs: { why: "broke", ended: "", outcome: "fail", visit: 1 },
 			error:
 				'Node "boom" ended with "fail" and no edge leaves it on that outcome.',
+			// The called flow's end has no code of its own: the log keeps that too.
+			endReason: "_OTHER",
 		});
 		expect(tried?.outcome).toBe("fail");
 		expect(steps.find((s) => s.nodeId === "cleanup")?.outputs.log_tail).toBe(

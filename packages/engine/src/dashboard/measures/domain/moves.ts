@@ -37,8 +37,6 @@ const SETUP_ENDS = {
 	"agent.network": "network",
 	"agent.signed_out": "signedOut",
 } as const;
-/** How a hand-off between Devices fails (`graph/step/ready-device.ts`). */
-const HANDOFF_FAILED = "could not take the run's work";
 
 const GUARD_ENDS: Record<string, MoveGuard> = {
 	"guard.budget": "budget",
@@ -82,7 +80,7 @@ function endMoves(runs: readonly RunDetailIn[]): Weighted[] {
 	for (const run of runs) {
 		const setupEnd =
 			SETUP_ENDS[run.endReason as keyof typeof SETUP_ENDS] ??
-			(run.steps.some((step) => step.error?.includes(HANDOFF_FAILED))
+			(run.steps.some((step) => step.handOffFailed !== undefined)
 				? "handoff"
 				: undefined);
 		if (setupEnd) {

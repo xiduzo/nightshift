@@ -61,8 +61,7 @@ export type StepEnd = {
 	/**
 	 * Why a park of the step ends the run, when its end knows a cause that
 	 * is not a guard: the network past its grace, or the cause of the end of
-	 * a Call's flow. Not in the log: a step whose route a daemon lost has
-	 * only its guard.
+	 * a Call's flow (`StepEnded.endReason`).
 	 */
 	endReason?: RunEndReason;
 	/** Agent steps: the harness session the step has, for a reopen. */
@@ -213,6 +212,7 @@ export function routeDone(
 		outputs: ended.outputs,
 		error: ended.error,
 		...(ended.guard ? { guard: ended.guard } : {}),
+		...(ended.endReason ? { endReason: ended.endReason } : {}),
 		...(ended.variables ? { variables: ended.variables } : {}),
 	};
 	return routeOn(ctx, state, node, end, config, extra, done.edges);

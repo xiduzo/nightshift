@@ -141,6 +141,7 @@ const runFailed = (nodeId: string, seq: number): LoggedEvent => ({
 		payload: {
 			status: "failed",
 			reason: `Node "${nodeId}" ended with "pass" and no edge leaves it on that outcome.`,
+			node: nodeId,
 		},
 	})[0] as LoggedEvent),
 	seq,

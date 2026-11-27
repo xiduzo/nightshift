@@ -2,8 +2,13 @@ import type { AgentHarnessName } from "@nightshift/agents/types";
 import type { Outcome } from "@nightshift/flows";
 import { iso } from "@nightshift/time";
 import type { RunResult, RunStatus } from "../../../run-status";
-import type { InputValues, Scope, StepOutcome, StepOutputs } from "../step";
-import type { RunEndReason } from "./end-reason";
+import type {
+	InputValues,
+	RunEndReason,
+	Scope,
+	StepOutcome,
+	StepOutputs,
+} from "../step";
 
 /**
  * The events of a run, and the words their payloads use: its start, where
@@ -172,6 +177,13 @@ export type RunPayloads = {
 		 * was stored: a reader proves one from the sentence, or `_OTHER`.
 		 */
 		endReason?: RunEndReason;
+		/**
+		 * The node whose step ended the run as failed: the node the reason
+		 * names. Absent when no step's failure ended the run (it finished,
+		 * a person or the stop time stopped it, the step cap, the engine
+		 * failed), and in logs written before it was stored: not known.
+		 */
+		node?: string;
 		result?: RunResult;
 	};
 	/**

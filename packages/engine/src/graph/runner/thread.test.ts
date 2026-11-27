@@ -223,7 +223,8 @@ describe("endingOf", () => {
 				},
 				interrupts: [],
 			},
-			{ status: "failed", reason: "boom", endReason: "_OTHER" },
+			// A step of the node failed the run: its end names the node.
+			{ status: "failed", reason: "boom", endReason: "_OTHER", node: "a" },
 		],
 		[
 			// A checkpoint parked without a code: no cause, and no throw.

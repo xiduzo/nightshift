@@ -12,6 +12,7 @@ import type {
 	GateBrief,
 	GateChoice,
 	GateDeadline,
+	HandOffFailure,
 	ResumeAction,
 	ResumedBy,
 	RunEndReason,
@@ -131,6 +132,8 @@ export type StepSummary = {
 	test?: StandIn;
 	/** A pinned step: the step of an earlier run its output comes from, and when that step ended. */
 	pinnedFrom?: { runId: string; stepId: string; endedAt: number };
+	/** The run's work could not move to the step's Device. Absent: no such end, or not known. */
+	handOffFailed?: HandOffFailure;
 };
 
 /**

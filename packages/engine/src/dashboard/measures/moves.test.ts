@@ -166,17 +166,43 @@ describe("where runs stop", () => {
 				status: "failed",
 				endReason: "agent.usage_limit",
 			}),
-			run(
-				[
-					step("spec", null, {
-						error: "host could not take the run's work from laptop.",
-					}),
-				],
-				{ status: "failed", endReason: "_OTHER" },
-			),
+			run([step("spec", "error", { handOffFailed: "receive" })], {
+				status: "failed",
+				endReason: "_OTHER",
+			}),
 		]);
 		expect(moves.map((move) => move.kind === "setup" && move.cause)).toEqual(
 			expect.arrayContaining(["usageLimit", "handoff"]),
+		);
+	});
+
+	test("a hand-off fails on either side: both count, by the fact and not by the words", () => {
+		const failed = { status: "failed", endReason: "_OTHER" } as const;
+		const moves = nextMoves([
+			// The work could not be sent: the words are not those of a take.
+			run(
+				[
+					step("spec", "error", {
+						handOffFailed: "send",
+						error:
+							"The run's work on laptop cannot move to host. It has changes that are not committed.",
+					}),
+				],
+				failed,
+			),
+			run([step("spec", "error", { handOffFailed: "receive" })], failed),
+			// The words of a failed take, with no fact: a step's own error.
+			run(
+				[
+					step("spec", "error", {
+						error: "host could not take the run's work from laptop.",
+					}),
+				],
+				failed,
+			),
+		]);
+		expect(moves).toContainEqual(
+			expect.objectContaining({ kind: "setup", cause: "handoff", runs: 2 }),
 		);
 	});
 

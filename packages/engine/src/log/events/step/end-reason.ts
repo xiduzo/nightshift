@@ -1,5 +1,3 @@
-import type { StepGuard } from "../step";
-
 /**
  * Why a run ended, as a code. The sentence a person reads stays in
  * `RunEnded.reason`. The writer that knows the cause gives the code beside
@@ -23,6 +21,9 @@ export const RUN_END_REASONS = [
 ] as const;
 
 export type RunEndReason = (typeof RUN_END_REASONS)[number];
+
+/** A guard that stopped a step. The idle guard's warning kind is `stalled`. */
+export type StepGuard = "budget" | "turns" | "looping" | "idle" | "max_steps";
 
 const GUARD_ENDS = {
 	budget: "guard.budget",

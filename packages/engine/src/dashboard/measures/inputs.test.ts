@@ -6,6 +6,7 @@ import {
 import type { FlowRevisionItem } from "../../flows";
 import type { RevisionKind } from "../../flows/store";
 import type {
+	HandOffFailure,
 	RungBy as LoggedRungBy,
 	RunScore as LoggedRunScore,
 } from "../../log";
@@ -28,6 +29,7 @@ import {
 	type RunIn,
 	type RunRung,
 	type RunScore,
+	type StepIn,
 } from "./domain/runs";
 import { type AnswerCostIn, HELP_AGENTS } from "./domain/spend-types";
 
@@ -57,6 +59,7 @@ describe("the shapes the dashboard reads", () => {
 				same<Same<RunRung, ReadRunRung>>(),
 				same<Same<RunScore, LoggedRunScore>>(),
 				same<Same<RevisionIn["kind"], RevisionKind>>(),
+				same<Same<NonNullable<StepIn["handOffFailed"]>, HandOffFailure>>(),
 				same<RunSummary extends RunIn ? true : false>(),
 				same<RunDetail extends RunDetailIn ? true : false>(),
 				same<FlowRevisionItem extends RevisionIn ? true : false>(),

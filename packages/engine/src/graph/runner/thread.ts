@@ -323,6 +323,8 @@ export function endingOf(outcome: DriveOutcome): {
 	reason: string | null;
 	result?: RunResult;
 	endReason: RunEndReason;
+	/** The node whose step ended the run as failed (`RunEnded.node`). */
+	node?: string;
 } | null {
 	switch (outcome.kind) {
 		case "ended": {
@@ -337,15 +339,19 @@ export function endingOf(outcome: DriveOutcome): {
 				endReason: failed ? "_OTHER" : "finished",
 			};
 		}
-		case "parked":
-			return outcome.parked.kind === "parked"
-				? {
-						status: outcome.parked.status,
-						reason: outcome.parked.reason,
-						// A checkpoint parked without a code has no cause to give.
-						endReason: outcome.parked.endReason ?? "_OTHER",
-					}
-				: null;
+		case "parked": {
+			const { parked } = outcome;
+			if (parked.kind !== "parked") return null;
+			// A step of the node ended, and the run fails on it: the node is the fact.
+			const failedOn = parked.status === "failed" && parked.stepId !== null;
+			return {
+				status: parked.status,
+				reason: parked.reason,
+				// A checkpoint parked without a code has no cause to give.
+				endReason: parked.endReason ?? "_OTHER",
+				...(failedOn ? { node: parked.nodeId } : {}),
+			};
+		}
 		case "fenced":
 			return null;
 	}

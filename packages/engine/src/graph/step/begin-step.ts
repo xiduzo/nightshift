@@ -475,6 +475,13 @@ export async function beginStep(
 						? { costSource: extra.costSource }
 						: {}),
 					...(written.ok && extra?.guard ? { guard: extra.guard } : {}),
+					// The cause a resume reads when it routes the step from the log.
+					...(written.ok && extra?.endReason
+						? { endReason: extra.endReason }
+						: {}),
+					...(extra?.handOffFailed
+						? { handOffFailed: extra.handOffFailed }
+						: {}),
 					// A step that ends `error` instead runs again: it saw nothing yet.
 					...(written.ok && lasting && extra?.memory
 						? { memory: extra.memory }

@@ -6,6 +6,7 @@ import type {
 	DerivedStep,
 	EnginePayloads,
 	GateChoice,
+	HandOffFailure,
 	KnowledgeUseEvent,
 	RunEndReason,
 	RunState,
@@ -185,9 +186,11 @@ export type EndExtra = {
 	guard?: StepGuard;
 	/**
 	 * Why a park of the step ends the run, when its end knows a cause that
-	 * is not a guard (`StepEnd.endReason`). Not in the log.
+	 * is not a guard (`StepEnd.endReason`): on `StepEnded` too.
 	 */
 	endReason?: RunEndReason;
+	/** The run's work could not move to the step's Device: `StepEnded.handOffFailed`. */
+	handOffFailed?: HandOffFailure;
 	/** What a Since last run step saw new or changed: saved with `StepEnded`. */
 	memory?: StepMemory;
 };
@@ -214,6 +217,8 @@ export type BodyEnd = {
 	costSource?: CostSource | null;
 	/** Agent steps: the harness session the step has, for a reopen. */
 	harnessSessionId?: string | null;
+	/** The run's work could not move to the step's Device (`readyDevice`). */
+	handOffFailed?: HandOffFailure;
 	/**
 	 * What a Since last run step saw new or changed: `StepEnded.memory`,
 	 * saved in its batch. Left out when the step ends `error` instead.

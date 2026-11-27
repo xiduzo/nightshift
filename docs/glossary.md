@@ -283,7 +283,7 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. The language of a method o
 | RunResumed | A person resumed a Run, or the daemon did after a restart (`by: "daemon"`). `action` says when it was more: `restart` (a person restarted the running Step) or `rerun` (a person ran the Run again from a Node). |
 | StepStarted | A Step began a Visit of a Node. `rung` says where the Step stands on its Node's ladder: who works or decides, the Tier it tries, and whether a try follows. A Step on no ladder has none, and neither has a Step of an older Walker. `test` says that the Step stood in for its Node in a Test run (`pinned` or `skipped`): it then names no Device and no Rung. |
 | StepReopened | A resume continued an Agent Step's Session in place. |
-| StepEnded | A Step ended with an Outcome and its Outputs. |
+| StepEnded | A Step ended with an Outcome and its Outputs. `endReason` keeps the cause that its end knows, so a resume that routes the Step from the log ends the Run with the same code. `handOffFailed` says that the Run's work could not move to the Step's Device: `send` or `receive`. An older Event has neither: the cause is not known. |
 | SessionStarted | A harness Session began for an Agent Step. |
 | HarnessSessionAssigned | The Harness reported its own session id. |
 | SessionUsage | What a running Session has spent so far, at most every 5 seconds. Only some Harnesses report it while they work. A Session that ends without a Cost keeps the last total. |
@@ -294,7 +294,7 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. The language of a method o
 | GateOpened | A Gate put its question in the Needs-you inbox. |
 | WaitStarted | A Step began a Wait: why, until when (none for a Signal with no timeout), and which Signal. |
 | WaitEnded | The Wait is over: the timer, a person, a Signal, or the daemon when a Device or a lease is back. `by` says who ended it early without a Signal. `prompt` is what that person told the Step's Session. |
-| RunEnded | The Run finished or failed, with the reason. After an End Node, also its result and its line. |
+| RunEnded | The Run finished or failed, with the reason and its code (`endReason`). After an End Node, also its result and its line. `node` names the Node whose Step failed the Run. An older Event has no `node`: no reader looks for it in the reason. |
 | RunWarned | A Warning about the Run, with the Step it is about. |
 | Scored | A Score of the Run: a Gate's answer, a person's useful answer, a pull request's fate, or a name a Command, Agent or Value Node wrote, on its Step after its StepEnded. |
 | KnowledgeSearched | An agent searched the project's Knowledge (`search_knowledge`): the query and the files it got back. On its Step, or with no Run through the nightshift MCP server. |

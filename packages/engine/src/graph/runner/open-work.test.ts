@@ -180,9 +180,10 @@ const runEnded = (
 	endReason: RunEndReason = status === "stopped"
 		? "stopped_by_person"
 		: "_OTHER",
+	node?: string,
 ): ClosingEvent => ({
 	type: "RunEnded",
-	payload: { status, reason, endReason },
+	payload: { status, reason, endReason, ...(node ? { node } : {}) },
 });
 
 describe("closingEvents: a stop", () => {
@@ -303,7 +304,8 @@ describe("closingEvents: a missed deadline", () => {
 			}),
 			stepEnded("w", { visit: 1 }, "error", cut.error),
 			stepEnded("c", { ended: "", visit: 1 }, "error", reason),
-			runEnded("failed", reason),
+			// The run's end names the overdue step's node: no reader finds it in the reason.
+			runEnded("failed", reason, "_OTHER", "w"),
 		]);
 	});
 
@@ -332,7 +334,7 @@ describe("closingEvents: a missed deadline", () => {
 				stepId: "w",
 				payload: { kind: "stalled", message: cut.error },
 			},
-			runEnded("failed", reason, "guard.idle"),
+			runEnded("failed", reason, "guard.idle", "w"),
 		]);
 	});
 });

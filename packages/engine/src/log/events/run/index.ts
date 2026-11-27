@@ -1,10 +1,5 @@
-/** The events of a run, the words their payloads use, and why a run ended, as a code. */
+/** The events of a run, and the words their payloads use. */
 
-export {
-	guardEndReason,
-	RUN_END_REASONS,
-	type RunEndReason,
-} from "./end-reason";
 export {
 	type GateVia,
 	type PinnedOutput,

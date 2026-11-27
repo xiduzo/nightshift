@@ -194,7 +194,14 @@ export function toStepSummary(
 		sources: stepSources(derived.knowledge),
 		...(derived.test ? { test: derived.test } : {}),
 		...(derived.pinnedFrom ? { pinnedFrom: derived.pinnedFrom } : {}),
+		...handOffOf(derived),
 	};
+}
+
+/** The Hand-off that failed the step's latest end, when one did. */
+function handOffOf(derived: DerivedStep) {
+	const failed = derived.openings.at(-1)?.end?.payload.handOffFailed;
+	return failed ? { handOffFailed: failed } : {};
 }
 
 /** A step with the prompt of each session and the element of each item: what a person opens. */

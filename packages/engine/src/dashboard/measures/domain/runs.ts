@@ -130,6 +130,8 @@ export type StepIn = {
 	scope: { parentStepId: string; itemId: string | null } | null;
 	costUsd: number;
 	gate: { openedAt: number; deadline: unknown } | null;
+	/** The run's work could not move to the step's Device: it could not be sent, or not be taken. */
+	handOffFailed?: "send" | "receive";
 };
 
 /** One revision of a flow, as its changes read it (`flows/store/`). */

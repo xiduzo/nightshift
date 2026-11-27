@@ -13,7 +13,7 @@ import type {
 	Policy,
 } from "@nightshift/flows";
 import { now } from "@nightshift/time";
-import { foldRun, type RunEndReason } from "../../log";
+import { type EnginePayloads, foldRun, type RunEndReason } from "../../log";
 import { getRunRow } from "../../log/run-row/run-row";
 import { parseCalledFlows, parseRunFlow } from "../../read";
 import {
@@ -313,6 +313,49 @@ describe("each cause gives its code", () => {
 	}
 });
 
+describe("the node whose step failed the run", () => {
+	async function nodeOf(flow: Flow, options: StartOptions = {}) {
+		const h = await startRun(sandbox, flow, options);
+		const driven = await drive(h, { inputs: {}, stopAt: null });
+		return endingOf(driven.outcome)?.node;
+	}
+
+	test("a step that failed, with no edge on its end: its node", async () => {
+		expect(await nodeOf(flowOf([command("look", "exit 3")]))).toBe("look");
+	});
+
+	test("the words of the reason do not matter: a failed Agent names its node", async () => {
+		const harness = fakeHarness(failingScript('Node "other" failed: boom'));
+		expect(await nodeOf(flowOf([agent("worker")]), { harness })).toBe("worker");
+	});
+
+	test("a Call whose flow failed: the Call's node", async () => {
+		const { flow, flows } = wrapped(
+			"call",
+			flowOf([command("look", "exit 3")]),
+		);
+		expect(await nodeOf(flow, { flows })).toBe("call");
+	});
+
+	test("no step failed: a finished run, a failed End, a stop or the step cap names none", async () => {
+		expect(await nodeOf(flowOf([end("done", "done")]))).toBeUndefined();
+		expect(await nodeOf(flowOf([end("broke", "failed")]))).toBeUndefined();
+		expect(
+			await nodeOf(flowOf([command("a", "true")]), {
+				signal: AbortSignal.abort(),
+			}),
+		).toBeUndefined();
+		const capped = withPolicy(
+			flowOf(
+				[command("a", "true"), command("b", "true")],
+				[edge("e1", "a", "pass", "b")],
+			),
+			{ maxSteps: 1 },
+		);
+		expect(await nodeOf(capped)).toBeUndefined();
+	});
+});
+
 describe("a stop between the elements of a Call with each", () => {
 	/**
 	 * A loop over two elements whose body is one Command. Right after the
@@ -415,14 +458,28 @@ describe("a step whose route the daemon lost", () => {
 	 * before the commit after it. Recovery closes the run, and a resume
 	 * routes the step from the log. Gives the run's log.
 	 */
-	async function afterLostCommit(flow: Flow, harness: StartOptions["harness"]) {
-		const h = await startRun(sandbox, flow, { harness });
+	async function afterLostCommit(
+		flow: Flow,
+		harness: StartOptions["harness"],
+		options: {
+			flows?: StartOptions["flows"];
+			/** The `StepEnded` after which the daemon dies. Default: the first. */
+			diesAfter?: (ended: EnginePayloads["StepEnded"]) => boolean;
+		} = {},
+	) {
+		const h = await startRun(sandbox, flow, {
+			harness,
+			...(options.flows ? { flows: options.flows } : {}),
+		});
 		let ended = false;
 		let dead = false;
-		/** Every write after `StepEnded` fails: the daemon died before the commit. */
-		const point = (write: string) => {
+		/** Every write after that `StepEnded` fails: the daemon died before the commit. */
+		const point = (write: string, payload?: unknown) => {
 			if (dead) throw new Error("the daemon died");
-			if (write === "StepEnded") {
+			if (
+				write === "StepEnded" &&
+				(options.diesAfter?.(payload as EnginePayloads["StepEnded"]) ?? true)
+			) {
 				ended = true;
 				return;
 			}
@@ -440,7 +497,7 @@ describe("a step whose route the daemon lost", () => {
 				ctx.log = {
 					...log,
 					append: async (input, writes) => {
-						point(input.type);
+						point(input.type, input.payload);
 						return log.append(input, writes);
 					},
 				};
@@ -504,6 +561,7 @@ describe("a step whose route the daemon lost", () => {
 		expect(payloads(events, "RunEnded").at(-1)).toMatchObject({
 			status: "failed",
 			endReason: "guard.turns",
+			node: "worker",
 		});
 		expect(foldRun(events).end?.endReason).toBe("guard.turns");
 	});
@@ -527,6 +585,32 @@ describe("a step whose route the daemon lost", () => {
 		expect(payloads(events, "RunEnded").at(-1)).toMatchObject({
 			status: "failed",
 			endReason: "agent.network",
+		});
+		expect(foldRun(events).end?.endReason).toBe("agent.network");
+	});
+
+	test("a Call whose Agent gave up on the network keeps the network code when the commit after the Call's end never landed", async () => {
+		// The Call ends `fail` on its own: a resume routes it from the log.
+		// The log keeps the cause of its end, so the resume reads the code.
+		// The run's policy is the policy of its own flow.
+		const events = await afterLostCommit(
+			withPolicy(flowOf([callNode("inner")]), { networkGraceMinutes: 0.5 }),
+			fakeHarness({
+				steps: [{ type: "text", text: "Starting." }],
+				outcome: { type: "error", kind: "network", message: "offline" },
+			}),
+			{
+				flows: { inner: flowOf([agent("worker")]) },
+				diesAfter: (ended) => ended.outcome === "fail",
+			},
+		);
+		const ends = payloads(events, "StepEnded");
+		expect(ends.map((p) => p.outcome)).toEqual(["error", "fail"]);
+		expect(ends[1]?.endReason).toBe("agent.network");
+		expect(payloads(events, "RunEnded").at(-1)).toMatchObject({
+			status: "failed",
+			endReason: "agent.network",
+			node: "call",
 		});
 		expect(foldRun(events).end?.endReason).toBe("agent.network");
 	});

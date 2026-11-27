@@ -195,6 +195,9 @@ export async function runStep(
 				result.error,
 				{
 					...extraOf(result),
+					...(result.handOffFailed
+						? { handOffFailed: result.handOffFailed }
+						: {}),
 					...(result.memory ? { memory: result.memory } : {}),
 					...(result.trail ? { trail: result.trail } : {}),
 				},

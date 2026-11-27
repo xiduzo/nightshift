@@ -14,6 +14,7 @@ export {
 	type GateVia,
 	groupByRun,
 	guardEndReason,
+	type HandOffFailure,
 	type HoldSection,
 	type InputValues,
 	type ItemFacts,

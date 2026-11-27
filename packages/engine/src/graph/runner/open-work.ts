@@ -228,6 +228,8 @@ export function closingEvents(
 				status: rule.run,
 				reason,
 				endReason: cutEndReason(cut),
+				// The overdue step's node fails the run: the reason names it.
+				...(cut.kind === "overdue" ? { node: cut.nodeId } : {}),
 			},
 		});
 	}

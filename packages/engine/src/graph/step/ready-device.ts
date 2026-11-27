@@ -1,6 +1,6 @@
 import type { FlowNode } from "@nightshift/flows";
 import type { Device } from "../../device";
-import type { RunState } from "../../log";
+import type { HandOffFailure, RunState } from "../../log";
 import { deriveWorktrees } from "../../read";
 import { type StepContext, stepFailure } from "../context";
 import {
@@ -80,11 +80,12 @@ export async function readyDevice(
 		step.device = moved;
 	}
 	if (works !== "worktree") return null;
-	const fail = (error: string): BodyResult => ({
+	const fail = (error: string, handOffFailed?: HandOffFailure): BodyResult => ({
 		kind: "end",
 		outcome: "error",
 		outputs: { visit: step.visit },
 		error,
+		...(handOffFailed ? { handOffFailed } : {}),
 	});
 	const { device } = step;
 	let runState = await ctx.log.state(ctx.run.id);
@@ -139,6 +140,7 @@ export async function readyDevice(
 	} catch (error) {
 		return fail(
 			`The run's work on ${from.name} cannot move to ${device.name}. ${stepFailure(error, `the hand-off of run ${ctx.run.id}`)}`,
+			"send",
 		);
 	}
 	const author = ctx.run.startedBy
@@ -158,6 +160,7 @@ export async function readyDevice(
 	} catch (error) {
 		return fail(
 			`${device.name} could not take the run's work from ${from.name}. ${stepFailure(error, `the hand-off of run ${ctx.run.id}`)}`,
+			"receive",
 		);
 	}
 	await ctx.log.append({

@@ -5,16 +5,14 @@ import {
 	type ListItem,
 	newlyBlocked,
 	nextItem,
-	renderCommand,
-	type TemplateContext,
 	unfinishedBlockers,
 } from "@nightshift/flows";
 import { messageOf } from "@nightshift/refusal";
 import { itemBranchName } from "../../../contract";
-import { runCommand } from "../../../device";
 import type {
 	DerivedStep,
 	EnginePayloads,
+	HandOffFailure,
 	InputValues,
 	ItemFacts,
 	RunEndReason,
@@ -35,8 +33,6 @@ import {
 import {
 	eachOutputs,
 	itemLabel,
-	jsonSourceItems,
-	parseCommandItems,
 	renderBindings,
 	resolveInputs,
 	toItemFacts,
@@ -57,7 +53,6 @@ import {
 	RESUME_RULES,
 	readyDevice,
 	resumePoint,
-	type StepHandle,
 } from "../../step";
 
 import {
@@ -72,6 +67,7 @@ import {
 	runBody,
 	typedOutputs,
 } from "./body";
+import { readSource } from "./each-source";
 
 /**
  * A Call node with `each`: the per-element loop of `callNode`, ported from
@@ -166,6 +162,7 @@ export function callEachNode(node: CallEachNode, ctx: StepContext): NodeAction {
 		const endStep = async (
 			outcome: StepOutcome,
 			error: string | null,
+			handOff?: HandOffFailure,
 		): Promise<StepEnd> => {
 			const derived = await current();
 			const states = itemStates(derived);
@@ -175,20 +172,30 @@ export function callEachNode(node: CallEachNode, ctx: StepContext): NodeAction {
 					id: item.id,
 					blockers: unfinishedBlockers(item, lastRead, states),
 				}));
-			return step.end(
+			const outputs = eachOutputs({
+				items: derived.items,
+				visit,
 				outcome,
-				eachOutputs({ items: derived.items, visit, outcome, waiting }),
-				error,
-			);
+				waiting,
+			});
+			return step.end(outcome, outputs, error, { handOffFailed: handOff });
 		};
-		const finish = async (outcome: StepOutcome, error: string | null) =>
-			route(ctx, state, node, await endStep(outcome, error), config, {
+		const finish = async (
+			outcome: StepOutcome,
+			error: string | null,
+			handOff?: HandOffFailure,
+		) => {
+			const end = await endStep(outcome, error, handOff);
+			return route(ctx, state, node, end, config, {
 				loops: { [node.id]: null },
 			});
+		};
 		// Its item branches and its source work in the worktree: the run's
 		// work moves to this step's Device first.
 		const ready = await readyDevice(ctx, node, step);
-		if (ready?.kind === "end") return finish("error", ready.error);
+		if (ready?.kind === "end") {
+			return finish("error", ready.error, ready.handOffFailed);
+		}
 		if (ready?.kind === "offline") {
 			return finish(
 				"error",
@@ -549,48 +556,4 @@ function stopBeforeNext(
 		return { reason: STOP_TIME_REASON, endReason: "stop_time" };
 	}
 	return null;
-}
-
-/**
- * Reads the source as list items: a JSON value, or the JSON a command
- * prints in the worktree. Throws with a readable
- * message. Ported from `readSource` in engine.ts.
- */
-async function readSource(
-	ctx: StepContext,
-	node: CallEachNode,
-	tctx: TemplateContext,
-	step: StepHandle,
-): Promise<ListItem[]> {
-	const worktree = step.worktree;
-	const source = node.each.source;
-	switch (source.kind) {
-		case "json":
-			return jsonSourceItems(source.value, tctx);
-		case "command": {
-			const { command, env } = renderCommand(source.command, tctx);
-			let stdout = "";
-			const result = await runCommand(step.device, {
-				command,
-				cwd: worktree,
-				env,
-				logPath: ctx.log.files(ctx.run.id).commandLog(step.stepId),
-				signal: step.signal,
-				onOutput: (stream, text) => {
-					if (stream === "stdout") stdout += text;
-				},
-			});
-			if (result.spawnError) {
-				throw new Error(
-					`The source command could not start: ${result.spawnError}`,
-				);
-			}
-			if (result.exitCode !== 0) {
-				throw new Error(
-					`The source command failed. Its last output:\n${result.logTail}`,
-				);
-			}
-			return parseCommandItems(stdout);
-		}
-	}
 }

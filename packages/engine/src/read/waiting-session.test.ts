@@ -37,7 +37,14 @@ const ended = (
 	log: Log,
 	status: "stopped" | "failed" | "finished",
 	reason: string | null = null,
-) => log.push("RunEnded", { status, reason });
+	node?: string,
+) =>
+	log.push("RunEnded", {
+		status,
+		reason,
+		...(node !== undefined ? { node } : {}),
+	});
+const NO_EDGE = 'Node "a" ended with "fail" and no edge leaves it.';
 const cut = (log: Log, id: string, outcome: StepOutcome = "stopped") =>
 	log.stepEnded(id, outcome);
 const waits = (log: Log) => waitingSession(log.state())?.id ?? null;
@@ -75,21 +82,27 @@ describe("the session that gets the prompt of a resume", () => {
 		expect(waits(ended(cut(log, "a"), "stopped"))).toBe("a");
 	});
 
-	test("its own end: only when the run failed on it", () => {
-		const failed = (reason: string | null) => {
+	test("its own end: only when the run's end names its node", () => {
+		const failed = (reason: string | null, node?: string) => {
 			const log = agentStep(start(), "a").stepEnded("a", "fail");
-			return waits(ended(log, reason ? "failed" : "stopped", reason));
+			return waits(ended(log, reason ? "failed" : "stopped", reason, node));
 		};
-		expect(failed('Node "a" ended with "fail" and no edge leaves it.')).toBe(
-			"a",
-		);
+		expect(failed(NO_EDGE, "a")).toBe("a");
+		// The node is the fact, not the words of the reason.
+		expect(failed("It broke.", "a")).toBe("a");
+		expect(failed(NO_EDGE, "b")).toBeNull();
 		expect(failed("The engine failed.")).toBeNull();
 		expect(failed(null)).toBeNull();
 	});
 
+	test("an end logged before the node was stored names none: the words are not read", () => {
+		const log = agentStep(start(), "a").stepEnded("a", "fail");
+		expect(waits(ended(log, "failed", NO_EDGE))).toBeNull();
+	});
+
 	test("its own end, and a stop before the resume opened it again: still parked", () => {
 		const log = agentStep(start(), "a").stepEnded("a", "fail");
-		ended(log, "failed", 'Node "a" ended with "fail" and no edge leaves it.');
+		ended(log, "failed", NO_EDGE, "a");
 		log.resumed("a", "a", { prompt: "First." });
 		expect(waits(ended(log, "stopped"))).toBe("a");
 	});
@@ -98,7 +111,7 @@ describe("the session that gets the prompt of a resume", () => {
 		const log = start().stepStarted("a", "a", 1, { nodeType: "agent" });
 		log.sessionStarted("a", "x", { resumeSessionId: "h" });
 		log.stepEnded("a", "error");
-		expect(waits(ended(log, "failed", 'Node "a" failed: boom'))).toBe("a");
+		expect(waits(ended(log, "failed", 'Node "a" failed: boom', "a"))).toBe("a");
 		expect(waits(log)).toBe("a");
 	});
 
@@ -123,7 +136,7 @@ describe("the session that gets the prompt of a resume", () => {
 
 	test("an own end after an earlier failure of the run is not that failure's", () => {
 		const log = agentStep(start(), "a").stepEnded("a", "fail");
-		ended(log, "failed", 'Node "a" ended with "fail" and no edge leaves it.');
+		ended(log, "failed", NO_EDGE, "a");
 		log.resumed("a", "a").stepReopened("a").stepEnded("a", "pass");
 		expect(waits(ended(log, "stopped"))).toBeNull();
 	});

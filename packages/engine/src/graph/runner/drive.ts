@@ -58,7 +58,7 @@ export function createDrives(
 		status: RunEnding,
 		reason: string | null,
 		endReason: RunEndReason,
-		result?: RunResult,
+		more: { result?: RunResult; node?: string } = {},
 	): Promise<void> {
 		try {
 			await writer.append({
@@ -68,7 +68,8 @@ export function createDrives(
 					status,
 					reason,
 					endReason,
-					...(result ? { result } : {}),
+					...(more.node !== undefined ? { node: more.node } : {}),
+					...(more.result ? { result: more.result } : {}),
 				},
 			});
 			await letGo(holds, runId, status);
@@ -142,7 +143,10 @@ export function createDrives(
 				ending.status,
 				ending.reason,
 				ending.endReason,
-				ending.result,
+				{
+					...(ending.result ? { result: ending.result } : {}),
+					...(ending.node !== undefined ? { node: ending.node } : {}),
+				},
 			);
 		} catch (error) {
 			// A stop took the run from this drive: it writes nothing more.

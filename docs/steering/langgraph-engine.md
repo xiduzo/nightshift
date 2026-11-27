@@ -370,7 +370,8 @@ packages/engine/src/
    `needs-input`-without-edge park the thread. The node appends its
    `StepEnded` and returns `goto: park__<nodeId>`. The park node calls
    `interrupt({ kind: "parked", ... })`. The runner appends `RunEnded`
-   when it sees that interrupt. A resume is `Command({ resume })` and
+   when it sees that interrupt. When a step of the node failed the run,
+   `RunEnded.node` names the node. A resume is `Command({ resume })` and
    re-enters the node. So "resume at the last step's node, inside a
    Subflow with `each` at the same item" comes free at any depth.
 3. **The event log is written exactly as before.** Same payloads, same
@@ -697,7 +698,9 @@ rule of the run position:
    step: the checkpoint holds it open or never committed it, and it ended
    on its own (not `stopped`, `error` or `interrupted`). The node continues
    from its logged end (`routeDone`). It applies the same update, and takes
-   the `EdgeTaken` the log has in the state only. The one exception is the
+   the `EdgeTaken` the log has in the state only. A park on that end reads
+   its cause from the log (`StepEnded.guard`, `StepEnded.endReason`), so
+   the run ends with the same code. The one exception is the
    last step of a run that finished: a resume reopens it on purpose
    (rule 10).
 2. **A task whose writes are saved keeps the thread pending.** LangGraph's

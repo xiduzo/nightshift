@@ -130,13 +130,14 @@ function isCutShort(step: DerivedStep): boolean {
 	);
 }
 
-/** The run failed on the step's own end, which no edge leaves: that end of the run names the node (`route`). */
+/**
+ * The run failed on the step's own end, which no edge leaves: that end of
+ * the run names the node (`RunEnded.node`). An end logged before the node
+ * was stored names none.
+ */
 function parkedOn(run: RunState, step: DerivedStep): boolean {
 	const end = step.openings.at(-1)?.end;
 	return run.ends.some(
-		(e) =>
-			end != null &&
-			e.seq > end.seq &&
-			e.payload.reason?.startsWith(`Node "${step.nodeId}" `) === true,
+		(e) => end != null && e.seq > end.seq && e.payload.node === step.nodeId,
 	);
 }

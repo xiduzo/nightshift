@@ -1,11 +1,18 @@
-/** The events of a step, and the words their payloads use. */
+/** The events of a step, the words their payloads use, and why a run ended, as a code. */
 
+export {
+	guardEndReason,
+	RUN_END_REASONS,
+	type RunEndReason,
+	type StepGuard,
+} from "./end-reason";
 export {
 	type GateBackgroundItem,
 	type GateBrief,
 	type GateBriefPart,
 	type GateChoice,
 	type GateDeadline,
+	type HandOffFailure,
 	type InputValues,
 	type ItemFacts,
 	type RungBy,
@@ -13,7 +20,6 @@ export {
 	type SessionOutcome,
 	type StandIn,
 	type StepBudget,
-	type StepGuard,
 	type StepOutcome,
 	type StepOutputs,
 	type StepPayloads,

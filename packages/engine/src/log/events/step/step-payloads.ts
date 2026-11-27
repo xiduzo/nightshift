@@ -14,6 +14,7 @@ import type {
 	OutcomeColor,
 } from "@nightshift/flows";
 import type { StepMemory } from "../../../memory";
+import type { RunEndReason, StepGuard } from "./end-reason";
 
 /**
  * The events of a step, and the words their payloads use: its start and
@@ -104,8 +105,12 @@ export type ItemFacts = {
 	value: JsonValue;
 };
 
-/** A guard that stopped a step. The idle guard's warning kind is `stalled`. */
-export type StepGuard = "budget" | "turns" | "looping" | "idle" | "max_steps";
+/**
+ * How a Hand-off of the run's work to a step's Device failed: the Device
+ * that has the work could not send it (`send`), or the step's Device
+ * could not take it (`receive`).
+ */
+export type HandOffFailure = "send" | "receive";
 
 export type StepPayloads = {
 	/** A new visit of a node. */
@@ -159,6 +164,20 @@ export type StepPayloads = {
 		 * step ended on its own.
 		 */
 		guard?: StepGuard;
+		/**
+		 * Why a park of the step ends the run, when its end knows a cause
+		 * that is not a guard: the network past its grace, or the cause of
+		 * the end of a Call's flow. A resume that routes the step from the
+		 * log reads it. Absent when the end knows no such cause, and in
+		 * logs written before it was stored: not known.
+		 */
+		endReason?: RunEndReason;
+		/**
+		 * The step failed because the run's work could not move to its
+		 * Device (`HandOffFailure`). Absent for every other end, and in
+		 * logs written before it was stored: not known.
+		 */
+		handOffFailed?: HandOffFailure;
 		/**
 		 * The variables the step's writes (`set`) changed, by name. Absent
 		 * when it wrote none. In `StepEnded`, so a step never ends without

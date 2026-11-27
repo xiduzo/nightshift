@@ -109,6 +109,8 @@ export const stepSummarySchema = z.object({
 	pinnedFrom: z
 		.object({ runId: z.string(), stepId: z.string(), endedAt: z.number() })
 		.optional(),
+	/** The run's work could not move to the step's Device. Absent: no such failure, or not known. */
+	handOffFailed: z.enum(["send", "receive"]).optional(),
 });
 
 /** One step with the prompt of each session and the element of each item. */
