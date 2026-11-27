@@ -24,6 +24,7 @@ import {
 const SHAPES: Record<string, string> = {
 	1: "d063c69fb6dba609",
 	2: "c082a45aaf2f7d9d",
+	3: "cdca4b87e39094f7",
 };
 
 /** A schema as plain data, with its keys in order. Null: the procedure has none. */

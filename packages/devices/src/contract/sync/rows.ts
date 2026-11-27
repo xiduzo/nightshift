@@ -67,7 +67,17 @@ const eventRowSchema = z.object({
 	stepId: z.string().nullable(),
 	sessionId: z.string().nullable(),
 	type: z.string().min(1),
-	payload: z.string(),
+	/**
+	 * The event's payload as JSON, in the shape of this version: every
+	 * `RunEnded` has its `endReason`, and no `WorktreeRemoved` has `by`
+	 * (migration `run_end_codes`, version 3). The description says it, so
+	 * the hash of the contract sees a change of meaning under one shape.
+	 */
+	payload: z
+		.string()
+		.describe(
+			"The event payload as JSON. Every RunEnded has its endReason (version 3).",
+		),
 	at: z.number(),
 	walkerId: z.string().min(1),
 	walkerSeq: z.number().int().positive(),

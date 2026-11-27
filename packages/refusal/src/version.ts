@@ -8,7 +8,7 @@
  *
  * A difference is never a loss of access. It waits for an update.
  */
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 3;
 
 /** How another Night Shift compares with this one, when they differ. */
 export type OtherVersion = "older" | "newer";
