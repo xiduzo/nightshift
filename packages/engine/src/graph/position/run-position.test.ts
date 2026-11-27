@@ -83,7 +83,11 @@ const reopened = (stepId: string): Ev => ({
 });
 const runEnded = (status: "finished" | "stopped" | "interrupted"): Ev => ({
 	type: "RunEnded",
-	payload: { status, reason: null },
+	payload: {
+		status,
+		reason: null,
+		endReason: status === "finished" ? "finished" : "_OTHER",
+	},
 });
 const edgeTaken = (
 	from: string,

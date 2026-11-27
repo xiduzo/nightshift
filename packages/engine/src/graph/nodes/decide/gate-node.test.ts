@@ -81,7 +81,11 @@ async function stopAndResume(h: Harness, stepId: string, visit: number) {
 	await h.log.append({
 		type: "RunEnded",
 		runId: h.runId,
-		payload: { status: "stopped", reason: null },
+		payload: {
+			status: "stopped",
+			reason: null,
+			endReason: "stopped_by_person",
+		},
 	});
 	await h.log.append({
 		type: "RunResumed",

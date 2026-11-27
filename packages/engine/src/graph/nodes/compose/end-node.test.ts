@@ -151,6 +151,7 @@ describe("the End node", () => {
 			payload: {
 				status: "failed",
 				reason: null,
+				endReason: "_OTHER",
 				result: "failed",
 			},
 		});

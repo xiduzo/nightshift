@@ -101,7 +101,11 @@ function log() {
 				{ stepId },
 			),
 		ended: (status: "finished" | "stopped") =>
-			push("RunEnded", { status, reason: null }),
+			push("RunEnded", {
+				status,
+				reason: null,
+				endReason: status === "finished" ? "finished" : "stopped_by_person",
+			}),
 	};
 	return b;
 }

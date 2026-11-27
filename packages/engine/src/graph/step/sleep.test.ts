@@ -389,7 +389,11 @@ describe("the sleep module: an Agent step's usage-limit wait", () => {
 						...(events.at(-1) as (typeof events)[number]),
 						seq: 10_000,
 						type: "RunEnded",
-						payload: { status: "stopped", reason: null },
+						payload: {
+							status: "stopped",
+							reason: null,
+							endReason: "stopped_by_person",
+						},
 					} as (typeof events)[number],
 				]),
 				at,
@@ -421,7 +425,11 @@ describe("the sleep module: an Agent step's usage-limit wait", () => {
 		await h.log.append({
 			type: "RunEnded",
 			runId: h.runId,
-			payload: { status: "stopped", reason: null },
+			payload: {
+				status: "stopped",
+				reason: null,
+				endReason: "stopped_by_person",
+			},
 		});
 		await h.log.append({
 			type: "RunResumed",
@@ -695,7 +703,11 @@ describe("the sleep module: a Wait node's own wait", () => {
 		await h.log.append({
 			type: "RunEnded",
 			runId: h.runId,
-			payload: { status: "stopped", reason: null },
+			payload: {
+				status: "stopped",
+				reason: null,
+				endReason: "stopped_by_person",
+			},
 		});
 		await h.log.append({
 			type: "RunResumed",

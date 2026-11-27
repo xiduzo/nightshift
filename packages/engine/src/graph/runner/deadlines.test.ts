@@ -167,7 +167,11 @@ describe("findOverdue", () => {
 		const { events } = log()
 			.started()
 			.step(100, "worker", { timeoutMs: MINUTE })
-			.push(200, "RunEnded", { status: "interrupted", reason: null });
+			.push(200, "RunEnded", {
+				status: "interrupted",
+				reason: null,
+				endReason: "_OTHER",
+			});
 		expect(await check(events, 100 * MINUTE)).toBeNull();
 	});
 });

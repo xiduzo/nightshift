@@ -106,7 +106,11 @@ const runStarted = (stopAt: number | null = null): Ev => ({
 });
 const runEnded = (status: "finished" | "stopped" | "failed"): Ev => ({
 	type: "RunEnded",
-	payload: { status, reason: null },
+	payload: {
+		status,
+		reason: null,
+		endReason: status === "finished" ? "finished" : "_OTHER",
+	},
 });
 const edgeTaken = (from: string, to: string): Ev => ({
 	type: "EdgeTaken",
@@ -141,6 +145,7 @@ const runFailed = (nodeId: string, seq: number): LoggedEvent => ({
 		payload: {
 			status: "failed",
 			reason: `Node "${nodeId}" ended with "pass" and no edge leaves it on that outcome.`,
+			endReason: "_OTHER",
 			node: nodeId,
 		},
 	})[0] as LoggedEvent),
@@ -424,7 +429,11 @@ describe("planReentry: a resume", () => {
 				ended("s1", "error"),
 				{
 					type: "RunEnded",
-					payload: { status: "interrupted", reason: "Night Shift stopped." },
+					payload: {
+						status: "interrupted",
+						reason: "Night Shift stopped.",
+						endReason: "_OTHER",
+					},
 				},
 			);
 		const events = parked();
