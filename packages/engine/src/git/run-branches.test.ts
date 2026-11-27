@@ -259,8 +259,11 @@ describe("keeping the work of a run", () => {
 				[
 					"abcd1234",
 					[
-						"refs/nightshift/kept/abcd1234/copy",
-						"refs/nightshift/kept/abcd1234/heads/nightshift/abcd1234",
+						{ ref: "refs/nightshift/kept/abcd1234/copy", commit: tip },
+						{
+							ref: "refs/nightshift/kept/abcd1234/heads/nightshift/abcd1234",
+							commit: tip,
+						},
 					],
 				],
 			]),

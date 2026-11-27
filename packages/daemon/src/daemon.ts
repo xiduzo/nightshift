@@ -337,10 +337,12 @@ async function makeDaemon(
 		learningsChanged: (spaceId, projectId) =>
 			learningsChanged(spaceId, projectId),
 	});
+	/** The engine, once `startDevices` made it: a restore that asks before then waits for it. */
+	const madeEngine =
+		Promise.withResolvers<Pick<typeof engine, "keptWorkGone">>();
 	const { harnesses, decider, local } = wireLocalDevice({
 		computerAccess,
-		// The engine (made below, before a run can ask).
-		keptWorkGone: (run) => engine.keptWorkGone(run),
+		keptWorkGone: async (run) => (await madeEngine.promise).keptWorkGone(run),
 		id: device.id,
 		name: device.name,
 		config,
@@ -411,6 +413,7 @@ async function makeDaemon(
 		},
 		trustedOrigins,
 		started: (started) => {
+			madeEngine.resolve(started.engine);
 			personalSecrets = started.personalSecrets;
 			projectSecrets = started.projectSecrets;
 			knowledge.connect({

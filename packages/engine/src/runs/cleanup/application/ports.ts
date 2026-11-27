@@ -72,8 +72,10 @@ export type RunBranches = {
 		repoPath: string,
 		runs: readonly { shortId: string; baseRef: string }[],
 	): Promise<Map<string, RunCopyState>>;
-	/** The kept refs of the clone, by short id. */
-	listKept(repoPath: string): Promise<Map<string, string[]>>;
+	/** The kept refs of the clone, each with its commit, by short id. */
+	listKept(
+		repoPath: string,
+	): Promise<Map<string, { ref: string; commit: string }[]>>;
 	/** Commits the changes of the worktree at `cwd` without moving a branch. Returns the commit. */
 	commitChanges(cwd: string, message: string): Promise<string>;
 	/** Points the ref `ref` at `commit`. */

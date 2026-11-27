@@ -176,10 +176,13 @@ export function inMemoryRunBranches() {
 			return states;
 		},
 		async listKept(repoPath: string) {
-			const byShortId = new Map<string, string[]>();
-			for (const ref of twin.kept.get(repoPath)?.keys() ?? []) {
+			const byShortId = new Map<string, { ref: string; commit: string }[]>();
+			for (const [ref, commit] of twin.kept.get(repoPath) ?? []) {
 				const shortId = ref.slice(KEPT.length).split("/")[0] ?? "";
-				byShortId.set(shortId, [...(byShortId.get(shortId) ?? []), ref]);
+				byShortId.set(shortId, [
+					...(byShortId.get(shortId) ?? []),
+					{ ref, commit },
+				]);
 			}
 			return byShortId;
 		},

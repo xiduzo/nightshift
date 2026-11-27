@@ -82,6 +82,9 @@ const KEEPER = {
 type DefaultBranch = { name: string; refs: string[] };
 
 /** The run branches and worktrees of clones, over the git port. */
+/** A kept ref and the commit it holds. */
+type KeptRef = { ref: string; commit: string };
+
 export function createRunBranches(git: Git) {
 	async function refExists(cwd: string, ref: string): Promise<boolean> {
 		const result = await git.run(cwd, [
@@ -167,18 +170,19 @@ export function createRunBranches(git: Git) {
 		return local;
 	}
 
-	/** The kept refs of the clone (`refs/nightshift/kept/<short>/…`), by short id. */
-	async function listKept(repoPath: string): Promise<Map<string, string[]>> {
+	/** The kept refs of the clone (`refs/nightshift/kept/<short>/…`), each with its commit, by short id. */
+	async function listKept(repoPath: string): Promise<Map<string, KeptRef[]>> {
 		const out = await gitOrThrow(git, repoPath, [
 			"for-each-ref",
-			"--format=%(refname)",
+			"--format=%(objectname) %(refname)",
 			KEPT_REFS,
 		]);
-		const kept = new Map<string, string[]>();
-		for (const ref of out.split("\n").filter(Boolean)) {
+		const kept = new Map<string, KeptRef[]>();
+		for (const line of out.split("\n").filter(Boolean)) {
+			const [commit = "", ref = ""] = line.split(" ");
 			const shortId = ref.slice(KEPT_REFS.length).split("/")[0] ?? "";
 			if (shortId === "") continue;
-			kept.set(shortId, [...(kept.get(shortId) ?? []), ref]);
+			kept.set(shortId, [...(kept.get(shortId) ?? []), { ref, commit }]);
 		}
 		return kept;
 	}

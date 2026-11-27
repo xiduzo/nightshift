@@ -130,7 +130,7 @@ describe("sweepRunCopies", () => {
 		]);
 	});
 
-	test("frees the kept work of a run that ended 30 days ago, keeps a younger one, and logs how many went", async () => {
+	test("frees the kept work of a run that ended 30 days ago, keeps a younger one, and logs what went", async () => {
 		const { ports, sweep } = await setup();
 		// Kept work does not follow the days of run folders.
 		ports.ground.cleanUpAfterDays = 90;
@@ -147,7 +147,9 @@ describe("sweepRunCopies", () => {
 		const log = spyOn(console, "log").mockImplementation(() => {});
 		try {
 			expect(await sweep()).toEqual({ removed: [], expired: [RUN], left: 0 });
+			// Each kept tip, so a person can still get it back with git.
 			expect(log.mock.calls).toEqual([
+				[`[cleanup] freed the kept work of run ${SHORT}: ${refs.copy} at c1`],
 				["[cleanup] freed the kept work of 1 run (30 days after each ended)"],
 			]);
 		} finally {

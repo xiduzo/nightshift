@@ -1016,7 +1016,9 @@ describe("a hand-off of a branch the run made", () => {
 		await take(b, { branch: "feat", commit: base });
 		const { listKept, deleteRef } = createRunBranches(systemGit());
 		const noted = (await listKept(b)).get(shortId) ?? [];
-		expect(noted).toEqual([keptRefsOf(shortId).handed("feat")]);
+		expect(noted).toEqual([
+			{ ref: keptRefsOf(shortId).handed("feat"), commit: base },
+		]);
 		await mustGit(b, ["worktree", "remove", copyB]);
 		await restoreWorktree({
 			repoPath: b,
@@ -1025,7 +1027,7 @@ describe("a hand-off of a branch the run made", () => {
 			workGone: null,
 		});
 		expect((await listKept(b)).get(shortId)).toEqual(noted);
-		for (const ref of noted) await deleteRef(b, ref);
+		for (const { ref } of noted) await deleteRef(b, ref);
 		expect(await listKept(b)).toEqual(new Map());
 	});
 });

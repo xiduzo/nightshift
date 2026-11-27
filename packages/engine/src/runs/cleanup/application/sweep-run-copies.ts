@@ -214,9 +214,13 @@ export const sweepRunCopies =
 				if (keptWorkFate({ ...facts, open }) === "keep") continue;
 				const expired: string[] = [];
 				try {
-					for (const ref of refs) {
+					for (const { ref, commit } of refs) {
 						await branches.deleteRef(project.repoPath, ref);
 						expired.push(ref);
+						// git keeps the commit until it collects it: a person can still get it back.
+						console.log(
+							`[cleanup] freed the kept work of run ${shortId}: ${ref} at ${commit}`,
+						);
 					}
 					result.expired.push(runId);
 				} catch (error) {
