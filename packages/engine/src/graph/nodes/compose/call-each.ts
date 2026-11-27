@@ -21,8 +21,7 @@ import type {
 	StepOutcome,
 	StepOutputs,
 } from "../../../log";
-import { itemStates, OUTRUN_ERROR } from "../../../read";
-import { outrun } from "../../branches";
+import { itemStates } from "../../../read";
 import {
 	type NodeAction,
 	STOP_AFTER_STEP_REASON,
@@ -49,6 +48,7 @@ import type { Loop } from "../../state";
 import {
 	abortEnd,
 	beginStep,
+	callStopped,
 	entryOf,
 	RESUME_RULES,
 	readyDevice,
@@ -59,7 +59,6 @@ import {
 	type BodyGraph,
 	bodyGraph,
 	bodyOutputs,
-	callStopped,
 	failedEndReason,
 	hasStoppedEdge,
 	newOutputsSeen,
@@ -88,10 +87,11 @@ import { readSource } from "./each-source";
  * on with free work. An element whose outputs do not fit a type a person
  * gave them fails the same way (`typedOutputs`, Q42). A stop inside the
  * body ends the step `stopped` and propagates the park; when the step's
- * own signal stops it (another branch won a `first` Join, also between
- * two elements, or its time budget ran out), the step ends as `abortEnd`
- * says and the walk continues; a wait or a Gate inside the body propagates
- * with the step open. Everything before the body runs again on the resume
+ * own signal stops it (another branch won a `first` Join, or its time
+ * budget ran out), the step ends as `abortEnd` says and the walk
+ * continues; a wait or a Gate inside the body propagates with the step
+ * open. Between two elements, and when a hold or a resume takes the step
+ * up, `beginStep` ends it once its branch lost (`endOutrun`). Everything before the body runs again on the resume
  * and after a daemon death (rule 4), so the node continues the open element it
  * finds in the log (no `ItemStarted` or branch twice) and the body resumes
  * under the same namespace; an ended step (stopped, or `interrupted` by
@@ -307,10 +307,6 @@ export function callEachNode(node: CallEachNode, ctx: StepContext): NodeAction {
 					? null
 					: positionOf(state, runState, scope).cursorBehind(node);
 			if (behind !== null) return next(behind);
-			// Another branch won a `first` Join between two elements.
-			if (outrun(ctx, state, node, config)) {
-				return finish("stopped", OUTRUN_ERROR);
-			}
 			if (ctx.signal().aborted) return parkStopped(PERSON_STOP);
 			const stop = stopBeforeNext(
 				ctx,

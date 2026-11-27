@@ -768,8 +768,9 @@ from.
    Each branch that reaches the Join arrives in it. The Join's route
    closes it. A later round replaces an earlier one. Writes to one round
    merge, so all branches that arrive in one super-step count.
-3. A branch whose round is closed goes no further (`outrun`). Its new
-   steps do not start, and a step that ends routes nowhere.
+3. A branch that lost a `first` Join goes no further (`outrun`). Its new
+   steps do not start, a step that ends routes nowhere, and a step that a
+   hold, a resume or a new daemon takes up ends (`endOutrun`).
 4. A jump to a Join whose round is closed, or to a node of its branches,
    opens the next round (`reopenRound`). A resume of a run that ended at
    its Join, a run again from a branch or from the Join, a resume of a
@@ -777,20 +778,35 @@ from.
    there. The Join keeps every arrival. A branch keeps the arrivals of the
    other branches. A `first` Join keeps none.
 
-**`first`.** A super-step waits for all its tasks. So the Join alone
-would wait for the slowest branch. The first branch that reaches a
-`first` Join claims the round in memory (`Races`, one per Thread). It
-aborts the steps that run on the other branches (`AbortReason` `outrun`).
-Those steps end `stopped` with "Another branch reached the Join first.".
-A Subflow on such a branch stops the steps of its called flow too: they
-watch the Subflow step's signal. The Subflow step ends `stopped` with the
-same words, and the walk continues. A Subflow with `each` starts no next
-element after its branch lost. A Subflow that runs past its time budget
-stops its called flow the same way and ends `error`.
-A Gate or a sleep on such a branch ends at its next hold: its step ends
-`stopped` with the same words, so its Gate closes and the run does not
-wait for it. After a restart the claim is gone, and the Join picks the
-earliest arrival from the state.
+**`first`.** The winner is a fact of the log: the first `EdgeTaken` into
+the Join from a branch, since the round began. The round begins at the
+latest edge of the fan-out, or at a run again from a node of its
+branches. Every process reads the same winner, also a new daemon after
+a restart (`outrun` reads the run state, not the checkpoint).
+
+- A super-step waits for all its tasks. So the Join alone would wait for
+  the slowest branch. The branch that reaches a `first` Join aborts the
+  steps that run on the other branches (`Races`, in memory, one per
+  Thread, `AbortReason` `outrun`). Those steps end `stopped` with
+  "Another branch reached the Join first.".
+- A step of a branch that lost and that the log has already ends with
+  the same words when a hold, a resume or a new daemon takes it up
+  (`beginStep`, `endOutrun`). So does each open step of its called flows:
+  a Gate in a Subflow closes, and a sleep there ends. A step that a new
+  daemon ended `interrupted` stays so. A Subflow with `each` starts no
+  next element after its branch lost.
+- A held Gate or sleep on such a branch ends at its next hold, in the
+  same way. Its Gate closes, and the run does not wait for it.
+- A Subflow on such a branch stops the steps of its called flow too: they
+  watch the Subflow step's signal, and a step inside a nested Subflow
+  aborts with `cut`. The Subflow step ends `stopped` with the same words,
+  and the walk continues. A Subflow that runs past its time budget stops
+  its called flow the same way and ends `error`.
+- A called flow that a cut stopped parks nothing: its node throws
+  `CallCut` (`parksNoCut` in `compile.ts`). A park in its checkpoint
+  would read as a person's stop when a new daemon takes the Subflow up.
+  Without one the Subflow decides again: it ends as outrun, or its called
+  flow goes on, and a time budget that runs out again ends it `error`.
 
 **Interrupts.** A branch that parks, sleeps or opens a Gate interrupts
 its own task. The other tasks of the super-step finish. LangGraph ends a
@@ -1348,7 +1364,8 @@ type StepContext = StepShared & {
   flows: Record<string, Flow>;       // called flows by name
   policy(): ResolvedPolicy;          // resolved at each use, like settings()
   signal(): AbortSignal;             // the run's abort signal; in a called flow, the Subflow step's
-  races: Races;
+  drive(): AbortSignal;              // the drive's signal; a called flow has its caller's
+  races: Races;                      // the running steps a `first` Join may abort
 };
 ```
 

@@ -16,7 +16,6 @@ import {
 	guardEndReason,
 	leavingHolds,
 	type RunEndReason,
-	type Scope,
 	type StepGuard,
 	type StepOutcome,
 	type StepOutputs,
@@ -26,6 +25,7 @@ import type { NodeAction, StepContext, StopService } from "../context";
 import { commitVisit, type DoneStep, takenUp } from "../position";
 import type { PendingParked, RunStateUpdate, RunStateValues } from "../state";
 import { interruptNode } from "./interrupt";
+import { scopeOf } from "./scope";
 
 /**
  * Where a node goes after its step: the edge the outcome picks, a chosen
@@ -49,11 +49,6 @@ export const isInterruptNode = (name: string) =>
 	name.startsWith("park__") ||
 	name.startsWith("wait__") ||
 	name.startsWith("ask__");
-
-/** The scope of the flow this graph runs in: null at the top level. */
-export function scopeOf(config: LangGraphRunnableConfig): Scope | null {
-	return (config.configurable?.scope as Scope | null | undefined) ?? null;
-}
 
 /** How a step ended: what `StepEnded` recorded, plus what a park needs to continue it. */
 export type StepEnd = {
@@ -258,7 +253,10 @@ async function routeOn(
 	}
 	// A branch another branch outran goes no further, whatever its end:
 	// its Join went on without it (`branches.ts`).
-	if (outrun(ctx, state, node, config)) return new Command({ update });
+	const run = await ctx.log.state(ctx.run.id);
+	if (outrun(ctx.flow, run, node.id, scopeOf(config))) {
+		return new Command({ update });
+	}
 	// A stop parks. The one exception: a Call node the stop time ended
 	// follows its `stopped` edge to the nodes that wrap the run up. Only a
 	// Call node passes `wrappingUp` (`hasStoppedEdge` in nodes/compose/body.ts).

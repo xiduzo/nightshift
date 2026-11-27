@@ -141,7 +141,7 @@ const THERE: RestoredCopy = { kind: "there" };
 /** The copies being made again, by run and Device: two branches of a run make it once. */
 const restoring = new Map<string, Promise<RestoredCopy>>();
 
-/** The Devices whose copy a drive found there, by the drive's signal: each is asked once per drive. */
+/** The Devices whose copy a drive found there, by the drive's signal (`StepContext.drive`): each is asked once per drive. */
 const found = new WeakMap<AbortSignal, Set<string>>();
 
 /** The run's warning when its copy was made again, by where from. */
@@ -175,7 +175,7 @@ export async function restoreRunCopy(
 	cwd: string,
 	runState: RunState,
 ): Promise<RestoredCopy> {
-	const signal = ctx.signal();
+	const signal = ctx.drive();
 	const there = found.get(signal) ?? new Set<string>();
 	found.set(signal, there);
 	if (there.has(at.id)) return THERE;

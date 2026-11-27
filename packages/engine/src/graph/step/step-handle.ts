@@ -36,7 +36,8 @@ import type { DeviceWait, OwnWait, WaitRequest } from "./sleep";
 
 /**
  * Why a step's signal aborted. `outrun`: another branch reached a `first`
- * Join (`branches.ts`). `idle`: the Agent showed no activity for its idle
+ * Join (`branches.ts`). `cut`: the Call step whose called flow the step is
+ * in stopped on its own (`callStopped`). `idle`: the Agent showed no activity for its idle
  * limit (the stall guard). The guards a body trips (`StepHandle.halt`):
  * `budget` (the run passed its budget), `turns` (a session passed its turn
  * limit), `looping` (the same tool call three times in a row).
@@ -46,6 +47,7 @@ export type AbortReason =
 	| "timeout"
 	| "idle"
 	| "outrun"
+	| "cut"
 	| GuardReason;
 
 /** A guard of the run policy that a body trips. */

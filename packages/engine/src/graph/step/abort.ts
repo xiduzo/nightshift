@@ -66,5 +66,33 @@ export function abortEnd(
 	};
 }
 
+/**
+ * The Call step's own signal stopped it: another branch won a `first`
+ * Join, the step ran past its time budget, or the Call step around it
+ * stopped so (`cut`). A stop of the run aborts the same signal with
+ * `stopped`: that one is a person's stop, not the Call's.
+ */
+export function callStopped(signal: AbortSignal): boolean {
+	const reason = signal.reason as AbortReason | undefined;
+	return (
+		signal.aborted &&
+		(reason === "outrun" || reason === "timeout" || reason === "cut")
+	);
+}
+
+/**
+ * A node of a called flow parks nothing once its Call step stopped on its
+ * own (`callStopped`): it throws this instead, and the Call ends as
+ * `abortEnd` says. A park would stay in the called flow's checkpoint, and
+ * a Call that a new daemon takes up would read it as a person's stop. With
+ * no park the node runs again then: its step reopens.
+ */
+export class CallCut extends Error {
+	constructor() {
+		super("The Call step around this flow stopped.");
+		this.name = "CallCut";
+	}
+}
+
 /** The message of the guard each halted step's signal aborted for (`StepHandle.halt`). */
 export const haltMessages = new WeakMap<AbortSignal, string>();

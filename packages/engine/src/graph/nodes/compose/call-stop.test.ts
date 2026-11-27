@@ -343,3 +343,85 @@ describe("a person stops the run while a Call on a branch works", () => {
 		expect(run.ends.map((e) => e.endReason)).toEqual(["stopped_by_person"]);
 	}, 20_000);
 });
+
+describe("a Subflow that waits on the branch that loses a `first` Join", () => {
+	const gate = {
+		id: "ask",
+		type: "decision" as const,
+		position: at,
+		prompt: "Keep?",
+		by: "person" as const,
+		options: [{ name: "pass" }],
+	};
+	const nap = {
+		id: "nap",
+		type: "wait" as const,
+		position: at,
+		until: { kind: "duration" as const, minutes: 200 },
+	};
+	const waits = {
+		"a Gate": flowOf([gate], [], { inputs: [{ name: "item", type: "json" }] }),
+		"a sleep": flowOf([nap], [], { inputs: [{ name: "item", type: "json" }] }),
+	};
+	const subflows = {
+		once: {
+			id: "sub",
+			type: "call" as const,
+			position: at,
+			flow: "work",
+			inputs: {},
+		},
+		"with each": {
+			id: "sub",
+			type: "call" as const,
+			position: at,
+			flow: "work",
+			inputs: {},
+			each: {
+				source: { kind: "json" as const, value: '[{"id":"x","title":"x"}]' },
+				as: "item",
+				branch: "shared" as const,
+			},
+		},
+	};
+	for (const [what, work] of Object.entries(waits)) {
+		for (const [how, sub] of Object.entries(subflows)) {
+			test(`${how}, with ${what} in it: the wait ends, the Subflow stops, and the run finishes along the winner`, async () => {
+				const h = await startRun(
+					sandbox,
+					flowOf(
+						[
+							command("start", "true"),
+							command("fast", "sleep 1"),
+							sub,
+							{ id: "joined", type: "join", position: at, wait: "first" },
+							command("after", "true"),
+						],
+						[
+							edge("s-fast", "start", "pass", "fast"),
+							edge("s-sub", "start", "pass", "sub"),
+							edge("fast-j", "fast", "pass", "joined"),
+							edge("sub-j", "sub", "pass", "joined"),
+							edge("sub-jd", "sub", "done", "joined"),
+							edge("j-after", "joined", "done", "after"),
+						],
+					),
+					{ flows: { work } },
+				);
+				const run = await walk(h, "finished");
+				const of = (id: string) => run.steps.filter((s) => s.nodeId === id);
+				const inner = what === "a Gate" ? "ask" : "nap";
+				expect(of(inner).map((s) => [s.outcome, s.error])).toEqual([
+					["stopped", OUTRUN_ERROR],
+				]);
+				expect(of("sub").map((s) => [s.outcome, s.error])).toEqual([
+					["stopped", OUTRUN_ERROR],
+				]);
+				expect(of("after").map((s) => s.outcome)).toEqual(["pass"]);
+				expect(foldRun(run.events).gates).toEqual([]);
+				expect(foldRun(run.events).waits).toEqual([]);
+				expect(run.ends.map((e) => e.endReason)).toEqual(["finished"]);
+			}, 20_000);
+		}
+	}
+});

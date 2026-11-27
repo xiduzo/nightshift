@@ -6,7 +6,7 @@ import {
 	type Flow,
 	type FlowNode,
 } from "@nightshift/flows";
-import { scopeKey } from "../../log";
+import { type RunState, type Scope, scopeKey } from "../../log";
 import type { RunStateUpdate, RunStateValues } from "../state";
 
 /**
@@ -21,12 +21,12 @@ import type { RunStateUpdate, RunStateValues } from "../state";
  * closes it when it goes on. A step of a branch whose round is closed goes
  * no further: it is a branch a `first` Join left behind.
  *
- * A `first` Join is a race. The branch that reaches it first claims the
- * round in this process (`Races`), and the steps that still run in the
- * other branches are aborted at once: without that, the Join would wait
- * for them, since a super-step ends only when all its tasks did. The
- * claim lives in memory only. After a restart the Join itself decides
- * from the state: the earliest arrival wins.
+ * A `first` Join is a race. The branch that reaches it first wins: its
+ * `EdgeTaken` into the Join is in the log, so every process reads the same
+ * winner (`outrun`), also after a restart. The steps that still run in the
+ * other branches are aborted at once (`Races`, in memory): without that,
+ * the Join would wait for them, since a super-step ends only when all its
+ * tasks did.
  */
 
 const placesOf = new WeakMap<Flow, Map<string, BranchPlace>>();
@@ -54,22 +54,17 @@ export function fanOutOf(flow: Flow, joinId: string): FanOut | null {
 	return null;
 }
 
-/** The race of the `first` Joins, and the running steps of branches it may abort. In memory, one per Thread. */
+/** The running steps of branches a `first` Join may abort. In memory, one per Thread. */
 export type Races = {
 	/** A step of a branch node runs: `abort` stops it when its branch loses. Returns the release. */
 	running(scope: string, nodeId: string, abort: () => void): () => void;
-	/** Claims a round of a Join for one branch (its edge id). True for the first claim only. */
-	claim(scope: string, joinId: string, round: number, branch: string): boolean;
-	/** The branch that claimed the round, or null. */
-	winner(scope: string, joinId: string, round: number): string | null;
 	/** Stops the running step of `nodeId`, when one runs. */
 	abort(scope: string, nodeId: string): void;
 };
 
 export function createRaces(): Races {
-	const claims = new Map<string, string>();
 	const steps = new Map<string, () => void>();
-	const at = (...parts: (string | number)[]) => parts.join("\u0000");
+	const at = (...parts: string[]) => parts.join("\u0000");
 	return {
 		running(scope, nodeId, abort) {
 			const key = at(scope, nodeId);
@@ -78,14 +73,6 @@ export function createRaces(): Races {
 				if (steps.get(key) === abort) steps.delete(key);
 			};
 		},
-		claim(scope, joinId, round, branch) {
-			const key = at(scope, joinId, round);
-			if (claims.has(key)) return false;
-			claims.set(key, branch);
-			return true;
-		},
-		winner: (scope, joinId, round) =>
-			claims.get(at(scope, joinId, round)) ?? null,
 		abort(scope, nodeId) {
 			steps.get(at(scope, nodeId))?.();
 		},
@@ -101,24 +88,45 @@ const scopeOfConfig = (config: LangGraphRunnableConfig) =>
 	);
 
 /**
- * Whether `node` is on a branch that goes no further: its Join's round is
- * closed (the Join went on without it), or another branch claimed a
- * `first` Join's round in this process.
+ * Whether `nodeId`, in `scope`, is on a branch that lost its `first` Join:
+ * the log has an `EdgeTaken` into the Join from another branch since the
+ * round began. The round begins at the latest edge of the fan-out, or at
+ * a run again from a node of its branches. A branch of an `all` Join loses
+ * nothing: the Join waits for it.
  */
 export function outrun(
-	ctx: BranchContext,
-	state: Pick<RunStateValues, "joins">,
-	node: Pick<FlowNode, "id">,
-	config: LangGraphRunnableConfig,
+	flow: Flow,
+	run: Pick<RunState, "edges" | "resumes">,
+	nodeId: string,
+	scope: Scope | null,
 ): boolean {
-	const place = placeOf(ctx.flow, node.id);
-	const joinId = place?.fanOut.join;
-	if (!place || !joinId) return false;
-	const round = state.joins?.[joinId];
-	if (!round) return false;
-	if (round.closed) return true;
-	const winner = ctx.races.winner(scopeOfConfig(config), joinId, round.round);
-	return winner !== null && winner !== place.branch.edge.id;
+	const place = placeOf(flow, nodeId);
+	const join = flow.nodes.find((n) => n.id === place?.fanOut.join);
+	if (!place || join?.type !== "join" || join.wait !== "first") return false;
+	const { fanOut } = place;
+	const key = scopeKey(scope);
+	const taken = run.edges.get(key)?.taken ?? [];
+	const entries = new Set(fanOut.edges.map((e) => e.id));
+	const onBranches = new Set(fanOut.branches.flatMap((b) => b.nodes));
+	let began = -1;
+	for (const edge of taken) {
+		if (entries.has(edge.payload.edgeId)) began = Math.max(began, edge.seq);
+	}
+	for (const resume of run.resumes) {
+		const { action, nodeId: from, scope: at } = resume.payload;
+		if (
+			action === "rerun" &&
+			onBranches.has(from) &&
+			scopeKey(at ?? null) === key
+		) {
+			began = Math.max(began, resume.seq);
+		}
+	}
+	return taken.some((edge) => {
+		if (edge.seq <= began || edge.payload.to !== join.id) return false;
+		const from = placeOf(flow, edge.payload.from);
+		return from?.fanOut === fanOut && from.branch !== place.branch;
+	});
 }
 
 /** The state a fan-out writes with its edges: a new round of its Join. */
@@ -211,8 +219,8 @@ export function unreachableJoin(
 
 /**
  * The state a branch writes when it reaches its Join: its arrival in the
- * Join's round. For a `first` Join the first arrival also claims the round
- * and stops the steps that run in the other branches.
+ * Join's round. For a `first` Join it also stops the steps that run in
+ * the other branches: they lost (`outrun`).
  */
 export function arrive(
 	ctx: BranchContext,
@@ -227,11 +235,9 @@ export function arrive(
 	if (!place || place.fanOut.join !== join.id || !round) return {};
 	if (join.type === "join" && join.wait === "first") {
 		const scope = scopeOfConfig(config);
-		if (ctx.races.claim(scope, join.id, round.round, place.branch.edge.id)) {
-			for (const branch of place.fanOut.branches) {
-				if (branch === place.branch) continue;
-				for (const id of branch.nodes) ctx.races.abort(scope, id);
-			}
+		for (const branch of place.fanOut.branches) {
+			if (branch === place.branch) continue;
+			for (const id of branch.nodes) ctx.races.abort(scope, id);
 		}
 	}
 	return {

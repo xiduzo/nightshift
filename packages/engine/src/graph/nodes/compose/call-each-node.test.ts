@@ -1400,3 +1400,52 @@ describe("the outputs of a flow that runs per element hold their types (Q42)", (
 		]);
 	});
 });
+
+describe("the run's copy of the project, for the elements of a Call with each", () => {
+	test("a step of the called flow that works in the copy asks for it once per drive, not once per element", async () => {
+		const h = await startRun(
+			sandbox,
+			flowOf([
+				callEach(
+					"loop",
+					"work",
+					json([
+						{ id: "1", title: "one" },
+						{ id: "2", title: "two" },
+						{ id: "3", title: "three" },
+					]),
+					{ branch: "shared" },
+				),
+			]),
+			{ flows: { work: body([command("work", "true")]) } },
+		);
+		const asked: string[] = [];
+		const { placement } = h.ctx;
+		const counted = <D extends object>(device: D): D =>
+			new Proxy(device, {
+				get(target, key, receiver) {
+					const value = Reflect.get(target, key, receiver);
+					if (key !== "restoreWorktree" || typeof value !== "function") {
+						return value;
+					}
+					return (...args: unknown[]) => {
+						asked.push("restoreWorktree");
+						return value.apply(target, args);
+					};
+				},
+			});
+		h.ctx.placement = {
+			...placement,
+			deviceFor: (...args) => counted(placement.deviceFor(...args)),
+			deviceById: (...args) => counted(placement.deviceById(...args)),
+		};
+		const { state } = await drive(h, { inputs: {} });
+		expect(state.ended).toMatchObject({ nodeId: "loop", outcome: "done" });
+		expect(
+			deriveSteps(foldRun(await h.events()))
+				.filter((s) => s.nodeId === "work")
+				.map((s) => s.outcome),
+		).toEqual(["pass", "pass", "pass"]);
+		expect(asked).toEqual(["restoreWorktree"]);
+	});
+});

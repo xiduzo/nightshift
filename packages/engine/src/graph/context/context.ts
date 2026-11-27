@@ -177,8 +177,14 @@ export type StepContext = StepShared & {
 	/** The run's abort signal: a person stopped the run. In a called flow, the Subflow step's own. */
 	signal(): AbortSignal;
 	/**
-	 * The race of the `first` Joins of this thread and the running steps of
-	 * branches it may stop (`branches.ts`). A body shares its caller's.
+	 * The signal of the drive that walks the run now: a person stopped the
+	 * run. A called flow has its caller's, so what holds for one drive
+	 * (`restoreRunCopy`) holds across the elements of a Call too.
+	 */
+	drive(): AbortSignal;
+	/**
+	 * The running steps of branches that a `first` Join of this thread may
+	 * stop (`branches.ts`). A body shares its caller's.
 	 */
 	races: Races;
 };

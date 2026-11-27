@@ -8,7 +8,12 @@ import {
 import { type Flow, initialVariables, standsIn } from "@nightshift/flows";
 import { dataProblem } from "@nightshift/flows/json-schema";
 import { keptNames } from "../../variables";
-import { keptFlowOf, type StepContext, templateContext } from "../context";
+import {
+	keptFlowOf,
+	type NodeAction,
+	type StepContext,
+	templateContext,
+} from "../context";
 import {
 	askNodeId,
 	parkCommand,
@@ -18,7 +23,7 @@ import {
 	waitNodeId,
 } from "../route";
 import { RunState } from "../state";
-import { waitNode } from "../step";
+import { CallCut, callStopped, waitNode } from "../step";
 import { withStandIn } from "./stand-in";
 
 /**
@@ -39,7 +44,9 @@ import { withStandIn } from "./stand-in";
  * The runner compiles once per run (`compileFlow(flow, ctx).compile({
  * checkpointer })`) with the thread id set to the run id. A Call node
  * compiles its called flow the same way, with `ctx.flow` and `ctx.flowName`
- * replaced, and invokes it with the config passed through (rule 6).
+ * replaced, and invokes it with the config passed through (rule 6). A node
+ * of a called flow parks nothing once its Call step stopped on its own
+ * (`parksNoCut`).
  */
 
 export function compileFlow(flow: Flow, ctx: StepContext) {
@@ -51,13 +58,14 @@ export function compileFlow(flow: Flow, ctx: StepContext) {
 		const kind = ctx.kindOf(node);
 		const park = parkNodeId(node.id);
 		const own = [park];
+		const cut = (action: NodeAction) => parksNoCut(ctx, park, action);
 		for (const aux of kind.aux(node)) {
 			switch (aux.kind) {
 				case "wait": {
 					const wait = waitNodeId(node.id);
 					own.push(wait);
 					// A hold sends each interrupting node to itself (`interruptNode`).
-					graph.addNode(wait, waitNode(node.id, ctx), {
+					graph.addNode(wait, cut(waitNode(node.id, ctx)), {
 						ends: [node.id, wait],
 					});
 					break;
@@ -67,7 +75,7 @@ export function compileFlow(flow: Flow, ctx: StepContext) {
 					// node itself; a reopen sends it back to the node.
 					const ask = askNodeId(node.id);
 					own.push(ask);
-					graph.addNode(ask, aux.make(node, ctx), {
+					graph.addNode(ask, cut(aux.make(node, ctx)), {
 						ends: [...ends, park, node.id, ask],
 					});
 					break;
@@ -81,7 +89,7 @@ export function compileFlow(flow: Flow, ctx: StepContext) {
 			node.id,
 			ctx.callPath.length === 0 && standsIn(node)
 				? withStandIn(node, ctx, made)
-				: made,
+				: cut(made),
 			{ ends: [...ends, ...own] },
 		);
 		graph.addNode(park, parkNode(node, ctx), { ends: [node.id, park] });
@@ -95,6 +103,27 @@ export function compileFlow(flow: Flow, ctx: StepContext) {
 		graph.addEdge(START, flow.start as typeof START);
 	}
 	return graph;
+}
+
+/**
+ * A node of a called flow parks nothing once its Call step stopped on its
+ * own (`callStopped`): it throws `CallCut`, and `runBody` reads the cut.
+ * At the top level the run's signal stops only for a person: the node is
+ * as it is.
+ */
+function parksNoCut(
+	ctx: StepContext,
+	park: string,
+	action: NodeAction,
+): NodeAction {
+	if (ctx.callPath.length === 0) return action;
+	return async (state, config) => {
+		const command = await action(state, config);
+		if (callStopped(ctx.signal()) && [command.goto].flat().includes(park)) {
+			throw new CallCut();
+		}
+		return command;
+	};
 }
 
 /** The graph node that sets a flow's variables before its first step. */

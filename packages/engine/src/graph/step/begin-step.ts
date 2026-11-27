@@ -11,11 +11,9 @@ import {
 	type DerivedStep,
 	type FlowScore,
 	flowScores,
-	type Hold,
 	knowledgeUseEvent,
 	type RunEndReason,
 	type RunState,
-	type Scope,
 	type StepBudget,
 	type StepOutcome,
 	type StepOutputs,
@@ -44,10 +42,11 @@ import {
 import { keepShapes, stepShapes } from "../data";
 import { budgetPassed, runBudget } from "../policy";
 import { positionOf } from "../position";
-import { parkCommand, route, scopeOf } from "../route";
+import { endOutrun, parkCommand, route, scopeOf } from "../route";
 import type { RunStateValues } from "../state";
-import { haltMessages } from "./abort";
+import { callStopped, haltMessages } from "./abort";
 import { worktreeOn } from "./ready-device";
+import { withServiceTails } from "./service-tails";
 import type {
 	AbortReason,
 	BeginStep,
@@ -88,7 +87,10 @@ async function dataScores(
 }
 
 /**
- * Opens a step of `node` and returns what the node needs. For a new visit
+ * Opens a step of `node` and returns what the node needs. A step of a
+ * branch that lost its `first` Join (`outrun`) does not open: a new visit
+ * starts nothing, and a step the log has ends as outrun (`endOutrun`), with
+ * the open steps of its called flows. For a new visit
  * it first runs the walk's entry checks, in this order, and parks the run
  * when one fires: a stop of the run (stopped, no reason), a stop after the
  * running step, the stop time (both stopped, with today's reasons), and the
@@ -165,9 +167,11 @@ export async function beginStep(
 	let path: string;
 	let visit: number;
 	let existing: DerivedStep | null = null;
+	// A branch another branch outran starts nothing more, and takes nothing
+	// up again: the winner is in the log, also after a restart.
+	const lost = outrun(ctx.flow, logged, node.id, scope);
 	if (start.kind === "new") {
-		// A branch another branch outran starts nothing more.
-		if (outrun(ctx, state, node, config)) {
+		if (lost) {
 			return {
 				kind: "parked",
 				command: new Command({ update: { pending: { [node.id]: null } } }),
@@ -239,6 +243,12 @@ export async function beginStep(
 	} else {
 		existing = logged.steps.get(start.stepId) ?? null;
 		if (!existing) throw new Error(`Step not found: ${start.stepId}`);
+		if (lost) {
+			return {
+				kind: "parked",
+				command: await endOutrun(ctx, node.id, existing, state),
+			};
+		}
 		stepId = existing.id;
 		visit = existing.visit;
 		// A step that moved goes on where it moved to: its session and its
@@ -274,7 +284,12 @@ export async function beginStep(
 	// no activity for too long.
 	const stepController = new AbortController();
 	const runSignal = ctx.signal();
-	const onStop = () => stepController.abort("stopped" satisfies AbortReason);
+	// A stop of the run is a person's. In a called flow whose Call step
+	// stopped on its own, the step is cut with it.
+	const onStop = () =>
+		stepController.abort(
+			(callStopped(runSignal) ? "cut" : "stopped") satisfies AbortReason,
+		);
 	if (runSignal.aborted) onStop();
 	else runSignal.addEventListener("abort", onStop, { once: true });
 	const timer = timeoutMinutes
@@ -567,30 +582,4 @@ function writeVariables(
 		context: { ...tctx, nodes: { ...tctx.nodes, [node.id]: outputs } },
 		checkSchema: dataProblem,
 	});
-}
-
-/**
- * `{{stack.log_tail}}` of a service that runs: the end of its log as it is
- * now, not as it was when the service got ready. Only the services of this
- * flow's scope, by their node.
- */
-function withServiceTails(
-	ctx: StepContext,
-	tctx: TemplateContext,
-	holds: readonly Hold[],
-	scope: Scope | null,
-): TemplateContext {
-	const key = scopeKey(scope);
-	let nodes: TemplateContext["nodes"] | null = null;
-	for (const hold of holds) {
-		if (hold.kind !== "service" || scopeKey(hold.scope) !== key) continue;
-		const outputs = tctx.nodes[hold.nodeId];
-		if (outputs === undefined) continue;
-		nodes ??= { ...tctx.nodes };
-		nodes[hold.nodeId] = {
-			...outputs,
-			log_tail: ctx.services.tail(hold.logPath),
-		};
-	}
-	return nodes === null ? tctx : { ...tctx, nodes };
 }

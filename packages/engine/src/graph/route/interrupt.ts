@@ -5,7 +5,6 @@ import {
 	type LangGraphRunnableConfig,
 } from "@langchain/langgraph";
 
-import { ANSWER_DROPPED, OUTRUN_ERROR } from "../../read";
 import { outrun } from "../branches";
 import type { NodeAction, StepContext } from "../context";
 import { commitVisit, heldStep, holdEnded } from "../position";
@@ -16,6 +15,8 @@ import type {
 	ResumeValue,
 	RunStateValues,
 } from "../state";
+import { endOutrun } from "./outrun";
+import { scopeOf } from "./scope";
 
 /**
  * The one interrupting graph node. Three nodes park a thread at an
@@ -65,7 +66,7 @@ export function interruptNode<K extends Pending["kind"]>(spec: {
 	 * does then. A held step on a branch another branch outran ends there.
 	 */
 	stale?: {
-		ctx: Pick<StepContext, "log" | "run" | "bus" | "flow" | "races">;
+		ctx: Pick<StepContext, "log" | "run" | "bus" | "flow" | "kindOf">;
 		letGo(
 			pending: Extract<Pending, { kind: K }>,
 			state: RunStateValues,
@@ -99,15 +100,11 @@ export function interruptNode<K extends Pending["kind"]>(spec: {
 		// stay as they are.
 		if (answer?.kind === "hold") {
 			const { stale } = spec;
-			if (
-				stale &&
-				own.stepId !== null &&
-				outrun(stale.ctx, state, { id: spec.nodeId }, config)
-			) {
-				return endOutrun(stale.ctx, spec.nodeId, {
-					stepId: own.stepId,
-					visit: own.visit,
-				});
+			if (!stale || own.stepId === null) return holdAgain(config);
+			const run = await stale.ctx.log.state(stale.ctx.run.id);
+			const step = run.steps.get(own.stepId);
+			if (step && outrun(stale.ctx.flow, run, spec.nodeId, scopeOf(config))) {
+				return endOutrun(stale.ctx, spec.nodeId, step, state);
 			}
 			return holdAgain(config);
 		}
@@ -117,48 +114,6 @@ export function interruptNode<K extends Pending["kind"]>(spec: {
 
 /** What an interrupting node's answer can be: anything but a hold, which `interruptNode` takes. */
 type Answer = Exclude<ResumeValue, { kind: "hold" }>;
-
-/**
- * A held Gate or sleep on a branch that another branch outran at a `first`
- * Join: its step ends `stopped` as an outrun step does, and the branch goes
- * no further. Its Gate closes, and its sleep ends with it.
- */
-async function endOutrun(
-	ctx: Pick<StepContext, "log" | "run" | "bus">,
-	nodeId: string,
-	held: { stepId: string; visit: number },
-): Promise<Command> {
-	await ctx.log.append({
-		type: "StepEnded",
-		runId: ctx.run.id,
-		stepId: held.stepId,
-		payload: {
-			outcome: "stopped",
-			outputs: { visit: held.visit, outcome: "stopped" },
-			error: OUTRUN_ERROR,
-		},
-	});
-	// An answer that waited for the drive goes with the Gate.
-	const run = await ctx.log.state(ctx.run.id);
-	if (run.steps.get(held.stepId)?.gate?.queued) {
-		await ctx.log.append({
-			type: "RunWarned",
-			runId: ctx.run.id,
-			stepId: held.stepId,
-			payload: {
-				kind: "answer-dropped",
-				message: `${ANSWER_DROPPED} ${OUTRUN_ERROR}`,
-			},
-		});
-	}
-	ctx.bus.publish(ctx.run.id, { kind: "step-changed", stepId: held.stepId });
-	return new Command({
-		update: {
-			pending: { [nodeId]: null },
-			...commitVisit({ id: nodeId }, held.visit),
-		},
-	});
-}
 
 /** The interrupting node runs again in the next super-step and interrupts with what it holds. */
 function holdAgain(config: LangGraphRunnableConfig): Command {
@@ -207,7 +162,7 @@ export function openAgain(
  */
 export function gateNode(
 	node: { id: string },
-	ctx: Pick<StepContext, "log" | "run" | "bus" | "flow" | "races">,
+	ctx: Pick<StepContext, "log" | "run" | "bus" | "flow" | "kindOf">,
 	spec: {
 		answer: GateSpec["answer"];
 		/** What opens at the node, in the error when none is. Default: a Gate. */

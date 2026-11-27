@@ -182,6 +182,7 @@ export function openThread(row: RunRow, deps: ThreadDeps): Thread {
 		// Resolved at each use: the settings may change while the thread is open.
 		policy: () => resolvePolicy(flow.policy, shared.settings().policy),
 		signal: () => controller.signal,
+		drive: () => controller.signal,
 		races: createRaces(),
 	};
 	const saver = new FencedSaver(deps.db, fence);

@@ -31,7 +31,7 @@ import {
 } from "../../data";
 
 import type { Parked, RunStateValues } from "../../state";
-import type { AbortReason, OpenStep } from "../../step";
+import { CallCut, type OpenStep } from "../../step";
 
 /**
  * What a Call node does, once and per element: running a called flow as a
@@ -62,9 +62,11 @@ import type { AbortReason, OpenStep } from "../../step";
  * - `cut`: the Call step's own signal stopped the body (`callStopped`):
  *   another branch won a `first` Join, or the Call ran past its time
  *   budget. The body's steps watch that signal, not only the run's, so
- *   they end `stopped` at once. The body's park is swallowed, as for
- *   `failed`: the caller ends its step as `abortEnd` says and the walk goes
- *   on. The run does not end as a person's stop.
+ *   they end `stopped` at once, and the body parks nothing: its node
+ *   throws `CallCut` (`compileFlow`). The caller ends its step as
+ *   `abortEnd` says and the walk goes on. The run does not end as a
+ *   person's stop, also when the daemon dies before the Call's end: the
+ *   Call taken up again runs its body on.
  * - `aborted`: the body parked `failed` before a step started (the step
  *   cap). The caller ends its step `error` and rethrows.
  * - `paused`: a wait or a Gate inside the body. The caller leaves its step
@@ -111,16 +113,6 @@ export type BodyGraph = ReturnType<ReturnType<typeof compileFlow>["compile"]>;
 
 /** The signal the steps of each compiled body watch: that of the Call step that runs it now (`runBody`). */
 const watched = new WeakMap<BodyGraph, { signal: AbortSignal }>();
-
-/**
- * The Call step's own signal stopped it: another branch won a `first`
- * Join, or the step ran past its time budget. A stop of the run aborts the
- * same signal with `stopped`: that one is a person's stop, not the Call's.
- */
-export function callStopped(signal: AbortSignal): boolean {
-	const reason = signal.reason as AbortReason | undefined;
-	return signal.aborted && (reason === "outrun" || reason === "timeout");
-}
 
 /**
  * The called flow compiled for the caller's run, with its own `flow` and
@@ -206,10 +198,10 @@ export async function runBody(input: {
 			config,
 		)) as RunStateValues;
 	} catch (error) {
+		if (error instanceof CallCut) return { kind: "cut" };
 		if (!isGraphInterrupt(error)) throw error;
 		const value = error.interrupts[0]?.value as Parked | undefined;
 		if (value?.kind !== "parked") return { kind: "paused", interrupt: error };
-		if (callStopped(input.signal)) return { kind: "cut" };
 		if (value.status === "stopped") {
 			return {
 				kind: "stopped",
