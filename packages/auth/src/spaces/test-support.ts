@@ -37,15 +37,5 @@ export async function spacesPorts() {
 				createdAt: asDate(0),
 			});
 		},
-		/** The Spaces, as a test compares them. */
-		spaces: () =>
-			db
-				.select({
-					id: organization.id,
-					name: organization.name,
-					slug: organization.slug,
-					personal: organization.personal,
-				})
-				.from(organization),
 	};
 }
