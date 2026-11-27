@@ -107,7 +107,6 @@ export type WorktreeRemoved = {
 	branches: string[];
 	kept?: string[];
 	expired?: string[];
-	by: "person" | "cleanup";
 };
 
 /**

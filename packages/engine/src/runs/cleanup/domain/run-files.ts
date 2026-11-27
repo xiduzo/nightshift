@@ -33,8 +33,8 @@ export type RunFiles = {
 	more: boolean;
 	/** When the scheduled cleanup removes the folder. Null when it never will on its own: the run goes on, or the cleanup is off. */
 	cleanupAt: number | null;
-	/** When this computer removed the folder, and who. Null while it is here. */
-	removed: { at: number; by: "person" | "cleanup" } | null;
+	/** When this computer removed the folder. Null while it is here. */
+	removed: { at: number } | null;
 };
 
 /** The answer for a run without a folder here. */

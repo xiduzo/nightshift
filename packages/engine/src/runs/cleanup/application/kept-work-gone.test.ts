@@ -7,7 +7,6 @@ const removal = {
 	projectId: "project-1",
 	worktreePath: null,
 	branches: [],
-	by: "cleanup" as const,
 };
 
 describe("keptWorkGone", () => {

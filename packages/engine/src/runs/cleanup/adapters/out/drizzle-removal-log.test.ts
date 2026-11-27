@@ -27,7 +27,7 @@ describe("RemovalLog over drizzle", () => {
 		expect(await under.removalLog.removals("p1")).toEqual([]);
 	});
 
-	test("gives the project's removals oldest first, each with its run and who removed it, and whether it kept or freed work", async () => {
+	test("gives the project's removals oldest first, each with its run, and whether it kept or freed work", async () => {
 		const { removalLog } = under;
 		await removalLog.removed({
 			projectId: "p1",
@@ -35,14 +35,12 @@ describe("RemovalLog over drizzle", () => {
 			worktreePath: "/work/run-1",
 			branches: ["nightshift/run-1"],
 			kept: ["refs/nightshift/kept/run-1/copy"],
-			by: "cleanup",
 		});
 		await removalLog.removed({
 			projectId: "p2",
 			runId: "run-2",
 			worktreePath: null,
 			branches: [],
-			by: "cleanup",
 		});
 		await removalLog.removed({
 			projectId: "p1",
@@ -50,13 +48,11 @@ describe("RemovalLog over drizzle", () => {
 			worktreePath: null,
 			branches: [],
 			expired: ["refs/nightshift/kept/run-3/copy"],
-			by: "person",
 		});
 		const removals = await removalLog.removals("p1");
 		expect(
-			removals.map(({ runId, by, kept, expired, copy }) => ({
+			removals.map(({ runId, kept, expired, copy }) => ({
 				runId,
-				by,
 				kept,
 				expired,
 				copy,
@@ -64,14 +60,12 @@ describe("RemovalLog over drizzle", () => {
 		).toEqual([
 			{
 				runId: "run-1",
-				by: "cleanup",
 				kept: true,
 				expired: false,
 				copy: true,
 			},
 			{
 				runId: "run-3",
-				by: "person",
 				kept: false,
 				expired: true,
 				copy: false,

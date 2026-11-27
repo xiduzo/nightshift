@@ -78,13 +78,9 @@ describe("listRunFiles", () => {
 			runId: "run-1",
 			worktreePath: "/data/run-folders/run-1",
 			branches: [],
-			by: "cleanup",
 		});
 		await ports.removedAt(42);
-		expect((await list(ADA, { runId: "run-1" })).removed).toEqual({
-			at: 42,
-			by: "cleanup",
-		});
+		expect((await list(ADA, { runId: "run-1" })).removed).toEqual({ at: 42 });
 	});
 
 	test("every Member of the run's Space may, before any read, and nobody else", async () => {

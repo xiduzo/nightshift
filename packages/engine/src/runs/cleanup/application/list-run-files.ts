@@ -40,7 +40,7 @@ export const listRunFiles =
 			const last = removals.findLast((removal) => removal.runId === run.id);
 			return {
 				...NO_FILES,
-				removed: last ? { at: last.at, by: last.by } : null,
+				removed: last ? { at: last.at } : null,
 			};
 		}
 		const { cleanUpRuns, cleanUpAfterDays } = ports.ground.settings();

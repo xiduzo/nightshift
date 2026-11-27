@@ -40,9 +40,9 @@ describe("showsRunFiles", () => {
 	});
 
 	test("why none is here: removed, or on another computer", () => {
-		expect(
-			showsRunFiles(files({ here: false, removed: { at: 1, by: "cleanup" } })),
-		).toBe(true);
+		expect(showsRunFiles(files({ here: false, removed: { at: 1 } }))).toBe(
+			true,
+		);
 		expect(showsRunFiles(files({ here: false }))).toBe(true);
 	});
 });

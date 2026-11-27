@@ -26,7 +26,6 @@ describe("sweepRunFolders", () => {
 				runId: "run-old",
 				worktreePath: "/data/run-folders/run-old",
 				branches: [],
-				by: "cleanup",
 			},
 		]);
 	});

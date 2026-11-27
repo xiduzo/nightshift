@@ -243,7 +243,6 @@ describe("the scheduled cleanup", () => {
 			runId: empty.id,
 			worktreePath: empty.worktreePath,
 			branches: [empty.branch],
-			by: "cleanup",
 		});
 		expect(byRun.get(unsaved.id)?.kept).toEqual([
 			`refs/nightshift/kept/${short(unsaved.id)}/copy`,
@@ -311,7 +310,6 @@ describe("the scheduled cleanup", () => {
 			runId: run.id,
 			worktreePath: null,
 			branches: [],
-			by: "cleanup",
 		});
 		expect(expired?.payload.expired).toHaveLength(2);
 	}, 60_000);

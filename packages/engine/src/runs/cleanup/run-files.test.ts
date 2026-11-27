@@ -233,14 +233,13 @@ describe("the scheduled cleanup of run folders", () => {
 				runId: ended.id,
 				worktreePath: ended.worktreePath,
 				branches: [],
-				by: "cleanup",
 			},
 		]);
 		expect(await later.listRunFiles(ended.id)).toMatchObject({
 			here: false,
 			files: [],
 			cleanupAt: null,
-			removed: { by: "cleanup" },
+			removed: { at: expect.any(Number) },
 		});
 	}, 30_000);
 

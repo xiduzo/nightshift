@@ -45,9 +45,7 @@ export const runFilesSchema = exact<RunFiles>()(
 		more: z.boolean(),
 		/** When the cleanup removes the folder. Null while the run goes on, or when the cleanup is off. */
 		cleanupAt: z.number().nullable(),
-		/** When this computer removed the folder, and who. */
-		removed: z
-			.object({ at: z.number(), by: z.enum(["person", "cleanup"]) })
-			.nullable(),
+		/** When this computer removed the folder. */
+		removed: z.object({ at: z.number() }).nullable(),
 	}),
 );

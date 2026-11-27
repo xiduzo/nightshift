@@ -128,7 +128,6 @@ export type RemovalLog = {
 		{
 			at: number;
 			runId: string;
-			by: "person" | "cleanup";
 			kept: boolean;
 			expired: boolean;
 			/** It removed a copy of the run (`worktreePath`). */

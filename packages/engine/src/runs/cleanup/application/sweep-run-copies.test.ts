@@ -39,7 +39,6 @@ describe("sweepRunCopies", () => {
 				runId: RUN,
 				worktreePath: `${REPO}.nightshift/${SHORT}`,
 				branches: [`nightshift/${SHORT}`],
-				by: "cleanup",
 			},
 		]);
 	});
@@ -125,7 +124,6 @@ describe("sweepRunCopies", () => {
 				runId: RUN,
 				worktreePath: `${REPO}.nightshift/${SHORT}`,
 				branches: [],
-				by: "cleanup",
 			},
 		]);
 	});
@@ -165,7 +163,6 @@ describe("sweepRunCopies", () => {
 				worktreePath: null,
 				branches: [],
 				expired: [refs.copy],
-				by: "cleanup",
 			},
 		]);
 	});
@@ -179,7 +176,6 @@ describe("sweepRunCopies", () => {
 			worktreePath: null,
 			branches: [],
 			kept: [ports.branches.keptRefs("gone0000").copy],
-			by: "cleanup",
 		});
 		await ports.removedAt(2 * DAY_MS);
 		const refs = ports.branches.keptRefs("gone0000");
@@ -219,7 +215,6 @@ describe("sweepRunCopies", () => {
 			worktreePath: null,
 			branches: [],
 			kept: [ports.branches.keptRefs("moved000").copy],
-			by: "cleanup",
 		});
 		await ports.removedAt(2 * DAY_MS);
 		await ports.branches.keep(

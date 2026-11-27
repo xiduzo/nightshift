@@ -90,7 +90,6 @@ export const sweepRunCopies =
 				projectId,
 				runId,
 				...removed,
-				by: "cleanup",
 			});
 		}
 

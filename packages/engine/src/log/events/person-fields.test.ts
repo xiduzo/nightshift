@@ -71,7 +71,6 @@ const samples: { [T in EngineEventType]: EnginePayloads[T] } = {
 		runId: "r1",
 		worktreePath: null,
 		branches: [],
-		by: "person",
 	},
 	StepMoved: { from: "device-a", to: "device-b" },
 	HandedOff: {
@@ -149,7 +148,7 @@ const samples: { [T in EngineEventType]: EnginePayloads[T] } = {
 	StopAfterStepRequested: {},
 	StopAfterStepCancelled: {},
 	RunTakenOver: { by: LOCAL, harness: "claude-code" },
-	RunEnded: { status: "finished", reason: null },
+	RunEnded: { status: "finished", reason: null, endReason: "finished" },
 	RunWarned: { kind: "cost-unknown", message: "Unknown cost" },
 	PullRequestOpened: { url: "https://github.com/acme/app/pull/1" },
 	Scored: { score: "gate_decision", value: 1, label: "approve", by: "person" },

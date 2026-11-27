@@ -10,7 +10,6 @@ export function drizzleRemovals(db: Database): Pick<RemovalLog, "removals"> {
 			return removals.map((removal) => ({
 				at: removal.at,
 				runId: removal.payload.runId,
-				by: removal.payload.by,
 				kept: (removal.payload.kept?.length ?? 0) > 0,
 				expired: (removal.payload.expired?.length ?? 0) > 0,
 				copy: removal.payload.worktreePath !== null,

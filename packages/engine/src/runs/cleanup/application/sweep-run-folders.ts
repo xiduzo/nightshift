@@ -59,7 +59,6 @@ export const sweepRunFolders =
 						runId,
 						worktreePath: folders.path(runId),
 						branches: [],
-						by: "cleanup",
 					});
 				}
 			} catch (error) {
