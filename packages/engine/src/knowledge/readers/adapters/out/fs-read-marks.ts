@@ -1,4 +1,5 @@
-import { readFile } from "node:fs/promises";
+import type { Dirent } from "node:fs";
+import { readdir, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
 import { writeWhole } from "../../../../archive";
@@ -40,11 +41,49 @@ const entrySchema = z.object({
 
 const fileSchema = z.record(z.string(), entrySchema);
 
+/** The end of the name of a part file that a failed save left before c494f0259. */
+const OLD_PART = ".json.part";
+
+/**
+ * Removes the part files that a failed save of the marks left in `root`
+ * before the marks were written whole (c494f0259), and logs how many. No
+ * new one appears. Every other file stays.
+ */
+async function removeOldParts(root: string): Promise<void> {
+	let entries: Dirent[];
+	try {
+		entries = await readdir(root, { withFileTypes: true });
+	} catch {
+		return; // No folder yet: no part file either.
+	}
+	const parts = entries.filter(
+		(entry) => entry.isFile() && entry.name.endsWith(OLD_PART),
+	);
+	let removed = 0;
+	for (const part of parts) {
+		try {
+			await rm(join(root, part.name));
+			removed++;
+		} catch (error) {
+			console.warn(
+				`An old part file of the page read marks stays: ${part.name}`,
+				error,
+			);
+		}
+	}
+	if (removed > 0) {
+		console.info(
+			`Removed ${removed} old part file${removed === 1 ? "" : "s"} (*${OLD_PART}) of the page read marks from ${root}.`,
+		);
+	}
+}
+
 export function fsReadMarks(dataDir: string): ReadMarks {
 	const root = join(dataDir, "knowledge", ".reads");
 	const loaded = new Map<string, Map<string, KeptRead>>();
 	const dirty = new Set<string>();
 	let timer: ReturnType<typeof setTimeout> | null = null;
+	let swept: Promise<void> | null = null;
 
 	const keyOf = (reader: string, url: string) => `${reader} ${url}`;
 	const fileOf = (projectId: string) =>
@@ -53,6 +92,8 @@ export function fsReadMarks(dataDir: string): ReadMarks {
 	async function load(projectId: string): Promise<Map<string, KeptRead>> {
 		const kept = loaded.get(projectId);
 		if (kept) return kept;
+		swept ??= removeOldParts(root);
+		await swept;
 		let entries = new Map<string, KeptRead>();
 		try {
 			const parsed = fileSchema.safeParse(

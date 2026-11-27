@@ -67,3 +67,41 @@ test("a failed write leaves what was there and no part file", async () => {
 		warn.mockRestore();
 	}
 });
+
+test("the first read removes the part files of old failed saves, and only those", async () => {
+	const info = spyOn(console, "info").mockImplementation(() => {});
+	try {
+		await mkdir(join(reads, "kept.json.part"), { recursive: true });
+		await writeFile(join(reads, "p1.json.part"), "{");
+		await writeFile(join(reads, "p2.json.part"), "");
+		await writeFile(join(reads, "p1.json"), "{}");
+		await writeFile(join(reads, "note.part"), "mine");
+		const marks = fsReadMarks(dataDir);
+
+		await marks.get("p1", "nightshift", pageOf(0));
+		await marks.get("p2", "nightshift", pageOf(0));
+
+		expect((await readdir(reads)).sort()).toEqual([
+			"kept.json.part",
+			"note.part",
+			"p1.json",
+		]);
+		expect(info.mock.calls).toEqual([
+			[
+				`Removed 2 old part files (*.json.part) of the page read marks from ${reads}.`,
+			],
+		]);
+	} finally {
+		info.mockRestore();
+	}
+});
+
+test("a folder without part files logs nothing", async () => {
+	const info = spyOn(console, "info").mockImplementation(() => {});
+	try {
+		await fsReadMarks(dataDir).get("p1", "nightshift", pageOf(0));
+		expect(info).not.toHaveBeenCalled();
+	} finally {
+		info.mockRestore();
+	}
+});
