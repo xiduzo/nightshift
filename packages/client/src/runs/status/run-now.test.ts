@@ -219,9 +219,9 @@ describe("what a waiting run needs", () => {
 		expect(notice("waiting", { steps })).toEqual({
 			kind: "gate",
 			title: ["Waiting for your answer"],
-			gist: "At the gate node-review",
+			gist: "At the Gate node-review",
 			body: [
-				"The run waits at the gate ",
+				"The run waits at the Gate ",
 				{ code: "node-review" },
 				" until someone answers it.",
 			],
@@ -236,7 +236,7 @@ describe("what a waiting run needs", () => {
 		expect(notice("waiting", { steps, signal: "deployed" })).toMatchObject({
 			kind: "gate",
 			body: [
-				"The run waits at the gate ",
+				"The run waits at the Gate ",
 				{ code: "node-review" },
 				" until someone answers it.",
 				" A step beside it waits for the signal ",

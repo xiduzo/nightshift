@@ -69,6 +69,9 @@ const SUMMARY_CHANGES: ReadonlySet<EngineEventType> = new Set([
 	"StepReopened",
 	"StepEnded",
 	"GateOpened",
+	// An answer that waits for the drive, or did not reach its Gate.
+	"AnswerQueued",
+	"RunWarned",
 	"WaitStarted",
 	"WaitEnded",
 	"WalkerMoved",

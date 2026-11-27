@@ -286,7 +286,7 @@ function noticeOf(
 					["Answer sent"],
 					"The Gate takes it when the other branch's step ends.",
 					[
-						"Your answer is on its way to the gate ",
+						"Your answer is on its way to the Gate ",
 						{ code: gate.nodeId },
 						". The Gate takes it when the step on another branch of the run ends.",
 					],
@@ -295,9 +295,9 @@ function noticeOf(
 			return notice(
 				"gate",
 				["Waiting for your answer"],
-				`At the gate ${gate.nodeId}`,
+				`At the Gate ${gate.nodeId}`,
 				[
-					"The run waits at the gate ",
+					"The run waits at the Gate ",
 					{ code: gate.nodeId },
 					" until someone answers it.",
 					...(signal !== null
