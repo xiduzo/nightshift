@@ -296,7 +296,7 @@ export const sweepRunCopies =
 		const freed = result.expired.length;
 		if (freed > 0) {
 			console.log(
-				`[cleanup] freed the kept work of ${freed} run${freed === 1 ? "" : "s"} (${KEPT_WORK_DAYS} days after each ended)`,
+				`[cleanup] freed the kept work of ${freed} run${freed === 1 ? "" : "s"} (${KEPT_WORK_DAYS} days after each ended or was kept)`,
 			);
 		}
 		return result;

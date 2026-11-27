@@ -81,10 +81,10 @@ const KEEPER = {
 /** The project's default branch, and the refs of it this clone has (local, origin). */
 type DefaultBranch = { name: string; refs: string[] };
 
-/** The run branches and worktrees of clones, over the git port. */
 /** A kept ref and the commit it holds. */
 type KeptRef = { ref: string; commit: string };
 
+/** The run branches and worktrees of clones, over the git port. */
 export function createRunBranches(git: Git) {
 	async function refExists(cwd: string, ref: string): Promise<boolean> {
 		const result = await git.run(cwd, [

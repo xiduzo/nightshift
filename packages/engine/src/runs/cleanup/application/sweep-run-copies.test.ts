@@ -150,7 +150,9 @@ describe("sweepRunCopies", () => {
 			// Each kept tip, so a person can still get it back with git.
 			expect(log.mock.calls).toEqual([
 				[`[cleanup] freed the kept work of run ${SHORT}: ${refs.copy} at c1`],
-				["[cleanup] freed the kept work of 1 run (30 days after each ended)"],
+				[
+					"[cleanup] freed the kept work of 1 run (30 days after each ended or was kept)",
+				],
 			]);
 		} finally {
 			log.mockRestore();
