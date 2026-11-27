@@ -101,6 +101,14 @@ To work with other people, invite them to a Space on your Host. Each person gets
 
 A Host is invitation-only. Nobody makes an account without an invitation link from a Member.
 
+### Leave a Space and join it again
+
+When an admin removes you from a Space, the Space goes from your computers. To work in it again:
+
+1. Ask an admin of the Space for a new invitation.
+2. Open the link, and choose **Join** with the name of the Space.
+3. Your computers show the Space again when they next connect to the Host.
+
 ### Offers
 
 An Offer lets a Space use one of your profiles. A step of another person runs on your computer only through an Offer. Each Offer sets two limits: the widest permission mode, and how many sessions run at once.
