@@ -3,9 +3,12 @@
  * (`workToKeep`), and whether a run still has it. Pure: the facts come
  * from the run's end and from the `WorktreeRemoved` facts of this computer.
  *
- * The work goes `KEPT_WORK_DAYS` after the run ended. A run this computer
- * does not know has no end here: its work goes `KEPT_WORK_DAYS` after the
- * cleanup last kept it. Without either fact, the work stays. An open run
+ * The work goes `KEPT_WORK_DAYS` after the run ended, and never sooner
+ * than `KEPT_WORK_DAYS` after the cleanup last kept it: a run that ended
+ * long ago while this computer was off keeps its work hidden that long
+ * too. A run this computer does not know has no end here: its work goes
+ * `KEPT_WORK_DAYS` after the cleanup last kept it. Without either fact,
+ * the work stays. An open run
  * keeps it, as does a run only another version can continue (`keepsWork`).
  */
 
@@ -18,7 +21,7 @@ export const KEPT_WORK_DAYS = 30;
 export type KeptWorkFacts = {
 	/** When the run ended (or started, when it has no end). Null for a run this computer does not know. */
 	endedAt: number | null;
-	/** When the cleanup last kept work of the run (`WorktreeRemoved` with `kept`). Null when the log has none. */
+	/** When the cleanup last kept work of the run (`WorktreeRemoved` with `kept`, or this sweep). Null when it never did. */
 	keptAt: number | null;
 	/** Nothing removes the run's work: it goes on, or only another version can continue it. */
 	open: boolean;
@@ -28,7 +31,11 @@ export type KeptWorkFacts = {
 /** Whether the cleanup frees the run's kept work now, or keeps it. */
 export function keptWorkFate(facts: KeptWorkFacts): "free" | "keep" {
 	if (facts.open) return "keep";
-	const since = facts.endedAt ?? facts.keptAt;
+	const { endedAt, keptAt } = facts;
+	const since =
+		endedAt !== null && keptAt !== null
+			? Math.max(endedAt, keptAt)
+			: (endedAt ?? keptAt);
 	if (since === null) return "keep";
 	return since + KEPT_WORK_DAYS * DAY_MS <= facts.now ? "free" : "keep";
 }

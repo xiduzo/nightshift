@@ -150,6 +150,7 @@ export const sweepRunCopies =
 					);
 					kept.push(refs.branch(branch.name));
 				}
+				if (kept.length > 0) keptNow.add(shortId);
 				worktreePath = await removeCopy(repoPath, state);
 				for (const branch of state.branches) {
 					await branches.deleteBranch(repoPath, branch.name);
@@ -170,8 +171,9 @@ export const sweepRunCopies =
 
 		/**
 		 * Deletes the kept refs of each run whose kept work is due
-		 * (`keptWorkFate`): by the run's end, or for a run this computer does
-		 * not know, by when the cleanup last kept its work.
+		 * (`keptWorkFate`): by the run's end and by when the cleanup last kept
+		 * its work (in the log, or in this sweep), or for a run this computer
+		 * does not know, by that keep alone.
 		 */
 		async function expire(
 			project: { id: string; repoPath: string },
@@ -183,25 +185,25 @@ export const sweepRunCopies =
 			const byShortId = new Map(
 				projectRuns.map((run) => [shortIdOf(run.id), run]),
 			);
+			const now = ground.now();
 			const keptAt = new Map<string, { runId: string; at: number }>();
-			if ([...kept.keys()].some((shortId) => !byShortId.has(shortId))) {
-				for (const removal of await ports.removalLog.removals(project.id)) {
-					if (removal.kept) {
-						keptAt.set(shortIdOf(removal.runId), {
-							runId: removal.runId,
-							at: removal.at,
-						});
-					}
+			for (const removal of await ports.removalLog.removals(project.id)) {
+				if (removal.kept) {
+					keptAt.set(shortIdOf(removal.runId), {
+						runId: removal.runId,
+						at: removal.at,
+					});
 				}
 			}
-			const now = ground.now();
 			for (const [shortId, refs] of kept) {
 				const run = byShortId.get(shortId);
 				const runId = run?.id ?? keptAt.get(shortId)?.runId;
 				if (runId === undefined) continue;
 				const facts = {
 					endedAt: run ? (run.endedAt ?? run.createdAt) : null,
-					keptAt: keptAt.get(shortId)?.at ?? null,
+					keptAt: keptNow.has(shortId)
+						? now
+						: (keptAt.get(shortId)?.at ?? null),
 					now,
 				};
 				// Only a due run is asked whether it goes on.
@@ -233,6 +235,8 @@ export const sweepRunCopies =
 		}
 
 		const result: SweepResult = { removed: [], expired: [], left: 0 };
+		/** The runs whose work this sweep kept, by short id: it stays at least `KEPT_WORK_DAYS` from now. */
+		const keptNow = new Set<string>();
 		if (!ground.settings().cleanUpRuns) return result;
 		for (const project of await ports.projects.list()) {
 			try {

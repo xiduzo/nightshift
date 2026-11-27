@@ -66,6 +66,17 @@ describe("sweepRunCopies", () => {
 		]);
 	});
 
+	test("work kept now stays 30 days, also of a run that ended 40 days ago", async () => {
+		const { ports, sweep } = await setup();
+		ports.ground.at = 41 * DAY_MS;
+		ports.branches.leave(REPO, SHORT, {
+			changes: 1,
+			head: { commit: "c1", branch: `nightshift/${SHORT}`, unsaved: 0 },
+		});
+		expect(await sweep()).toEqual({ removed: [RUN], expired: [], left: 0 });
+		expect([...(await ports.branches.listKept(REPO)).keys()]).toEqual([SHORT]);
+	});
+
 	test("leaves a copy git does not know, an open run and a run at work here", async () => {
 		const { ports, sweep } = await setup();
 		ports.branches.leave(REPO, SHORT, { registered: false });
