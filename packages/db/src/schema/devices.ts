@@ -119,11 +119,7 @@ export const hostLink = sqliteTable(
  */
 export const hostSpace = sqliteTable("host_space", {
 	spaceId: text("space_id").primaryKey(),
-	/**
-	 * The Host's Device id. Empty: the Host is not known (a Space this
-	 * computer left before it kept that). The first Host that lists the
-	 * Space again takes it.
-	 */
+	/** The Host's Device id. Only this Host brings a left Space back. */
 	hostId: text("host_id").notNull(),
 	name: text("name").notNull(),
 	/** The role of this Device's owner in the Space, on the Host. */

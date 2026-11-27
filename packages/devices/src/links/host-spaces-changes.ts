@@ -21,9 +21,6 @@ export type KeptHostSpace = {
 	left: boolean;
 };
 
-/** The Host of a row this computer left before it kept which Host that was. */
-export const UNKNOWN_HOST = "";
-
 /** The membership of this computer's Person in a Space here. */
 export type HostSpaceMembership = {
 	/** Null for a membership that an earlier change of the same list adds. */
@@ -68,8 +65,10 @@ export type HostSpaceChange =
 /**
  * The changes that a Host's list makes here, in order. A Space of this
  * Replica's own, or one another Host keeps or kept, is never taken. A
- * Space this computer left comes back through its own Host, or through
- * the first Host that lists it when that Host is not known. A personal
+ * Space this computer left comes back only through its own Host. A
+ * listed Space with no row here is taken as new only when this Replica
+ * has no Space of that id. So a Space left before its Host was known
+ * stays out. A personal
  * Space is "Personal" when it is this computer's own, else named after
  * its Host. A Space listed as before changes nothing. A Space of this
  * Host that the list leaves out loses the membership, and its row is
@@ -84,7 +83,7 @@ export function hostSpaceChanges(state: HostSpaceState): HostSpaceChange[] {
 	for (const listed of state.listed) {
 		const row = kept.get(listed.id);
 		if (state.own.has(listed.id) && !row) continue;
-		if (row && !mayTake(row, host.id)) continue;
+		if (row && row.hostId !== host.id) continue;
 		const name = !listed.personal
 			? listed.name
 			: personalSpaceName(
@@ -132,9 +131,4 @@ export function hostSpaceChanges(state: HostSpaceState): HostSpaceChange[] {
 		.map((row) => row.spaceId);
 	if (gone.length > 0) changes.push({ kind: "leave", spaceIds: gone });
 	return changes;
-}
-
-/** Whether a Host may take a kept row: its own, or a left one whose Host is not known. */
-function mayTake(row: KeptHostSpace, hostId: string): boolean {
-	return row.hostId === hostId || (row.left && row.hostId === UNKNOWN_HOST);
 }

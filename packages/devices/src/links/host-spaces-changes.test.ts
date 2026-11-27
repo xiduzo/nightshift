@@ -5,7 +5,6 @@ import {
 	type HostSpaceState,
 	hostSpaceChanges,
 	type KeptHostSpace,
-	UNKNOWN_HOST,
 } from "./host-spaces-changes";
 
 const studio = { id: "host-a", name: "studio" };
@@ -58,7 +57,7 @@ const take = (
 describe("what a Host's list of Spaces changes here", () => {
 	test.each<[string, World, HostSpaceChange[]]>([
 		[
-			"a new shared Space: kept with its name, and a membership in its role",
+			"a new shared Space, with no row here: kept with its name, and a membership in its role",
 			{ listed: [team] },
 			[
 				take(
@@ -352,34 +351,6 @@ describe("what a Host's list of Spaces changes here", () => {
 				listed: [team],
 				own: new Set(["space-team"]),
 				kept: [{ ...keptTeam, hostId: "host-b", left: true }],
-			},
-			[],
-		],
-		[
-			"left through a Host that is not known: the first Host that lists it takes it",
-			{
-				listed: [team],
-				own: new Set(["space-team"]),
-				kept: [{ ...keptTeam, hostId: UNKNOWN_HOST, left: true }],
-			},
-			[
-				take(
-					{
-						spaceId: "space-team",
-						name: "Team",
-						role: "member",
-						personal: false,
-					},
-					{ kind: "add", role: "member" },
-				),
-			],
-		],
-		[
-			"kept by a Host that is not known, and not left: never taken",
-			{
-				listed: [team],
-				own: new Set(["space-team"]),
-				kept: [{ ...keptTeam, hostId: UNKNOWN_HOST }],
 			},
 			[],
 		],

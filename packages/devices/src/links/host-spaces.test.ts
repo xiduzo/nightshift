@@ -343,27 +343,41 @@ describe("the Spaces a Host keeps", () => {
 		expect(row?.leftAt).toBeInstanceOf(Date);
 	});
 
-	test("a Space left before its Host was known goes to the first Host that lists it, once", async () => {
+	test("a Space left before its Host was known stays out after the migration removed its row, whichever linked Host lists it", async () => {
 		const hostSpaces = createHostSpaces(sandbox.db);
 		await hostSpaces.update(studio, listed, personId);
 		await hostSpaces.update(studio, [], personId);
-		// As the migration leaves such a Space: left, its Host not known.
+		// As migration host_space_no_host leaves such a Space: its Space row
+		// stays here, its host_space row is gone.
 		await sandbox.db
-			.update(hostSpace)
-			.set({ hostId: "" })
+			.delete(hostSpace)
 			.where(eq(hostSpace.spaceId, "space-team"));
+		const links = createHostLinks(sandbox.db);
+		await links.save(homeLink);
+		await links.save({
+			...homeLink,
+			hostId: attic.id,
+			name: attic.name,
+			role: "guest",
+			personId: "person-on-b",
+		});
 
-		await hostSpaces.update(
-			attic,
-			[{ id: "space-team", name: "Team", personal: false, role: "viewer" }],
-			personId,
-		);
-		expect(await hostSpaces.hostOf("space-team")).toBe(attic.id);
-		expect(await roleOf("space-team")).toBe("viewer");
-
-		await hostSpaces.update(studio, listed, personId);
-		expect(await hostSpaces.hostOf("space-team")).toBe(attic.id);
-		expect(await roleOf("space-team")).toBe("viewer");
+		for (const host of [attic, studio]) {
+			await hostSpaces.update(
+				host,
+				[{ id: "space-team", name: "Taken", personal: false, role: "owner" }],
+				personId,
+			);
+			expect(await hostSpaces.hostOf("space-team")).toBeNull();
+			expect(await roleOf("space-team")).toBeNull();
+			expect(await nameOf("space-team")).toBe("Team");
+		}
+		expect(
+			await sandbox.db
+				.select()
+				.from(hostSpace)
+				.where(eq(hostSpace.spaceId, "space-team")),
+		).toEqual([]);
 	});
 
 	test("a Space listed twice ends as its last listing, with one membership", async () => {
