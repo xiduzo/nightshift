@@ -199,11 +199,31 @@ describe("sweepRunCopies", () => {
 		expect(ports.branches.done).toEqual([`delete-ref ${refs.copy}`]);
 	});
 
-	test("keeps the kept work of a run that is open again", async () => {
+	test("keeps the kept work of an open run that the project's runs do not list", async () => {
 		const { ports, sweep } = await setup();
+		// A merge moved the run to another project: its log still has it waiting.
+		const moved = "moved000-run";
+		ports.runs.add({
+			id: moved,
+			projectId: "project-2",
+			status: "waiting",
+			endedAt: null,
+		});
+		await ports.removalLog.removed({
+			projectId: "project-1",
+			runId: moved,
+			worktreePath: null,
+			branches: [],
+			kept: [ports.branches.keptRefs("moved000").copy],
+			by: "cleanup",
+		});
+		await ports.removedAt(2 * DAY_MS);
+		await ports.branches.keep(
+			REPO,
+			ports.branches.keptRefs("moved000").copy,
+			"c1",
+		);
 		ports.ground.at = 40 * DAY_MS;
-		ports.runs.add({ id: RUN, status: "running", endedAt: DAY_MS });
-		await ports.branches.keep(REPO, ports.branches.keptRefs(SHORT).copy, "c1");
 		ports.branches.done.length = 0;
 		expect((await sweep()).expired).toEqual([]);
 		expect(ports.branches.done).toEqual([]);

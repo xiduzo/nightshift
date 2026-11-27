@@ -208,7 +208,9 @@ export const sweepRunCopies =
 				};
 				// Only a due run is asked whether it goes on.
 				if (keptWorkFate({ ...facts, open: false }) === "keep") continue;
-				const open = run ? await keeps(runId) : runs.isActive(runId);
+				// Also a run the project's runs do not list: a merge or a move can
+				// have moved it, and its log can still have it open.
+				const open = await keeps(runId);
 				if (keptWorkFate({ ...facts, open }) === "keep") continue;
 				const expired: string[] = [];
 				try {
